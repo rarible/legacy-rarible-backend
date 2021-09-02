@@ -1,0 +1,16 @@
+(executable
+ (name update)
+ (modules update)
+ (libraries ez_pgocaml crawlori.versions crawlori.config))
+
+(rule
+ (deps update.exe)
+ (targets .rarible_witness)
+ (action (with-stdout-to %{targets} (run %{project_root}/backend/db/update.exe))))
+
+(library
+ (name db)
+ (modules db)
+ (preprocessor_deps (env_var "PGDATABASE") .rarible_witness)
+ (preprocess (pps pgocaml_ppx))
+ (libraries crawlori.pg let))

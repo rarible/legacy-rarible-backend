@@ -1,0 +1,4 @@
+(executable
+ (name crawler)
+ (modules crawler)
+ (libraries let db))

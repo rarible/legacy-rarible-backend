@@ -1,0 +1,5 @@
+(executable
+ (name api)
+ (modules api)
+ (preprocess (pps ez_api.ppx_server))
+ (libraries types))

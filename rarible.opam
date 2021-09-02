@@ -1,0 +1,26 @@
+opam-version: "2.0"
+synopsis: "Crawler, server and sdk for Tezos rarible"
+maintainer: ["contact@functori.com"]
+authors: ["functori"]
+license: "MIT"
+homepage: "https://gitlab.com/functori/rarible"
+bug-reports: "https://gitlab.com/functori/rarible/-/issues"
+depends: [
+  "dune" {>= "2.9"}
+  "crawlori"
+  "pgocaml_ppx"
+  "ez_pgocaml"
+]
+build: [
+  ["dune" "subst"] {pinned}
+  [
+    "dune"
+    "build"
+    "-p"
+    name
+    "-j"
+    jobs
+    "@install"
+  ]
+]
+dev-repo: "git://gitlab.com/functori/rarible"

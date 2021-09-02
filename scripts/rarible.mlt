@@ -1,0 +1,6 @@
+#!/usr/bin/env ocaml
+;;
+#load "unix.cma";;
+#use "./backend/script/script.ml";;
+
+let () = main ()
