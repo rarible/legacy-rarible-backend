@@ -7,28 +7,32 @@ include Fa2_interface
   Updates operator storage using an `update_operator` command.
   Helper function to implement `Update_operators` FA2 entrypoint
 *)
-let update_operators (storage : operator_storage) (update : operator_param)
+let update_operators (storage : operator_storage) (update : operator_update)
     : operator_storage =
-  if update.op_add then
-    Big_map.update (update.op_owner, (update.op_operator, update.op_token_id)) (Some ()) storage
-  else
-    Big_map.remove (update.op_owner, (update.op_operator, update.op_token_id)) storage
+  match update with
+  | Add_operator update ->
+    Big_map.update (update.owner, (update.operator, update.token_id)) (Some ()) storage
+  | Remove_operator update ->
+    Big_map.remove (update.owner, (update.operator, update.token_id)) storage
 
 (**
 Validate if operator update is performed by the token owner.
 @param updater an address that initiated the operation; usually `Tezos.sender`.
 *)
-let validate_update_operators_by_owner (op : operator_param) (updater : address)
+let validate_update_operators_by_owner (update : operator_update) (updater : address)
   : unit =
-  if op.op_owner = updater then () else failwith fa2_not_owner
+  let op = match update with
+    | Add_operator op -> op
+    | Remove_operator op -> op in
+  if op.owner = updater then () else failwith fa2_not_owner
 
 (**
   Generic implementation of the FA2 `%update_operators` entrypoint.
   Assumes that only the token owner can change its operators.
  *)
-let fa2_update_operators (storage : operator_storage) (ops : operator_param list)
+let fa2_update_operators (storage : operator_storage) (ops : operator_update list)
   : operator_storage =
-  let process_update (storage, update : operator_storage * operator_param) : operator_storage =
+  let process_update (storage, update : operator_storage * operator_update) : operator_storage =
     let () = validate_update_operators_by_owner update Tezos.sender in
     update_operators storage update in
   List.fold process_update ops storage

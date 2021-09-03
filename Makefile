@@ -6,7 +6,7 @@ CONVERTERS=$(OPAM_SWITCH_PREFIX)/share/crawlori/converters
 all: copy
 
 build:
-	@CRAWLORI_NO_UPDATE=true PGDATABASE=$(DB) PGCUSTOM_CONVERTERS_CONFIG=$(CONVERTERS) dune build backend contracts
+	@CRAWLORI_NO_UPDATE=true PGDATABASE=$(DB) PGCUSTOM_CONVERTERS_CONFIG=$(CONVERTERS) dune build backend
 
 copy: build
 	@mkdir -p _bin
@@ -43,3 +43,9 @@ ts-deps:
 
 ts:
 	@tsc -p sdk/tsconfig.json
+
+mligo-install:
+	@opam pin add -n -y mligo.~dev git+https://gitlab.com/functori/mligo.git
+
+mligo:
+	@dune build contracts

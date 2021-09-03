@@ -32,8 +32,17 @@ interface OperatorParam {
   owner: string;
   operator: string;
   token_id: number;
-  add: boolean;
 }
+
+interface AddOperator {
+  add_operator : OperatorParam
+}
+
+interface RemoveOperator {
+  remove_operator : OperatorParam
+}
+
+type UpdateOperator = AddOperator | RemoveOperator
 
 interface Storage {
   admin: string;
@@ -127,7 +136,7 @@ async function transfer(
 async function update_operators(
   tk: TezosToolkit,
   kt1: string,
-  param: OperatorParam[] )
+  param: UpdateOperator[] )
 : Promise<string> {
   const contract = await tk.contract.at(kt1)
   const op = await contract.methods.update_operators(param).send()

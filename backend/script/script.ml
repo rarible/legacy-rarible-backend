@@ -4,12 +4,12 @@ let exe = Sys.argv.(0)
 let contract_name = "fa2_nft_asset"
 let storage_name = "fa2_nft_storage"
 let test_name = "fa2_nft_test"
-let contract_dir = "_build/default/src/contract"
+let contract_dir = "_build/default/contract/mligo/nft_single"
 
 let ligo_file = ref None
 let format = ref "text"
 let output = ref (None : string option)
-let client = ref "tezos-client"
+let client = ref (Option.value ~default:"tezos-client" (Sys.getenv_opt "TEZOS_CLIENT"))
 let endpoint = ref "http://tz.functori.com"
 let contract = ref contract_name
 let source = ref (None : string option)
@@ -164,7 +164,7 @@ let call param = match !source with
     let param = command_result @@ compile_parameter param in
     let s = Filename.quote_command !client ([
         "-E"; !endpoint; "call"; !contract; "from"; source;
-        "--arg"; Format.sprintf "%s" param; "--burn-cap";
+        "--arg"; param; "--burn-cap";
         Format.sprintf "%F" !burn_cap ] @ fee @ log) in
     if !verbose > 0 then Format.printf "Command:\n%s@." s;
     Some s
@@ -221,8 +221,8 @@ let transfer l =
 let update_operators l =
   fa2 @@ Format.sprintf "Update_operators [%s]" @@ String.concat "; " @@
   List.map (fun (id, owner, operator, add) ->
-      Format.sprintf "{owner = %s; operator = %s; token_id = %s; add = %B}"
-        (address owner) (address operator) (nat id) add) l
+      Format.sprintf "%s {owner = %s; operator = %s; token_id = %s}"
+        (if add then "Add_operator" else "Remove_operator") (address owner) (address operator) (nat id)) l
 
 let managed add =
   fa2 @@ Format.sprintf "Managed %s" add

@@ -1,42 +1,45 @@
 open Mligo
 
 type transfer_destination = {
-  tr_dst : address;
-  tr_token_id : nat;
-  tr_amount : nat;
-} [@@comb]
+  to_ : address;
+  token_id : nat;
+  amount : nat;
+} [@@comb] [@@param Transfer]
 
 type transfer = {
-  tr_from : address;
-  tr_txs : transfer_destination list;
-} [@@comb]
+  from_ : address;
+  txs : transfer_destination list;
+} [@@comb] [@@param Transfer]
 
 type balance_of_request = {
-  bal_owner : address;
-  bal_token_id : nat;
+  owner : address;
+  token_id : nat;
 } [@@comb]
 
 type balance_of_response = {
-  bal_request : balance_of_request;
-  bal_balance : nat;
+  request : balance_of_request;
+  balance : nat;
 } [@@comb]
 
 type balance_of_param = {
-  bal_requests : balance_of_request list;
-  bal_callback : (balance_of_response list) contract;
+  requests : balance_of_request list;
+  callback : (balance_of_response list) contract;
 } [@@comb]
 
 type operator_param = {
-  op_owner : address;
-  op_operator : address;
-  op_token_id: nat;
-  op_add : bool;
-} [@@comb]
+  owner : address;
+  operator : address;
+  token_id: nat;
+} [@@comb] [@@param Update_operators]
+
+type operator_update =
+  | Add_operator of operator_param
+  | Remove_operator of operator_param
 
 type token_metadata = {
   meta_token_id : nat;
   meta_token_info : (string, bytes) map;
-} [@@comb]
+} [@@comb] [@@param Store]
 
 (*
 One of the options to make token metadata discoverable is to declare
@@ -56,20 +59,26 @@ type token_metadata_param = {
 type fa2_entry_points =
   | Transfer of transfer list
   | Balance_of of balance_of_param
-  | Update_operators of operator_param list
+  | Update_operators of operator_update list
   | Managed of bool
+[@@entry Fa2]
+
+type nft_entry_points =
+  | Fa2 of fa2_entry_points
+  | Token_metadata of token_metadata_param
+[@@entry Assets]
 
 type token_def = {
   from_ : nat;
   to_ : nat;
-} [@@comb] [@@param]
+} [@@comb] [@@param Store]
 
-type nft_meta = (token_def, token_metadata) big_map
+type nft_meta = (token_def, token_metadata) big_map [@@param Store]
 
-type ledger = (nat, address) big_map
+type ledger = (nat, address) big_map [@@param Store]
 
-type operator_storage = ((address * (address * nat)), unit) big_map
-type managed_storage = (address, unit) big_map
+type operator_storage = ((address * (address * nat)), unit) big_map [@@param Store]
+type managed_storage = (address, unit) big_map [@@param Store]
 
 type storage = {
   admin : address;
@@ -84,4 +93,4 @@ type storage = {
   next_token_id : nat;
   token_metas : nft_meta;
   metadata : (string, bytes) big_map;
-}
+} [@@store]
