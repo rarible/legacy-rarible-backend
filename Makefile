@@ -6,7 +6,7 @@ CONVERTERS=$(OPAM_SWITCH_PREFIX)/share/crawlori/converters
 all: copy
 
 build:
-	@CRAWLORI_NO_UPDATE=true PGDATABASE=$(DB) PGCUSTOM_CONVERTERS_CONFIG=$(CONVERTERS) dune build backend
+	@CRAWLORI_NO_UPDATE=true PGDATABASE=$(DB) PGCUSTOM_CONVERTERS_CONFIG=$(CONVERTERS) dune build backend contracts
 
 copy: build
 	@mkdir -p _bin
