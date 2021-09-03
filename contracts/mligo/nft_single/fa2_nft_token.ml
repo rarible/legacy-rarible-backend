@@ -57,7 +57,7 @@ let get_metadata (tokens : nat list) (storage : storage) : token_metadata list =
   List.map (fun (tid: nat) ->
     let tdef = find_token_def tid storage.token_defs in
     match Big_map.find_opt tdef storage.token_metas with
-    | Some m -> { m with meta_token_id = tid }
+    | Some m -> { m with token_id = tid }
     | None -> (failwith "NO_DATA" : token_metadata)) tokens
 
 

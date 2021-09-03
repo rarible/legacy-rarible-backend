@@ -35,7 +35,7 @@ deps:
 	@opam pin add -n -y ppx_deriving_jsoo.dev git+https://gitlab.com/o-labs/ppx_deriving_jsoo.git
 	@opam pin add -n -y --ignore-pin-depends tzfunc.~dev git+https://gitlab.com/functori/tzfunc.git
 	@opam pin add -n -y --ignore-pin-depends crawlori.~dev git+https://gitlab.com/functori/crawlori.git
-	@opam install --deps-only --ignore-pin-depends .
+	@PGDATABASE=$(DB) opam install --deps-only --ignore-pin-depends .
 
 ts-deps:
 	@sudo npm i -g typescript
@@ -44,7 +44,7 @@ ts-deps:
 ts:
 	@tsc -p sdk/tsconfig.json
 
-mligo-install:
+mligo-pin:
 	@opam pin add -n -y mligo.~dev git+https://gitlab.com/functori/mligo.git
 
 mligo:

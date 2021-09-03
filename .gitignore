@@ -4,3 +4,4 @@ _bin
 sdk/node_modules
 sdk/package*.json
 sdk/dist
+*.tz

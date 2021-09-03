@@ -3,7 +3,7 @@ include Admin
 
 type mint_param = {
   token_def : token_def;
-  token_metadata : token_metadata;
+  metadata : token_metadata;
   owners : address list;
 } [@@comb] [@@param]
 
@@ -47,7 +47,7 @@ let mint_tokens (s : storage) (p : mint_param)  : storage =
   if s.next_token_id > td.from_ then (failwith "USED_TOKEN_IDS" : storage)
   else
     let token_defs = Set.add td s.token_defs in
-    let token_metas = Big_map.add td p.token_metadata s.token_metas in
+    let token_metas = Big_map.add td p.metadata s.token_metas in
     let tid_owners = zip_owners_with_token_ids p.owners td.from_ in
     let ledger = List.fold (fun (l, owner_id : ledger * (address * nat)) ->
         let owner, tid = owner_id in
@@ -72,7 +72,7 @@ let burn_tokens (s : storage) (p : token_def)  : storage =
   | None -> (failwith "INVALID_PARAM" : storage)
   | Some m ->
     if Tezos.sender = s.admin then remove_token_aux s p
-    else if not (Map.mem "burnable" m.meta_token_info) then (failwith "NOT_BURNABLE" : storage)
+    else if not (Map.mem "burnable" m.token_info) then (failwith "NOT_BURNABLE" : storage)
     else if p.from_ <> p.to_ + 1n then (failwith "NOT_AN_ADMIN" : storage)
     else match Big_map.find_opt p.from_ s.ledger with
       | None -> (failwith "INVALID_PARAM" : storage)

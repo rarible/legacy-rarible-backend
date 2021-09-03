@@ -4,7 +4,7 @@ let exe = Sys.argv.(0)
 let contract_name = "fa2_nft_asset"
 let storage_name = "fa2_nft_storage"
 let test_name = "fa2_nft_test"
-let contract_dir = "_build/default/contract/mligo/nft_single"
+let contract_dir = "../_build/default/contracts/mligo/nft_single"
 
 let ligo_file = ref None
 let format = ref "text"
@@ -114,7 +114,7 @@ let deploy () = match !source with
       | None ->
         let s = command_result ~f:(String.concat "\n") @@ compile_contract () in
         let file = make_file contract_name in
-        let name = Filename.(remove_extension @@ basename file) ^ ".mich" in
+        let name = Filename.(remove_extension @@ basename file) ^ ".tz" in
         let oc = open_out name in
         output_string oc s;
         close_out oc;
