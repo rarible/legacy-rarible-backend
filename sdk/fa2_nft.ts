@@ -1,4 +1,5 @@
 import { TezosToolkit, BigMapAbstraction } from "@taquito/taquito"
+import { MichelsonV1Expression } from "@taquito/rpc"
 
 interface TransferDestination {
   to_ : string;
@@ -18,8 +19,7 @@ interface TokenDef {
 
 interface TokenMetadata {
   token_id: number;
-  token_info: Map<string, string>;
-  token_burnable: boolean;
+  token_info: [string, string][];
 }
 
 interface MintParam {
@@ -100,13 +100,41 @@ async function unpause(
   return op.hash
 }
 
+function encode_map(l : [string, string][]) : MichelsonV1Expression {
+  return l.map(function([k, v]) {
+    return {
+      prim: 'Elt',
+      args: [ {string: k}, {bytes: v} ]
+    }
+  })
+}
+
 async function mint(
   tk: TezosToolkit,
   kt1: string,
   param: MintParam)
 : Promise<string> {
-  const contract = await tk.contract.at(kt1)
-  const op = await contract.methods.mint_tokens(param).send()
+  let value = {
+    prim: 'Pair',
+    args: [
+      {
+        prim: 'Pair',
+        args: [ { int: param.token_def.from_.toString() }, { int: param.token_def.to_.toString() } ] },
+      {
+          prim: 'Pair',
+          args: [
+            { int: param.metadata.token_id.toString() },
+            encode_map(param.metadata.token_info)
+          ]
+        },
+      param.owners.map(function(s) { return {string: s} })
+    ]
+  }
+  const op = await tk.contract.transfer({
+    amount: 0,
+    to: kt1,
+    parameter: { entrypoint: 'mint_tokens', value }
+  })
   await op.confirmation()
   return op.hash
 }
@@ -116,8 +144,15 @@ async function burn(
   kt1: string,
   param: TokenDef)
 : Promise<string> {
-  const contract = await tk.contract.at(kt1)
-  const op = await contract.methods.burn_tokens(param).send()
+  let value = {
+    prim: 'Pair',
+    args: [ { int: param.from_.toString() }, { int: param.to_.toString() } ]
+  }
+  const op = await tk.contract.transfer({
+    amount: 0,
+    to: kt1,
+    parameter: { entrypoint: 'burn_tokens', value }
+  })
   await op.confirmation()
   return op.hash
 }
