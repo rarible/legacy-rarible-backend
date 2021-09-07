@@ -1,3 +1,5 @@
+module Utils = Utils
+
 let (let>) = Lwt.bind
 let (let|>) p f = Lwt.map f p
 let (let>?) p f = Lwt.bind p (function Error e -> Lwt.return_error e | Ok x -> f x)
@@ -10,6 +12,7 @@ let (>|=?) p f = Lwt.map (function Error e -> Error e| Ok x -> Ok (f x)) p
 
 type error = [
   | Crawlori.Rp.error
+  | `unexpected_michelson_value
 ]
 
 let fold_rp f acc l =
@@ -18,7 +21,16 @@ let fold_rp f acc l =
     | h :: t ->
       Lwt.bind (f acc h) (function
           | Error e -> Lwt.return_error e
-          | Ok () -> aux acc t) in
+          | Ok acc -> aux acc t) in
   aux acc l
 
 let iter_rp f l = fold_rp (fun () x -> f x) () l
+
+let map_rp f l =
+  let rec aux acc = function
+    | [] -> Lwt.return_ok acc
+    | h :: t ->
+      Lwt.bind (f h) (function
+          | Error e -> Lwt.return_error e
+          | Ok x -> aux (x :: acc) t) in
+  Lwt.map (Result.map List.rev) (aux [] l)

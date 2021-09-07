@@ -14,53 +14,62 @@ let upgrade_1_to_2 dbh version =
       last_block varchar not null default '',
       tokens_number bigint not null default 0)|};
     {|create table contracts(
+      kind varchar not null,
       address varchar primary key,
       block varchar not null,
+      level int not null,
       main boolean not null default false,
+      last timestamp not null,
       tokens_number bigint not null default 0,
-      supply bigint,
       metadata jsonb not null default '{}')|};
     {|create table tokens(
-      kind varchar not null,
       contract varchar not null,
       token_id bigint not null,
       block varchar not null,
+      level int not null,
       main boolean not null default false,
       last timestamp not null,
+      transaction varchar not null,
       owner varchar not null,
-      amount bigint,
+      amount bigint not null,
+      supply bigint not null,
+      operators varchar[] not null default '{}',
       metadata jsonb not null default '{}',
       primary key (contract, owner, token_id))|};
     {|create table accounts(
       address varchar primary key,
       block varchar not null,
+      level int not null,
       main boolean not null default false,
       last timestamp not null,
-      tokens bigint[] not null default '{}')|};
+      tokens jsonb[] not null default '{}')|};
     {|create table contract_updates(
       transaction varchar not null,
-      counter zarith,
-      nonce int,
+      id varchar not null,
       block varchar not null,
+      level int not null,
       main boolean not null default false,
       tsp timestamp not null,
       contract varchar not null,
-      mints bigint[] not null,
-      burns bigint[] not null,
-      primary key (transaction, counter, nonce))|};
+      mints jsonb[] not null default '{}',
+      burns jsonb[] not null default '{}',
+      burn_owner varchar,
+      primary key (transaction, id))|};
     {|create table token_updates(
       transaction varchar not null,
-      counter zarith,
-      nonce int,
+      id varchar not null,
       block varchar not null,
+      level int not null,
       main boolean not null default false,
       tsp timestamp not null,
-      old_owner varchar not null,
-      new_owner varchar not null,
+      source varchar not null,
+      destination varchar not null,
+      operator varchar,
+      add boolean,
       contract varchar not null,
-      token_id varchar not null,
+      token_id bigint not null,
       amount bigint,
-      primary key (transaction, counter, nonce))|};
+      primary key (transaction, id))|};
   ]
 
 let upgrades =

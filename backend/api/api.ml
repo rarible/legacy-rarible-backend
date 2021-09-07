@@ -1,5 +1,5 @@
 open EzAPIServer
-open Types
+open Rtypes
 
 let erc20_balance ((_, contract), owner) () =
   return_ok { contract; owner; balance = Z.zero; decimal_balance = Z.zero }

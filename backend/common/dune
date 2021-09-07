@@ -1,12 +1,12 @@
 (library
- (name types)
+ (name rtypes)
  (package rarible)
- (modules types)
+ (modules rtypes)
  (preprocess (pps ppx_deriving_encoding))
  (libraries zarith))
 
 (library
  (name let)
  (package rarible)
- (modules let)
- (libraries crawlori))
+ (modules utils let)
+ (libraries crawlori rtypes))

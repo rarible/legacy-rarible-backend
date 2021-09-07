@@ -1,0 +1,10 @@
+{
+  "nodes": [ "http://granada.tz.functori.com" ],
+  "start": 410880,
+  "db_kind": "pg",
+  "step_forward": 30,
+  "accounts": [
+    "KT1SGf3Z1TLm7SWqQrNbA7qFqhkGNxjymRB3"
+  ],
+  "allow_no_metadata": true
+}

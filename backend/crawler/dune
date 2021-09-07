@@ -1,4 +1,4 @@
 (executable
  (name crawler)
  (modules crawler)
- (libraries let db))
+ (libraries let db ez_api.icurl_lwt))

@@ -20,6 +20,7 @@ let amount = ref (None: int option)
 let verbose = ref 0
 let main = ref "nft_asset_main"
 let storage = ref "store"
+let dry_run = ref false
 
 let make_file s = match !ligo_file with
   | None ->
@@ -58,6 +59,7 @@ let spec = [
       endpoint := "http://granada.tz.functori.com";
       verbose := 1
     ), "set dev settings";
+  "--dry-run", Arg.Set dry_run, "dry run";
 ]
 
 let missing l =
@@ -108,6 +110,7 @@ let ligo_test () =
 
 let deploy () = match !source with
   | Some source ->
+    let dry_run = if !dry_run then [ "--dry-run" ] else [] in
     let storage = command_result @@ compile_storage () in
     let mich = match !mich with
       | Some mich -> mich
@@ -124,7 +127,7 @@ let deploy () = match !source with
     let s = Filename.quote_command !client ([
         "-E"; !endpoint; "originate"; "contract"; !contract; "transferring"; "0";
         "from"; source; "running"; mich; "--init"; storage; "--burn-cap";
-        Format.sprintf "%F" !burn_cap] @ fee @ log) in
+        Format.sprintf "%F" !burn_cap] @ fee @ log @ dry_run) in
     if !verbose > 0 then Format.printf "Command:\n%s@." s;
     Some s
   | source ->
@@ -132,9 +135,11 @@ let deploy () = match !source with
     None
 
 let get_storage () =
+  let dry_run = if !dry_run then [ "--dry-run" ] else [] in
   let s =
-    Filename.quote_command !client [
-      "-E"; !endpoint; "get"; "contract"; "storage"; "for"; !contract ] in
+    Filename.quote_command !client ([
+        "-E"; !endpoint; "get"; "contract"; "storage"; "for"; !contract ] @
+        dry_run) in
   if !verbose > 0 then Format.printf "Command:\n%s@." s;
   s
 
@@ -161,11 +166,12 @@ let call param = match !source with
   | Some source ->
     let fee = match !fee with None -> [] | Some f -> [ "--fee"; Format.sprintf "%F" f ] in
     let log = if !verbose > 1 then ["-l"] else [] in
+    let dry_run = if !dry_run then [ "--dry-run" ] else [] in
     let param = command_result @@ compile_parameter param in
     let s = Filename.quote_command !client ([
         "-E"; !endpoint; "call"; !contract; "from"; source;
         "--arg"; param; "--burn-cap";
-        Format.sprintf "%F" !burn_cap ] @ fee @ log) in
+        Format.sprintf "%F" !burn_cap ] @ fee @ log @ dry_run) in
     if !verbose > 0 then Format.printf "Command:\n%s@." s;
     Some s
   | src -> missing [ "--source", src ]; None
@@ -181,18 +187,18 @@ let owners bm_id l =
 
 (** printers *)
 
+let address s = Format.sprintf "(%S : address)" s
+let nat i = Format.sprintf "%dn" i
+
 let assets s = Format.sprintf "Assets (%s)" s
 let admin s = Format.sprintf "Admin (%s)" s
 let tokens s = Format.sprintf "Tokens (%s)" s
 
-let set_admin s = admin @@ Format.sprintf "Set_admin %S" s
+let set_admin s = admin @@ Format.sprintf "Set_admin %s" (address s)
 let confirm_admin () = admin @@ "Confirm_admin"
-let set_company_wallet s = admin @@ Format.sprintf "Set_company_wallet %S" s
+let set_company_wallet s = admin @@ Format.sprintf "Set_company_wallet %s" (address s)
 let confirm_company_wallet () = admin @@ "Confirm_company_wallet"
 let pause b = admin @@ Format.sprintf "Pause %B" b
-
-let address s = Format.sprintf "(%S : address)" s
-let nat i = Format.sprintf "%dn" i
 
 let mint_params ~start l =
   Format.sprintf
