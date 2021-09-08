@@ -1,5 +1,5 @@
 (executable
  (name api)
- (modules api)
+ (modules api errors)
  (preprocess (pps ez_api.ppx_server))
  (libraries rtypes))
