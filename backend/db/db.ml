@@ -48,34 +48,32 @@ let transaction_id op =
   | _ -> Lwt.return_error (`hook_error "no counter or nonce in transaction")
 
 let set_mint dbh op kt1 m =
-  let>? mints = map_rp (fun tk ->
-      let meta = EzEncoding.construct token_meta_enc tk.tk_meta in
-      let token_id = tk.tk_own.tk_op.tk_token_id in
-      let owner = tk.tk_own.tk_owner in
-      let>? () = [%pgsql dbh
-          "insert into tokens(contract, token_id, block, level, last, owner, amount, \
-           metadata, transaction, supply) \
-           values($kt1, $token_id, ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, \
-           $owner, 0, $meta, ${op.bo_hash}, 0) on conflict do nothing"] in
-      let|>? () = set_account dbh owner ~block:op.bo_block ~level:op.bo_level ~tsp:op.bo_tsp in
-      Some (EzEncoding.construct token_op_owner_enc tk.tk_own)
-    ) m in
+  let meta = EzEncoding.construct token_metadata_enc m.mi_meta in
+  let token_id = m.mi_op.tk_op.tk_token_id in
+  let owner = m.mi_op.tk_owner in
+  let>? () = [%pgsql dbh
+      "insert into tokens(contract, token_id, block, level, last, owner, amount, \
+       metadata, transaction, supply) \
+       values($kt1, $token_id, ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, \
+       $owner, 0, $meta, ${op.bo_hash}, 0) on conflict do nothing"] in
+  let>? () = set_account dbh owner ~block:op.bo_block ~level:op.bo_level ~tsp:op.bo_tsp in
+  let mint = EzEncoding.construct token_op_owner_enc m.mi_op in
   let>? id = transaction_id op in
-  [%pgsql dbh
+[%pgsql dbh
       "insert into contract_updates(transaction, id, block, level, tsp, \
-       contract, mints) \
+       contract, mint) \
        values(${op.bo_hash}, $id, ${op.bo_block}, ${op.bo_level}, \
-       ${op.bo_tsp}, $kt1, $mints) \
+       ${op.bo_tsp}, $kt1, $mint) \
        on conflict do nothing"]
 
 let set_burn dbh op tr m =
-  let burns = List.map (fun tk -> Some (EzEncoding.construct token_op_enc tk)) m in
+  let burn = EzEncoding.construct token_op_owner_enc m in
   let>? id = transaction_id op in
   [%pgsql dbh
       "insert into contract_updates(transaction, id, block, level, tsp, \
-       contract, burns, burn_owner) \
+       contract, burn) \
        values(${op.bo_hash}, $id, ${op.bo_block}, ${op.bo_level}, \
-       ${op.bo_tsp}, ${tr.destination}, $burns, ${op.bo_op.source}) \
+       ${op.bo_tsp}, ${tr.destination}, $burn) \
        on conflict do nothing"]
 
 let set_transfer dbh op tr lt =
@@ -105,20 +103,56 @@ let set_update dbh op tr lt =
   iter_rp (fun {op_owner; op_operator; op_token_id; op_add} ->
       let>? () = [%pgsql dbh
           "insert into token_updates(transaction, id, block, level, tsp, \
-           source, destination, operator, add, contract, token_id) \
+           source, operator, add, contract, token_id) \
            values(${op.bo_hash}, $id, ${op.bo_block}, ${op.bo_level}, \
-           ${op.bo_tsp}, $op_owner, $op_owner, $op_operator, $op_add, \
-           $kt1, $op_token_id)"] in
+           ${op.bo_tsp}, $op_owner, $op_operator, $op_add, \
+           $kt1, $op_token_id) on conflict do nothing"] in
       set_account dbh op_operator ~block:op.bo_block ~level:op.bo_level ~tsp:op.bo_tsp) lt
+
+let set_update_all dbh op tr lt =
+  let>? id = transaction_id op in
+  let kt1 = tr.destination in
+  let source = op.bo_op.source in
+  iter_rp (fun (operator, add) ->
+      let>? () = [%pgsql dbh
+          "insert into token_updates(transaction, id, block, level, tsp, \
+           source, operator, add, contract) \
+           values(${op.bo_hash}, $id, ${op.bo_block}, ${op.bo_level}, \
+           ${op.bo_tsp}, $source, $operator, $add, $kt1) on conflict do nothing"] in
+      set_account dbh operator ~block:op.bo_block ~level:op.bo_level ~tsp:op.bo_tsp) lt
+
+let set_uri dbh op tr s =
+  let>? id = transaction_id op in
+  [%pgsql dbh
+      "insert into contract_updates(transaction, id, block, level, tsp, \
+       contract, uri) \
+       values(${op.bo_hash}, $id, ${op.bo_block}, ${op.bo_level}, \
+       ${op.bo_tsp}, ${tr.destination}, $s) \
+       on conflict do nothing"]
+
+let set_metadata dbh op tr (token_id, l) =
+  let meta = EzEncoding.construct token_metadata_enc l in
+  let>? id = transaction_id op in
+  let source = op.bo_op.source in
+  let kt1 = tr.destination in
+  [%pgsql dbh
+      "insert into token_updates(transaction, id, block, level, tsp, \
+       source, token_id, contract, metadata) \
+       values(${op.bo_hash}, $id, ${op.bo_block}, ${op.bo_level}, \
+       ${op.bo_tsp}, $source, $token_id, $kt1, $meta) \
+       on conflict do nothing"]
 
 let set_transaction dbh op tr =
   match tr.parameters with
   | Some {entrypoint; value = Micheline m} ->
-    begin match Utils.parse entrypoint m with
+    begin match Utils.parse_nft entrypoint m with
       | Ok (Mint_tokens m) -> set_mint dbh op tr.destination m
       | Ok (Burn_tokens b) -> set_burn dbh op tr b
       | Ok (Transfers t) -> set_transfer dbh op tr t
       | Ok (Operator_updates t) -> set_update dbh op tr t
+      | Ok (Operator_updates_all t) -> set_update_all dbh op tr t
+      | Ok (Metadata_uri s) -> set_uri dbh op tr s
+      | Ok (Token_metadata x) -> set_metadata dbh op tr x
       | Error _ -> Lwt.return_ok ()
     end
   | _ -> Lwt.return_ok ()
@@ -164,62 +198,66 @@ let set_block config dbh b =
         ) op.op_contents
     ) b.operations
 
-let contract_updates_base dbh ~main ~contract ~block ~level ~tsp ~burn l =
+let contract_updates_base dbh ~main ~contract ~block ~level ~tsp ~burn
+    {tk_owner; tk_op = {tk_token_id; tk_amount} } =
   let main_s = if main then 1L else -1L in
   let factor = if burn then Int64.neg main_s else main_s in
-  iter_rp (fun {tk_owner; tk_op = {tk_token_id; tk_amount} } ->
-      (* update tokens *)
-      let>? l_amount = [%pgsql dbh
-          "update tokens set supply = supply + $factor * $tk_amount::bigint, \
-           amount = amount + $factor * $tk_amount::bigint
+  let>? l_amount = [%pgsql dbh
+      "update tokens set supply = supply + $factor * $tk_amount::bigint, \
+       amount = amount + $factor * $tk_amount::bigint
            where token_id = $tk_token_id and contract = $contract and owner = $tk_owner \
-           returning amount"] in
-      let>? () = [%pgsql dbh
-          "update tokens set supply = supply + $factor * $tk_amount::bigint \
-           where token_id = $tk_token_id and contract = $contract and owner <> $tk_owner"] in
-      (* update account *)
-      let>? new_amount = one ~err:"no amount for burn update" l_amount in
-      let new_token = EzEncoding.construct account_token_enc {
-          at_token_id = tk_token_id;
-          at_contract = contract;
-          at_amount = new_amount } in
-      let old_token = EzEncoding.construct account_token_enc {
-          at_token_id = tk_token_id;
-          at_contract = contract;
-          at_amount = Int64.(sub new_amount (mul main_s tk_amount))  } in
-      [%pgsql dbh
-          "update accounts set tokens = array_append(array_remove(tokens, $old_token), $new_token), \
-           block = case when $main then $block else block end, \
-           level = case when $main then $level else level end, \
-           last = case when $main then $tsp else last end where address = $tk_owner"])
-    l
+       returning amount"] in
+  let>? () = [%pgsql dbh
+      "update tokens set supply = supply + $factor * $tk_amount::bigint \
+       where token_id = $tk_token_id and contract = $contract and owner <> $tk_owner"] in
+  (* update account *)
+  let>? new_amount = one ~err:"no amount for burn update" l_amount in
+  let new_token = EzEncoding.construct account_token_enc {
+      at_token_id = tk_token_id;
+      at_contract = contract;
+      at_amount = new_amount } in
+  let old_token = EzEncoding.construct account_token_enc {
+      at_token_id = tk_token_id;
+      at_contract = contract;
+      at_amount = Int64.(sub new_amount (mul main_s tk_amount))  } in
+  [%pgsql dbh
+      "update accounts set tokens = array_append(array_remove(tokens, $old_token), $new_token), \
+       block = case when $main then $block else block end, \
+       level = case when $main then $level else level end, \
+       last = case when $main then $tsp else last end where address = $tk_owner"]
 
 let contract_updates dbh main l =
   iter_rp (fun r ->
       let contract, block, level, tsp = r#contract, r#block, r#level, r#tsp in
-      let>? () = match r#burn_owner with
-        | Some tk_owner ->
-          let l = List.filter_map (function
-              | None -> None
-              | Some s ->
-                Some {tk_owner; tk_op = (EzEncoding.destruct token_op_enc s) }) r#burns in
-          contract_updates_base dbh ~main ~contract ~block ~level ~tsp ~burn:true l
-        | None ->
-          let l = List.filter_map (function
-              | None -> None
-              | Some s -> Some (EzEncoding.destruct token_op_owner_enc s)) r#mints in
-          contract_updates_base dbh ~main ~contract ~block ~level ~tsp ~burn:false l in
+      let>? n = match r#mint, r#burn, r#uri with
+        | Some json, _, _ ->
+          let tk = EzEncoding.destruct token_op_owner_enc json in
+          let|>? () = contract_updates_base dbh ~main ~contract ~block ~level ~tsp ~burn:false tk in
+          if main then 1L else -1L
+        | _, Some json, _ ->
+          let tk = EzEncoding.destruct token_op_owner_enc json in
+          let|>? () = contract_updates_base dbh ~main ~contract ~block ~level ~tsp ~burn:true tk in
+          if main then -1L else 1L
+        | _, _, Some uri ->
+          let|>? () =
+            if main then
+              [%pgsql dbh
+                  "update contracts set metadata = jsonb_set(metadata, '{ \"\" }', $uri, true), \
+                   block = $block, last = $tsp, level = $level where address = $contract"]
+            else Lwt.return_ok () in
+          0L
+        | _ -> Lwt.return_ok 0L in
       (* update contracts *)
       [%pgsql dbh
-          "with tmp(n) as (\
-           select count(distinct token_id) from tokens where contract = $contract and main and supply > 0) \
-           update contracts set tokens_number = tmp.n, \
+          "update contracts set \
+           tokens_number = tokens_number + $n, \
            block = case when $main then $block else block end, \
            last = case when $main then $tsp else last end, \
-           level = case when $main then $level else level end from tmp \
+           level = case when $main then $level else level end \
            where address = ${r#contract}"]) l
 
-let operator_updates dbh main ~operator ~add ~contract ~block ~level ~tsp ~token_id ~source =
+let operator_updates dbh ?token_id ~operator ~add ~contract ~block ~level ~tsp ~source main =
+  let no_token_id = Option.is_none token_id in
   [%pgsql dbh
       "update tokens set \
        operators = case when ($main and $add) or (not $main and not $add) then \
@@ -227,7 +265,7 @@ let operator_updates dbh main ~operator ~add ~contract ~block ~level ~tsp ~token
        block = case when $main then $block else block end, \
        level = case when $main then $level else level end, \
        last = case when $main then $tsp else last end \
-       where token_id = $token_id and owner = $source and contract = $contract"]
+       where ($no_token_id or token_id = $?token_id) and owner = $source and contract = $contract"]
 
 let transfer_updates dbh main ~contract ~block ~level ~tsp ~token_id ~source amount destination =
   let amount = if main then amount else Int64.neg amount in
@@ -272,13 +310,19 @@ let transfer_updates dbh main ~contract ~block ~level ~tsp ~token_id ~source amo
 
 let token_updates dbh main l =
   iter_rp (fun r ->
-      let contract, block, level, tsp, token_id, source =
-        r#contract, r#block, r#level, r#tsp, r#token_id, r#source in
-      match r#operator, r#add, r#amount with
-      | Some operator, Some add, _ ->
-        operator_updates dbh main ~operator ~add ~contract ~block ~level ~tsp ~token_id ~source
-      | _, _, Some amount ->
-        transfer_updates dbh main ~contract ~block ~level ~tsp ~token_id ~source amount r#destination
+      let contract, block, level, tsp, source =
+        r#contract, r#block, r#level, r#tsp, r#source in
+      match r#destination, r#token_id, r#amount, r#operator, r#add, r#metadata  with
+      | Some destination, Some token_id, Some amount, _, _, _ ->
+        transfer_updates dbh main ~contract ~block ~level ~tsp ~token_id ~source amount destination
+      | _, token_id, _, Some operator, Some add, _ ->
+        operator_updates dbh main ~operator ~add ~contract ~block ~level ~tsp ?token_id ~source
+      | _, Some token_id, _, _, _, Some meta ->
+        if main then
+          [%pgsql dbh
+            "update tokens set metadata = $meta where contract = $contract and \
+             token_id = $token_id"]
+        else Lwt.return_ok ()
       | _ -> Lwt.return_error (`hook_error "invalid token_update")) l
 
 

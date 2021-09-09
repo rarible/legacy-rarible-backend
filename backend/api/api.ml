@@ -305,7 +305,7 @@ let buyer_fee_signature req _input =
 [@@post
   {path="/v0.1/orders/buyerFeeSignature";
    input=order_form_enc;
-   output=binary_enc;
+   output=A.binary_enc;
    errors=[rarible_error_500]}]
 
 let get_sell_orders_by_maker req () =
@@ -471,16 +471,16 @@ let is_unlockable _req () =
 [@@@server 8080]
 
 (* module V_0_1 = struct
- * 
+ *
  *   module Acontroller = struct
  *     let dir = empty
  *   end
- * 
+ *
  *   module Bcontroller = struct
  *     let dir = Acontroller.dir
  *   end
  *   module Ccontroler = struct
  *     let dur = Bcontroller.dir
  *   end
- * 
+ *
  * end *)

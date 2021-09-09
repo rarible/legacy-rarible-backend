@@ -2,17 +2,21 @@ let upgrade_1_to_2 dbh version =
   EzPG.upgrade ~dbh ~version
     ~downgrade:[
       "drop table state";
-      "drop contracts";
-      "drop tokens";
-      "drop accounts";
-      "drop contract_updates";
-      "drop token_updates";
+      "drop table contracts";
+      "drop table tokens";
+      "drop table accounts";
+      "drop table contract_updates";
+      "drop table token_updates";
     ] [
     {|create table state(
       admin_wallet varchar not null default '',
       last_updated timestamp not null default now(),
       last_block varchar not null default '',
-      tokens_number bigint not null default 0)|};
+      royalties_contract varchar,
+      exchange_v2_contract varchar,
+      validator_contract varchar,
+      fees_receiver jsonb[] not null default '{}',
+      protocol_fee bigint)|};
     {|create table contracts(
       kind varchar not null,
       address varchar primary key,
@@ -51,9 +55,9 @@ let upgrade_1_to_2 dbh version =
       main boolean not null default false,
       tsp timestamp not null,
       contract varchar not null,
-      mints jsonb[] not null default '{}',
-      burns jsonb[] not null default '{}',
-      burn_owner varchar,
+      mint jsonb,
+      burn jsonb,
+      uri varchar,
       primary key (transaction, id))|};
     {|create table token_updates(
       transaction varchar not null,
@@ -63,12 +67,13 @@ let upgrade_1_to_2 dbh version =
       main boolean not null default false,
       tsp timestamp not null,
       source varchar not null,
-      destination varchar not null,
+      destination varchar,
       operator varchar,
       add boolean,
       contract varchar not null,
-      token_id bigint not null,
+      token_id bigint,
       amount bigint,
+      metadata jsonb,
       primary key (transaction, id))|};
   ]
 

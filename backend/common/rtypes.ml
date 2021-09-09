@@ -30,7 +30,10 @@ type operator_update = {
   op_add: bool;
 } [@@deriving encoding]
 
-type token_meta = (string * string) list [@assoc]
+type token_metadata = ((string * string) list [@assoc])
+[@@deriving encoding]
+
+type token_royalties = ((string * int64) list [@assoc])
 [@@deriving encoding]
 
 type token_op = {
@@ -44,8 +47,9 @@ type token_op_owner = {
 } [@@deriving encoding {remove_prefix=3}]
 
 type mint = {
-  tk_own: token_op_owner; [@merge]
-  tk_meta: token_meta;
+  mi_op : token_op_owner;
+  mi_royalties: token_royalties;
+  mi_meta: token_metadata
 } [@@deriving encoding]
 
 type account_token = {
@@ -57,34 +61,39 @@ type account_token = {
 type param =
   | Transfers of transfer list
   | Operator_updates of operator_update list
-  | Mint_tokens of mint list
-  | Burn_tokens of token_op list
+  | Operator_updates_all of (string * bool) list
+  | Mint_tokens of mint
+  | Burn_tokens of token_op_owner
+  | Metadata_uri of string
+  | Token_metadata of (int64 * (string * string) list)
 [@@deriving encoding]
 
+module A = struct
+  (* TODO : B58CHECK ? *)
+  type address = string [@@deriving encoding]
+  (* TODO : B58CHECK ? EX TRANSACTION HASH*)
+  type word = string [@@deriving encoding]
 
-(* TODO : B58CHECK ? *)
-type address = string [@@deriving encoding]
-(* TODO : B58CHECK ? EX TRANSACTION HASH*)
-type word = string [@@deriving encoding]
+  type nonce = int64 [@@deriving encoding]
 
-type nonce = int64 [@@deriving encoding]
+  type block_number = int64 [@@deriving encoding]
 
-type block_number = int64 [@@deriving encoding]
+  type big_decimal = z [@@deriving encoding]
 
-type big_decimal = z [@@deriving encoding]
+  type big_integer = z [@@deriving encoding]
 
-type big_integer = z [@@deriving encoding]
+  type binary = string [@@deriving encoding]
+  (* TODO : data format 2017-07-21T17:32:28Z *)
+  type date = string [@@deriving encoding]
+
+  type bytes_str = string [@@deriving encoding]
+end
 
 type part = {
-  part_account : address;
+  part_account : A.address;
   part_value : int ;
 } [@@deriving encoding]
 
-type binary = string [@@deriving encoding]
-(* TODO : data format 2017-07-21T17:32:28Z *)
-type date = string [@@deriving encoding]
-
-type bytes_str = string [@@deriving encoding]
 
 type rarible_error_500_code =
   | UNKNOWN
@@ -143,9 +152,9 @@ type rarible_error_400 = {
 
 type create_transaction_request = {
   req_hash : string;
-  req_from : address;
-  req_nonce : nonce;
-  req_to : address option;
+  req_from : A.address;
+  req_nonce : A.nonce;
+  req_to : A.address option;
   req_input : string;
 } [@@deriving encoding]
 
@@ -158,12 +167,12 @@ type gateway_pending_transactions_ouput_status =
 [@@deriving encoding]
 
 type log_event = {
-  ev_transaction_hash : word;
+  ev_transaction_hash : A.word;
   ev_status : gateway_pending_transactions_ouput_status;
-  ev_address : address;
-  ev_from : address option;
+  ev_address : A.address;
+  ev_from : A.address option;
   ev_topic : string;
-  ev_nonce : nonce option;
+  ev_nonce : A.nonce option;
 } [@@deriving encoding {camel}]
 
 type log_events = log_event list [@@deriving encoding]
@@ -172,7 +181,7 @@ type currency_rate = {
   rate_from_currency_id : string;
   rate_to_currency_id : string;
   rate_rate : z;
-  rate_date : big_decimal;
+  rate_date : A.big_decimal;
 } [@@deriving encoding {camel}]
 
 type erc20_decimal_balance = {
@@ -183,23 +192,23 @@ type erc20_decimal_balance = {
 } [@@deriving encoding {camel}]
 
 type erc20_token = {
-  erc20_token_id : address;
+  erc20_token_id : A.address;
   erc20_token_name : string;
   erc20_token_symbol : string;
 } [@@deriving encoding]
 
 type lazy_nft_common = {
-  lazy_nft_contract : address;
-  lazy_nft_tokenId : big_integer;
+  lazy_nft_contract : A.address;
+  lazy_nft_tokenId : A.big_integer;
   lazy_nft_uri : string;
   lazy_nft_creators : part list;
   lazy_nft_royalties : part list;
-  lazy_nft_signatures : binary;
+  lazy_nft_signatures : A.binary;
 } [@@deriving encoding]
 
 type lazy_nft_diff =
   | LazyNft721 [@kind "ERC721"] [@kind_label "@type"]
-  | LazyNft1155 of (big_integer [@wrap "supply"]) [@kind "ERC1155"] [@kind_label "@type"]
+  | LazyNft1155 of (A.big_integer [@wrap "supply"]) [@kind "ERC1155"] [@kind_label "@type"]
 [@@deriving encoding]
 
 type lazy_nft = {
@@ -209,9 +218,9 @@ type lazy_nft = {
 
 type item_transfer = {
   item_transfer_type_ : string [@kind "TRANSFER"];
-  item_transfer_owner : address option;
-  item_transfer_value : big_integer option;
-  item_transfer_from : address;
+  item_transfer_owner : A.address option;
+  item_transfer_value : A.big_integer option;
+  item_transfer_from : A.address;
 } [@@deriving encoding]
 
 type nft_item_attribute = {
@@ -248,14 +257,14 @@ type nft_item_meta = {
 
 type nft_item = {
   nft_item_id : string ;
-  nft_item_contract : address;
-  nft_item_token_id : big_integer;
+  nft_item_contract : A.address;
+  nft_item_token_id : A.big_integer;
   nft_item_creators : part list;
-  nft_item_supply : big_integer;
-  nft_item_lazy_supply : big_integer;
-  nft_item_owners : address list;
+  nft_item_supply : A.big_integer;
+  nft_item_lazy_supply : A.big_integer;
+  nft_item_owners : A.address list;
   nft_item_royalties : part list;
-  nft_item_date : date option;
+  nft_item_date : A.date option;
   nft_item_pending : item_transfer list option;
   nft_item_deleted : bool option;
   nft_item_meta : nft_item_meta option;
@@ -299,18 +308,18 @@ type nft_activity_filter_item_type =
 
 type nft_activity_by_user = {
   nft_activity_by_user_types : nft_activty_filter_user_type list ;
-  nft_activity_by_user_users : address list
+  nft_activity_by_user_users : A.address list
 } [@@deriving encoding]
 
 type nft_activity_by_item = {
   nft_activity_by_item_types : nft_activity_filter_item_type list;
-  nft_activity_by_item_contract : address;
-  nft_activity_by_item_token_id : big_integer;
+  nft_activity_by_item_contract : A.address;
+  nft_activity_by_item_token_id : A.big_integer;
 } [@@deriving encoding {camel}]
 
 type nft_activity_by_collection = {
   nft_activity_by_collection_types : nft_activity_filter_item_type list;
-  nft_activity_by_collection_contract : address;
+  nft_activity_by_collection_contract : A.address;
 } [@@deriving encoding]
 
 type nft_activity_filter =
@@ -326,19 +335,19 @@ type nft_activity_filter =
 
 type nft_activity_elt = {
   (* nft_activity_type : activity_type ; *)
-  nft_activity_owner : address;
-  nft_activity_contract : address ;
-  nft_activity_token_id : big_integer ;
-  nft_activity_value : big_integer ;
-  nft_activity_transaction_hash : word ;
-  nft_activity_block_hash : word ;
-  nft_activity_block_number : block_number ;
+  nft_activity_owner : A.address;
+  nft_activity_contract : A.address ;
+  nft_activity_token_id : A.big_integer ;
+  nft_activity_value : A.big_integer ;
+  nft_activity_transaction_hash : A.word ;
+  nft_activity_block_hash : A.word ;
+  nft_activity_block_number : A.block_number ;
   nft_activity_log_index : int ;
 } [@@deriving encoding {camel}]
 
 type nft_activity_transfer = {
   nft_activity_tranfer_elt : nft_activity_elt ; [@merge]
-  nft_activity_tranfer_from : address ; [@merge]
+  nft_activity_tranfer_from : A.address ; [@merge]
 } [@@deriving encoding]
 
 type nft_activity =
@@ -353,17 +362,17 @@ type nft_activities = {
 } [@@deriving encoding]
 
 type item_history_elt = {
-  item_history_owner : address option;
-  item_history_contract : address;
-  item_history_token_id : big_integer;
-  item_history_value : big_integer option;
-  item_history_date : date;
+  item_history_owner : A.address option;
+  item_history_contract : A.address;
+  item_history_token_id : A.big_integer;
+  item_history_value : A.big_integer option;
+  item_history_date : A.date;
 } [@@deriving encoding {camel}]
 
 type item_history_transfer = {
-  owner: address option ;
-  value : address option ;
-  from : address ;
+  iht_owner: A.address option ;
+  iht_value : A.address option ;
+  iht_from : A.address ;
 } [@@deriving encoding]
 
 type item_history =
@@ -373,13 +382,13 @@ type item_history =
 
 type nft_ownership = {
   nft_ownership_id : string ;
-  nft_ownership_contract : address ;
-  nft_ownership_token_id : big_integer ;
-  nft_ownership_owner : address ;
+  nft_ownership_contract : A.address ;
+  nft_ownership_token_id : A.big_integer ;
+  nft_ownership_owner : A.address ;
   nft_ownership_creators : part list ;
-  nft_ownership_value : big_integer ;
-  nft_ownership_lazy_value : big_integer ;
-  nft_ownership_date : date ;
+  nft_ownership_value : A.big_integer ;
+  nft_ownership_lazy_value : A.big_integer ;
+  nft_ownership_date : A.date ;
   nft_ownership_pending : item_history list;
 } [@@deriving encoding {camel}]
 
@@ -390,13 +399,13 @@ type nft_ownerships = {
 } [@@deriving encoding]
 
 type nft_signature = {
-  nft_signature_r : bytes_str ;
-  nft_signature_s : binary ;
-  nft_signature_v : binary ;
+  nft_signature_r : A.bytes_str ;
+  nft_signature_s : A.binary ;
+  nft_signature_v : A.binary ;
 } [@@deriving encoding]
 
 type nft_token_id = {
-  nft_token_id : big_integer ;
+  nft_token_id : A.big_integer ;
   nft_token_id_signatures : nft_signature list;
 } [@@deriving encoding]
 
@@ -410,8 +419,8 @@ type nft_collection_feature =
 [@@deriving encoding]
 
 type nft_collection = {
-  nft_collection_id : address ;
-  nft_collection_owner : address option ;
+  nft_collection_id : A.address ;
+  nft_collection_owner : A.address option ;
   nft_collection_name : string ;
   nft_collection_symbol : string option ;
   nft_collection_features : nft_collection_feature list ;
@@ -425,23 +434,23 @@ type nft_collections = {
 } [@@deriving encoding]
 
 type asset_type_nft = {
-  asset_type_nft_contract : address ;
-  asset_type_nft_token_id : big_integer ;
+  asset_type_nft_contract : A.address ;
+  asset_type_nft_token_id : A.big_integer ;
 } [@@deriving encoding {camel}]
 
 type asset_type_lazy_nft = {
-  asset_type_lazy_nft_contract : address ;
-  asset_type_lazy_nft_token_id : big_integer ;
+  asset_type_lazy_nft_contract : A.address ;
+  asset_type_lazy_nft_token_id : A.big_integer ;
   asset_type_lazy_nft_uri : string ;
   asset_type_lazy_nft_creators : part list ;
   asset_type_lazy_nft_royalties : part list ;
-  asset_type_lazy_nft_signature : binary ;
+  asset_type_lazy_nft_signature : A.binary ;
 } [@@deriving encoding {camel}]
 
 type asset_type =
   | ATETH [@kind "assetClass"] [@kind_label "ETH"]
   | ATFLOW [@kind "assetClass"] [@kind_label "FLOW"]
-  | ATERC20 of (address [@wrap "contract"])[@kind "assetClass"] [@kind_label "ERC20"]
+  | ATERC20 of (A.address [@wrap "contract"])[@kind "assetClass"] [@kind_label "ERC20"]
   | ATERC721 of asset_type_nft [@kind "assetClass"] [@kind_label "ERC721"]
   | ATERC1155 of asset_type_nft [@kind "assetClass"] [@kind_label "ERC1155"]
   | ATERC721_LAZY of asset_type_lazy_nft [@kind "assetClass"] [@kind_label "ERC721_LAZY"]
@@ -450,18 +459,18 @@ type asset_type =
 
 type asset = {
   asset_type : asset_type ;
-  asset_value : big_integer ;
+  asset_value : A.big_integer ;
 } [@@deriving encoding]
 
 type order_form_elt = {
-  order_form_elt_maker : address ;
-  order_form_elt_taker : address option ;
+  order_form_elt_maker : A.address ;
+  order_form_elt_taker : A.address option ;
   order_form_elt_make : asset ;
   order_form_elt_take : asset ;
-  order_form_elt_salt : big_integer ;
+  order_form_elt_salt : A.big_integer ;
   order_form_elt_start : int64 option ;
   order_form_elt_end : int64 option ;
-  order_form_elt_signature : binary ;
+  order_form_elt_signature : A.binary ;
 } [@@deriving encoding]
 
 type order_open_sea_v1_data_v1_fee_method =
@@ -486,21 +495,21 @@ type order_open_sea_v1_data_v1_how_to_call =
 
 type order_open_sea_v1_data_v1 = {
   order_open_sea_v1_data_v1_data_type: string [@kind "OPEN_SEA_V1_DATA_V1"] ;
-  order_open_sea_v1_data_v1_exchange : address ;
-  order_open_sea_v1_data_v1_maker_relayer_fee : big_integer ;
-  order_open_sea_v1_data_v1_taker_relayer_fee : big_integer ;
-  order_open_sea_v1_data_v1_maker_protocol_fee : big_integer ;
-  order_open_sea_v1_data_v1_taker_protocol_fee : big_integer ;
-  order_open_sea_v1_data_v1_fee_recipient : address ;
+  order_open_sea_v1_data_v1_exchange : A.address ;
+  order_open_sea_v1_data_v1_maker_relayer_fee : A.big_integer ;
+  order_open_sea_v1_data_v1_taker_relayer_fee : A.big_integer ;
+  order_open_sea_v1_data_v1_maker_protocol_fee : A.big_integer ;
+  order_open_sea_v1_data_v1_taker_protocol_fee : A.big_integer ;
+  order_open_sea_v1_data_v1_fee_recipient : A.address ;
   order_open_sea_v1_data_v1_fee_method : order_open_sea_v1_data_v1_fee_method ;
   order_open_sea_v1_data_v1_type: order_open_sea_v1_data_v1_type ;
   order_open_sea_v1_data_v1_sale_kind : order_open_sea_v1_data_v1_kind ;
   order_open_sea_v1_data_v1_how_to_call : order_open_sea_v1_data_v1_how_to_call ;
-  order_open_sea_v1_data_v1_call_data : binary ;
-  order_open_sea_v1_data_v1_replacement_pattern : binary ;
-  order_open_sea_v1_data_v1_static_target: address ;
-  order_open_sea_v1_data_v1_static_extra_data: binary ;
-  order_open_sea_v1_data_v1_extra: big_integer;
+  order_open_sea_v1_data_v1_call_data : A.binary ;
+  order_open_sea_v1_data_v1_replacement_pattern : A.binary ;
+  order_open_sea_v1_data_v1_static_target: A.address ;
+  order_open_sea_v1_data_v1_static_extra_data: A.binary ;
+  order_open_sea_v1_data_v1_extra: A.big_integer;
 } [@@deriving encoding]
 
 type order_data_legacy = {
@@ -540,11 +549,11 @@ type order_form =
 [@@deriving encoding]
 
 type order_exchange_history_elt = {
-  order_exchange_history_elt_hash : word ;
+  order_exchange_history_elt_hash : A.word ;
   order_exchange_history_elt_make : asset option;
   order_exchange_history_elt_take : asset option ;
-  order_exchange_history_elt_date : date ;
-  order_exchange_history_elt_maker : address option ;
+  order_exchange_history_elt_date : A.date ;
+  order_exchange_history_elt_maker : A.address option ;
 } [@@deriving encoding]
 
 type order_side =
@@ -555,13 +564,13 @@ type order_side =
 type order_side_match = {
   order_side_match_elt : order_exchange_history_elt [@merge];
   order_side_match_side : order_side ;
-  order_side_match_fill : big_integer ;
-  order_side_match_taker : address ;
-  order_side_match_counter_hash : word ;
-  order_side_match_make_usd : big_decimal ;
-  order_side_match_take_usd : big_decimal ;
-  order_side_match_make_price_ssd : big_decimal ;
-  order_side_match_take_price_usd : big_decimal ;
+  order_side_match_fill : A.big_integer ;
+  order_side_match_taker : A.address ;
+  order_side_match_counter_hash : A.word ;
+  order_side_match_make_usd : A.big_decimal ;
+  order_side_match_take_usd : A.big_decimal ;
+  order_side_match_make_price_ssd : A.big_decimal ;
+  order_side_match_take_price_usd : A.big_decimal ;
 } [@@deriving encoding {camel}]
 
 type order_exchange_history =
@@ -570,30 +579,30 @@ type order_exchange_history =
 [@@deriving encoding]
 
 type order_price_history_record = {
-  order_price_history_record_date : date ;
-  order_price_history_record_make_value : big_decimal ;
-  order_price_history_record_take_value : big_decimal ;
+  order_price_history_record_date : A.date ;
+  order_price_history_record_make_value : A.big_decimal ;
+  order_price_history_record_take_value : A.big_decimal ;
 } [@@deriving encoding {camel}]
 
 type order_elt = {
-  order_elt_maker : address;
-  order_elt_taker: address;
+  order_elt_maker : A.address;
+  order_elt_taker: A.address;
   order_elt_make: asset;
   order_elt_take: asset;
-  order_elt_fill: big_integer;
+  order_elt_fill: A.big_integer;
   order_elt_start: int64;
   order_elt_end: int64;
-  order_elt_make_stock: big_integer;
+  order_elt_make_stock: A.big_integer;
   order_elt_cancelled: bool ;
-  order_elt_salt: word;
-  order_elt_signature: binary;
-  order_elt_created_at: date;
-  order_elt_last_update_at: date;
+  order_elt_salt: A.word;
+  order_elt_signature: A.binary;
+  order_elt_created_at: A.date;
+  order_elt_last_update_at: A.date;
   order_elt_pending: order_exchange_history list ;
-  order_elt_hash: word;
-  order_elt_make_balance: big_integer;
-  order_elt_make_price_usd: big_decimal;
-  order_elt_take_price_usd: big_decimal;
+  order_elt_hash: A.word;
+  order_elt_make_balance: A.big_integer;
+  order_elt_make_price_usd: A.big_decimal;
+  order_elt_take_price_usd: A.big_decimal;
   order_elt_price_history: order_price_history_record list ;
 } [@@deriving encoding {camel}]
 
@@ -622,27 +631,27 @@ type order =
 [@@deriving encoding]
 
 type prepare_order_tx_form = {
-  prepare_order_tx_form_maker : address ;
-  prepare_order_tx_form_amount : big_integer ;
+  prepare_order_tx_form_maker : A.address ;
+  prepare_order_tx_form_amount : A.big_integer ;
   prepare_order_tx_form_payouts : part list ;
   prepare_order_tx_form_origin_fees : part list ;
 } [@@deriving encoding {camel}]
 
 type prepared_order_tx = {
-  prepared_order_tx_to : address ;
-  prepared_order_tx_data : binary ;
+  prepared_order_tx_to : A.address ;
+  prepared_order_tx_data : A.binary ;
 } [@@deriving encoding]
 
 type prepare_order_tx_response = {
-  prepare_order_tx_response_transfer_proxy_address : address option ;
+  prepare_order_tx_response_transfer_proxy_address : A.address option ;
   prepare_order_tx_response_asset : asset ;
   prepare_order_tx_response_transaction : prepared_order_tx ;
 } [@@deriving encoding {camel}]
 
 type invert_order_form = {
-  invert_order_form_maker : address ;
-  invert_order_form_amount : big_integer ;
-  invert_order_form_salt : big_integer ;
+  invert_order_form_maker : A.address ;
+  invert_order_form_amount : A.big_integer ;
+  invert_order_form_salt : A.big_integer ;
   invert_order_form_origin_fees : part list ;
 } [@@deriving encoding {camel}]
 
@@ -652,8 +661,8 @@ type orders_pagination = {
 } [@@deriving encoding]
 
 type aggregation_data = {
-  aggregation_data_address : address ;
-  aggregation_data_sum : big_decimal ;
+  aggregation_data_address : A.address ;
+  aggregation_data_sum : A.big_decimal ;
   aggregation_data_count : int64 ;
 } [@@deriving encoding]
 
@@ -675,7 +684,7 @@ type order_activty_filter_user_type =
 
 type order_activity_by_user = {
   order_activity_by_user_types : order_activty_filter_user_type list ;
-  order_activity_by_user_users : address list
+  order_activity_by_user_users : A.address list
 } [@@deriving encoding]
 
 type order_activity_filter_item_type =
@@ -686,13 +695,13 @@ type order_activity_filter_item_type =
 
 type order_activity_by_item = {
   order_activity_by_item_types : order_activity_filter_item_type list;
-  order_activity_by_item_contract : address;
-  order_activity_by_item_token_id : big_integer;
+  order_activity_by_item_contract : A.address;
+  order_activity_by_item_token_id : A.big_integer;
 } [@@deriving encoding {camel}]
 
 type order_activity_by_collection = {
   order_activity_by_collection_types : order_activity_filter_item_type list;
-  order_activity_by_collection_contract : address;
+  order_activity_by_collection_contract : A.address;
 } [@@deriving encoding]
 
 type order_activity_filter =
@@ -713,7 +722,7 @@ type order_activity_source =
 
 type order_activity_elt = {
   order_activity_elt_id : string ;
-  order_activity_elt_date : date ;
+  order_activity_elt_date : A.date ;
   order_activity_elt_source : order_activity_source ;
 } [@@deriving encoding]
 
@@ -723,8 +732,8 @@ type order_activity_side_type =
 [@@deriving encoding]
 
 type order_activity_match_side = {
-  order_activity_match_side_maker : address ;
-  order_activity_match_side_hash : word ;
+  order_activity_match_side_maker : A.address ;
+  order_activity_match_side_hash : A.word ;
   order_activity_match_side_asset : asset ;
   order_activity_match_side_type : order_activity_side_type ;
 } [@@deriving encoding]
@@ -732,30 +741,30 @@ type order_activity_match_side = {
 type order_activity_match = {
   order_activity_match_left: order_activity_match_side ;
   order_activity_match_right: order_activity_match_side ;
-  order_activity_match_price: big_decimal ;
-  order_activity_match_price_usd: big_decimal option ;
-  order_activity_match_transaction_hash: word ;
-  order_activity_match_block_hash: word ;
+  order_activity_match_price: A.big_decimal ;
+  order_activity_match_price_usd: A.big_decimal option ;
+  order_activity_match_transaction_hash: A.word ;
+  order_activity_match_block_hash: A.word ;
   order_activity_match_block_number: int64 ;
   order_activity_match_log_index: int ;
 } [@@deriving encoding {camel}]
 
 type order_activity_bid = {
-  order_activity_bid_hash : word ;
-  order_activity_bid_maker : address ;
+  order_activity_bid_hash : A.word ;
+  order_activity_bid_maker : A.address ;
   order_activity_bid_make : asset ;
   order_activity_bid_take : asset ;
-  order_activity_bid_price : big_decimal ;
-  order_activity_bid_price_usd : big_decimal option ;
+  order_activity_bid_price : A.big_decimal ;
+  order_activity_bid_price_usd : A.big_decimal option ;
 } [@@deriving encoding {camel}]
 
 type order_activity_cancel_bid = {
-  order_activity_cancel_bid_hash : word ;
-  order_activity_cancel_bid_maker : address ;
+  order_activity_cancel_bid_hash : A.word ;
+  order_activity_cancel_bid_maker : A.address ;
   order_activity_cancel_bid_make : asset_type ;
   order_activity_cancel_bid_take : asset_type ;
-  order_activity_cancel_bid_transction_hash : word ;
-  order_activity_cancel_bid_block_hash : word ;
+  order_activity_cancel_bid_transction_hash : A.word ;
+  order_activity_cancel_bid_block_hash : A.word ;
   order_activity_cancel_bid_block_number : int64 ;
   order_activity_cancel_bid_log_index : int ;
 } [@@deriving encoding {camel}]
@@ -782,21 +791,21 @@ type order_bid_status =
 [@@deriving encoding]
 
 type order_bid_elt = {
-  order_bid_elt_order_hash : word ;
+  order_bid_elt_order_hash : A.word ;
   order_bid_elt_status : order_bid_status ;
-  order_bid_elt_maker : address ;
-  order_bid_elt_taker : address option ;
+  order_bid_elt_maker : A.address ;
+  order_bid_elt_taker : A.address option ;
   order_bid_elt_make : asset ;
   order_bid_elt_take : asset ;
-  order_bid_elt_make_balance : big_integer option ;
-  order_bid_elt_make_price_usd : big_decimal option ;
-  order_bid_elt_take_price_usd : big_decimal option ;
-  order_bid_elt_fill : big_integer ;
-  order_bid_elt_make_stock : big_integer ;
+  order_bid_elt_make_balance : A.big_integer option ;
+  order_bid_elt_make_price_usd : A.big_decimal option ;
+  order_bid_elt_take_price_usd : A.big_decimal option ;
+  order_bid_elt_fill : A.big_integer ;
+  order_bid_elt_make_stock : A.big_integer ;
   order_bid_elt_cancelled : bool ;
-  order_bid_elt_salt : binary ;
-  order_bid_elt_signature : binary option ;
-  order_bid_elt_created_at : date;
+  order_bid_elt_salt : A.binary ;
+  order_bid_elt_signature : A.binary option ;
+  order_bid_elt_created_at : A.date;
 } [@@deriving encoding {camel}]
 
 type legacy_order_bid = {
@@ -826,7 +835,7 @@ type order_bids_pagination = {
 } [@@deriving encoding]
 
 type lock_form = {
-  lock_form_signature : binary option ;
+  lock_form_signature : A.binary option ;
   lock_form_content : string ;
 } [@@deriving encoding]
 
@@ -834,13 +843,13 @@ type lock = {
   lock_id : string ;
   lock_item_id : string ;
   lock_content : string ;
-  lock_author : address ;
-  lock_signature : binary ;
-  lock_unlock_date : date ;
+  lock_author : A.address ;
+  lock_signature : A.binary ;
+  lock_unlock_date : A.date ;
   lock_version : int64 ;
 } [@@deriving encoding {camel}]
 
 type signature_form = {
-  signature_form_signature : binary option ;
+  signature_form_signature : A.binary option ;
   signature_form_content : string ;
 } [@@deriving encoding]
