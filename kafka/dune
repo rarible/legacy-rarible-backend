@@ -1,0 +1,4 @@
+(executable
+ (name producer)
+ (modules producer)
+ (libraries lwt kafka kafka_lwt))

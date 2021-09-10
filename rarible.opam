@@ -10,6 +10,9 @@ depends: [
   "crawlori"
   "pgocaml_ppx"
   "ez_pgocaml"
+  "kafka"
+  "kafka_lwt"
+  "ocurl"
 ]
 build: [
   ["dune" "subst"] {pinned}

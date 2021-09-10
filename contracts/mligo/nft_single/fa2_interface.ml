@@ -37,8 +37,8 @@ type operator_update =
   | Remove_operator of operator_param
 
 type token_metadata = {
-  token_id : nat;
-  token_info : (string, bytes) map;
+  token_id : nat; [@key "token_id"]
+  token_info : (string, bytes) map; [@key "token_info"]
 } [@@comb] [@@param Store]
 
 (*
