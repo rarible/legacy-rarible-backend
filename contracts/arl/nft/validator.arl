@@ -1,0 +1,397 @@
+archetype validator(exchangeV2 : address, royaltiesContract : address)
+with metadata ""
+
+entry setRoyaltiesContract(iroyalties_contract : address) {
+  called by exchangeV2
+  effect {
+    royaltiesContract := iroyalties_contract
+  }
+}
+
+enum asset_class =
+| XTZ
+| FA_1_2
+| FA_2
+| FA_2_LAZY
+| OTHER<bytes>
+
+record asset_type {
+  assetClass : asset_class;
+  assetData : bytes;
+}
+
+record %asset {
+  assetType : asset_type;
+  assetValue : nat;
+}
+
+record order {
+  maker : option<key>;
+  makeAsset : %asset;
+  taker : option<key>;
+  takeAsset : %asset;
+  salt : nat;
+  start : option<date>;
+  %end :  option<date>;
+  dataType : bytes;
+  data : bytes;
+}
+
+record fill_result {
+  fr_makeValue : nat;
+  fr_takeValue : nat;
+}
+
+enum fee_side =
+| NONE
+| MAKE
+| TAKE
+
+record part {
+  partAccount : address;
+  partValue   : nat;
+}
+
+record DataV1 {
+  payouts : list<part>;
+  originFees : list<part>;
+}
+
+variable fill : big_map<bytes, nat> = []
+
+entry setMetadataUri(idata : bytes) {
+  called by exchangeV2
+  effect {
+    metadata := put(metadata, "", idata)
+  }
+}
+
+entry cancel(iorder : order) {
+  sourced by key_address(opt_get(iorder.maker))
+  called by exchangeV2
+  require {
+    r1: iorder.salt <> 0 otherwise "0 salt can't be used";
+  }
+  effect {
+    fill.remove(hashKeyOrder(iorder));
+  }
+}
+
+asset matcher {
+  m_addr : address;
+}
+
+asset asset_class_matcher {
+  acm_classType : asset_class;
+  acm_addr : address;
+}
+
+entry setAssetMatcher(k : asset_class, v : address) {
+  called by exchangeV2
+  effect {
+    matcher.add({v});
+    asset_class_matcher.add({k; v});
+  }
+}
+
+// who fills asset collection `fill` ?
+function hashKeyOrder(iorder : order) : bytes {
+  return keccak(concat([
+    pack(iorder.maker);
+    keccak(pack(iorder.makeAsset.assetType));
+    keccak(pack(iorder.takeAsset.assetType));
+    pack(iorder.salt)]))
+}
+
+function safeGetPartialAmountFloor(
+    numerator: nat,
+    denominator: nat,
+    target: nat) : nat {
+  var num = numerator * target;
+  match num /% denominator with
+  | some(p) -> begin
+    if (num <> 0) then dofailif (p[1] * 1_000 >= num, "rounding error");
+    return p[0]
+    end
+  | none -> fail("division by zero")
+  end
+}
+
+function calculateRemaining(iorder : order, ifill : nat) : (nat * nat) {
+  if (iorder.takeAsset.assetValue < ifill) then (
+    fail(("calculateRemaining", iorder.takeAsset.assetValue, ifill))
+  );
+  var takeValue = sub_nat(iorder.takeAsset.assetValue, ifill);
+  var makeValue = safeGetPartialAmountFloor(iorder.makeAsset.assetValue, iorder.takeAsset.assetValue, takeValue);
+  return ((makeValue, takeValue))
+}
+
+function fillLeft(leftMakeValue : nat, leftTakeValue : nat, rightMakeValue : nat, rightTakeValue : nat) : fill_result {
+  var rightTake = safeGetPartialAmountFloor(leftTakeValue, rightMakeValue, rightTakeValue);
+  dorequire(rightTake <= leftMakeValue, "fillLeft: unable to fill");
+  return ({leftMakeValue; leftTakeValue})
+}
+
+function fillRight(leftMakeValue : nat, leftTakeValue : nat, rightMakeValue : nat, rightTakeValue : nat) : fill_result {
+  var makerValue = safeGetPartialAmountFloor(rightTakeValue, leftMakeValue, leftTakeValue);
+  dorequire(makerValue <= rightMakeValue, "fillRight: unable to fill");
+  return ({rightTakeValue; makerValue})
+}
+
+function fillOrder(leftOrder : order, rightOrder : order, leftOrderFill : nat, rightOrderFill : nat) : fill_result {
+  var leftPair  = calculateRemaining(leftOrder, leftOrderFill);
+  var rightPair = calculateRemaining(rightOrder, rightOrderFill);
+
+  var leftMakeValue  = leftPair[0];
+  var leftTakeValue  = leftPair[1];
+  var rightMakeValue = rightPair[0];
+  var rightTakeValue = rightPair[1];
+
+  return
+  (if (rightTakeValue > leftMakeValue)
+  then fillLeft(leftMakeValue, leftTakeValue, rightOrder.makeAsset.assetValue, rightOrder.takeAsset.assetValue)
+  else fillRight(leftOrder.makeAsset.assetValue, leftOrder.takeAsset.assetValue, rightMakeValue, rightTakeValue))
+}
+
+function getOrderFill(iorder : order, ihash : bytes) : nat {
+  var res : nat = 0;
+  if (iorder.salt <> 0 and fill.contains(ihash))
+  then res := fill[ihash];
+  return res
+}
+
+function getFeeSide(imake : asset_class, itake : asset_class) : fee_side {
+  if imake = XTZ
+  then return MAKE
+  else if itake = XTZ
+  then return TAKE
+  else if imake = FA_1_2
+  then return MAKE
+  else if itake = FA_1_2
+  then return TAKE
+  else if imake = FA_2
+  then return MAKE
+  else if itake = FA_2
+  then return TAKE
+  else return NONE
+}
+
+record MintFA2Data {
+  mfd_tokenId : nat;
+  mfd_tokenURI : string;
+  mfd_supply : nat;
+  mfd_creators : list<part>;
+  mfd_royalties : list<part>;
+  mfd_signatures : list<bytes>;
+}
+
+function getRoyaltiesByAssetType(matchNft : asset_type, idata : bytes, s : address) : or<list<part>, operation> {
+  var empty_royalties : list<part> = [];
+  var res = left<list<part>, operation>(empty_royalties);
+
+  match matchNft.assetClass with
+  | FA_2_LAZY -> begin
+    match unpack<address * MintFA2Data>(matchNft.assetData) with
+    | some (v) -> res := left<list<part>, operation>(v[1].mfd_royalties)
+    | none -> fail (("cannot unpack FA_2_LAZY", matchNft.assetData))
+    end
+  end
+  | FA_2 -> begin
+    match unpack<address * nat>(matchNft.assetData) with
+    | some (v) -> begin
+      var token : address = v[0];
+      var tokenId : nat   = v[1];
+      var callback = require_entrypoint<list<part> * bytes>("%processRoyalities", s, "processRoyalities not found");
+      var e = require_entrypoint<(address * nat * bytes) * contract<list<part> * bytes>>("%getRoyalties", royaltiesContract, "%getRoyalties not found");
+      var op : operation = mkoperation(transferred, e, ((token, tokenId, idata), callback));
+      res := right<list<part>, operation>(op)
+    end
+    | none -> fail (("cannot unpack FA_2", matchNft.assetData))
+    end
+  end
+  | _ -> ()
+  end;
+
+  return res
+}
+
+entry matchAndTransfer(orderLeft : order, orderRight : order, imakeMatch : option<asset_type>, itakeMatch : option<asset_type>) {
+  called by selfaddress or matcher
+  effect {
+    var makeMatch = require_some(imakeMatch, "Invalid makeMatch");
+    var takeMatch = require_some(itakeMatch, "Invalid takeMatch");
+    var leftOrderKeyHash = hashKeyOrder(orderLeft);
+    var rightOrderKeyHash = hashKeyOrder(orderRight);
+    var leftOrderFill = getOrderFill(orderLeft, leftOrderKeyHash);
+    var rightOrderFill = getOrderFill(orderRight, rightOrderKeyHash);
+    var newFill = fillOrder(orderLeft, orderRight, leftOrderFill, rightOrderFill);
+
+    dorequire(newFill.fr_takeValue > 0, "nothing to fill");
+
+    if (orderLeft.salt <> 0)
+    then fill.put(leftOrderKeyHash, (leftOrderFill + newFill.fr_takeValue));
+
+    if (orderRight.salt <> 0)
+    then fill.put(rightOrderKeyHash, (rightOrderFill + newFill.fr_makeValue));
+
+    var feeSide = getFeeSide(makeMatch.assetClass, takeMatch.assetClass);
+    var packedData = pack((makeMatch, takeMatch, newFill, orderLeft, orderRight, feeSide));
+    var empty_royalties : list<part> = [];
+    var royalties : or<list<part>, operation> =
+    match feeSide with
+    | MAKE -> getRoyaltiesByAssetType(takeMatch, packedData, selfaddress)
+    | TAKE -> getRoyaltiesByAssetType(makeMatch, packedData, selfaddress)
+    | NONE -> left<operation>(empty_royalties)
+    end;
+
+    match royalties with
+    | left(r) -> transfer transferred to exchangeV2 call doTransfers<asset_type * asset_type * fill_result * order * order * fee_side * list<part>>
+    ((makeMatch, takeMatch, newFill, orderLeft, orderRight, feeSide, r))
+    | right(op) -> transfer op
+    end
+  }
+}
+
+entry processRoyalities(r : list<part>, idata : bytes) {
+  called by royaltiesContract
+  effect {
+    match unpack<asset_type * asset_type * fill_result * order * order * fee_side>(idata) with
+    | some (v) -> begin
+        var makeMatch  = v[0];
+        var takeMatch  = v[1];
+        var newFill    = v[2];
+        var orderLeft  = v[3];
+        var orderRight = v[4];
+        var feeSide    = v[5];
+        transfer transferred to exchangeV2 call doTransfers<asset_type * asset_type * fill_result * order * order * fee_side * list<part>>
+        ((makeMatch, takeMatch, newFill, orderLeft, orderRight, feeSide, r))
+    end
+    | none -> fail (("cannot unpack", idata))
+    end
+  }
+}
+
+
+enum time_pos = | PAST | FUTURE
+
+function validateDate(d : option<date>, pos : time_pos) : bool {
+  return
+    match d with
+      | some(v) ->
+        match pos with
+        | PAST   -> v < now
+        | FUTURE -> v > now
+        end
+      | none -> true
+    end
+}
+
+function validate (iorder : order, isig : option<signature>) : bool {
+  var key_maker : key = opt_get(iorder.maker);
+  var addr_maker : address = key_address(key_maker);
+  if (iorder.salt = 0) then (
+    dorequire(source = addr_maker, "maker is not tx sender");
+    return true
+  ) else (
+    if (source <> addr_maker) then (
+      var s = require_some(isig, "signature none");
+      return check_signature(key_maker, s, pack(iorder))
+    ) else (
+      return true
+    )
+  )
+}
+
+function is_caller(k : option<key>) : bool {
+  match k with
+    | some(k) -> return (key_address(k) = caller)
+    | none -> return false
+  end
+}
+
+// function validateOrder(iorder : order) {
+//   if (iorder.salt = 0)
+//   then dorequire(is_caller(iorder.maker), "maker is not tx sender")
+//   else begin
+//     if (not is_caller(iorder.maker))
+//     then begin
+//       var h = hashOrder(iorder);
+//     end
+//   end
+// }
+
+function validateFull(iorder : order, isignature : option<signature>) : bool {
+  dorequire(validateDate(iorder.start, PAST), "Order start validation failed");
+  dorequire(validateDate(iorder.%end, FUTURE), "Order end validation failed");
+  dorequire(validate(iorder, isignature), ("Bad signature", opt_get(iorder.maker), pack(iorder), isignature));
+  return true
+}
+
+
+function simpleMatch(leftAssetType : asset_type, rightAssetType : asset_type) : option<asset_type> {
+  var leftHash  = keccak(leftAssetType.assetData);
+  var rightHash = keccak(rightAssetType.assetData);
+  if (leftHash = rightHash)
+  then return some(leftAssetType)
+  else return none<asset_type>
+}
+
+function isOther(iassetClass : asset_class) : bool {
+  return
+    match iassetClass with
+    | OTHER(v) -> true
+    | _ -> false
+    end
+}
+
+function eqOther(iLeftClass : asset_class, iRightClass : asset_class) : bool {
+  return (isOther(iLeftClass) and isOther(iRightClass) and
+    match iLeftClass with
+    | OTHER(v) -> some(v)
+    | _ -> none<bytes>
+    end
+    =
+    match iRightClass with
+    | OTHER(v) -> some(v)
+    | _ -> none<bytes>
+    end
+  )
+}
+
+// matchAssetOneSide
+function matchAssetTypes(leftAssetType : asset_type, rightAssetType : asset_type) : option<asset_type> {
+  var classLeft = leftAssetType.assetClass;
+  var classRight = rightAssetType.assetClass;
+  var classPair = (classLeft, classRight);
+
+  if (classPair = (XTZ, XTZ))
+  then return some(leftAssetType)
+  else if (classPair = (FA_1_2, FA_1_2) or classPair = (FA_2, FA_2) or (eqOther(classLeft, classRight)))
+  then return simpleMatch(leftAssetType, rightAssetType)
+  else return none<asset_type>
+}
+
+entry matchOrders(
+  orderLeft : order,
+  signatureLeft : option<signature>,
+  orderRight : order,
+  signatureRight : option<signature>) {
+  var a_ = validateFull(orderLeft, signatureLeft);
+  var b_ = validateFull(orderRight, signatureRight);
+  if (issome(orderLeft.taker))
+  then dorequire(orderRight.maker = orderLeft.taker, "leftOrder.taker verification failed");
+  if (issome(orderRight.taker))
+  then dorequire(orderRight.taker = orderLeft.maker, "rightOrder.taker verification failed");
+
+  var makeMatch = matchAssetTypes(orderLeft.makeAsset.assetType, orderRight.takeAsset.assetType);
+  var takeMatch = matchAssetTypes(orderLeft.takeAsset.assetType, orderRight.makeAsset.assetType);
+  var orderData : bytes = pack((orderLeft, orderRight));
+  if (isnone(makeMatch) or isnone(takeMatch))
+  then begin
+    var matcher_addr : address = asset_class_matcher[XTZ].acm_addr;
+    transfer transferred to matcher_addr call
+     matchAssets<order * order * contract<order * order * option<asset_type> * option<asset_type>>>
+     ((orderLeft, orderRight, self.matchAndTransfer))
+  end
+  else transfer transferred to entry self.matchAndTransfer(orderLeft, orderRight, makeMatch, takeMatch)
+}

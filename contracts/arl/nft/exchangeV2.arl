@@ -1,0 +1,433 @@
+archetype exchangeV2(
+  owner : address,
+  defaultFeeReceiver : address,
+  protocolFee : nat
+)
+with metadata ""
+
+variable owner_candidate : option<address> = none
+variable feeReceivers : map<address, address> = []
+variable validator : option<address> = none
+
+entry setValidator(ivalidator : address) {
+  called by owner
+  effect {
+    validator := some(ivalidator)
+  }
+}
+
+entry declareOwnership(candidate : address) {
+  called by owner
+  effect {
+    owner_candidate := some(candidate);
+  }
+}
+
+entry claimOwnership() {
+  called by opt_get(owner_candidate)
+  effect {
+    owner := opt_get(owner_candidate);
+    owner_candidate := none
+  }
+}
+
+entry setFeeReceiver(token : address, wallet : address) {
+  called by owner
+  effect {
+    feeReceivers.put(token, wallet)
+  }
+}
+
+entry setDefaultFeeReceiver(newDefaultFeeReceiver : address) {
+  called by owner
+  effect {
+    defaultFeeReceiver := newDefaultFeeReceiver
+  }
+}
+
+entry cancel(iorder : order) {
+  require {
+    r0: issome(validator) otherwise "validator is unset"
+  }
+  effect {
+    transfer transferred to opt_get(validator) call cancel<order>(iorder)
+  }
+}
+
+entry setMetadataUri(idata : bytes) {
+  called by owner
+  effect {
+    metadata := put(metadata, "", idata)
+  }
+}
+
+entry setMetadataUriValidator(idata : bytes) {
+  called by owner
+  effect {
+    transfer transferred to require_some(validator, "validator is unset") call setMetadataUri<bytes>(idata)
+  }
+}
+
+function getFeeReceiver(token : option<address>) : address {
+  return
+    match token with
+    | some (v) ->
+        match feeReceivers.getopt(v) with
+        | some (wallet) -> wallet
+        | none -> defaultFeeReceiver
+        end
+    | none -> defaultFeeReceiver
+    end
+}
+entry setProtocolFee(n : nat) {
+  called by owner
+  effect {
+    protocolFee := n
+  }
+}
+
+entry setRoyaltiesContract(iroyaltiesContract : address) {
+  called by owner
+  effect {
+    transfer transferred to opt_get(validator) call setRoyaltiesContract<address>(iroyaltiesContract)
+  }
+}
+
+enum asset_class =
+| XTZ
+| FA_1_2
+| FA_2
+| FA_2_LAZY
+| OTHER<bytes>
+
+record asset_type {
+  assetClass : asset_class;
+  assetData : bytes;
+}
+
+record %asset {
+  assetType : asset_type;
+  assetValue : nat;
+}
+
+record order {
+  maker : option<key>;
+  makeAsset : %asset;
+  taker : option<key>;
+  takeAsset : %asset;
+  salt : nat;
+  start : option<date>;
+  %end :  option<date>;
+  dataType : bytes;
+  data : bytes;
+}
+
+record fill_result {
+  fr_makeValue : nat;
+  fr_takeValue : nat;
+}
+
+enum fee_side =
+| NONE
+| MAKE
+| TAKE
+
+record part {
+  partAccount : address;
+  partValue   : nat;
+}
+
+record DataV1 {
+  payouts : list<part>;
+  originFees : list<part>;
+}
+
+entry setAssetMatcher(k : asset_class, v : address) {
+  called by owner
+  effect {
+    transfer transferred to opt_get(validator) call setAssetMatcher<asset_class * address>((k, v))
+  }
+}
+
+// constant TO_MAKER : bytes = keccak(pack("TO_MAKER"))
+// constant TO_TAKER : bytes = keccak(pack("TO_TAKER"))
+// constant PROTOCOL : bytes = keccak(pack("PROTOCOL"))
+// constant ROYALTY  : bytes = keccak(pack("ROYALTY"))
+// constant ORIGIN   : bytes = keccak(pack("ORIGIN"))
+// constant PAYOUT   : bytes = keccak(pack("PAYOUT"))
+
+constant V1 : bytes = keccak(pack("V1"))
+
+function payoutSet(orderAddress : address, dataOrderOnePayoutIn : DataV1) : DataV1 {
+  return { dataOrderOnePayoutIn with payouts = [{ partAccount = orderAddress; partValue = 10000 }] }
+}
+
+function parse(iorder : order) : DataV1 {
+  var addr_maker : address = key_address(opt_get(iorder.maker));
+  if (iorder.dataType = V1) then (
+    match unpack<DataV1>(iorder.data) with
+    | some(dataOrder) -> begin
+       var res = dataOrder;
+       if (length(dataOrder.payouts) = 0) then (
+         res := payoutSet(addr_maker, dataOrder);
+       );
+    return dataOrder
+    end
+    | none -> fail("unable to unpack DataV1")
+    end
+  ) else if (iorder.dataType = 0xffffffff) then (
+    return payoutSet(addr_maker, {[]; []})
+  ) else (
+    fail("Unknown Order data type")
+  )
+}
+
+function bp(value : nat, bpValue : nat) : nat {
+  return abs(floor(value * bpValue / 10000))
+}
+
+function get_transfer(
+  iasset : %asset,
+  ifrom : address,
+  ito : address/*,
+  transferDirection : bytes,
+  transferType : bytes*/) : operation {
+    match iasset.assetType.assetClass with
+    | XTZ -> begin
+      var e   : contract<unit> = ito;
+      var vamount : tez = iasset.assetValue * 1utz;
+      var op  : operation = mkoperation(vamount, e, ());
+      return op
+    end
+    | FA_1_2 -> begin
+      var addr_fa_1_2 = require_some(unpack<address>(iasset.assetType.assetData), "cannot unpack addr fa_1_2");
+      var e = require_entrypoint<address * address * nat>("%transfer", addr_fa_1_2, "entry transfer FA_1_2 not found");
+      return mkoperation(0tz, e, (ifrom, ito, iasset.assetValue));
+    end
+    | FA_2 -> begin
+      var u = require_some(unpack<address * nat>(iasset.assetType.assetData), "cannot unpack addr fa_2");
+      var e = require_entrypoint<list<address * list<address * nat * nat>>>("%transfer", u[0], "entry transfer FA_2 not found");
+      var arg : list<address * list<address * nat * nat>> = [(ifrom, [(ito, u[1], iasset.assetValue)])];
+      return mkoperation(0tz, e, arg);
+    end
+    | FA_2_LAZY -> fail ("Unsupported")
+    | OTHER(v) -> fail ("Unsupported")
+    end
+}
+
+function transferPayouts(
+  matchCalculate : asset_type,
+  iamount : nat,
+  ifrom : address,
+  ipayouts : list<part>/*,
+  transferDirection : bytes*/) : list<operation> {
+    var ops : list<operation> = [];
+    match reverse(ipayouts) with
+    | lastPayout::rPayouts -> begin
+      var sumBps : nat = 0;
+      var restValue : nat = iamount;
+      for item in rPayouts do
+          var currentAmount = bp(iamount, item.partValue);
+          sumBps += item.partValue;
+          if (currentAmount > 0) then (
+            restValue := sub_nat(restValue, currentAmount);
+            ops.prepend(get_transfer(
+              {assetType = matchCalculate;
+               assetValue = currentAmount}, ifrom, item.partAccount/*, transferDirection, PAYOUT*/));
+          )
+      done;
+      ops.reverse();
+      sumBps += lastPayout.partValue;
+      dorequire(sumBps = 10_000, "Sum payouts Bps not equal 100%");
+      if (restValue > 0) then (
+          ops.prepend(get_transfer(
+              {assetType = matchCalculate;
+               assetValue = restValue}, ifrom, lastPayout.partAccount/*, transferDirection, PAYOUT*/));
+      )
+    end
+    | [] -> ()
+    end;
+    return ops
+}
+
+function calculateTotalAmount(iamount : nat, feeOnTopBp : nat, orderOriginFees : list<part>) : nat {
+  var total = iamount + bp(iamount, feeOnTopBp);
+  for item in orderOriginFees do
+    total += bp(iamount, item.partValue)
+  done;
+  return total
+}
+
+function subFee(value : nat, fee : nat) : nat * nat {
+  return (if value > fee then (sub_nat (value, fee), fee) else (0, value))
+}
+
+function subFeeInBp(value : nat, total : nat, feeInBp : nat) : nat * nat {
+  return subFee(value, bp(total, feeInBp))
+}
+
+function get_tokenAddress(matchCalculate : asset_type) : option<address> {
+  return
+  match matchCalculate.assetClass with
+  | FA_1_2 -> unpack<address>(matchCalculate.assetData)
+  | FA_2 -> begin
+      match unpack<address * nat>(matchCalculate.assetData) with
+      | some(v) -> some(v[0])
+      | none -> none<address>
+      end
+    end
+  | _ -> none<address>
+  end
+}
+
+function transferProtocolFee(
+    itotalAmount : nat,
+    iamount : nat,
+    ifrom : address,
+    matchCalculate : asset_type/*,
+    transferDirection : bytes*/
+) : nat * list<operation> {
+    var ops : list<operation> = [];
+    var rest_fee = subFeeInBp(itotalAmount, iamount, protocolFee * 2);
+    var fee = rest_fee[1];
+    if (fee > 0) then (
+      var tokenAddress = get_tokenAddress(matchCalculate);
+      ops.prepend(get_transfer({matchCalculate; fee}, ifrom, getFeeReceiver(tokenAddress)/*, transferDirection, PROTOCOL*/));
+    );
+    return ((rest_fee[0], ops))
+}
+
+function transferFees(
+  matchCalculate : asset_type,
+  rest : nat,
+  amount : nat,
+  fees : list<part>,
+  ifrom : address/*,
+  transferDirection : bytes,
+  transferType : bytes*/) : nat * nat * list<operation> {
+  var totalFees = 0;
+  var restValue = rest;
+  var ops : list<operation> = [];
+  for fee in fees do
+    totalFees += fee.partValue;
+    var p = subFeeInBp(restValue, amount, fee.partValue);
+    var newRestValue = p[0];
+    var feeValue = p[1];
+    restValue := newRestValue;
+    if (feeValue > 0) then (
+      ops.prepend(get_transfer({matchCalculate; feeValue}, ifrom, fee.partAccount/*, transferDirection, transferType*/));
+    )
+  done;
+  return ((restValue, totalFees, reverse(ops)))
+}
+
+function transferRoyalties(
+    matchCalculate : asset_type,
+    matchNft : asset_type,
+    rest : nat,
+    iamount : nat,
+    ifrom : address,
+    /*transferDirection : bytes,*/
+    fees : list<part>) : nat * list<operation> {
+    var r = transferFees(matchCalculate, rest, iamount, fees, ifrom/*, transferDirection, ROYALTY*/);
+    var result = r[0];
+    var totalRoyalties = r[1];
+    var ops = r[2];
+    dorequire(totalRoyalties <= 5000, "Royalties are too high (>50%)");
+    return ((result, ops))
+}
+
+function doTransfersWithFees(
+  iamount : nat,
+  ifrom : address,
+  dataCalculate : DataV1,
+  dataNft : DataV1,
+  matchCalculate : asset_type,
+  matchNft : asset_type,
+  /* transferDirection : bytes,*/
+  iroyalties : list<part>) : nat * list<operation> {
+    var totalAmount = calculateTotalAmount(iamount, protocolFee, dataCalculate.originFees);
+    var restpf = transferProtocolFee(totalAmount, iamount, ifrom, matchCalculate/*, transferDirection*/);
+    var ops_rest = restpf[1];
+    var restr = transferRoyalties(matchCalculate, matchNft, restpf[0], iamount, ifrom/*, transferDirection*/, iroyalties);
+    var ops_restr = restr[1];
+    var r = transferFees(matchCalculate, restr[0], iamount, dataCalculate.originFees, ifrom/*, transferDirection, ORIGIN*/);
+    var ops_r = r[2];
+    var p = transferFees(matchCalculate, r[0], iamount, dataNft.originFees, ifrom/*, transferDirection, ORIGIN*/);
+    var ops_p = p[2];
+    var ops_payouts = transferPayouts(matchCalculate, p[0], ifrom, dataNft.payouts/*, transferDirection*/);
+    var ops = concat(ops_rest, concat(ops_restr, concat(ops_r, concat(ops_p, ops_payouts))));
+    return ((totalAmount, ops))
+}
+
+entry doTransfers(
+  makeMatch  : asset_type,
+  takeMatch  : asset_type,
+  ifill      : fill_result,
+  leftOrder  : order,
+  rightOrder : order,
+  feeSide    : fee_side,
+  iroyalties : list<part>) {
+    called by require_some(validator, "validator is unset")
+    effect {
+      var totalMakeValue = ifill.fr_makeValue;
+      var totalTakeValue = ifill.fr_takeValue;
+      var leftOrderData  = parse(leftOrder);
+      var rightOrderData = parse(rightOrder);
+
+      var ops1 : list<operation> = [];
+      var ops2 : list<operation> = [];
+      var leftOrderMaker  : address = key_address(opt_get(leftOrder.maker));
+      var rightOrderMaker : address = key_address(opt_get(rightOrder.maker));
+      if (feeSide = MAKE) then (
+        var r = doTransfersWithFees(ifill.fr_makeValue, leftOrderMaker, leftOrderData, rightOrderData, makeMatch, takeMatch, /*TO_TAKER,*/ iroyalties);
+        totalMakeValue := r[0];
+        ops1 := r[1];
+        ops2 := transferPayouts(takeMatch, ifill.fr_takeValue, rightOrderMaker, leftOrderData.payouts/*, TO_MAKER*/);
+      ) else if (feeSide = TAKE) then (
+        var r = doTransfersWithFees(ifill.fr_takeValue, rightOrderMaker, rightOrderData, leftOrderData, takeMatch, makeMatch/*, TO_MAKER*/, iroyalties);
+        totalTakeValue := r[0];
+        ops1 := r[1];
+        ops2 := transferPayouts(makeMatch, ifill.fr_makeValue, leftOrderMaker, rightOrderData.payouts/*, TO_TAKER*/);
+      ) else (
+        ops1 := transferPayouts(makeMatch, ifill.fr_makeValue, leftOrderMaker, rightOrderData.payouts/*, TO_TAKER*/);
+        ops2 := transferPayouts(takeMatch, ifill.fr_takeValue, rightOrderMaker, leftOrderData.payouts/*, TO_MAKER*/);
+      );
+
+      var ops3 : list<operation> = [];
+      if (makeMatch.assetClass = XTZ) then (
+        dorequire(takeMatch.assetClass <> XTZ, "takeMatch.assetClass <> XTZ");
+        var ntransferred = mutez_to_nat(transferred);
+        dorequire(ntransferred >= totalMakeValue, "not enough xtz");
+        if (ntransferred > totalMakeValue) then (
+          var e : contract<unit> = source;
+          var n : nat = ntransferred;
+          var a : tez = sub_nat(n, totalMakeValue) * 1utz;
+          ops3 := [mkoperation(a, e, Unit)]
+        )
+      ) else if (takeMatch.assetClass = XTZ) then (
+        var ntransferred = mutez_to_nat(transferred);
+        dorequire(ntransferred >= totalTakeValue, "not enough xtz");
+        if (ntransferred > totalTakeValue) then (
+          var e : contract<unit> = source;
+          var n : nat = ntransferred;
+          var a : tez = sub_nat(n, totalTakeValue) * 1utz;
+          ops3 := [mkoperation(a, e, Unit)]
+        )
+      );
+      operations := ops1.concat(concat(ops2, ops3))
+    }
+}
+
+entry matchOrders(
+  orderLeft : order,
+  signatureLeft : option<signature>,
+  orderRight : order,
+  signatureRight : option<signature>) {
+    require {
+      r1: issome(validator) otherwise "validator is unset"
+    }
+    effect {
+      transfer transferred to opt_get(validator) call matchOrders<order * option<signature> * order * option<signature>>((orderLeft, signatureLeft, orderRight, signatureRight))
+    }
+}

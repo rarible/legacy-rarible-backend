@@ -66,6 +66,14 @@ let storage_fa2 ~admin ~royalties =
 let storage_royalties ~admin =
   Format.sprintf "(Pair %S (Pair None (Pair {} {})))" admin
 
+let storage_exchange ~admin ~receiver ~fee =
+  Format.sprintf {|(Pair %S (Pair %S (Pair %Ld (Pair None (Pair {} (Pair None {Elt "" 0x}))))))|}
+    admin receiver fee
+
+let storage_validator ~exchange ~royalties =
+  Format.sprintf {|(Pair %S (Pair %S (Pair {} (Pair {} (Pair {} {Elt "" 0x})))))|}
+    exchange royalties
+
 let compile_contract filename =
   Filename.quote_command "completium-cli" [ "generate"; "michelson"; filename ]
 
@@ -226,6 +234,10 @@ let update_operators_for_all l =
 let actions = [
   ["compile contract"], "compile the contract";
   ["deploy <contract file> <storage>"], "deploy the contract";
+  ["deploy_fa2 <admin> <royalties_cotnract>"], "deploy fa2 contract";
+  ["deploy_royalties <admin>"], "deploy royalties contract";
+  ["deploy_exchange <admin> <default_receiver> <protocol_fee>"], "deploy exchangeV2 contract";
+  ["deploy_validator <exchangeV2_contract> <royalties_contract>"], "deploy validator contract";
   ["storage"], "get the storage of the contract";
   ["value <big_map_id> <big_map_key>"], "get the big map value";
   ["call <entrypoint> <param>"], "call the contract with the following param";
@@ -252,6 +264,12 @@ let main () =
       deploy ~filename:"../contracts/arl/nft/fa2.arl" (storage_fa2 ~admin ~royalties)
     | [ "deploy_royalties"; admin ] ->
       deploy ~filename:"../contracts/arl/nft/royalties.arl" (storage_royalties ~admin)
+    | [ "deploy_exchange"; admin; receiver; fee ] ->
+      deploy ~filename:"../contracts/arl/nft/exchangeV2.arl"
+        (storage_exchange ~admin ~receiver ~fee:(Int64.of_string fee))
+    | [ "deploy_validator"; exchange; royalties ] ->
+      deploy ~filename:"../contracts/arl/nft/validator.arl"
+        (storage_validator ~exchange ~royalties)
     | [ "storage" ] -> get_storage ()
     | [ "value"; bm_id; key; typ ] -> Some (get_bigmap_value bm_id key typ)
     | [ "call"; entrypoint; s ] -> call ~entrypoint s
