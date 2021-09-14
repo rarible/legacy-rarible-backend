@@ -1,4 +1,4 @@
-import { Provider, MichelsonV1Expression, send, storage } from "../utils"
+import { Provider, MichelsonV1Expression, send } from "../utils"
 
 function mint_param(
   token_id: bigint,
@@ -34,9 +34,9 @@ function metadata_param(metadata : { [key: string] : string }) : MichelsonV1Expr
 export async function get_next_token_id(
   provider: Provider,
   contract: string) : Promise<bigint> {
-  // todo : call API
-  const st = await storage(provider, contract)
-  return st.next_token_id
+  const r = await window.fetch(provider.api + '/' + contract + '/next_token_id')
+  const json = await r.json()
+  return BigInt(JSON.stringify(json))
 }
 
 export async function mintErc721Legacy(

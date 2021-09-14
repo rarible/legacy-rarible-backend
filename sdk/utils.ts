@@ -10,14 +10,11 @@ export interface Provider {
 }
 
 export interface Storage {
-  admin: string;
-  pending_admin: string | undefined | null;
-  paused: boolean;
+  owner: string;
+  royaltiesContract: string;
   ledger: BigMapAbstraction;
-  operators: BigMapAbstraction;
-  approved: BigMapAbstraction;
-  next_token_id: bigint;
-  metadata: BigMapAbstraction;
+  operator: BigMapAbstraction;
+  operator_for_all: BigMapAbstraction;
 }
 
 export interface Asset {
