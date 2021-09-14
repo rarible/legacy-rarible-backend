@@ -64,7 +64,6 @@ type mint_param = {
   mi_owner : address;
   mi_amount : nat;
   mi_royalties : part list;
-  mi_info : (string, bytes) map
 } [@@comb] [@@param Mint]
 
 type burn_param = {
@@ -76,14 +75,13 @@ type burn_param = {
 type manager =
   | Mint of mint_param
   | Burn of burn_param
+  | SetTokenMetadata of (nat * (string, string) map)
 [@@entry Manager]
 
 (* Admin *)
 
 type admin =
-  | Set_admin of address
-  | Confirm_admin
-  | Pause of bool
+  | SetMetadataUri of bytes
 [@@entry Admin]
 
 (* Main *)
@@ -99,7 +97,7 @@ type param =
 type ledger = (nat * address, nat) big_map [@@param Store]
 type operators_storage = ((address * (address * nat)), unit) big_map [@@param Store]
 type operators_for_all_storage = ((address * address), unit) big_map [@@param Store]
-type token_metadata_storage = (nat, (string, bytes) map) big_map [@@param Store]
+type token_metadata_storage = (nat, (string, string) map) big_map [@@param Store]
 
 type storage = {
   admin : address;

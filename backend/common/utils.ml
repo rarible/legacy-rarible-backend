@@ -107,11 +107,8 @@ let parse_mint = function
       Mint id;
       Mstring tk_owner;
       Mint amount;
-      Mseq royalties;
-      Mseq meta ]; _ } ->
-    let mi_meta = List.filter_map (function
-        | Mprim { prim = `Elt; args = [ Mstring s; Mbytes (`Hex h) ]; _ } -> Some (s, h)
-        | _ -> None) meta in
+      Mseq royalties ]; _ } ->
+    let mi_meta = [] in
     let mi_royalties = List.filter_map (function
         | Mprim { prim = `Elt; args = [ Mstring s; Mint i ]; _ } -> Some (s, Z.to_int64 i)
         | _ -> None) royalties in

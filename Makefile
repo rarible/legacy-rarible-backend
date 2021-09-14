@@ -48,4 +48,11 @@ mligo-pin:
 	@opam pin add -n -y mligo.~dev git+https://gitlab.com/functori/mligo.git
 
 mligo:
-	@dune build contracts
+	@dune build contracts/mligo
+
+arl-deps:
+	sudo npm i @completium/completium-cli -g
+	completium-cli init
+
+arl:
+	@dune build contracts/arl

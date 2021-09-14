@@ -1,0 +1,44 @@
+archetype royalties(owner : address)
+
+variable owner_candidate : option<address> = none
+
+asset whitelist {
+  a : address
+}
+
+entry transferOwnership(candidate : address) {
+  called by owner
+  effect {
+    owner_candidate := some(candidate);
+  }
+}
+
+entry claimOwnership() {
+  called by opt_get(owner_candidate)
+  effect {
+    owner := opt_get(owner_candidate);
+    owner_candidate := none
+  }
+}
+
+record part {
+  partAccount : address;
+  partValue   : nat;
+}
+
+asset royalties identified by rtoken rtokenId {
+  rtoken : address;
+  rtokenId : nat;
+  rvalue : list<part>;
+}
+
+entry setRoyalties(token : address, tokenId : nat, value : list<part>) {
+  sourced by owner
+  effect {
+    royalties.addupdate((token, tokenId), {rvalue = value})
+  }
+}
+
+getter getRoyalties(token : address, tokenId : nat, data : bytes) : list<part> * bytes {
+  return ((royalties[(token, tokenId)].rvalue, data))
+}

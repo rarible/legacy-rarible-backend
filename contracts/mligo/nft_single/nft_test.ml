@@ -34,7 +34,6 @@ let test_mint =
     mi_owner = src;
     mi_amount = 10n;
     mi_royalties = [ {pa_account=src; pa_value=10n} ];
-    mi_info = (Map.empty : (string, bytes) map);
   } in
   let () = Test.transfer_to_contract_exn contr (Manager (Mint mint_param) ) 0t in
   let storage = Test.get_storage taddr in
