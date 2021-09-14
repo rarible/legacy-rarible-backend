@@ -4,6 +4,11 @@ import { MichelsonV1Expression } from "@taquito/rpc"
 export { TezosToolkit, TransactionOperation, BigMapAbstraction } from "@taquito/taquito"
 export { MichelsonV1Expression } from "@taquito/rpc"
 
+export interface Provider {
+  tezos: TezosToolkit;
+  api: string;
+}
+
 export interface Storage {
   admin: string;
   pending_admin: string | undefined | null;
@@ -23,11 +28,11 @@ export interface Asset {
 }
 
 export async function send(
-  tk : TezosToolkit,
+  provider : Provider,
   contract: string,
   entrypoint: string,
   value: MichelsonV1Expression) : Promise<TransactionOperation> {
-  return tk.contract.transfer({
+  return provider.tezos.contract.transfer({
     amount: 0,
     to: contract,
     parameter: { entrypoint, value }
@@ -35,10 +40,10 @@ export async function send(
 }
 
 export async function storage(
-  tk: TezosToolkit,
+  provider: Provider,
   contract: string)
 : Promise<Storage> {
-  const c = await tk.contract.at(contract)
+  const c = await provider.tezos.contract.at(contract)
   let storage = await c.storage() as Storage
   return storage
 }
