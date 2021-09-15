@@ -3,10 +3,10 @@
  (package rarible)
  (modules rtypes)
  (preprocess (pps ppx_deriving_encoding))
- (libraries zarith))
+ (libraries zarith tzfunc))
 
 (library
  (name let)
  (package rarible)
  (modules utils let)
- (libraries crawlori rtypes))
+ (libraries crawlori rtypes cryptokit))

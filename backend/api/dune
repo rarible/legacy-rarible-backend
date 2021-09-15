@@ -2,4 +2,4 @@
  (name api)
  (modules api errors)
  (preprocess (pps ez_api.ppx_server))
- (libraries rtypes))
+ (libraries let rtypes))

@@ -179,3 +179,86 @@ let rec parse_nft e p =
   | EPnamed "setTokenMetadata", m -> parse_token_metadata m
 
   | _ -> Error `unexpected_michelson_value
+
+let string_of_asset_type = function
+  | ATXTZ -> "XTZ"
+  | _ -> failwith "Unsupported"
+
+(* fun AssetType.hash(type: AssetType): Word = keccak256(Tuples.assetTypeHashType().encode(Tuple3.apply(
+ *     TYPE_HASH.bytes(),
+ *     type.type.bytes(),
+ *     keccak256(type.data).bytes()
+ * ))) *)
+
+(* fun hashKey(maker: Address, makeAssetType: AssetType, takeAssetType: AssetType, salt: BigInteger): Word =
+ *     keccak256(
+ *         Tuples.orderKeyHashType().encode(
+ *             Tuple4(
+ *                 maker,
+ *                 AssetType.hash(makeAssetType).bytes(),
+ *                 AssetType.hash(takeAssetType).bytes(),
+ *                 salt
+ *             )
+ *         )
+ *     ) *)
+
+let hash_order _order =
+  failwith "TODO : hash_order"
+
+
+(* // who fills asset collection `fill` ?
+ * function hashKeyOrder(iorder : order) : bytes {
+ *   return keccak(concat([
+ *     pack(iorder.maker);
+ *     keccak(pack(iorder.makeAsset.assetType));
+ *     keccak(pack(iorder.takeAsset.assetType));
+ *     pack(iorder.salt)]))
+ * } *)
+
+let hash_key maker make_asset_type take_asset_type salt =
+  let make_asset_type_enc =
+    Cryptokit.hash_string (Cryptokit.Hash.keccak 256) @@ string_of_asset_type make_asset_type in
+  let take_asset_type_enc =
+    Cryptokit.hash_string (Cryptokit.Hash.keccak 256) @@ string_of_asset_type take_asset_type in
+  let str = maker ^ make_asset_type_enc ^ take_asset_type_enc ^ salt in
+  Cryptokit.hash_string (Cryptokit.Hash.keccak 256) str
+
+let order_elt_form_rarible_v2_order_form_elt elt =
+  let make_asset = elt.order_form_elt_make in
+  let take_asset = elt.order_form_elt_take in
+  let salt = Z.to_string elt.order_form_elt_salt in
+  (* TODO *)
+  let hash =
+    hash_key elt.order_form_elt_maker make_asset.asset_type take_asset.asset_type salt in
+  let make_balance = None in
+  let make_stock = Z.zero in
+  let price_history = [] in
+  let now = CalendarLib.Calendar.now () in
+  {
+    order_elt_maker = elt.order_form_elt_maker ;
+    order_elt_taker = elt.order_form_elt_taker;
+    order_elt_make = make_asset;
+    order_elt_take = take_asset;
+    order_elt_fill = Z.zero;
+    order_elt_start = elt.order_form_elt_start;
+    order_elt_end = elt.order_form_elt_end;
+    order_elt_make_stock = make_stock;
+    order_elt_cancelled = false;
+    order_elt_salt = salt ;
+    order_elt_signature = elt.order_form_elt_signature;
+    order_elt_created_at = now;
+    order_elt_last_update_at = now;
+    order_elt_pending = Some [];
+    order_elt_hash = hash;
+    order_elt_make_balance = make_balance;
+    order_elt_make_price_usd = None;
+    order_elt_take_price_usd = None;
+    order_elt_price_history = price_history;
+  }
+
+let rarible_v2_order_from_rarible_v2_order_form form =
+  let rarible_v2_order_elt =
+    order_elt_form_rarible_v2_order_form_elt form.rarible_v2_order_form_elt in
+  let rarible_v2_order_data = form.rarible_v2_order_form_data in
+  let rarible_v2_order = { rarible_v2_order_elt; rarible_v2_order_data } in
+  rarible_v2_order

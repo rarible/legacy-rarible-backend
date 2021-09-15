@@ -84,7 +84,7 @@ module A = struct
 
   type binary = string [@@deriving encoding]
   (* TODO : data format 2017-07-21T17:32:28Z *)
-  type date = string [@@deriving encoding]
+  type date = (Tzfunc.Proto.A.timestamp [@encoding Tzfunc.Proto.A.timestamp_enc.Tzfunc.Proto.Encoding.json]) [@@deriving encoding]
 
   type bytes_str = string [@@deriving encoding]
 end
@@ -448,6 +448,7 @@ type asset_type_lazy_nft = {
 } [@@deriving encoding {camel}]
 
 type asset_type =
+  | ATXTZ [@kind "assetClass"] [@kind_label "XTZ"]
   | ATETH [@kind "assetClass"] [@kind_label "ETH"]
   | ATFLOW [@kind "assetClass"] [@kind_label "FLOW"]
   | ATERC20 of (A.address [@wrap "contract"])[@kind "assetClass"] [@kind_label "ERC20"]
@@ -586,23 +587,23 @@ type order_price_history_record = {
 
 type order_elt = {
   order_elt_maker : A.address;
-  order_elt_taker: A.address;
+  order_elt_taker: A.address option;
   order_elt_make: asset;
   order_elt_take: asset;
   order_elt_fill: A.big_integer;
-  order_elt_start: int64;
-  order_elt_end: int64;
+  order_elt_start: int64 option;
+  order_elt_end: int64 option;
   order_elt_make_stock: A.big_integer;
   order_elt_cancelled: bool ;
   order_elt_salt: A.word;
   order_elt_signature: A.binary;
   order_elt_created_at: A.date;
   order_elt_last_update_at: A.date;
-  order_elt_pending: order_exchange_history list ;
+  order_elt_pending: order_exchange_history list option ;
   order_elt_hash: A.word;
-  order_elt_make_balance: A.big_integer;
-  order_elt_make_price_usd: A.big_decimal;
-  order_elt_take_price_usd: A.big_decimal;
+  order_elt_make_balance: A.big_integer option;
+  order_elt_make_price_usd: A.big_decimal option;
+  order_elt_take_price_usd: A.big_decimal option;
   order_elt_price_history: order_price_history_record list ;
 } [@@deriving encoding {camel}]
 
