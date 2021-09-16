@@ -29,7 +29,8 @@ opam-switch:
 
 deps:
 	@opam pin add -n -y ez_pgocaml.dev git+https://github.com/ocamlpro/ez_pgocaml.git
-	@opam pin add -n -y ez_api.dev git+https://github.com/ocamlpro/ez_api.git
+	@opam pin add -n -y ez_api.dev git+https://github.com/maxtori/ez_api.git#allow-static-dynamic
+	@opam pin add -n -y digestif.dev git+https://github.com/maxtori/digestif.git#keccak-256
 	@opam pin add -n -y hacl.dev git+https://gitlab.com/maxtori/ocaml-hacl.git
 	@opam pin add -n -y ppx_deriving_encoding.dev git+https://gitlab.com/o-labs/ppx_deriving_encoding.git
 	@opam pin add -n -y ppx_deriving_jsoo.dev git+https://gitlab.com/o-labs/ppx_deriving_jsoo.git

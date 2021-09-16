@@ -11,4 +11,4 @@
 (package
  (name rarible)
  (synopsis "Crawler, server and sdk for Tezos rarible")
- (depends crawlori pgocaml_ppx ez_pgocaml))
+ (depends crawlori pgocaml_ppx ez_pgocaml ocurl kafka_lwt))
