@@ -69,6 +69,13 @@ type param =
 [@@deriving encoding]
 
 module A = struct
+  let big_integer_enc =
+    let open Json_encoding in
+    union [
+      case string (fun x -> Some x) (fun x -> x);
+      case int53 Int64.of_string_opt Int64.to_string;
+    ]
+
   (* TODO : B58CHECK ? *)
   type address = string [@@deriving encoding]
   (* TODO : B58CHECK ? EX TRANSACTION HASH*)
@@ -78,9 +85,9 @@ module A = struct
 
   type block_number = int64 [@@deriving encoding]
 
-  type big_decimal = z [@@deriving encoding]
+  type big_decimal = string [@@deriving encoding]
 
-  type big_integer = z [@@deriving encoding]
+  type big_integer = string
 
   type binary = string [@@deriving encoding]
 
@@ -215,8 +222,8 @@ type lazy_nft_common = {
 } [@@deriving encoding]
 
 type lazy_nft_diff =
-  | LazyNft721 [@kind "ERC721"] [@kind_label "@type"]
-  | LazyNft1155 of (A.big_integer [@wrap "supply"]) [@kind "ERC1155"] [@kind_label "@type"]
+  | LazyNft721 [@kind_label "ERC721"] [@kind "@type"]
+  | LazyNft1155 of (A.big_integer [@wrap "supply"]) [@kind_label "ERC1155"] [@kind "@type"]
 [@@deriving encoding]
 
 type lazy_nft = {
@@ -225,7 +232,7 @@ type lazy_nft = {
 } [@@deriving encoding]
 
 type item_transfer = {
-  item_transfer_type_ : string [@kind "TRANSFER"];
+  item_transfer_type_ : string [@kind_label "TRANSFER"];
   item_transfer_owner : A.address option;
   item_transfer_value : A.big_integer option;
   item_transfer_from : A.address;
@@ -332,13 +339,13 @@ type nft_activity_by_collection = {
 
 type nft_activity_filter =
   | ActivityFilterAll of
-      (nft_activity_filter_all_type list [@wrap "types"]) [@kind "all"] [@kind_label "@type"]
+      (nft_activity_filter_all_type list [@wrap "types"]) [@kind_label "all"] [@kind "@type"]
   | ActivityFilterByUser of
-      nft_activity_by_user [@kind "by_user"] [@kind_label "@type"]
+      nft_activity_by_user [@kind_label "by_user"] [@kind "@type"]
   | ActivityFilterByItem of
-      nft_activity_by_item  [@kind "by_item"] [@kind_label "@type"]
+      nft_activity_by_item  [@kind_label "by_item"] [@kind "@type"]
   | ActivityFilterByCollection of
-      nft_activity_by_collection [@kind "by_collection"] [@kind_label "@type"]
+      nft_activity_by_collection [@kind_label "by_collection"] [@kind "@type"]
 [@@deriving encoding]
 
 type nft_activity_elt = {
@@ -355,13 +362,13 @@ type nft_activity_elt = {
 
 type nft_activity_transfer = {
   nft_activity_tranfer_elt : nft_activity_elt ; [@merge]
-  nft_activity_tranfer_from : A.address ; [@merge]
+  nft_activity_tranfer_from : A.address ;
 } [@@deriving encoding]
 
 type nft_activity =
-  | NftActivityMint of nft_activity_elt [@kind "mint"] [@kind_label "@type"]
-  | NftActivityBurn of nft_activity_elt [@kind "burn"] [@kind_label "@type"]
-  | NftActivityTransfer of nft_activity_transfer [@kind "mint"] [@kind_label "@type"]
+  | NftActivityMint of nft_activity_elt [@kind_label "mint"] [@kind "@type"]
+  | NftActivityBurn of nft_activity_elt [@kind_label "burn"] [@kind "@type"]
+  | NftActivityTransfer of nft_activity_transfer [@kind_label "mint"] [@kind "@type"]
 [@@deriving encoding]
 
 type nft_activities = {
@@ -384,8 +391,8 @@ type item_history_transfer = {
 } [@@deriving encoding]
 
 type item_history =
-  | IHRoyalty of (part list [@wrap "royalties"]) [@kind "ROYALTY"] [@kind_label "type"]
-  | IHTransfer of item_history_transfer [@kind "TRANSFER"] [@kind_label "type"]
+  | IHRoyalty of (part list [@wrap "royalties"]) [@kind_label "ROYALTY"] [@kind "type"]
+  | IHTransfer of item_history_transfer [@kind_label "TRANSFER"] [@kind "type"]
 [@@deriving encoding]
 
 type nft_ownership = {
@@ -459,6 +466,8 @@ type asset_type =
   | ATXTZ [@kind_label "assetClass"] [@kind "XTZ"]
   | ATFA_1_2 [@kind_label "assetClass"] [@kind "FA_1_2"]
   | ATFA_2 [@kind_label "assetClass"] [@kind "FA_2"]
+  | ATETH [@kind_label "assetClass"] [@kind "ETH"]
+  | ATERC721 of asset_type_nft [@kind_label "assetClass"] [@kind "ERC721"]
   (* | ATETH [@kind "assetClass"] [@kind_label "ETH"]
    * | ATFLOW [@kind "assetClass"] [@kind_label "FLOW"]
    * | ATERC20 of (A.address [@wrap "contract"])[@kind "assetClass"] [@kind_label "ERC20"]
@@ -469,8 +478,8 @@ type asset_type =
 [@@deriving encoding]
 
 type asset = {
-  asset_type : asset_type ;
-  asset_value : A.big_integer ;
+  asset_type : asset_type [@key "assetType"] ;
+  asset_value : A.big_integer [@key "value"] ;
 } [@@deriving encoding]
 
 type order_form_elt = {
@@ -505,7 +514,7 @@ type order_open_sea_v1_data_v1_how_to_call =
 [@@deriving encoding]
 
 type order_open_sea_v1_data_v1 = {
-  order_open_sea_v1_data_v1_data_type: string [@kind "OPEN_SEA_V1_DATA_V1"] ;
+  order_open_sea_v1_data_v1_data_type: string ;
   order_open_sea_v1_data_v1_exchange : A.address ;
   order_open_sea_v1_data_v1_maker_relayer_fee : A.big_integer ;
   order_open_sea_v1_data_v1_taker_relayer_fee : A.big_integer ;
@@ -521,10 +530,10 @@ type order_open_sea_v1_data_v1 = {
   order_open_sea_v1_data_v1_static_target: A.address ;
   order_open_sea_v1_data_v1_static_extra_data: A.binary ;
   order_open_sea_v1_data_v1_extra: A.big_integer;
-} [@@deriving encoding]
+} [@@deriving encoding {camel}]
 
 type order_data_legacy = {
-  order_data_legacy_data_type : string [@kind "LEGACY"] ;
+  order_data_legacy_data_type : string ;
   order_data_legacy_fee : int ;
 } [@@deriving encoding {camel}]
 
@@ -534,10 +543,10 @@ type legacy_order_form = {
 } [@@deriving encoding]
 
 type order_rarible_v2_data_v1 = {
-  order_rarible_v2_data_v1_data_type : string [@kind "RARIBLE_V2_DATA_V1"] ;
+  order_rarible_v2_data_v1_data_type : string ;
   order_rarible_v2_data_v1_payouts : part list ;
   order_rarible_v2_data_v1_origin_fees : part list ;
-} [@@deriving encoding]
+} [@@deriving encoding {camel}]
 
 type rarible_v2_order_form = {
   rarible_v2_order_form_elt : order_form_elt [@merge] ;
@@ -551,11 +560,11 @@ type open_sea_v1_order_form = {
 
 type order_form =
   | LegacyOrderForm of
-      legacy_order_form [@kind "type"] [@kind_label "RARIBLE_V1"]
+      legacy_order_form [@kind_label "type"] [@kind "RARIBLE_V1"]
   | RaribleV2OrderFrom of
-      rarible_v2_order_form [@kind "type"] [@kind_label "RARIBLE_V2"]
+      rarible_v2_order_form [@kind_label "type"] [@kind "RARIBLE_V2"]
   | OpenSeav1OrderForm of
-      open_sea_v1_order_form [@kind "type"] [@kind_label "OPEN_SEA_V1"]
+      open_sea_v1_order_form [@kind_label "type"] [@kind "OPEN_SEA_V1"]
 [@@deriving encoding]
 
 type order_exchange_history_elt = {
@@ -573,19 +582,19 @@ type order_side =
 
 type order_side_match = {
   order_side_match_elt : order_exchange_history_elt [@merge];
-  order_side_match_side : order_side ;
+  order_side_match_side : order_side option ;
   order_side_match_fill : A.big_integer ;
-  order_side_match_taker : A.address ;
-  order_side_match_counter_hash : A.word ;
-  order_side_match_make_usd : A.big_decimal ;
-  order_side_match_take_usd : A.big_decimal ;
-  order_side_match_make_price_ssd : A.big_decimal ;
-  order_side_match_take_price_usd : A.big_decimal ;
+  order_side_match_taker : A.address option ;
+  order_side_match_counter_hash : A.word option ;
+  order_side_match_make_usd : A.big_decimal option ;
+  order_side_match_take_usd : A.big_decimal option ;
+  order_side_match_make_price_usd : A.big_decimal option ;
+  order_side_match_take_price_usd : A.big_decimal option ;
 } [@@deriving encoding {camel}]
 
 type order_exchange_history =
-  | OrderCancel of order_exchange_history_elt [@kind "type"] [@kind_label "CANCEL"]
-  | OrderSideMatch of order_side_match [@kind "type"] [@kind_label "ORDER_SIDE_MATCH"]
+  | OrderCancel of order_exchange_history_elt [@kind_label "type"] [@kind "CANCEL"]
+  | OrderSideMatch of order_side_match [@kind_label "type"] [@kind "ORDER_SIDE_MATCH"]
 [@@deriving encoding]
 
 type order_price_history_record = {
@@ -607,7 +616,7 @@ type order_elt = {
   order_elt_salt: A.big_integer;
   order_elt_signature: A.binary;
   order_elt_created_at: A.date;
-  order_elt_last_update_at: A.date;
+  order_elt_last_updated_at: A.date;
   order_elt_pending: order_exchange_history list option ;
   order_elt_hash: A.word;
   order_elt_make_balance: A.big_integer option;
@@ -706,13 +715,13 @@ type order_activity_by_collection = {
 
 type order_activity_filter =
   | ActivityFilterAll of
-      (order_activity_filter_all_type list [@wrap "types"]) [@kind "all"] [@kind_label "@type"]
+      (order_activity_filter_all_type list [@wrap "types"]) [@kind_label "all"] [@kind "@type"]
   | ActivityFilterByUser of
-      order_activity_by_user [@kind "by_user"] [@kind_label "@type"]
+      order_activity_by_user [@kind_label "by_user"] [@kind "@type"]
   | ActivityFilterByItem of
-      order_activity_by_item  [@kind "by_item"] [@kind_label "@type"]
+      order_activity_by_item  [@kind_label "by_item"] [@kind "@type"]
   | ActivityFilterByCollection of
-      order_activity_by_collection [@kind "by_collection"] [@kind_label "@type"]
+      order_activity_by_collection [@kind_label "by_collection"] [@kind "@type"]
 [@@deriving encoding]
 
 type order_activity_source =
@@ -770,11 +779,11 @@ type order_activity_cancel_bid = {
 } [@@deriving encoding {camel}]
 
 type order_activity =
-  | OrderActivityMatch of order_activity_match [@kind "match"] [@kind_label "@type"]
-  | OrderActivityList of order_activity_bid [@kind "list"] [@kind_label "@type"]
-  | OrderActivityBid of order_activity_bid [@kind "bid"] [@kind_label "@type"]
-  | OrderActivityCancelBid of order_activity_cancel_bid [@kind "cancel_bid"] [@kind_label "@type"]
-  | OrderActivityCancelList of order_activity_cancel_bid [@kind "cancel_list"] [@kind_label "@type"]
+  | OrderActivityMatch of order_activity_match [@kind_label "match"] [@kind "@type"]
+  | OrderActivityList of order_activity_bid [@kind_label "list"] [@kind "@type"]
+  | OrderActivityBid of order_activity_bid [@kind_label "bid"] [@kind "@type"]
+  | OrderActivityCancelBid of order_activity_cancel_bid [@kind_label "cancel_bid"] [@kind "@type"]
+  | OrderActivityCancelList of order_activity_cancel_bid [@kind_label "cancel_list"] [@kind "@type"]
 [@@deriving encoding]
 
 type order_activities = {
@@ -824,9 +833,9 @@ type open_sea_v1_order_bid = {
 } [@@deriving encoding]
 
 type order_bid =
-  | LegacyOrderBid of legacy_order_bid [@kind "RARIBLE_V1"] [@kind_label "type"]
-  | RaribleV2OrderBid of rarible_v2_order_bid [@kind "RARIBLE_V2"] [@kind_label "type"]
-  | OpenSeav1OrderBid of open_sea_v1_order_bid [@kind "OPEN_SEA_V1"] [@kind_label "type"]
+  | LegacyOrderBid of legacy_order_bid [@kind_label "RARIBLE_V1"] [@kind "type"]
+  | RaribleV2OrderBid of rarible_v2_order_bid [@kind_label "RARIBLE_V2"] [@kind "type"]
+  | OpenSeav1OrderBid of open_sea_v1_order_bid [@kind_label "OPEN_SEA_V1"] [@kind "type"]
 [@@deriving encoding]
 
 type order_bids_pagination = {

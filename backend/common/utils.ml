@@ -281,7 +281,9 @@ let match_fields l script =
 
 let string_of_asset_type = function
   | ATXTZ -> "XTZ"
-  | _ -> failwith "Unsupported"
+  | ATETH -> "ETH"
+  | ATERC721 _ -> "ERC721"
+  | _ -> failwith "Unsupported asset"
 
 (* fun AssetType.hash(type: AssetType): Word = keccak256(Tuples.assetTypeHashType().encode(Tuple3.apply(
  *     TYPE_HASH.bytes(),
@@ -312,11 +314,13 @@ let asset_type_mich = function
   | ATXTZ -> prim `Left ~args:[prim `Unit]
   | ATFA_1_2 -> prim `Right ~args:[prim `Left ~args:[ prim `Unit ]]
   | ATFA_2 -> prim `Right ~args:[prim `Right ~args:[ prim `Left ~args:[ prim `Unit ] ]]
+  | ATETH -> Mint Z.zero
+  | ATERC721 _ -> Mint Z.one
 
 let asset_mich a =
   prim `Pair ~args:[
     prim `Pair ~args:[ asset_type_mich a.asset_type; Mbytes (`Hex "00") ];
-    Mint a.asset_value
+    Mint (Z.of_string a.asset_value)
   ]
 
 let option_mich f = function
@@ -330,7 +334,7 @@ let hash_key maker make_asset_type take_asset_type salt =
   let$ maker = pack @@ Mstring maker in
   let$ make_asset_type = pack @@ asset_type_mich make_asset_type in
   let$ take_asset_type = pack @@ asset_type_mich take_asset_type in
-  let$ salt = pack @@ Mint salt in
+  let$ salt = pack @@ Mint (Z.of_string salt) in
   Result.ok @@ keccak @@ String.concat "" [
     maker;
     keccak make_asset_type;
@@ -339,6 +343,7 @@ let hash_key maker make_asset_type take_asset_type salt =
   ]
 
 let hash_order order =
+  Format.eprintf "hash_order\n%!";
   let elt = order.order_elt in
   (* todo : correct data_type *)
   match order.order_data with
@@ -362,7 +367,7 @@ let hash_order order =
           prim `Pair ~args:[
             asset_mich elt.order_elt_make;
             prim `Pair ~args:[
-              Mint elt.order_elt_salt;
+              Mint (Z.of_string elt.order_elt_salt);
               prim `Pair ~args:[
                 option_mich (fun c -> Mstring (Proto.A.cal_to_str c)) elt.order_elt_start;
                 prim `Pair ~args:[
@@ -397,7 +402,7 @@ let order_elt_form_rarible_v2_order_form_elt elt =
     hash_key elt.order_form_elt_maker make_asset.asset_type take_asset.asset_type
       elt.order_form_elt_salt in
   let make_balance = None in
-  let make_stock = Z.zero in
+  let make_stock = "0" in
   let price_history = [] in
   let now = CalendarLib.Calendar.now () in
   Ok {
@@ -405,7 +410,7 @@ let order_elt_form_rarible_v2_order_form_elt elt =
     order_elt_taker = elt.order_form_elt_taker;
     order_elt_make = make_asset;
     order_elt_take = take_asset;
-    order_elt_fill = Z.zero;
+    order_elt_fill = "0";
     order_elt_start = elt.order_form_elt_start;
     order_elt_end = elt.order_form_elt_end;
     order_elt_make_stock = make_stock;
@@ -413,7 +418,7 @@ let order_elt_form_rarible_v2_order_form_elt elt =
     order_elt_salt = elt.order_form_elt_salt;
     order_elt_signature = elt.order_form_elt_signature;
     order_elt_created_at = now;
-    order_elt_last_update_at = now;
+    order_elt_last_updated_at = now;
     order_elt_pending = Some [];
     order_elt_hash = hash;
     order_elt_make_balance = make_balance;
@@ -427,3 +432,38 @@ let rarible_v2_order_from_rarible_v2_order_form form =
     order_elt_form_rarible_v2_order_form_elt form.rarible_v2_order_form_elt in
   let rarible_v2_order_data = form.rarible_v2_order_form_data in
   Ok { order_elt; order_data = RaribleV2Order rarible_v2_order_data }
+
+let string_opt_of_float_opt = function
+  | None -> None
+  | Some f -> Some (string_of_float f)
+
+let float_opt_of_string_opt = function
+  | None -> None
+  | Some f -> Some (float_of_string f)
+
+let order_side_opt_of_string_opt = function
+  | None -> None
+  | Some "LEFT" -> Some OSLEFT
+  | Some "RIGHT" -> Some OSRIGHT
+  | _ -> assert false
+
+let string_opt_of_order_side_opt = function
+  | None -> None
+  | Some OSLEFT -> Some "LEFT"
+  | Some OSRIGHT -> Some "RIGHT"
+
+let int64_opt_of_timestamp_opt = function
+  | None -> None
+  | Some t -> Some (Int64.of_float @@ CalendarLib.Calendar.to_unixfloat t)
+
+let timestamp_opt_of_int64_opt = function
+  | None -> None
+  | Some f -> Some (CalendarLib.Calendar.from_unixfloat @@ Int64.to_float f)
+
+let string_opt_of_int64_opt = function
+  | None -> None
+  | Some i -> Some (Int64.to_string i)
+
+let int64_opt_of_string_opt = function
+  | None -> None
+  | Some i -> Some (Int64.of_string i)

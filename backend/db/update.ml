@@ -85,13 +85,64 @@ let upgrade_1_to_2 dbh version =
       primary key (transaction, id))|};
 
     {|create table orders(
-      id bigserial primary key)|};
+      maker varchar not null,
+      taker varchar,
+      make_asset_type_class varchar not null,
+      make_asset_type_contract varchar,
+      make_asset_type_token_id varchar,
+      make_asset_value bigint not null,
+      take_asset_type_class varchar not null,
+      take_asset_type_contract varchar,
+      take_asset_type_token_id varchar,
+      take_asset_value bigint not null,
+      fill bigint not null,
+      start_date timestamp,
+      end_date timestamp,
+      make_stock bigint not null,
+      cancelled boolean not null,
+      salt varchar not null,
+      signature varchar not null,
+      created_at timestamp not null,
+      last_updated_at timestamp not null,
+      payouts jsonb,
+      origin_fees jsonb,
+      hash varchar primary key,
+      make_balance bigint,
+      make_price_usd float,
+      take_price_usd float)|};
+
+    {|create table order_pending(
+      type varchar not null,
+      make_asset_type_class varchar,
+      make_asset_type_contract varchar,
+      make_asset_type_token_id varchar,
+      make_asset_value bigint,
+      take_asset_type_class varchar,
+      take_asset_type_contract varchar,
+      take_asset_type_token_id varchar,
+      take_asset_value bigint,
+      date timestamp not null,
+      maker varchar,
+      side varchar,
+      fill bigint,
+      taker varchar,
+      counter_hash varchar,
+      make_usd float,
+      take_usd float,
+      make_price_usd float,
+      take_price_usd float,
+      hash varchar not null references orders(hash) on delete cascade)|};
+
+    {|create table order_price_history(
+      date timestamp not null,
+      make_value bigint not null,
+      take_value bigint not null,
+      hash varchar not null references orders(hash) on delete cascade)|};
 
     {|create table match_orders(
-      id1 bigint not null references orders(id),
-      id2 bigint not null references orders(id),
-      cancel boolean not null default false,
-      primary key (id1, id2))|};
+      hash1 varchar not null references orders(hash),
+      hash2 varchar not null references orders(hash),
+      primary key (hash1, hash2))|};
   ]
 
 let upgrades =

@@ -2,6 +2,7 @@ open Let
 open Tzfunc.Proto
 open Rtypes
 open Hooks
+open Utils
 
 module PGOCaml = Pg.PGOCaml
 
@@ -346,3 +347,345 @@ let set_main _config dbh {Hooks.m_main; m_hash} =
   let>? c_updates = [%pgsql.object dbh "update contract_updates set main = $m_main where block = $m_hash returning *"] in
   let>? () = contract_updates dbh m_main c_updates in
   token_updates dbh m_main t_updates
+
+let mk_asset asset_class contract token_id asset_value =
+  let asset_value = Int64.to_string asset_value in
+  match asset_class with
+  (* For testing purposes*)
+  | "ERC721" ->
+    begin
+      match contract, token_id with
+      | Some c, Some id ->
+        let asset_type =
+          ATERC721
+            { asset_type_nft_contract = c ; asset_type_nft_token_id = id } in
+        Lwt.return_ok { asset_type; asset_value }
+      | _, _ ->
+        Lwt.return_error (`hook_error ("no contract or tokenId for ERC721 asset"))
+    end
+  | "ETH" ->
+    begin
+      match contract, token_id with
+      | None, None ->
+        Lwt.return_ok { asset_type = ATETH ; asset_value }
+      | _, _ ->
+        Lwt.return_error (`hook_error ("contract or tokenId for ETH asset"))
+    end
+    (* Tezos assets*)
+    (* | "XTZ"
+     * | "FA1.2"
+     * | "FA2" *)
+  | _ ->
+    Lwt.return_error (`hook_error ("invalid asset class " ^ asset_class))
+
+let db_from_asset asset =
+  let asset_value = Int64.of_string asset.asset_value in
+  match asset.asset_type with
+  (* For testing purposes*)
+  | ATERC721 data ->
+    Lwt.return_ok
+      (string_of_asset_type asset.asset_type,
+       Some data.asset_type_nft_contract,
+       Some data.asset_type_nft_token_id,
+       asset_value)
+  | ATETH ->
+    Lwt.return_ok
+      (string_of_asset_type asset.asset_type, None, None, asset_value)
+  (* Tezos assets*)
+  (* | "XTZ"
+   * | "FA1.2"
+   * | "FA2" *)
+  | _ ->
+    Lwt.return_error (`hook_error ("invalid asset"))
+
+let get_order_pending ?dbh hash_key =
+  use dbh @@ fun dbh ->
+  let>? l =
+    [%pgsql dbh
+        "select type, make_asset_type_class, make_asset_type_contract, \
+         make_asset_type_token_id, make_asset_value, \
+         take_asset_type_class, take_asset_type_contract, \
+         take_asset_type_token_id, take_asset_value, \
+         date, maker, side, fill, taker, counter_hash, make_usd, take_usd, \
+         make_price_usd, take_price_usd \
+         from order_pending where hash = $hash_key"] in
+  map_rp
+    (fun
+      (htype, make_class, make_contract, make_token_id, make_asset_value,
+       take_class, take_contract, take_token_id, take_asset_value,
+       date, maker, side, fill, taker, counter_hash, make_usd, take_usd,
+       make_price_usd, take_price_usd) ->
+      begin match make_class, make_asset_value with
+        | Some ac, Some v ->
+          mk_asset ac make_contract make_token_id v >>=? fun asset ->
+          Lwt.return_ok @@ Some asset
+        | _, _ -> Lwt.return_ok None
+      end >>=? fun order_exchange_history_elt_make ->
+      begin match take_class ,take_asset_value with
+        | Some ac, Some v ->
+          mk_asset ac take_contract take_token_id v >>=? fun asset ->
+          Lwt.return_ok @@ Some asset
+        | _, _ -> Lwt.return_ok None
+      end >>=? fun order_exchange_history_elt_take ->
+      let order_exchange_history_elt = {
+        order_exchange_history_elt_hash = hash_key ;
+        order_exchange_history_elt_make ;
+        order_exchange_history_elt_take ;
+        order_exchange_history_elt_date = date ;
+        order_exchange_history_elt_maker = maker ;
+      } in
+      match htype with
+      | "CANCEL" ->
+        Lwt.return_ok @@ OrderCancel order_exchange_history_elt
+      | "ORDER_SIDE_MATCH" ->
+        begin
+          match fill with
+          | None ->
+            Lwt.return_error (`hook_error "null fill with order_side_match")
+          | Some f ->
+            let order_side_match_fill = Int64.to_string f in
+            let order_side_match = {
+              order_side_match_elt = order_exchange_history_elt ;
+              order_side_match_side = order_side_opt_of_string_opt side ;
+              order_side_match_fill ;
+              order_side_match_taker = taker ;
+              order_side_match_counter_hash = counter_hash ;
+              order_side_match_make_usd = string_opt_of_float_opt make_usd;
+              order_side_match_take_usd = string_opt_of_float_opt take_usd ;
+              order_side_match_make_price_usd = string_opt_of_float_opt make_price_usd ;
+              order_side_match_take_price_usd = string_opt_of_float_opt take_price_usd ;
+            } in
+            Lwt.return_ok @@ OrderSideMatch order_side_match
+        end
+      | _ -> Lwt.return_error (`hook_error ("wrong pending type " ^ htype))) l
+
+let get_order_price_history ?dbh hash_key =
+  use dbh @@ fun dbh ->
+  let|>? l =
+    [%pgsql dbh
+        "select date, make_value, take_value \
+         from order_price_history where hash = $hash_key"] in
+  List.map
+    (fun (date, make_value, take_value) -> {
+         order_price_history_record_date = date ;
+         order_price_history_record_make_value = Int64.to_string make_value ;
+         order_price_history_record_take_value = Int64.to_string take_value ;
+       }) l
+
+let mk_order order_obj =
+  mk_asset
+    order_obj#make_asset_type_class
+    order_obj#make_asset_type_contract
+    order_obj#make_asset_type_token_id
+    order_obj#make_asset_value
+  >>=? fun order_elt_make ->
+  mk_asset
+    order_obj#take_asset_type_class
+    order_obj#take_asset_type_contract
+    order_obj#take_asset_type_token_id
+    order_obj#take_asset_value
+  >>=? fun order_elt_take ->
+  get_order_pending order_obj#hash >>=? fun pending ->
+  get_order_price_history order_obj#hash >>=? fun price_history ->
+  let order_elt = {
+    order_elt_maker = order_obj#maker ;
+    order_elt_taker = order_obj#taker ;
+    order_elt_make ;
+    order_elt_take ;
+    order_elt_fill = Int64.to_string order_obj#fill ;
+    order_elt_start = order_obj#start_date ;
+    order_elt_end = order_obj#end_date ;
+    order_elt_make_stock = Int64.to_string order_obj#make_stock ;
+    order_elt_cancelled = order_obj#cancelled ;
+    order_elt_salt = order_obj#salt ;
+    order_elt_signature = order_obj#signature ;
+    order_elt_created_at = order_obj#created_at ;
+    order_elt_last_updated_at = order_obj#last_updated_at ;
+    order_elt_pending = Some pending ;
+    order_elt_hash = order_obj#hash ;
+    order_elt_make_balance = string_opt_of_int64_opt order_obj#make_balance ;
+    order_elt_make_price_usd = string_opt_of_float_opt order_obj#make_price_usd ;
+    order_elt_take_price_usd = string_opt_of_float_opt order_obj#take_price_usd ;
+    order_elt_price_history = price_history ;
+  } in
+  let data = RaribleV2Order {
+    order_rarible_v2_data_v1_data_type = "RARIBLE_V2_DATA_V1" ;
+    order_rarible_v2_data_v1_payouts =
+      begin match order_obj#payouts with
+        | None -> []
+        | Some json -> (EzEncoding.destruct (Json_encoding.list part_enc) json)
+      end ;
+    order_rarible_v2_data_v1_origin_fees =
+      match order_obj#origin_fees with
+      | None -> []
+      | Some json -> (EzEncoding.destruct (Json_encoding.list part_enc) json) ;
+  } in
+  let rarible_v2_order = {
+    order_elt = order_elt ;
+    order_data = data ;
+  } in
+  Lwt.return_ok rarible_v2_order
+
+let get_order ?dbh hash_key =
+  use dbh @@ fun dbh ->
+  let>? l =
+    [%pgsql.object dbh
+        "select maker, taker, \
+         make_asset_type_class, make_asset_type_contract, make_asset_type_token_id, \
+         make_asset_value, \
+         take_asset_type_class, take_asset_type_contract, take_asset_type_token_id, \
+         take_asset_value, \
+         fill, start_date, end_date, make_stock, cancelled, salt, \
+         signature, created_at, last_updated_at, hash, payouts, origin_fees, \
+         make_balance, make_price_usd, take_price_usd \
+         from orders where hash = $hash_key"] in
+  match l with
+  | [] -> Lwt.return_ok None
+  | _ ->
+    one l >>=? fun r ->
+    mk_order r >>=? fun order ->
+    Lwt.return_ok @@ Some order
+
+let insert_pendings ?dbh pendings hash_key =
+  use dbh @@ fun dbh ->
+  iter_rp (fun pending ->
+      let>? (ptype, make_class, make_contract, make_token_id, make_asset_value,
+             take_class, take_contract, take_token_id, take_asset_value,
+             date, maker, side, fill, taker, counter_hash, make_usd, take_usd,
+             make_price_usd, taker_price_usd) = match pending with
+        | OrderCancel elt ->
+          let>? make_class, make_contract, make_token_id, make_asset_value =
+            match elt.order_exchange_history_elt_make with
+            | None -> Lwt.return_ok (None, None, None, None)
+            | Some asset ->
+              let|>? make_class, make_contract, make_token_id, make_asset_value =
+                db_from_asset asset in
+              (Some make_class, make_contract, make_token_id, Some make_asset_value)
+          in
+          let|>? take_class, take_contract, take_token_id, take_asset_value =
+            match elt.order_exchange_history_elt_take with
+            | None -> Lwt.return_ok (None, None, None, None)
+            | Some asset ->
+              let|>? take_class, take_contract, take_token_id, take_asset_value =
+                db_from_asset asset in
+              (Some take_class, take_contract, take_token_id, Some take_asset_value)
+          in
+          "CANCEL", make_class, make_contract, make_token_id, make_asset_value,
+          take_class, take_contract, take_token_id, take_asset_value,
+          elt.order_exchange_history_elt_date, elt.order_exchange_history_elt_maker,
+          None, None, None, None, None, None, None, None
+        | OrderSideMatch side_match ->
+          let elt = side_match.order_side_match_elt in
+          let>? make_class, make_contract, make_token_id, make_asset_value =
+            match elt.order_exchange_history_elt_make with
+            | None -> Lwt.return_ok (None, None, None, None)
+            | Some asset ->
+              let|>? make_class, make_contract, make_token_id, make_asset_value =
+                db_from_asset asset in
+              (Some make_class, make_contract, make_token_id, Some make_asset_value)
+          in
+          let|>? take_class, take_contract, take_token_id, take_asset_value =
+            match elt.order_exchange_history_elt_take with
+            | None -> Lwt.return_ok (None, None, None, None)
+            | Some asset ->
+              let|>? take_class, take_contract, take_token_id, take_asset_value =
+                db_from_asset asset in
+              (Some take_class, take_contract, take_token_id, Some take_asset_value)
+          in
+          "ORDER_SIDE_MATCH", make_class, make_contract, make_token_id, make_asset_value,
+          take_class, take_contract, take_token_id, take_asset_value,
+          elt.order_exchange_history_elt_date, elt.order_exchange_history_elt_maker,
+          string_opt_of_order_side_opt side_match.order_side_match_side,
+          Some (Int64.of_string side_match.order_side_match_fill),
+          side_match.order_side_match_taker,
+          side_match.order_side_match_counter_hash,
+          float_opt_of_string_opt side_match.order_side_match_make_usd,
+          float_opt_of_string_opt side_match.order_side_match_take_usd,
+          float_opt_of_string_opt side_match.order_side_match_make_price_usd,
+          float_opt_of_string_opt side_match.order_side_match_take_price_usd
+      in
+      [%pgsql dbh
+          "insert into order_pending(\
+           type, make_asset_type_class, make_asset_type_contract, \
+           make_asset_type_token_id, make_asset_value, \
+           take_asset_type_class, take_asset_type_contract, \
+           take_asset_type_token_id, take_asset_value, \
+           date, maker, side, fill, taker, counter_hash, make_usd, take_usd, \
+           make_price_usd, take_price_usd, hash) values(\
+           $ptype, $?make_class, $?make_contract, $?make_token_id, $?make_asset_value, \
+           $?take_class, $?take_contract, $?take_token_id, $?take_asset_value, \
+           $date, $?maker, $?side, $?fill, $?taker, $?counter_hash, $?make_usd, $?take_usd, \
+           $?make_price_usd, $?taker_price_usd, $hash_key)"]
+    ) pendings
+
+let insert_price_history ?dbh price_history hash_key =
+  use dbh @@ fun dbh ->
+  iter_rp (fun ph ->
+      let date = ph.order_price_history_record_date in
+      let make_value = Int64.of_string ph.order_price_history_record_make_value in
+      let take_value = Int64.of_string ph.order_price_history_record_take_value in
+      [%pgsql dbh
+          "insert into order_price_history (date, make_value, take_value, hash) \
+           values ($date, $make_value, $take_value, $hash_key)"])
+    price_history
+
+let upsert_order ?dbh order hash_key =
+  let order_elt = order.order_elt in
+  let order_data = order.order_data in
+  let maker = order_elt.order_elt_maker in
+  let taker = order_elt.order_elt_taker in
+  let>? make_class, make_contract, make_token_id, make_asset_value =
+    db_from_asset order_elt.order_elt_make in
+  let>? take_class, take_contract, take_token_id, take_asset_value =
+    db_from_asset order_elt.order_elt_take in
+  let fill = Int64.of_string order_elt.order_elt_fill in
+  let start_date = order_elt.order_elt_start in
+  let end_date = order_elt.order_elt_end in
+  let make_stock = Int64.of_string order_elt.order_elt_make_stock in
+  let cancelled = order_elt.order_elt_cancelled in
+  let salt = order_elt.order_elt_salt in
+  let signature = order_elt.order_elt_signature in
+  let created_at = order_elt.order_elt_created_at in
+  let last_updated_at = order_elt.order_elt_last_updated_at in
+  let payouts = match order_data with
+    | RaribleV2Order data ->
+      EzEncoding.construct
+        (Json_encoding.list part_enc)
+        data.order_rarible_v2_data_v1_payouts
+    | _ -> assert false in
+  let origin_fees = match order_data with
+    | RaribleV2Order data ->
+      EzEncoding.construct
+        (Json_encoding.list part_enc)
+        data.order_rarible_v2_data_v1_origin_fees
+    | _ -> assert false in
+  let make_balance = int64_opt_of_string_opt order_elt.order_elt_make_balance in
+  let make_price_usd = float_opt_of_string_opt order_elt.order_elt_make_price_usd in
+  let take_price_usd = float_opt_of_string_opt order_elt.order_elt_take_price_usd in
+  use dbh @@ fun dbh ->
+  let>? () =
+    [%pgsql dbh
+        "insert into \
+         orders(maker, taker, \
+         make_asset_type_class, make_asset_type_contract, make_asset_type_token_id, \
+         make_asset_value, \
+         take_asset_type_class, take_asset_type_contract, take_asset_type_token_id, \
+         take_asset_value, \
+         fill, start_date, end_date, make_stock, cancelled, salt, \
+         signature, created_at, last_updated_at, hash, payouts, origin_fees, \
+         make_balance, make_price_usd, take_price_usd) \
+         values($maker, $?taker, \
+         $make_class, $?make_contract, $?make_token_id, $make_asset_value, \
+         $take_class, $?take_contract, $?take_token_id, $take_asset_value, \
+         $fill, $?start_date, $?end_date, $make_stock, \
+         $cancelled, $salt, $signature, $created_at, $last_updated_at, \
+         $hash_key, $payouts, $origin_fees, \
+         $?make_balance, $?make_price_usd, $?take_price_usd) \
+         on conflict (hash) do update set (\
+         make_asset_value, take_asset_value, make_stock, signature, last_updated_at) = \
+         ($make_asset_value, $take_asset_value, $make_stock, $signature, $last_updated_at)"] in
+  begin match order_elt.order_elt_pending with
+    | None -> Lwt.return_ok ()
+    | Some pendings -> insert_pendings pendings hash_key
+  end >>=? fun () ->
+  insert_price_history order_elt.order_elt_price_history hash_key
