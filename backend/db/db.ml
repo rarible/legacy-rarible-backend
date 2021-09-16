@@ -157,19 +157,30 @@ let set_transaction dbh op tr =
     end
   | _ -> Lwt.return_ok ()
 
-let filter_contracts _ori =
-  (* todo: filter from storage *)
-  None
+let filter_contracts dbh ori =
+  let|>? r = [%pgsql.object dbh "select admin_wallet, royalties_contract from state"] in
+  match r with
+  | [ r ] ->
+    let open Utils in
+    if match_entrypoints (fa2_entrypoints @ fa2_ext_entrypoints) ori.script.code then
+      match match_fields [ "ledger"; "owner"; "royaltiesContract" ] ori.script with
+      | Ok [ Some (Mint ledger_id); Some (Mstring owner); Some (Mstring royalties_contract) ] ->
+        if r#admin_wallet = owner && r#royalties_contract = royalties_contract then
+          Some (`nft (Z.to_int64 ledger_id))
+        else None
+      | _ -> None
+    else None
+  | _ -> None
 
 let set_origination config dbh op ori =
-  match filter_contracts ori with
+  let>? r = filter_contracts dbh ori in
+  match r with
   | None -> Lwt.return_ok ()
-  | Some (kind, mints) ->
+  | Some (`nft ledger_id) ->
     let kt1 = Tzfunc.Crypto.op_to_KT1 op.bo_hash in
-    let>? () = set_mint dbh op kt1 mints in
     let|>? () = [%pgsql dbh
-        "insert into contracts(kind, address, block, level, last) \
-         values($kind, $kt1, ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}) \
+        "insert into contracts(kind, address, block, level, last, ledger_id) \
+         values('nft', $kt1, ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, $ledger_id) \
          on conflict do nothing"] in
     let open Crawlori.Config in
     match config.accounts with

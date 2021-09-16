@@ -180,6 +180,105 @@ let rec parse_nft e p =
 
   | _ -> Error `unexpected_michelson_value
 
+let rec list_entrypoints acc = function
+  | Mprim { prim = `or_; args = [ arg1; arg2 ] ; _ } ->
+    begin match list_entrypoints acc arg1 with
+      | Error e -> Error e
+      | Ok acc -> list_entrypoints acc arg2
+    end
+  | Mprim { annots = [ s ]; _ } as m when String.get s 0 = '%' ->
+    Ok (m :: acc)
+  | _ -> Error `unexpected_michelson_value
+
+let entrypoints m = match flatten m with
+  | Mseq [ Mprim { prim = `parameter; args = [ arg ]; _} ; _; _] ->
+    list_entrypoints [] arg
+  | _ -> Error `unexpected_michelson_value
+
+let rec michelson_type_eq m1 m2 = match m1, m2 with
+  | Mprim {prim=p1; args = args1; _}, Mprim {prim=p2; args = args2; _} ->
+    if p1 <> p2 then false
+    else if List.length args1 <> List.length args2 then false
+    else List.for_all (fun x -> x) @@ List.map2 michelson_type_eq args1 args2
+  | _ -> false
+
+let match_entrypoints l = function
+  | None | Some (Other _) | Some (Bytes _) -> false
+  | Some (Micheline code) ->
+    match entrypoints code with
+    | Error _ -> false
+    | Ok entrypoints ->
+      let rec aux = function
+        | [] -> true
+        | m1 :: q -> match List.find_opt (fun m2 -> michelson_type_eq m1 m2) entrypoints with
+          | None -> false
+          | Some _ -> aux q in
+      aux l
+
+let prim ?(args=[]) ?(annots=[]) prim = Mprim {prim; args; annots}
+let pair ?annots args = prim ?annots ~args `pair
+let list ?annots arg = prim ?annots ~args:[arg] `list
+
+let fa2_entrypoints = [
+  pair ~annots:["%balance_of"] [
+    list (pair [ prim `address; prim `nat ]);
+    prim `contract ~args:[ list @@ pair [ prim `address; prim `nat;  prim `nat ] ]
+  ];
+
+  list ~annots:["%update_operators"] @@
+  prim `or_ ~args:[
+    pair [ prim `address; prim `address; prim `nat ];
+    pair [ prim `address; prim `address; prim `nat ]
+  ];
+
+  list ~annots:["%transfer"] @@
+  pair [ prim `address; list @@ pair [ prim `address; prim `nat; prim `nat ] ];
+]
+
+let fa2_ext_entrypoints = [
+  list ~annots:["%update_operators_for_all"] @@
+  prim `or_ ~args:[ prim `address; prim `address ];
+
+  pair ~annots:["%mint"] [
+    prim `nat; prim `address; prim `nat; list @@ pair [ prim `address; prim `nat ]
+  ];
+
+  pair ~annots:["%burn"] [ prim `nat; prim `address; prim `nat ];
+
+  pair ~annots:["%setMetadataToken"] [
+    prim `nat;
+    prim `map ~args:[ prim `string; prim `string ] ]
+]
+
+let storage_fields = function
+  | None | Some (Other _) | Some (Bytes _) -> Error `not_michelson
+  | Some (Micheline m) -> match flatten m with
+    | Mseq [ _; Mprim { prim = `storage; args = [ arg ]; _} ; _] ->
+      begin match arg with
+        | Mprim { prim = `pair; args ; _ } ->
+          Result.ok @@
+          snd @@ List.fold_left (fun (i, acc) m ->
+              match m with
+              | Mprim { annots = [ name ]; _ } -> i+1, ((name, i) :: acc)
+              | _ -> i, acc) (0, []) args
+        | _ -> Error `unexpected_michelson_value
+      end
+    | _ -> Error `unexpected_michelson_value
+
+let match_fields l script =
+  match storage_fields script.code with
+  | Error e -> Error e
+  | Ok fields ->
+    match script.storage with
+    | Bytes _ | Other _ -> Error `not_michelson
+    | Micheline m -> match flatten m with
+      | Mprim { prim = `Pair; args; _ } ->
+        Ok (List.map (fun n ->
+            match List.assoc_opt ("%" ^ n) fields with
+            | None -> None
+            | Some i -> List.nth_opt args i) l)
+      | _ -> Error `unexpected_michelson_value
+
 let string_of_asset_type = function
   | ATXTZ -> "XTZ"
   | _ -> failwith "Unsupported"
@@ -201,8 +300,6 @@ let string_of_asset_type = function
  *             )
  *         )
  *     ) *)
-
-let prim ?(args=[]) ?(annots=[]) prim = Mprim {prim; args; annots}
 
 let (let$) = Result.bind
 
