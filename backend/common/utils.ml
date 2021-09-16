@@ -202,9 +202,86 @@ let string_of_asset_type = function
  *         )
  *     ) *)
 
-let hash_order _order =
-  failwith "TODO : hash_order"
+let prim ?(args=[]) ?(annots=[]) prim = Mprim {prim; args; annots}
 
+let (let$) = Result.bind
+
+let pack m =
+  let$ b = Forge.forge_micheline m in
+  let h = Hex.of_string b in
+  Forge.forge_micheline @@ Mbytes h
+
+let asset_type_mich = function
+  | ATXTZ -> prim `Left ~args:[prim `Unit]
+  | ATFA_1_2 -> prim `Right ~args:[prim `Left ~args:[ prim `Unit ]]
+  | ATFA_2 -> prim `Right ~args:[prim `Right ~args:[ prim `Left ~args:[ prim `Unit ] ]]
+
+let asset_mich a =
+  prim `Pair ~args:[
+    prim `Pair ~args:[ asset_type_mich a.asset_type; Mbytes (`Hex "00") ];
+    Mint a.asset_value
+  ]
+
+let option_mich f = function
+  | None -> prim `None
+  | Some x -> prim `Some ~args:[ f x ]
+
+let keccak s =
+  Digestif.KECCAK_256.(to_raw_string @@ digest_string s)
+
+let hash_key maker make_asset_type take_asset_type salt =
+  let$ maker = pack @@ Mstring maker in
+  let$ make_asset_type = pack @@ asset_type_mich make_asset_type in
+  let$ take_asset_type = pack @@ asset_type_mich take_asset_type in
+  let$ salt = pack @@ Mint salt in
+  Result.ok @@ keccak @@ String.concat "" [
+    maker;
+    keccak make_asset_type;
+    keccak take_asset_type;
+    salt
+  ]
+
+let hash_order order =
+  let elt = order.order_elt in
+  (* todo : correct data_type *)
+  match order.order_data with
+  | RaribleV2Order o ->
+    let$ data_type = pack (Mstring o.order_rarible_v2_data_v1_data_type) in
+    let$ data = pack (prim `Pair ~args:[
+        Mseq (List.map (fun p -> prim `Pair ~args:[
+            Mstring p.part_account;
+            Mint (Z.of_int p.part_value) ]) o.order_rarible_v2_data_v1_payouts);
+        Mseq (List.map (fun p -> prim `Pair ~args:[
+            Mstring p.part_account;
+            Mint (Z.of_int p.part_value) ]) o.order_rarible_v2_data_v1_origin_fees);
+      ]) in
+    pack @@
+    prim `Pair ~args:[
+      option_mich (fun s -> Mstring s) (Some elt.order_elt_maker);
+      prim `Pair ~args:[
+        asset_mich elt.order_elt_make;
+        prim `Pair ~args:[
+          option_mich (fun s -> Mstring s) elt.order_elt_taker;
+          prim `Pair ~args:[
+            asset_mich elt.order_elt_make;
+            prim `Pair ~args:[
+              Mint elt.order_elt_salt;
+              prim `Pair ~args:[
+                option_mich (fun c -> Mstring (Proto.A.cal_to_str c)) elt.order_elt_start;
+                prim `Pair ~args:[
+                  option_mich (fun c -> Mstring (Proto.A.cal_to_str c)) elt.order_elt_end;
+                  prim `Pair ~args:[
+                    Mbytes (Hex.of_string @@ keccak data_type);
+                    Mbytes (Hex.of_string data);
+                  ]
+                ]
+              ]
+            ]
+          ]
+        ]
+      ]
+    ]
+  | _ -> Error `wrong_order
 
 (* // who fills asset collection `fill` ?
  * function hashKeyOrder(iorder : order) : bytes {
@@ -215,26 +292,18 @@ let hash_order _order =
  *     pack(iorder.salt)]))
  * } *)
 
-let hash_key maker make_asset_type take_asset_type salt =
-  let make_asset_type_enc =
-    Cryptokit.hash_string (Cryptokit.Hash.keccak 256) @@ string_of_asset_type make_asset_type in
-  let take_asset_type_enc =
-    Cryptokit.hash_string (Cryptokit.Hash.keccak 256) @@ string_of_asset_type take_asset_type in
-  let str = maker ^ make_asset_type_enc ^ take_asset_type_enc ^ salt in
-  Cryptokit.hash_string (Cryptokit.Hash.keccak 256) str
-
 let order_elt_form_rarible_v2_order_form_elt elt =
   let make_asset = elt.order_form_elt_make in
   let take_asset = elt.order_form_elt_take in
-  let salt = Z.to_string elt.order_form_elt_salt in
   (* TODO *)
-  let hash =
-    hash_key elt.order_form_elt_maker make_asset.asset_type take_asset.asset_type salt in
+  let$ hash =
+    hash_key elt.order_form_elt_maker make_asset.asset_type take_asset.asset_type
+      elt.order_form_elt_salt in
   let make_balance = None in
   let make_stock = Z.zero in
   let price_history = [] in
   let now = CalendarLib.Calendar.now () in
-  {
+  Ok {
     order_elt_maker = elt.order_form_elt_maker ;
     order_elt_taker = elt.order_form_elt_taker;
     order_elt_make = make_asset;
@@ -244,7 +313,7 @@ let order_elt_form_rarible_v2_order_form_elt elt =
     order_elt_end = elt.order_form_elt_end;
     order_elt_make_stock = make_stock;
     order_elt_cancelled = false;
-    order_elt_salt = salt ;
+    order_elt_salt = elt.order_form_elt_salt;
     order_elt_signature = elt.order_form_elt_signature;
     order_elt_created_at = now;
     order_elt_last_update_at = now;
@@ -257,8 +326,7 @@ let order_elt_form_rarible_v2_order_form_elt elt =
   }
 
 let rarible_v2_order_from_rarible_v2_order_form form =
-  let rarible_v2_order_elt =
+  let$ order_elt =
     order_elt_form_rarible_v2_order_form_elt form.rarible_v2_order_form_elt in
   let rarible_v2_order_data = form.rarible_v2_order_form_data in
-  let rarible_v2_order = { rarible_v2_order_elt; rarible_v2_order_data } in
-  rarible_v2_order
+  Ok { order_elt; order_data = RaribleV2Order rarible_v2_order_data }

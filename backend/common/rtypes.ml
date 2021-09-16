@@ -83,10 +83,18 @@ module A = struct
   type big_integer = z [@@deriving encoding]
 
   type binary = string [@@deriving encoding]
+
   (* TODO : data format 2017-07-21T17:32:28Z *)
   type date = (Tzfunc.Proto.A.timestamp [@encoding Tzfunc.Proto.A.timestamp_enc.Tzfunc.Proto.Encoding.json]) [@@deriving encoding]
+  let date_int64_enc =
+    let open Json_encoding in
+    conv
+      (fun c -> Int64.of_float @@ CalendarLib.Calendar.to_unixfloat c)
+      (fun i -> CalendarLib.Calendar.from_unixfloat (Int64.to_float i)) int53
+  type date_int64 = CalendarLib.Calendar.t
 
   type bytes_str = string [@@deriving encoding]
+
 end
 
 type part = {
@@ -448,14 +456,16 @@ type asset_type_lazy_nft = {
 } [@@deriving encoding {camel}]
 
 type asset_type =
-  | ATXTZ [@kind "assetClass"] [@kind_label "XTZ"]
-  | ATETH [@kind "assetClass"] [@kind_label "ETH"]
-  | ATFLOW [@kind "assetClass"] [@kind_label "FLOW"]
-  | ATERC20 of (A.address [@wrap "contract"])[@kind "assetClass"] [@kind_label "ERC20"]
-  | ATERC721 of asset_type_nft [@kind "assetClass"] [@kind_label "ERC721"]
-  | ATERC1155 of asset_type_nft [@kind "assetClass"] [@kind_label "ERC1155"]
-  | ATERC721_LAZY of asset_type_lazy_nft [@kind "assetClass"] [@kind_label "ERC721_LAZY"]
-  | ATERC1155_LAZY of asset_type_lazy_nft [@kind "assetClass"] [@kind_label "ERC1155_LAZY"]
+  | ATXTZ [@kind_label "assetClass"] [@kind "XTZ"]
+  | ATFA_1_2 [@kind_label "assetClass"] [@kind "FA_1_2"]
+  | ATFA_2 [@kind_label "assetClass"] [@kind "FA_2"]
+  (* | ATETH [@kind "assetClass"] [@kind_label "ETH"]
+   * | ATFLOW [@kind "assetClass"] [@kind_label "FLOW"]
+   * | ATERC20 of (A.address [@wrap "contract"])[@kind "assetClass"] [@kind_label "ERC20"]
+   * | ATERC721 of asset_type_nft [@kind "assetClass"] [@kind_label "ERC721"]
+   * | ATERC1155 of asset_type_nft [@kind "assetClass"] [@kind_label "ERC1155"]
+   * | ATERC721_LAZY of asset_type_lazy_nft [@kind "assetClass"] [@kind_label "ERC721_LAZY"]
+   * | ATERC1155_LAZY of asset_type_lazy_nft [@kind "assetClass"] [@kind_label "ERC1155_LAZY"] *)
 [@@deriving encoding]
 
 type asset = {
@@ -469,8 +479,8 @@ type order_form_elt = {
   order_form_elt_make : asset ;
   order_form_elt_take : asset ;
   order_form_elt_salt : A.big_integer ;
-  order_form_elt_start : int64 option ;
-  order_form_elt_end : int64 option ;
+  order_form_elt_start : A.date_int64 option ;
+  order_form_elt_end : A.date_int64 option ;
   order_form_elt_signature : A.binary ;
 } [@@deriving encoding]
 
@@ -522,7 +532,6 @@ type legacy_order_form = {
   legacy_order_form_elt : order_form_elt [@merge] ;
   legacy_order_form_data : order_data_legacy ;
 } [@@deriving encoding]
-
 
 type order_rarible_v2_data_v1 = {
   order_rarible_v2_data_v1_data_type : string [@kind "RARIBLE_V2_DATA_V1"] ;
@@ -591,11 +600,11 @@ type order_elt = {
   order_elt_make: asset;
   order_elt_take: asset;
   order_elt_fill: A.big_integer;
-  order_elt_start: int64 option;
-  order_elt_end: int64 option;
+  order_elt_start: A.date_int64 option;
+  order_elt_end: A.date_int64 option;
   order_elt_make_stock: A.big_integer;
   order_elt_cancelled: bool ;
-  order_elt_salt: A.word;
+  order_elt_salt: A.big_integer;
   order_elt_signature: A.binary;
   order_elt_created_at: A.date;
   order_elt_last_update_at: A.date;
@@ -607,29 +616,19 @@ type order_elt = {
   order_elt_price_history: order_price_history_record list ;
 } [@@deriving encoding {camel}]
 
-type legacy_order = {
-  legacy_order_elt : order_elt [@merge] ;
-  legacy_order_data : order_data_legacy ;
-} [@@deriving encoding]
-
-type rarible_v2_order = {
-  rarible_v2_order_elt : order_elt [@merge] ;
-  rarible_v2_order_data : order_rarible_v2_data_v1 ;
-} [@@deriving encoding]
-
-type open_sea_v1_order = {
-  open_sea_v1_order_elt : order_elt [@merge] ;
-  open_sea_v1_order_data : order_rarible_v2_data_v1 ;
-} [@@deriving encoding]
-
-type order =
+type order_data =
   | LegacyOrder of
-      legacy_order [@kind "type"] [@kind_label "RARIBLE_V1"]
+      order_data_legacy [@kind_label "type"] [@kind "RARIBLE_V1"]
   | RaribleV2Order of
-      rarible_v2_order [@kind "type"] [@kind_label "RARIBLE_V2"]
+      order_rarible_v2_data_v1 [@kind_label "type"] [@kind "RARIBLE_V2"]
   | OpenSeav1Order of
-      open_sea_v1_order [@kind "type"] [@kind_label "OPEN_SEA_V1"]
+      order_rarible_v2_data_v1 [@kind_label "type"] [@kind "OPEN_SEA_V1"]
 [@@deriving encoding]
+
+type order = {
+  order_elt : order_elt; [@merge]
+  order_data : order_data; [@merge]
+} [@@deriving encoding]
 
 type prepare_order_tx_form = {
   prepare_order_tx_form_maker : A.address ;
@@ -804,7 +803,7 @@ type order_bid_elt = {
   order_bid_elt_fill : A.big_integer ;
   order_bid_elt_make_stock : A.big_integer ;
   order_bid_elt_cancelled : bool ;
-  order_bid_elt_salt : A.binary ;
+  order_bid_elt_salt : A.big_integer ;
   order_bid_elt_signature : A.binary option ;
   order_bid_elt_created_at : A.date;
 } [@@deriving encoding {camel}]

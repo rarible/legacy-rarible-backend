@@ -13,6 +13,7 @@ let (>|=?) p f = Lwt.map (function Error e -> Error e| Ok x -> Ok (f x)) p
 type error = [
   | Crawlori.Rp.error
   | `unexpected_michelson_value
+  | `wrong_order
 ]
 
 let fold_rp f acc l =
@@ -34,3 +35,8 @@ let map_rp f l =
           | Error e -> Lwt.return_error e
           | Ok x -> aux (x :: acc) t) in
   Lwt.map (Result.map List.rev) (aux [] l)
+
+let string_of_error : error -> string = function
+  | #Crawlori.Rp.error as e -> Crawlori.Rp.string_of_error e
+  | `unexpected_michelson_value -> "unexpected_michelson_value"
+  | `wrong_order -> "unhandled order"

@@ -244,9 +244,13 @@ let create_order_pending_transaction _req _input =
    output=log_events_enc;
    errors=[rarible_error_500]}]
 
+let (let$>) r f = match r with
+  | Error e -> Lwt.return_error (invalid_argument (string_of_error e))
+  | Ok x -> f x
+
 let validate_signature order =
-  let order_elt = order.rarible_v2_order_elt in
-  let msg = hash_order order_elt in
+  let order_elt = order.order_elt in
+  let$> msg = hash_order order in
   let signature =
     Bigstring.of_string @@
     Crypto.Base58.decode Crypto.Prefix.ed25519_signature order_elt.order_elt_signature in
@@ -254,10 +258,10 @@ let validate_signature order =
     Hacl.Sign.unsafe_pk_of_bytes @@
     Bigstring.of_string @@
     Crypto.Pk.b58dec order_elt.order_elt_maker in
-  if Hacl.Sign.verify ~pk ~msg ~signature then
-    Lwt.return @@ Ok ()
+  if Hacl.Sign.verify ~pk ~msg:(Bigstring.of_string msg) ~signature then
+    Lwt.return_ok ()
   else
-    Lwt.return (Error (invalid_argument "Incorrect signature"))
+    Lwt.return_error (invalid_argument "Incorrect signature")
 
 let validate_order order =
   (* No need to check form.data as other combinations are not accepted by the input encoding *)
@@ -265,22 +269,22 @@ let validate_order order =
   Lwt.return @@ Ok ()
 
 let validate existing update =
-  let existing_make_value = existing.rarible_v2_order_elt.order_elt_make.asset_value in
-  let update_make_value = update.rarible_v2_order_elt.order_elt_make.asset_value in
-  let existing_take_value = existing.rarible_v2_order_elt.order_elt_take.asset_value in
-  let update_take_value = update.rarible_v2_order_elt.order_elt_take.asset_value in
-  if existing.rarible_v2_order_elt.order_elt_cancelled then
+  let existing_make_value = existing.order_elt.order_elt_make.asset_value in
+  let update_make_value = update.order_elt.order_elt_make.asset_value in
+  let existing_take_value = existing.order_elt.order_elt_take.asset_value in
+  let update_take_value = update.order_elt.order_elt_take.asset_value in
+  if existing.order_elt.order_elt_cancelled then
     Lwt.return (Error (invalid_argument "Order is cancelled"))
-  else if existing.rarible_v2_order_data <> update.rarible_v2_order_data then
+  else if existing.order_data <> update.order_data then
     Lwt.return (Error (invalid_argument "Invalide update data"))
-  else if existing.rarible_v2_order_elt.order_elt_start <>
-          update.rarible_v2_order_elt.order_elt_start then
+  else if existing.order_elt.order_elt_start <>
+          update.order_elt.order_elt_start then
     Lwt.return (Error (invalid_argument "Invalide update start date"))
-  else if existing.rarible_v2_order_elt.order_elt_end <>
-          update.rarible_v2_order_elt.order_elt_end then
+  else if existing.order_elt.order_elt_end <>
+          update.order_elt.order_elt_end then
     Lwt.return (Error (invalid_argument "Invalide update end date"))
-  else if existing.rarible_v2_order_elt.order_elt_taker <>
-          update.rarible_v2_order_elt.order_elt_taker then
+  else if existing.order_elt.order_elt_taker <>
+          update.order_elt.order_elt_taker then
     Lwt.return (Error (invalid_argument "Invalide update taker"))
   else if update_make_value < existing_make_value then
     Lwt.return (Error (invalid_argument "Invalide update can't reduce make asset value"))
@@ -294,6 +298,8 @@ let get_existing_order _order_elt =
   (* SELECT FROM ORDER WITH ORDER_ELT.xxx & order_elt.yyy*)
   assert false
 
+
+
 (* order-controller *)
 let upset_order _req input = match input with
   | LegacyOrderForm _ ->
@@ -301,9 +307,10 @@ let upset_order _req input = match input with
   | OpenSeav1OrderForm _ ->
     return (Error (invalid_argument "OpenSea order not supported"))
   | RaribleV2OrderFrom order_form ->
-    let order =
-      rarible_v2_order_from_rarible_v2_order_form order_form in
-    validate_order order >>= function
+    match rarible_v2_order_from_rarible_v2_order_form order_form with
+    | Error e -> return (Error (invalid_argument @@ string_of_error e))
+    | Ok order ->
+      validate_order order >>= function
       | Ok () ->
         begin
           begin match get_existing_order order with
@@ -312,18 +319,18 @@ let upset_order _req input = match input with
                 validate existing_order order >>= function
                 | Ok () ->
                   let now = CalendarLib.Calendar.now () in
-                  let asset_value = order.rarible_v2_order_elt.order_elt_make.asset_value in
-                  let old_make_asset = existing_order.rarible_v2_order_elt.order_elt_make in
+                  let asset_value = order.order_elt.order_elt_make.asset_value in
+                  let old_make_asset = existing_order.order_elt.order_elt_make in
                   let order_elt_make = { old_make_asset with asset_value } in
-                  let asset_value = order.rarible_v2_order_elt.order_elt_take.asset_value in
-                  let old_take_asset = existing_order.rarible_v2_order_elt.order_elt_take in
+                  let asset_value = order.order_elt.order_elt_take.asset_value in
+                  let old_take_asset = existing_order.order_elt.order_elt_take in
                   let order_elt_take = { old_take_asset with asset_value } in
-                  let order_elt_make_stock = order.rarible_v2_order_elt.order_elt_make_stock in
-                  let order_elt_signature = order.rarible_v2_order_elt.order_elt_signature in
+                  let order_elt_make_stock = order.order_elt.order_elt_make_stock in
+                  let order_elt_signature = order.order_elt.order_elt_signature in
                   Lwt.return @@ Ok
                     { existing_order with
-                      rarible_v2_order_elt =
-                        { existing_order.rarible_v2_order_elt with
+                      order_elt =
+                        { existing_order.order_elt with
                           order_elt_make ;
                           order_elt_take ;
                           order_elt_make_stock ;

@@ -9,4 +9,4 @@
  (name let)
  (package rarible)
  (modules utils let)
- (libraries crawlori rtypes cryptokit))
+ (libraries crawlori rtypes))
