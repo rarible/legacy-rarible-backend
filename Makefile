@@ -11,7 +11,7 @@ build:
 copy: build
 	@mkdir -p _bin
 	@cp -f _build/default/backend/crawler/crawler.exe _bin/crawler
-	@cp -f _build/default/backend/api/api.exe _bin/api
+	@cp -f _build/default/backend/api/main_api.exe _bin/api
 
 clean:
 	@dune clean

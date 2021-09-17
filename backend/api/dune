@@ -1,5 +1,11 @@
-(executable
+(library
  (name api)
  (modules api errors)
  (preprocess (pps ez_api.ppx_server))
  (libraries db let rtypes))
+
+(executable
+ (name main_api)
+ (modules main_api)
+ (preprocess (pps ez_api.ppx_server))
+ (libraries api))

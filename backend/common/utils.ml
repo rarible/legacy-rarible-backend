@@ -281,9 +281,10 @@ let match_fields l script =
 
 let string_of_asset_type = function
   | ATXTZ -> "XTZ"
+  | ATFA_1_2 _ -> "FA_1_2"
+  | ATFA_2 _ -> "FA_2"
   | ATETH -> "ETH"
   | ATERC721 _ -> "ERC721"
-  | _ -> failwith "Unsupported asset"
 
 (* fun AssetType.hash(type: AssetType): Word = keccak256(Tuples.assetTypeHashType().encode(Tuple3.apply(
  *     TYPE_HASH.bytes(),
@@ -312,8 +313,8 @@ let pack m =
 
 let asset_type_mich = function
   | ATXTZ -> prim `Left ~args:[prim `Unit]
-  | ATFA_1_2 -> prim `Right ~args:[prim `Left ~args:[ prim `Unit ]]
-  | ATFA_2 -> prim `Right ~args:[prim `Right ~args:[ prim `Left ~args:[ prim `Unit ] ]]
+  | ATFA_1_2 _ -> prim `Right ~args:[prim `Left ~args:[ prim `Unit ]]
+  | ATFA_2 _ -> prim `Right ~args:[prim `Right ~args:[ prim `Left ~args:[ prim `Unit ] ]]
   | ATETH -> Mint Z.zero
   | ATERC721 _ -> Mint Z.one
 
@@ -335,11 +336,48 @@ let hash_key maker make_asset_type take_asset_type salt =
   let$ make_asset_type = pack @@ asset_type_mich make_asset_type in
   let$ take_asset_type = pack @@ asset_type_mich take_asset_type in
   let$ salt = pack @@ Mint (Z.of_string salt) in
-  Result.ok @@ keccak @@ String.concat "" [
+  Result.ok @@ Hex.show @@ Hex.of_string @@ keccak @@ String.concat "" [
     maker;
     keccak make_asset_type;
     keccak take_asset_type;
     salt
+  ]
+
+let hash_order_form maker make taker take salt start_date end_date data_type payouts origin_fees =
+  let$ data_type = pack (Mstring data_type) in
+  let$ data = pack (prim `Pair ~args:[
+      Mseq (List.map (fun p -> prim `Pair ~args:[
+          Mstring p.part_account;
+          Mint (Z.of_int p.part_value) ]) payouts);
+      Mseq (List.map (fun p -> prim `Pair ~args:[
+          Mstring p.part_account;
+          Mint (Z.of_int p.part_value) ]) origin_fees);
+    ]) in
+  pack @@
+  prim `Pair ~args:[
+    option_mich (fun s -> Mstring s) (Some maker);
+    prim `Pair ~args:[
+      asset_mich make;
+      prim `Pair ~args:[
+        option_mich (fun s -> Mstring s) taker;
+        prim `Pair ~args:[
+          asset_mich take;
+          prim `Pair ~args:[
+            Mint (Z.of_string salt);
+            prim `Pair ~args:[
+              option_mich (fun c -> Mstring (Proto.A.cal_to_str c)) start_date;
+              prim `Pair ~args:[
+                option_mich (fun c -> Mstring (Proto.A.cal_to_str c)) end_date;
+                prim `Pair ~args:[
+                  Mbytes (Hex.of_string @@ keccak data_type);
+                  Mbytes (Hex.of_string data);
+                ]
+              ]
+            ]
+          ]
+        ]
+      ]
+    ]
   ]
 
 let hash_order order =
@@ -365,7 +403,7 @@ let hash_order order =
         prim `Pair ~args:[
           option_mich (fun s -> Mstring s) elt.order_elt_taker;
           prim `Pair ~args:[
-            asset_mich elt.order_elt_make;
+            asset_mich elt.order_elt_take;
             prim `Pair ~args:[
               Mint (Z.of_string elt.order_elt_salt);
               prim `Pair ~args:[
@@ -394,16 +432,18 @@ let hash_order order =
  *     pack(iorder.salt)]))
  * } *)
 
-let order_elt_form_rarible_v2_order_form_elt elt =
+let order_elt_from_order_form_elt elt =
   let make_asset = elt.order_form_elt_make in
   let take_asset = elt.order_form_elt_take in
   (* TODO *)
   let$ hash =
-    hash_key elt.order_form_elt_maker make_asset.asset_type take_asset.asset_type
+    hash_key
+      elt.order_form_elt_maker
+      make_asset.asset_type
+      take_asset.asset_type
       elt.order_form_elt_salt in
   let make_balance = None in
   let make_stock = "0" in
-  let price_history = [] in
   let now = CalendarLib.Calendar.now () in
   Ok {
     order_elt_maker = elt.order_form_elt_maker ;
@@ -418,20 +458,34 @@ let order_elt_form_rarible_v2_order_form_elt elt =
     order_elt_salt = elt.order_form_elt_salt;
     order_elt_signature = elt.order_form_elt_signature;
     order_elt_created_at = now;
-    order_elt_last_updated_at = now;
+    order_elt_last_update_at = now;
     order_elt_pending = Some [];
     order_elt_hash = hash;
     order_elt_make_balance = make_balance;
     order_elt_make_price_usd = None;
     order_elt_take_price_usd = None;
-    order_elt_price_history = price_history;
+    order_elt_price_history = [];
   }
 
-let rarible_v2_order_from_rarible_v2_order_form form =
-  let$ order_elt =
-    order_elt_form_rarible_v2_order_form_elt form.rarible_v2_order_form_elt in
-  let rarible_v2_order_data = form.rarible_v2_order_form_data in
-  Ok { order_elt; order_data = RaribleV2Order rarible_v2_order_data }
+let order_from_order_form form =
+  let$ order_elt = order_elt_from_order_form_elt form.order_form_elt in
+  Ok { order_elt; order_data = form.order_form_data }
+
+let order_form_elt_from_order_elt order_elt = {
+  order_form_elt_maker = order_elt.order_elt_maker ;
+  order_form_elt_taker = order_elt.order_elt_taker ;
+  order_form_elt_make = order_elt.order_elt_make ;
+  order_form_elt_take = order_elt.order_elt_take ;
+  order_form_elt_salt = order_elt.order_elt_salt ;
+  order_form_elt_start = order_elt.order_elt_start ;
+  order_form_elt_end = order_elt.order_elt_end ;
+  order_form_elt_signature = order_elt.order_elt_signature ;
+}
+
+let order_form_from_order order = {
+  order_form_elt =  order_form_elt_from_order_elt order.order_elt ;
+  order_form_data = order.order_data
+}
 
 let string_opt_of_float_opt = function
   | None -> None
@@ -467,3 +521,18 @@ let string_opt_of_int64_opt = function
 let int64_opt_of_string_opt = function
   | None -> None
   | Some i -> Some (Int64.of_string i)
+
+let sign ~edsk ~bytes =
+  let open Tzfunc.Crypto in
+  let sk = Hacl.Sign.unsafe_sk_of_bytes (Bigstring.of_string @@ Base58.decode Prefix.ed25519_seed edsk) in
+  let msg = Bigstring.of_string @@ Crypto.Blake2b_32.hash [bytes] in
+  let signature = Bigstring.create 64 in
+  Hacl.Sign.sign ~sk ~msg ~signature;
+  Base58.encode Prefix.ed25519_signature @@ Bigstring.to_string @@ signature
+
+let check ~edpk ~signature ~bytes =
+  let open Tzfunc.Crypto in
+  let pk = Hacl.Sign.unsafe_pk_of_bytes (Bigstring.of_string @@ Base58.decode Prefix.ed25519_public_key edpk) in
+  let msg = Bigstring.of_string @@ Crypto.Blake2b_32.hash [bytes] in
+  let signature = Bigstring.of_string @@ Base58.decode Prefix.ed25519_signature signature in
+  Hacl.Sign.verify ~pk ~msg ~signature

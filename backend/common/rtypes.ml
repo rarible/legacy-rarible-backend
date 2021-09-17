@@ -462,10 +462,15 @@ type asset_type_lazy_nft = {
   asset_type_lazy_nft_signature : A.binary ;
 } [@@deriving encoding {camel}]
 
+type asset_fa2 = {
+  asset_fa2_contract : A.address ;
+  asset_fa2_token_id : A.big_integer option ;
+} [@@deriving encoding {camel}]
+
 type asset_type =
   | ATXTZ [@kind_label "assetClass"] [@kind "XTZ"]
-  | ATFA_1_2 [@kind_label "assetClass"] [@kind "FA_1_2"]
-  | ATFA_2 [@kind_label "assetClass"] [@kind "FA_2"]
+  | ATFA_1_2 of (A.address [@wrap "contract"]) [@kind_label "assetClass"] [@kind "FA_1_2"]
+  | ATFA_2 of asset_fa2 [@kind_label "assetClass"] [@kind "FA_2"]
   | ATETH [@kind_label "assetClass"] [@kind "ETH"]
   | ATERC721 of asset_type_nft [@kind_label "assetClass"] [@kind "ERC721"]
   (* | ATETH [@kind "assetClass"] [@kind_label "ETH"]
@@ -537,35 +542,25 @@ type order_data_legacy = {
   order_data_legacy_fee : int ;
 } [@@deriving encoding {camel}]
 
-type legacy_order_form = {
-  legacy_order_form_elt : order_form_elt [@merge] ;
-  legacy_order_form_data : order_data_legacy ;
-} [@@deriving encoding]
-
 type order_rarible_v2_data_v1 = {
   order_rarible_v2_data_v1_data_type : string ;
   order_rarible_v2_data_v1_payouts : part list ;
   order_rarible_v2_data_v1_origin_fees : part list ;
 } [@@deriving encoding {camel}]
 
-type rarible_v2_order_form = {
-  rarible_v2_order_form_elt : order_form_elt [@merge] ;
-  rarible_v2_order_form_data : order_rarible_v2_data_v1 ;
-} [@@deriving encoding]
-
-type open_sea_v1_order_form = {
-  open_sea_v1_order_form_elt : order_form_elt [@merge] ;
-  open_sea_v1_order_form_data : order_open_sea_v1_data_v1 ;
-} [@@deriving encoding]
-
-type order_form =
-  | LegacyOrderForm of
-      legacy_order_form [@kind_label "type"] [@kind "RARIBLE_V1"]
-  | RaribleV2OrderFrom of
-      rarible_v2_order_form [@kind_label "type"] [@kind "RARIBLE_V2"]
-  | OpenSeav1OrderForm of
-      open_sea_v1_order_form [@kind_label "type"] [@kind "OPEN_SEA_V1"]
+type order_data =
+  | LegacyOrder of
+      (order_data_legacy [@wrap "data"]) [@kind_label "type"] [@kind "RARIBLE_V1"]
+  | RaribleV2Order of
+      (order_rarible_v2_data_v1 [@wrap "data"]) [@kind_label "type"] [@kind "RARIBLE_V2"]
+  | OpenSeav1Order of
+      (order_rarible_v2_data_v1 [@wrap "data"]) [@kind_label "type"] [@kind "OPEN_SEA_V1"]
 [@@deriving encoding]
+
+type order_form = {
+  order_form_elt : order_form_elt ; [@merge]
+  order_form_data : order_data ; [@merge]
+} [@@deriving encoding]
 
 type order_exchange_history_elt = {
   order_exchange_history_elt_hash : A.word ;
@@ -613,10 +608,10 @@ type order_elt = {
   order_elt_end: A.date_int64 option;
   order_elt_make_stock: A.big_integer;
   order_elt_cancelled: bool ;
-  order_elt_salt: A.big_integer;
+  order_elt_salt: A.word;
   order_elt_signature: A.binary;
   order_elt_created_at: A.date;
-  order_elt_last_updated_at: A.date;
+  order_elt_last_update_at: A.date;
   order_elt_pending: order_exchange_history list option ;
   order_elt_hash: A.word;
   order_elt_make_balance: A.big_integer option;
@@ -624,15 +619,6 @@ type order_elt = {
   order_elt_take_price_usd: A.big_decimal option;
   order_elt_price_history: order_price_history_record list ;
 } [@@deriving encoding {camel}]
-
-type order_data =
-  | LegacyOrder of
-      order_data_legacy [@kind_label "type"] [@kind "RARIBLE_V1"]
-  | RaribleV2Order of
-      order_rarible_v2_data_v1 [@kind_label "type"] [@kind "RARIBLE_V2"]
-  | OpenSeav1Order of
-      order_rarible_v2_data_v1 [@kind_label "type"] [@kind "OPEN_SEA_V1"]
-[@@deriving encoding]
 
 type order = {
   order_elt : order_elt; [@merge]

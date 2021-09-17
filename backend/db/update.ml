@@ -103,13 +103,22 @@ let upgrade_1_to_2 dbh version =
       salt varchar not null,
       signature varchar not null,
       created_at timestamp not null,
-      last_updated_at timestamp not null,
-      payouts jsonb,
-      origin_fees jsonb,
+      last_update_at timestamp not null,
       hash varchar primary key,
       make_balance bigint,
       make_price_usd float,
       take_price_usd float)|};
+
+    {|create table origin_fees(
+      account varchar not null,
+      value int not null,
+      hash varchar not null references orders(hash) on delete cascade,
+      primary key (hash, account))|};
+
+    {|create table payouts(
+      account varchar not null,
+      value int not null,
+      hash varchar not null references orders(hash) on delete cascade)|};
 
     {|create table order_pending(
       type varchar not null,

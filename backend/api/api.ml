@@ -33,8 +33,8 @@ let owner_param = EzAPI.Param.string "owner"
 let creator_param = EzAPI.Param.string "creator"
 let collection_param = EzAPI.Param.string "collection"
 let show_deleted_param = EzAPI.Param.bool "showDeleted"
-let last_updated_from_param = EzAPI.Param.string "lastUpdatedFrom"
-let last_updated_to_param = EzAPI.Param.string "lastUpdatedTo"
+let last_update_from_param = EzAPI.Param.string "lastUpdateFrom"
+let last_update_to_param = EzAPI.Param.string "lastUpdateTo"
 let minter_param = EzAPI.Param.string "minter"
 let origin_param = EzAPI.Param.string "origin"
 (* TODO : ALL | RARIBLE | OPEN_SEA *)
@@ -50,6 +50,54 @@ let source_param = EzAPI.Param.string "source"
 let status_param = EzAPI.Param.string "status"
 
 let arg_hash = EzAPI.Arg.string "hash"
+
+let get_origin_param req =
+  let open Tzfunc.Crypto in
+  match EzAPI.Req.find_param origin_param req with
+  | None -> Ok None
+  | Some o ->
+    try
+      ignore @@ Base58.decode Prefix.ed25519_public_key o ;
+      Ok (Some o)
+    with _ ->
+      Error (invalid_argument "origin must be an edpk")
+
+let get_size_param req =
+  match EzAPI.Req.find_param size_param req with
+  | None -> Ok None
+  | Some s ->
+    try
+      let s = int_of_string s in
+      if s < 1000 then Ok (Some s)
+      else Error (invalid_argument "max size is 1000")
+    with _ ->
+      Error (invalid_argument "size must be an int")
+
+let get_continuation_last_update_param req =
+  match EzAPI.Req.find_param continuation_param req with
+  | None -> Ok None
+  | Some s ->
+    try
+      let l = String.split_on_char '_' s in
+      match l with
+      | ts :: h :: [] ->
+        let ts = CalendarLib.Calendar.from_unixfloat (float_of_string ts) in
+        Ok (Some (ts, h))
+      | _ ->
+        Error (invalid_argument "continuation must be in format TIMETAMP_HASH")
+    with _ ->
+      Error (invalid_argument "continuation must be in format TIMETAMP_HASH")
+
+let get_required_maker_param req =
+  let open Tzfunc.Crypto in
+  match EzAPI.Req.find_param maker_param req with
+  | None -> Error (invalid_argument "Query param maker is required")
+  | Some o ->
+    try
+      ignore @@ Base58.decode Prefix.ed25519_public_key o ;
+      Ok o
+    with _ ->
+      Error (invalid_argument "maker must be an edpk")
 
 (* (\* gateway-controller *\)
  * let create_gateway_pending_transactions _req _input =
@@ -206,8 +254,8 @@ let arg_hash = EzAPI.Arg.string "hash"
  *   let _continuation = EzAPI.Req.find_param continuation_param req in
  *   let _size = EzAPI.Req.find_param size_param req in
  *   let _show_deleted = EzAPI.Req.find_param show_deleted_param req in
- *   let _last_updated_from = EzAPI.Req.find_param last_updated_from_param req in
- *   let _last_updated_to = EzAPI.Req.find_param last_updated_to_param req in
+ *   let _last_update_from = EzAPI.Req.find_param last_update_from_param req in
+ *   let _last_update_to = EzAPI.Req.find_param last_update_to_param req in
  *   let _include_meta = EzAPI.Req.find_param include_meta_param req in
  *   return (Error (bad_request ""))
  * [@@get
@@ -265,15 +313,10 @@ let validate_signature order =
   let order_elt = order.order_elt in
   let$> msg = hash_order order in
   Format.eprintf "validate_signature\n%!";
-  let signature =
-    Bigstring.of_string @@
-    Crypto.Base58.decode Crypto.Prefix.ed25519_signature order_elt.order_elt_signature in
-  let pk =
-    Hacl.Sign.unsafe_pk_of_bytes @@
-    Bigstring.of_string @@
-    Crypto.Pk.b58dec order_elt.order_elt_maker in
+  let signature = order_elt.order_elt_signature in
+  let edpk = order_elt.order_elt_maker in
   Format.eprintf "validate_signature1\n%!";
-  if Hacl.Sign.verify ~pk ~msg:(Bigstring.of_string msg) ~signature then
+  if check ~edpk ~signature ~bytes:msg then
     Lwt.return_ok ()
   else
     Lwt.return_error (invalid_argument "Incorrect signature")
@@ -303,7 +346,7 @@ let validate existing update =
           update.order_elt.order_elt_taker then
     Lwt.return (Error (invalid_argument "Invalide update taker"))
   else if update_make_value < existing_make_value then
-    Lwt.return (Error (invalid_argument "Invalide update can't reduce make asset value"))
+    Lwt.return (Error (invalid_argument "Invalide update can't decrease make asset value"))
   else
     let new_max_take =
       Z.(div
@@ -317,99 +360,69 @@ let get_existing_order hash_key_order =
   Format.eprintf "get_existing_order\n%!";
   Db.get_order hash_key_order
 
-let upsert_order _req input = match input with
-  | LegacyOrderForm _ ->
-    return (Error (invalid_argument "Legacy order not supported"))
-  | OpenSeav1OrderForm _ ->
-    return (Error (invalid_argument "OpenSea order not supported"))
-  | RaribleV2OrderFrom order_form ->
-    Format.eprintf "upsert_order\n%!";
-    match rarible_v2_order_from_rarible_v2_order_form order_form with
-    | Error err -> return (Error (unexpected_api_error @@ string_of_error err))
-    | Ok order ->
-      ignore @@ begin match hash_order order with
-      | Error err -> return (Error (unexpected_api_error @@ string_of_error err))
-      | Ok h ->
-        let edpk = "edpktteLUCSRPZcJBSAQprz9gDjJj8DixtJjrkmnRMBpMYQ5X5fRMf" in
-        let pk =
-          Hacl.Sign.unsafe_pk_of_bytes @@
-          Bigstring.of_string @@
-          Crypto.Pk.b58dec edpk in
-        let edsk = "edsk4RqeRTrhdKfJKBTndA9x1RLp4A3wtNL1iMFRXDvfs5ANeZAncZ" in
-        let sk =
-          Bigstring.of_string @@
-          Tzfunc.Crypto.Base58.decode Tzfunc.Crypto.Prefix.ed25519_seed edsk in
-        let signature = Tzfunc.Forge.sign_exn ~sk h in
-        let bs = Bigstring.of_string signature in
-        let s = Tzfunc.Crypto.Base58.encode Tzfunc.Crypto.Prefix.ed25519_signature signature in
-        Format.eprintf "SIGN %S@." s ;
-        Format.eprintf "%b@." @@ Hacl.Sign.verify ~pk ~msg:(Bigstring.of_string h) ~signature:bs ;
-        return_ok ()
-      end ;
-      match hash_key
-              order.order_elt.order_elt_maker
-              order.order_elt.order_elt_make.asset_type
-              order.order_elt.order_elt_take.asset_type
-              order.order_elt.order_elt_salt with
-      | Error err -> return (Error (unexpected_api_error @@ string_of_error err))
-      | Ok hash_key_order ->
-        validate_order order >>= function
-        | Ok () ->
+let upsert_order _req input =
+  Format.eprintf "upsert_order\n%!";
+  match order_from_order_form input with
+  | Error err -> return (Error (unexpected_api_error @@ string_of_error err))
+  | Ok order ->
+    validate_order order >>= function
+    | Ok () ->
+      begin
+        get_existing_order order.order_elt.order_elt_hash >>= function
+        | Ok existing_order ->
           begin
-            get_existing_order hash_key_order >>= function
-            | Ok existing_order ->
-              begin
-                begin match existing_order with
-                  | Some existing_order ->
-                    begin
-                      validate existing_order order >>= function
-                      | Ok () ->
-                        let now = CalendarLib.Calendar.now () in
-                        let asset_value = order.order_elt.order_elt_make.asset_value in
-                        let old_make_asset = existing_order.order_elt.order_elt_make in
-                        let order_elt_make = { old_make_asset with asset_value } in
-                        let asset_value = order.order_elt.order_elt_take.asset_value in
-                        let old_take_asset = existing_order.order_elt.order_elt_take in
-                        let order_elt_take = { old_take_asset with asset_value } in
-                        let order_elt_make_stock = order.order_elt.order_elt_make_stock in
-                        let order_elt_signature = order.order_elt.order_elt_signature in
-                        Lwt.return @@ Ok
-                          { existing_order with
-                            order_elt =
-                              { existing_order.order_elt with
-                                order_elt_make ;
-                                order_elt_take ;
-                                order_elt_make_stock ;
-                                order_elt_signature ;
-                                order_elt_last_updated_at = now ;
-                              }
+            begin match existing_order with
+              | Some existing_order ->
+                begin
+                  validate existing_order order >>= function
+                  | Ok () ->
+                    let now = CalendarLib.Calendar.now () in
+                    let asset_value = order.order_elt.order_elt_make.asset_value in
+                    let old_make_asset = existing_order.order_elt.order_elt_make in
+                    let order_elt_make = { old_make_asset with asset_value } in
+                    let asset_value = order.order_elt.order_elt_take.asset_value in
+                    let old_take_asset = existing_order.order_elt.order_elt_take in
+                    let order_elt_take = { old_take_asset with asset_value } in
+                    let order_elt_make_stock = order.order_elt.order_elt_make_stock in
+                    let order_elt_signature = order.order_elt.order_elt_signature in
+                    Lwt.return @@ Ok
+                      { existing_order with
+                        order_elt =
+                          { existing_order.order_elt with
+                            order_elt_make ;
+                            order_elt_take ;
+                            order_elt_make_stock ;
+                            order_elt_signature ;
+                            order_elt_last_update_at = now ;
                           }
-                      | Error err -> Lwt.return @@ Error err
-                    end
-                  | None -> Lwt.return @@ Ok order
-                end >>= function
-                | Ok order ->
-                  begin
-                    (* TODO : USDVALUES *)
-                    (* TODO : pricehistory *)
-                    Db.upsert_order order hash_key_order >>= function
-                    | Ok () ->
-                      (* kafkta.push order *)
-                      return_ok order
-                    | Error db_err ->
-                      let str = Crawlori.Rp.string_of_error db_err in
-                      return (Error (unexpected_api_error str))
-                  end
-                | Error err ->
-                  return (Error err)
+                      }
+                  | Error err -> Lwt.return @@ Error err
+                end
+              | None -> Lwt.return @@ Ok order
+            end >>= function
+            | Ok order ->
+              begin
+                (* TODO : USDVALUES *)
+                (* TODO : pricehistory *)
+                Db.upsert_order order >>= function
+                | Ok () ->
+                  (* kafkta.push order *)
+                  return_ok order
+                | Error db_err ->
+                  let str = Crawlori.Rp.string_of_error db_err in
+                  return (Error (unexpected_api_error str))
               end
-            | Error db_err ->
-              let str = Crawlori.Rp.string_of_error db_err in
-              return (Error (unexpected_api_error str))
+            | Error err ->
+              return (Error err)
           end
-        | Error err -> return (Error err)
+        | Error db_err ->
+          let str = Crawlori.Rp.string_of_error db_err in
+          return (Error (unexpected_api_error str))
+      end
+    | Error err -> return (Error err)
 [@@post
-  {path="/v0.1/orders";
+  {debug;
+   path="/v0.1/orders";
    input=order_form_enc;
    output=order_enc;
    errors=[rarible_error_500]}]
@@ -429,6 +442,32 @@ let upsert_order _req input = match input with
  *    output=prepared_order_tx_enc;
  *    errors=[rarible_error_500]}] *)
 
+let get_orders_all req () =
+  Format.eprintf "get_orders_all\n%!";
+  (* let _platform = EzAPI.Req.find_param platform_param req in *)
+  match get_origin_param req with
+  | Ok origin ->
+    begin match get_size_param req with
+      | Ok size ->
+        begin match get_continuation_last_update_param req with
+          | Ok continuation ->
+            begin
+              Db.get_orders_all ?origin ?continuation ?size () >>= function
+              | Ok res -> return_ok res
+              | Error db_err ->
+                let str = Crawlori.Rp.string_of_error db_err in
+                return (Error (unexpected_api_error str))
+            end
+          | Error err -> return @@ Error err
+        end
+      | Error err -> return (Error err)
+    end
+  | Error err -> return (Error err)
+[@@get
+  {path="/v0.1/orders-all";
+   output=orders_pagination_enc;
+   errors=[rarible_error_500]}]
+
 let get_order_by_hash (_req, hash) () =
   Db.get_order hash >>= function
   | Ok (Some order) -> return_ok order
@@ -446,41 +485,47 @@ let get_order_by_hash (_req, hash) () =
  * [@@get
  *   {path="/v0.1/orders/{arg_hash}/updateMakeStock";
  *    output=order_enc;
- *    errors=[rarible_error_500]}]
- * 
- * let get_orders_all req () =
- *   let _origin = EzAPI.Req.find_param origin_param req in
- *   let _platform = EzAPI.Req.find_param platform_param req in
- *   let _continuation = EzAPI.Req.find_param continuation_param req in
- *   let _size = EzAPI.Req.find_param size_param req in
- *   return (Error (unexpected_api_error ""))
- * [@@get
- *   {path="/v0.1/orders/all";
- *    output=orders_pagination_enc;
- *    errors=[rarible_error_500]}]
- * 
- * let buyer_fee_signature req _input =
+ *    errors=[rarible_error_500]}] *)
+
+(* let buyer_fee_signature req _input =
  *   let _fee = EzAPI.Req.find_param fee_param req in
  *   return (Error (unexpected_api_error ""))
  * [@@post
  *   {path="/v0.1/orders/buyerFeeSignature";
  *    input=order_form_enc;
  *    output=A.binary_enc;
- *    errors=[rarible_error_500]}]
- * 
- * let get_sell_orders_by_maker req () =
- *   let _maker = EzAPI.Req.find_param maker_param req in
- *   let _origin = EzAPI.Req.find_param origin_param req in
- *   let _platform = EzAPI.Req.find_param platform_param req in
- *   let _continuation = EzAPI.Req.find_param continuation_param req in
- *   let _size = EzAPI.Req.find_param size_param req in
- *   return (Error (unexpected_api_error ""))
- * [@@get
- *   {path="/v0.1/orders/sell/byMaker";
- *    output=orders_pagination_enc;
- *    errors=[rarible_error_500]}]
- * 
- * let get_sell_orders_by_item req () =
+ *    errors=[rarible_error_500]}] *)
+
+let get_sell_orders_by_maker req () =
+  let _platform = EzAPI.Req.find_param platform_param req in
+  match get_required_maker_param req with
+  | Ok maker ->
+    begin match get_origin_param req with
+      | Ok origin ->
+        begin match get_size_param req with
+          | Ok size ->
+            begin match get_continuation_last_update_param req with
+              | Ok continuation ->
+                begin
+                  Db.get_sell_orders_by_maker ?origin ?continuation ?size maker >>= function
+                  | Ok res -> return_ok res
+                  | Error db_err ->
+                    let str = Crawlori.Rp.string_of_error db_err in
+                    return (Error (unexpected_api_error str))
+                end
+              | Error err -> return @@ Error err
+            end
+          | Error err -> return @@ Error err
+        end
+      | Error err -> return @@ Error err
+    end
+  | Error err -> return (Error err)
+[@@get
+  {path="/v0.1/orders-sell/byMaker";
+   output=orders_pagination_enc;
+   errors=[rarible_error_500]}]
+
+(* let get_sell_orders_by_item req () =
  *   let _contract = EzAPI.Req.find_param contract_param req in
  *   let _token_id = EzAPI.Req.find_param token_id_param req in
  *   let _maker = EzAPI.Req.find_param maker_param req in
@@ -492,9 +537,9 @@ let get_order_by_hash (_req, hash) () =
  * [@@get
  *   {path="/v0.1/orders/sell/byItem";
  *    output=orders_pagination_enc;
- *    errors=[rarible_error_500]}]
- * 
- * let get_sell_orders_by_collection req () =
+ *    errors=[rarible_error_500]}] *)
+
+(* let get_sell_orders_by_collection req () =
  *   let _collection = EzAPI.Req.find_param collection_param req in
  *   let _origin = EzAPI.Req.find_param origin_param req in
  *   let _platform = EzAPI.Req.find_param platform_param req in
@@ -504,9 +549,9 @@ let get_order_by_hash (_req, hash) () =
  * [@@get
  *   {path="/v0.1/orders/sell/byCollection";
  *    output=orders_pagination_enc;
- *    errors=[rarible_error_500]}]
- * 
- * let get_sell_orders req () =
+ *    errors=[rarible_error_500]}] *)
+
+(* let get_sell_orders req () =
  *   let _origin = EzAPI.Req.find_param origin_param req in
  *   let _platform = EzAPI.Req.find_param platform_param req in
  *   let _continuation = EzAPI.Req.find_param continuation_param req in
@@ -515,9 +560,9 @@ let get_order_by_hash (_req, hash) () =
  * [@@get
  *   {path="/v0.1/orders/sell";
  *    output=orders_pagination_enc;
- *    errors=[rarible_error_500]}]
- * 
- * let get_order_bids_by_maker req () =
+ *    errors=[rarible_error_500]}] *)
+
+(* let get_order_bids_by_maker req () =
  *   let _maker = EzAPI.Req.find_param maker_param req in
  *   let _origin = EzAPI.Req.find_param origin_param req in
  *   let _platform = EzAPI.Req.find_param platform_param req in
@@ -527,9 +572,9 @@ let get_order_by_hash (_req, hash) () =
  * [@@get
  *   {path="/v0.1/orders/bids/byMaker";
  *    output=orders_pagination_enc;
- *    errors=[rarible_error_500]}]
- * 
- * let get_order_bids_by_item req () =
+ *    errors=[rarible_error_500]}] *)
+
+(* let get_order_bids_by_item req () =
  *   let _contract = EzAPI.Req.find_param contract_param req in
  *   let _token_id = EzAPI.Req.find_param token_id_param req in
  *   let _maker = EzAPI.Req.find_param maker_param req in
@@ -627,8 +672,6 @@ let get_order_by_hash (_req, hash) () =
  *   {path="/v0.1/item/{itemId:string}/isUnlockable";
  *    output=Json_encoding.bool;
  *    errors=[rarible_error_500]}] *)
-
-[@@@server 8080]
 
 (* module V_0_1 = struct
  *

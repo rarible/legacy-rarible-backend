@@ -361,7 +361,7 @@ let mk_asset asset_class contract token_id asset_value =
             { asset_type_nft_contract = c ; asset_type_nft_token_id = id } in
         Lwt.return_ok { asset_type; asset_value }
       | _, _ ->
-        Lwt.return_error (`hook_error ("no contract or tokenId for ERC721 asset"))
+        Lwt.return_error (`hook_error ("no contract addr or tokenId for ERC721 asset"))
     end
   | "ETH" ->
     begin
@@ -369,12 +369,38 @@ let mk_asset asset_class contract token_id asset_value =
       | None, None ->
         Lwt.return_ok { asset_type = ATETH ; asset_value }
       | _, _ ->
-        Lwt.return_error (`hook_error ("contract or tokenId for ETH asset"))
+        Lwt.return_error (`hook_error ("contract addr or tokenId for ETH asset"))
     end
     (* Tezos assets*)
-    (* | "XTZ"
-     * | "FA1.2"
-     * | "FA2" *)
+  | "XTZ" ->
+    begin
+      match contract, token_id with
+      | None, None ->
+        Lwt.return_ok { asset_type = ATXTZ ; asset_value }
+      | _, _ ->
+        Lwt.return_error (`hook_error ("contract addr or tokenId for XTZ asset"))
+    end
+  | "FA_1_2" ->
+    begin
+      match contract, token_id with
+      | Some c, None ->
+        let asset_type = ATFA_1_2 c in
+        Lwt.return_ok { asset_type; asset_value }
+      | _, _ ->
+        Lwt.return_error (`hook_error ("need contract and no tokenId for FA1.2 asset"))
+    end
+  | "FA_2" ->
+    begin
+      match contract, token_id with
+      | Some c, id ->
+        let asset_type =
+          ATFA_2
+            { asset_fa2_contract = c ; asset_fa2_token_id = id } in
+        Lwt.return_ok { asset_type; asset_value }
+      | _, _ ->
+        Lwt.return_error (`hook_error ("no contract addr for FA2 asset"))
+    end
+
   | _ ->
     Lwt.return_error (`hook_error ("invalid asset class " ^ asset_class))
 
@@ -392,11 +418,21 @@ let db_from_asset asset =
     Lwt.return_ok
       (string_of_asset_type asset.asset_type, None, None, asset_value)
   (* Tezos assets*)
-  (* | "XTZ"
-   * | "FA1.2"
-   * | "FA2" *)
-  | _ ->
-    Lwt.return_error (`hook_error ("invalid asset"))
+  | ATXTZ ->
+    Lwt.return_ok
+      (string_of_asset_type asset.asset_type, None, None, asset_value)
+  | ATFA_1_2 c ->
+    Lwt.return_ok
+      (string_of_asset_type asset.asset_type,
+       Some c,
+       None,
+       asset_value)
+  | ATFA_2 fa2 ->
+    Lwt.return_ok
+      (string_of_asset_type asset.asset_type,
+       Some fa2.asset_fa2_contract,
+       fa2.asset_fa2_token_id,
+       asset_value)
 
 let get_order_pending ?dbh hash_key =
   use dbh @@ fun dbh ->
@@ -464,12 +500,35 @@ let get_order_price_history ?dbh hash_key =
   let|>? l =
     [%pgsql dbh
         "select date, make_value, take_value \
-         from order_price_history where hash = $hash_key"] in
+         from order_price_history where hash = $hash_key \
+         order by date desc"] in
   List.map
     (fun (date, make_value, take_value) -> {
          order_price_history_record_date = date ;
          order_price_history_record_make_value = Int64.to_string make_value ;
          order_price_history_record_take_value = Int64.to_string take_value ;
+       }) l
+
+let get_order_origin_fees ?dbh hash_key =
+  use dbh @@ fun dbh ->
+  let|>? l =
+    [%pgsql dbh
+        "select account, value from origin_fees where hash = $hash_key"] in
+  List.map
+    (fun (part_account, v) -> {
+         part_account ;
+         part_value = Int32.to_int v
+       }) l
+
+let get_order_payouts ?dbh hash_key =
+  use dbh @@ fun dbh ->
+  let|>? l =
+    [%pgsql dbh
+        "select account, value from payouts where hash = $hash_key"] in
+  List.map
+    (fun (part_account, v) -> {
+         part_account ;
+         part_value = Int32.to_int v
        }) l
 
 let mk_order order_obj =
@@ -487,6 +546,8 @@ let mk_order order_obj =
   >>=? fun order_elt_take ->
   get_order_pending order_obj#hash >>=? fun pending ->
   get_order_price_history order_obj#hash >>=? fun price_history ->
+  get_order_origin_fees order_obj#hash >>=? fun origin_fees ->
+  get_order_payouts order_obj#hash >>=? fun payouts ->
   let order_elt = {
     order_elt_maker = order_obj#maker ;
     order_elt_taker = order_obj#taker ;
@@ -500,7 +561,7 @@ let mk_order order_obj =
     order_elt_salt = order_obj#salt ;
     order_elt_signature = order_obj#signature ;
     order_elt_created_at = order_obj#created_at ;
-    order_elt_last_updated_at = order_obj#last_updated_at ;
+    order_elt_last_update_at = order_obj#last_update_at ;
     order_elt_pending = Some pending ;
     order_elt_hash = order_obj#hash ;
     order_elt_make_balance = string_opt_of_int64_opt order_obj#make_balance ;
@@ -510,15 +571,8 @@ let mk_order order_obj =
   } in
   let data = RaribleV2Order {
     order_rarible_v2_data_v1_data_type = "RARIBLE_V2_DATA_V1" ;
-    order_rarible_v2_data_v1_payouts =
-      begin match order_obj#payouts with
-        | None -> []
-        | Some json -> (EzEncoding.destruct (Json_encoding.list part_enc) json)
-      end ;
-    order_rarible_v2_data_v1_origin_fees =
-      match order_obj#origin_fees with
-      | None -> []
-      | Some json -> (EzEncoding.destruct (Json_encoding.list part_enc) json) ;
+    order_rarible_v2_data_v1_payouts = payouts ;
+    order_rarible_v2_data_v1_origin_fees = origin_fees ;
   } in
   let rarible_v2_order = {
     order_elt = order_elt ;
@@ -536,7 +590,7 @@ let get_order ?dbh hash_key =
          take_asset_type_class, take_asset_type_contract, take_asset_type_token_id, \
          take_asset_value, \
          fill, start_date, end_date, make_stock, cancelled, salt, \
-         signature, created_at, last_updated_at, hash, payouts, origin_fees, \
+         signature, created_at, last_update_at, hash, \
          make_balance, make_price_usd, take_price_usd \
          from orders where hash = $hash_key"] in
   match l with
@@ -545,6 +599,160 @@ let get_order ?dbh hash_key =
     one l >>=? fun r ->
     mk_order r >>=? fun order ->
     Lwt.return_ok @@ Some order
+
+let mk_last_update_continuation order =
+  Printf.sprintf "%Ld_%s"
+    (Int64.of_float @@ CalendarLib.Calendar.to_unixfloat order.order_elt.order_elt_last_update_at)
+    order.order_elt.order_elt_hash
+
+let get_orders_all ?dbh ?origin ?continuation ?(size=50) () =
+  Format.eprintf "get_orders_all %s %s %d@."
+    (match origin with None -> "None" | Some s -> s)
+    (match continuation with
+     | None -> "None"
+     | Some (ts, s) -> (Tzfunc.Proto.A.cal_to_str ts) ^ "_" ^ s)
+    size ;
+  use dbh @@ fun dbh ->
+  let size64 = Int64.of_int size in
+  let>? l = match origin, continuation with
+    | Some origin, Some (ts, h) ->
+      [%pgsql.object dbh
+          "select maker, taker, \
+           make_asset_type_class, make_asset_type_contract, make_asset_type_token_id, \
+           make_asset_value, \
+           take_asset_type_class, take_asset_type_contract, take_asset_type_token_id, \
+           take_asset_value, \
+           fill, start_date, end_date, make_stock, cancelled, salt, \
+           signature, created_at, last_update_at, hash, \
+           make_balance, make_price_usd, take_price_usd \
+           from orders where hash in (select hash from origin_fees where account = $origin) \
+           and ((last_update_at = $ts and hash > $h) or (last_update_at < $ts)) \
+           order by last_update_at desc, hash asc limit $size64"]
+    | Some origin, None ->
+      [%pgsql.object dbh
+          "select maker, taker, \
+           make_asset_type_class, make_asset_type_contract, make_asset_type_token_id, \
+           make_asset_value, \
+           take_asset_type_class, take_asset_type_contract, take_asset_type_token_id, \
+           take_asset_value, \
+           fill, start_date, end_date, make_stock, cancelled, salt, \
+           signature, created_at, last_update_at, hash, \
+           make_balance, make_price_usd, take_price_usd \
+           from orders where hash in (select hash from origin_fees where account = $origin) \
+           order by last_update_at desc, hash asc limit $size64"]
+    | None, Some (ts, h) ->
+      [%pgsql.object dbh
+          "select maker, taker, \
+           make_asset_type_class, make_asset_type_contract, make_asset_type_token_id, \
+           make_asset_value, \
+           take_asset_type_class, take_asset_type_contract, take_asset_type_token_id, \
+           take_asset_value, \
+           fill, start_date, end_date, make_stock, cancelled, salt, \
+           signature, created_at, last_update_at, hash, \
+           make_balance, make_price_usd, take_price_usd \
+           from orders where \
+           ((last_update_at = $ts and hash > $h) or (last_update_at < $ts)) \
+           order by last_update_at desc, hash asc limit $size64"]
+    | None, None ->
+      [%pgsql.object dbh
+          "select maker, taker, \
+           make_asset_type_class, make_asset_type_contract, make_asset_type_token_id, \
+           make_asset_value, \
+           take_asset_type_class, take_asset_type_contract, take_asset_type_token_id, \
+           take_asset_value, \
+           fill, start_date, end_date, make_stock, cancelled, salt, \
+           signature, created_at, last_update_at, hash, make_balance, \
+           make_price_usd, take_price_usd \
+           from orders order by last_update_at desc, hash asc limit $size64"] in
+  map_rp (fun r -> mk_order r) l >>=? fun orders ->
+  let len = List.length orders in
+  let orders_pagination_contination =
+    if len <> size then None
+    else Some
+        (mk_last_update_continuation @@ List.hd (List.rev orders)) in
+  Lwt.return_ok
+    { orders_pagination_orders = orders ; orders_pagination_contination }
+
+(* SELL ORDERS -> make asset = nft *)
+(* BID ORDERS -> take asset = nft *)
+let get_sell_orders_by_maker ?dbh ?origin ?continuation ?(size=20) maker =
+  Format.eprintf "get_orders_all_by_maker %s %s %s %d@."
+    maker
+    (match origin with None -> "None" | Some s -> s)
+    (match continuation with
+     | None -> "None"
+     | Some (ts, s) -> (Tzfunc.Proto.A.cal_to_str ts) ^ "_" ^ s)
+    size ;
+  use dbh @@ fun dbh ->
+  let size64 = Int64.of_int size in
+  let>? l = match origin, continuation with
+    | Some origin, Some (ts, h) ->
+      [%pgsql.object dbh
+          "select maker, taker, \
+           make_asset_type_class, make_asset_type_contract, make_asset_type_token_id, \
+           make_asset_value, \
+           take_asset_type_class, take_asset_type_contract, take_asset_type_token_id, \
+           take_asset_value, \
+           fill, start_date, end_date, make_stock, cancelled, salt, \
+           signature, created_at, last_update_at, hash, \
+           make_balance, make_price_usd, take_price_usd \
+           from orders where \
+           hash in (select hash from origin_fees where account = $origin) and \
+           (make_asset_type_class = 'FA_2' and make_asset_type_token_id is not null ) and \
+           maker = $maker and \
+           ((last_update_at = $ts and hash > $h) or (last_update_at < $ts)) \
+           order by last_update_at desc, hash asc limit $size64"]
+    | Some origin, None ->
+      [%pgsql.object dbh
+          "select maker, taker, \
+           make_asset_type_class, make_asset_type_contract, make_asset_type_token_id, \
+           make_asset_value, \
+           take_asset_type_class, take_asset_type_contract, take_asset_type_token_id, \
+           take_asset_value, \
+           fill, start_date, end_date, make_stock, cancelled, salt, \
+           signature, created_at, last_update_at, hash, \
+           make_balance, make_price_usd, take_price_usd \
+           from orders where \
+           hash in (select hash from origin_fees where account = $origin) and \
+           (make_asset_type_class = 'FA_2' and make_asset_type_token_id is not null) and \
+           maker = $maker \
+           order by last_update_at desc, hash asc limit $size64"]
+    | None, Some (ts, h) ->
+      [%pgsql.object dbh
+          "select maker, taker, \
+           make_asset_type_class, make_asset_type_contract, make_asset_type_token_id, \
+           make_asset_value, \
+           take_asset_type_class, take_asset_type_contract, take_asset_type_token_id, \
+           take_asset_value, \
+           fill, start_date, end_date, make_stock, cancelled, salt, \
+           signature, created_at, last_update_at, hash, make_balance, \
+           make_price_usd, take_price_usd \
+           from orders where \
+           (make_asset_type_class = 'FA_2' and make_asset_type_token_id is not null) and \
+           ((last_update_at = $ts and hash > $h) or (last_update_at < $ts)) and \
+           maker = $maker \
+           order by last_update_at desc, hash asc limit $size64"]
+    | None, None ->
+      [%pgsql.object dbh
+          "select maker, taker, \
+           make_asset_type_class, make_asset_type_contract, make_asset_type_token_id, \
+           make_asset_value, \
+           take_asset_type_class, take_asset_type_contract, take_asset_type_token_id, \
+           take_asset_value, \
+           fill, start_date, end_date, make_stock, cancelled, salt, \
+           signature, created_at, last_update_at, hash, make_balance, \
+           make_price_usd, take_price_usd \
+           from orders where \
+           (make_asset_type_class = 'FA_2' and make_asset_type_token_id is not null) \
+           and maker = $maker order by last_update_at desc, hash asc limit $size64"] in
+  map_rp (fun r -> mk_order r) l >>=? fun orders ->
+  let len = List.length orders in
+  let orders_pagination_contination =
+    if len <> size then None
+    else Some
+        (mk_last_update_continuation @@ List.hd (List.rev orders)) in
+  Lwt.return_ok
+    { orders_pagination_orders = orders ; orders_pagination_contination }
 
 let insert_pendings ?dbh pendings hash_key =
   use dbh @@ fun dbh ->
@@ -618,18 +826,33 @@ let insert_pendings ?dbh pendings hash_key =
            $?make_price_usd, $?taker_price_usd, $hash_key)"]
     ) pendings
 
-let insert_price_history ?dbh price_history hash_key =
+let insert_price_history ?dbh date make_value take_value hash_key =
   use dbh @@ fun dbh ->
-  iter_rp (fun ph ->
-      let date = ph.order_price_history_record_date in
-      let make_value = Int64.of_string ph.order_price_history_record_make_value in
-      let take_value = Int64.of_string ph.order_price_history_record_take_value in
-      [%pgsql dbh
-          "insert into order_price_history (date, make_value, take_value, hash) \
-           values ($date, $make_value, $take_value, $hash_key)"])
-    price_history
+  [%pgsql dbh
+      "insert into order_price_history (date, make_value, take_value, hash) \
+       values ($date, $make_value, $take_value, $hash_key)"]
 
-let upsert_order ?dbh order hash_key =
+let insert_origin_fees ?dbh fees hash_key =
+  use dbh @@ fun dbh ->
+  iter_rp (fun part ->
+      let account = part.part_account in
+      let value = Int32.of_int part.part_value in
+      [%pgsql dbh
+          "insert into origin_fees (account, value, hash) \
+           values ($account, $value, $hash_key)"])
+    fees
+
+let insert_payouts ?dbh p hash_key =
+  use dbh @@ fun dbh ->
+  iter_rp (fun part ->
+      let account = part.part_account in
+      let value = Int32.of_int part.part_value in
+      [%pgsql dbh
+          "insert into payouts (account, value, hash) \
+           values ($account, $value, $hash_key)"])
+    p
+
+let upsert_order ?dbh order =
   let order_elt = order.order_elt in
   let order_data = order.order_data in
   let maker = order_elt.order_elt_maker in
@@ -646,46 +869,44 @@ let upsert_order ?dbh order hash_key =
   let salt = order_elt.order_elt_salt in
   let signature = order_elt.order_elt_signature in
   let created_at = order_elt.order_elt_created_at in
-  let last_updated_at = order_elt.order_elt_last_updated_at in
+  let last_update_at = order_elt.order_elt_last_update_at in
   let payouts = match order_data with
-    | RaribleV2Order data ->
-      EzEncoding.construct
-        (Json_encoding.list part_enc)
-        data.order_rarible_v2_data_v1_payouts
+    | RaribleV2Order data -> data.order_rarible_v2_data_v1_payouts
     | _ -> assert false in
   let origin_fees = match order_data with
-    | RaribleV2Order data ->
-      EzEncoding.construct
-        (Json_encoding.list part_enc)
-        data.order_rarible_v2_data_v1_origin_fees
+    | RaribleV2Order data -> data.order_rarible_v2_data_v1_origin_fees
     | _ -> assert false in
   let make_balance = int64_opt_of_string_opt order_elt.order_elt_make_balance in
   let make_price_usd = float_opt_of_string_opt order_elt.order_elt_make_price_usd in
   let take_price_usd = float_opt_of_string_opt order_elt.order_elt_take_price_usd in
+  let hash_key = order_elt.order_elt_hash in
   use dbh @@ fun dbh ->
   let>? () =
     [%pgsql dbh
-        "insert into \
-         orders(maker, taker, \
+        "insert into orders(maker, taker, \
          make_asset_type_class, make_asset_type_contract, make_asset_type_token_id, \
          make_asset_value, \
          take_asset_type_class, take_asset_type_contract, take_asset_type_token_id, \
          take_asset_value, \
          fill, start_date, end_date, make_stock, cancelled, salt, \
-         signature, created_at, last_updated_at, hash, payouts, origin_fees, \
+         signature, created_at, last_update_at, hash, \
          make_balance, make_price_usd, take_price_usd) \
          values($maker, $?taker, \
          $make_class, $?make_contract, $?make_token_id, $make_asset_value, \
          $take_class, $?take_contract, $?take_token_id, $take_asset_value, \
          $fill, $?start_date, $?end_date, $make_stock, \
-         $cancelled, $salt, $signature, $created_at, $last_updated_at, \
-         $hash_key, $payouts, $origin_fees, \
-         $?make_balance, $?make_price_usd, $?take_price_usd) \
+         $cancelled, $salt, $signature, $created_at, $last_update_at, \
+         $hash_key, $?make_balance, $?make_price_usd, $?take_price_usd) \
          on conflict (hash) do update set (\
-         make_asset_value, take_asset_value, make_stock, signature, last_updated_at) = \
-         ($make_asset_value, $take_asset_value, $make_stock, $signature, $last_updated_at)"] in
+         make_asset_value, take_asset_value, make_stock, signature, last_update_at) = \
+         ($make_asset_value, $take_asset_value, $make_stock, $signature, $last_update_at)"] in
   begin match order_elt.order_elt_pending with
     | None -> Lwt.return_ok ()
     | Some pendings -> insert_pendings pendings hash_key
   end >>=? fun () ->
-  insert_price_history order_elt.order_elt_price_history hash_key
+  insert_price_history last_update_at make_asset_value take_asset_value hash_key >>=? fun () ->
+  begin
+    if last_update_at = created_at then insert_origin_fees origin_fees hash_key
+    else Lwt.return_ok ()
+  end >>=? fun () ->
+  insert_payouts payouts hash_key

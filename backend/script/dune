@@ -1,4 +1,11 @@
 (library
  (public_name rarible.script)
+ (modules script)
  (name script)
  (libraries unix hex))
+
+(executable
+ (public_name rarible.api_script)
+ (modules api_script)
+ (name api_script)
+ (libraries api unix hex let rtypes ez_api.icurl))
