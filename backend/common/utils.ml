@@ -306,23 +306,44 @@ let string_of_asset_type = function
 
 let (let$) = Result.bind
 
-let pack m =
-  let$ b = Forge.forge_micheline m in
-  let h = Hex.of_string b in
-  Forge.forge_micheline @@ Mbytes h
-
-let asset_type_mich = function
+let asset_class_mich = function
   | ATXTZ -> prim `Left ~args:[prim `Unit]
   | ATFA_1_2 _ -> prim `Right ~args:[prim `Left ~args:[ prim `Unit ]]
   | ATFA_2 _ -> prim `Right ~args:[prim `Right ~args:[ prim `Left ~args:[ prim `Unit ] ]]
-  | ATETH -> Mint Z.zero
-  | ATERC721 _ -> Mint Z.one
+  | ATETH -> assert false
+  | ATERC721 _ -> assert false
+
+let asset_class_type =
+  (prim `or_ ~args:[prim `unit; prim `or_ ~args:[prim `unit; prim `or_ ~args:[
+       prim `unit; prim `or_ ~args:[prim `unit; prim `bytes ]]]])
+
+let asset_data = function
+  | ATXTZ -> Ok "\000"
+  | ATFA_1_2 a -> Tzfunc.Forge.pack (prim `address) (Mstring a)
+  | ATFA_2 { asset_fa2_contract; asset_fa2_token_id } ->
+    let token_id = Option.get asset_fa2_token_id in
+    Tzfunc.Forge.pack (prim `pair ~args:[ prim `address; prim `nat ])
+      (prim `Pair ~args:[ Mstring asset_fa2_contract; Mint (Z.of_string token_id) ])
+  | ATETH -> assert false
+  | ATERC721 _ -> assert false
+
+
+let asset_type_mich a =
+  let$ data = asset_data a in
+  Result.ok @@ prim `Pair ~args:[
+    asset_class_mich a;
+    Mbytes (Hex.of_string data)
+  ]
 
 let asset_mich a =
-  prim `Pair ~args:[
-    prim `Pair ~args:[ asset_type_mich a.asset_type; Mbytes (`Hex "00") ];
-    Mint (Z.of_string a.asset_value)
-  ]
+  let$ asset_type = asset_type_mich a.asset_type in
+  Ok (prim `Pair ~args:[
+      asset_type;
+      Mint (Z.of_string a.asset_value)
+    ])
+
+let asset_type_type = prim `pair ~args:[ asset_class_type; prim `bytes]
+let asset_type = prim `pair ~args:[asset_type_type; prim `nat]
 
 let option_mich f = function
   | None -> prim `None
@@ -332,10 +353,14 @@ let keccak s =
   Digestif.KECCAK_256.(to_raw_string @@ digest_string s)
 
 let hash_key maker make_asset_type take_asset_type salt =
-  let$ maker = pack @@ Mstring maker in
-  let$ make_asset_type = pack @@ asset_type_mich make_asset_type in
-  let$ take_asset_type = pack @@ asset_type_mich take_asset_type in
-  let$ salt = pack @@ Mint (Z.of_string salt) in
+  let$ maker = Tzfunc.Forge.pack (prim `key) (Mstring maker) in
+  let$ make_asset_type_mich = asset_type_mich make_asset_type in
+  let$ make_asset_type =
+    Tzfunc.Forge.pack asset_type_type make_asset_type_mich in
+  let$ take_asset_type_mich = asset_type_mich take_asset_type in
+  let$ take_asset_type =
+    Tzfunc.Forge.pack asset_type_type take_asset_type_mich in
+  let$ salt = Tzfunc.Forge.pack (prim `nat) @@ Mint (Z.of_string salt) in
   Result.ok @@ Hex.show @@ Hex.of_string @@ keccak @@ String.concat "" [
     maker;
     keccak make_asset_type;
@@ -343,25 +368,60 @@ let hash_key maker make_asset_type take_asset_type salt =
     salt
   ]
 
+let part_type = prim `pair ~args:[ prim `address; prim `nat ]
+let order_data_type =
+  prim `pair ~args:[prim `list ~args:[ part_type ]; prim `list ~args:[ part_type ]]
+
+let order_type =
+  prim `pair ~args:[
+    prim `option ~args:[ prim `key ];
+    prim `pair ~args:[
+      asset_type;
+      prim `pair ~args:[
+        prim `option ~args:[ prim `key ];
+        prim `pair ~args:[
+          asset_type;
+          prim `pair ~args:[
+            prim `nat;
+            prim `pair ~args:[
+              prim `option ~args:[ prim `timestamp ];
+              prim `pair ~args:[
+                prim `option ~args:[ prim `timestamp ];
+                prim `pair ~args:[
+                  prim `bytes;
+                  prim `bytes
+                ]
+              ]
+            ]
+          ]
+        ]
+      ]
+    ]
+  ]
+
 let hash_order_form maker make taker take salt start_date end_date data_type payouts origin_fees =
-  let$ data_type = pack (Mstring data_type) in
-  let$ data = pack (prim `Pair ~args:[
-      Mseq (List.map (fun p -> prim `Pair ~args:[
-          Mstring p.part_account;
-          Mint (Z.of_int p.part_value) ]) payouts);
-      Mseq (List.map (fun p -> prim `Pair ~args:[
-          Mstring p.part_account;
-          Mint (Z.of_int p.part_value) ]) origin_fees);
-    ]) in
-  pack @@
+  let open Tzfunc.Forge in
+  let$ data_type = pack (prim `string) (Mstring data_type) in
+  let$ data = pack order_data_type
+      (prim `Pair ~args:[
+          Mseq (List.map (fun p -> prim `Pair ~args:[
+              Mstring p.part_account;
+              Mint (Z.of_int p.part_value) ]) payouts);
+          Mseq (List.map (fun p -> prim `Pair ~args:[
+              Mstring p.part_account;
+              Mint (Z.of_int p.part_value) ]) origin_fees);
+        ]) in
+  let$ asset_make = asset_mich make in
+  let$ asset_take = asset_mich take in
+  pack order_type @@
   prim `Pair ~args:[
     option_mich (fun s -> Mstring s) (Some maker);
     prim `Pair ~args:[
-      asset_mich make;
+      asset_make;
       prim `Pair ~args:[
         option_mich (fun s -> Mstring s) taker;
         prim `Pair ~args:[
-          asset_mich take;
+          asset_take;
           prim `Pair ~args:[
             Mint (Z.of_string salt);
             prim `Pair ~args:[
@@ -379,49 +439,6 @@ let hash_order_form maker make taker take salt start_date end_date data_type pay
       ]
     ]
   ]
-
-let hash_order order =
-  Format.eprintf "hash_order\n%!";
-  let elt = order.order_elt in
-  (* todo : correct data_type *)
-  match order.order_data with
-  | RaribleV2Order o ->
-    let$ data_type = pack (Mstring o.order_rarible_v2_data_v1_data_type) in
-    let$ data = pack (prim `Pair ~args:[
-        Mseq (List.map (fun p -> prim `Pair ~args:[
-            Mstring p.part_account;
-            Mint (Z.of_int p.part_value) ]) o.order_rarible_v2_data_v1_payouts);
-        Mseq (List.map (fun p -> prim `Pair ~args:[
-            Mstring p.part_account;
-            Mint (Z.of_int p.part_value) ]) o.order_rarible_v2_data_v1_origin_fees);
-      ]) in
-    pack @@
-    prim `Pair ~args:[
-      option_mich (fun s -> Mstring s) (Some elt.order_elt_maker);
-      prim `Pair ~args:[
-        asset_mich elt.order_elt_make;
-        prim `Pair ~args:[
-          option_mich (fun s -> Mstring s) elt.order_elt_taker;
-          prim `Pair ~args:[
-            asset_mich elt.order_elt_take;
-            prim `Pair ~args:[
-              Mint (Z.of_string elt.order_elt_salt);
-              prim `Pair ~args:[
-                option_mich (fun c -> Mstring (Proto.A.cal_to_str c)) elt.order_elt_start;
-                prim `Pair ~args:[
-                  option_mich (fun c -> Mstring (Proto.A.cal_to_str c)) elt.order_elt_end;
-                  prim `Pair ~args:[
-                    Mbytes (Hex.of_string @@ keccak data_type);
-                    Mbytes (Hex.of_string data);
-                  ]
-                ]
-              ]
-            ]
-          ]
-        ]
-      ]
-    ]
-  | _ -> Error `wrong_order
 
 (* // who fills asset collection `fill` ?
  * function hashKeyOrder(iorder : order) : bytes {
