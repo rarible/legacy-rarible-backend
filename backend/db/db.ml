@@ -52,11 +52,15 @@ let set_mint dbh op kt1 m =
   let meta = EzEncoding.construct token_metadata_enc m.mi_meta in
   let token_id = m.mi_op.tk_op.tk_token_id in
   let owner = m.mi_op.tk_owner in
+  let royalties = List.map (fun r ->
+      Some (EzEncoding.construct
+              Json_encoding.(obj2 (req "account" string) (req "value" int53)) r))
+      m.mi_royalties in
   let>? () = [%pgsql dbh
       "insert into tokens(contract, token_id, block, level, last, owner, amount, \
-       metadata, transaction, supply) \
+       metadata, royalties, transaction, supply) \
        values($kt1, $token_id, ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, \
-       $owner, 0, $meta, ${op.bo_hash}, 0) on conflict do nothing"] in
+       $owner, 0, $meta, $royalties, ${op.bo_hash}, 0) on conflict do nothing"] in
   let>? () = set_account dbh owner ~block:op.bo_block ~level:op.bo_level ~tsp:op.bo_tsp in
   let mint = EzEncoding.construct token_op_owner_enc m.mi_op in
   let>? id = transaction_id op in
