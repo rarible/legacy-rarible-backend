@@ -1,6 +1,7 @@
-import { TezosToolkit, storage } from "./rarible"
+import { TezosToolkit, pack } from "./rarible"
 
-import { InMemorySigner } from '@taquito/signer';
+import { InMemorySigner } from '@taquito/signer'
+const keccak_base = require('keccak')
 
 async function main() {
 
@@ -9,7 +10,23 @@ async function main() {
     signer: new InMemorySigner('edsk4RqeRTrhdKfJKBTndA9x1RLp4A3wtNL1iMFRXDvfs5ANeZAncZ'),
   });
 
-  const provider = { tezos, api: "https://api.todo-tezos.rarible.io" }
+  // const config = {
+  //   exchange: "",
+  //   proxies: { fa_1_2: "", nft: "" },
+  //   fees: 0
+  // }
+
+  // const provider = {
+  //   tezos,
+  //   api: "https://api.todo-tezos.rarible.io",
+  //   config
+  // }
+
+  // let s = pack_bytes({ string: 'V1' }, { prim: 'string'} )
+  // console.log('V1', keccak('keccak256').update(s, 'hex').digest('hex'))
+
+  let s = await tezos.signer.sign("002a")
+  console.log(s)
 
   // transfer(
   //   provider, 'KT1MWv7oH8JJhxJJs8co21XiByBEAYx2QDjY',
@@ -19,8 +36,8 @@ async function main() {
   //     console.log("done", hash))
   //   .catch(e => console.log("error", e))
 
-  const st = await storage(provider, 'KT1MWv7oH8JJhxJJs8co21XiByBEAYx2QDjY')
-  console.log(st.ledger.toJSON())
+  // const st : StorageFA2 = await storage(provider, 'KT1MWv7oH8JJhxJJs8co21XiByBEAYx2QDjY')
+  // console.log(st.ledger.toJSON())
 }
 
 main()

@@ -1,3 +1,5 @@
+import { Provider } from "../utils"
+
 export interface XTZAssetType {
   asset_class: "XTZ";
 }
@@ -13,7 +15,8 @@ export interface FA2AssetType {
   token_id: bigint;
 }
 
-export type AssetType = XTZAssetType | FA12AssetType | FA2AssetType
+export type NftAssetType = FA12AssetType | FA2AssetType
+export type AssetType = XTZAssetType | NftAssetType
 
 export interface Asset {
   asset_type: AssetType;
@@ -52,29 +55,33 @@ export interface OrderSideMatch {
 export type OrderExchangeHistory = OrderCancel | OrderSideMatch
 
 export interface Part {
-    account: string;
-    value: bigint;
+  account: string;
+  value: bigint;
 }
 
 export interface OrderRaribleV2DataV1 {
   data_type: "RARIBLE_V2_DATA_V1";
   payouts: Array<Part>;
-  originFees: Array<Part>;
+  origin_fees: Array<Part>;
 }
 
-export interface Order {
+export declare type OrderForm = {
   type: "RARIBLE_V2";
   maker: string;
   taker?: string;
   make: Asset;
   take: Asset;
-  fill: bigint;
+  salt: bigint;
   start?: number;
   end?: number;
+  signature?: string;
+  data: OrderRaribleV2DataV1;
+}
+
+export type Order = OrderForm & {
+  fill: bigint;
   makeStock: bigint;
   cancelled: boolean;
-  salt: string;
-  signature?: string;
   createdAt: string;
   lastUpdateAt: string;
   pending?: Array<OrderExchangeHistory>;
@@ -82,15 +89,21 @@ export interface Order {
   makeBalance?: bigint;
   makePriceUsd?: bigint;
   takePriceUsd?: bigint;
-  data: OrderRaribleV2DataV1;
 }
 
-export function mk_asset_type(a: AssetType)
-  return {
-    prim: 'Pair',
-    args: [
-      assetclass,
-      { bytes: data }
-    ]
-  }
+export function salt() : bigint {
+  let a = new Uint8Array(32)
+  a = crypto.getRandomValues(a)
+  let h = a.reduce((acc, x) => acc + x.toString(16).padStart(2, '0'), '')
+  return BigInt('0x'+h)
 }
+
+// export function mk_asset_type(a: AssetType) {
+//   return {
+//     prim: 'Pair',
+//     args: [
+//       a.assetclass,
+//       { bytes: data }
+//     ]
+//   }
+// }
