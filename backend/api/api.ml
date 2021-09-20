@@ -173,7 +173,7 @@ let get_required_maker_param req =
  *   {path="/v0.1/ownerships/{ownershipId:string}";
  *    output=nft_ownership_enc;
  *    errors=[rarible_error_500]}]
- * 
+ *
  * let get_nft_ownerships_by_item req () =
  *   let _contract = EzAPI.Req.find_param contract_param req in
  *   let _token_id = EzAPI.Req.find_param token_id_param req in
@@ -184,7 +184,7 @@ let get_required_maker_param req =
  *   {path="/v0.1/ownerships/byItem";
  *    output=nft_ownerships_enc;
  *    errors=[rarible_error_500]}]
- * 
+ *
  * let get_nft_all_ownerships req () =
  *   let _continuation = EzAPI.Req.find_param continuation_param req in
  *   let _size = EzAPI.Req.find_param size_param req in
@@ -193,7 +193,7 @@ let get_required_maker_param req =
  *   {path="/v0.1/ownerships/all";
  *    output=nft_ownerships_enc;
  *    errors=[rarible_error_500]}]
- * 
+ *
  * (\* nft-item-controller *\)
  * let get_nft_item_meta_by_id (_req, _item_id) () =
  *   return (Error (bad_request ""))
@@ -201,14 +201,14 @@ let get_required_maker_param req =
  *   {path="/v0.1/items/{itemId:string}/meta";
  *    output=nft_item_meta_enc;
  *    errors=[rarible_error_500]}]
- * 
+ *
  * let get_nft_lazy_item_by_id (_req, _item_id) () =
  *   return (Error (bad_request ""))
  * [@@get
  *   {path="/v0.1/items/{itemId:string}/lazy";
  *    output=lazy_nft_enc;
  *    errors=[rarible_error_500]}]
- * 
+ *
  * let get_nft_item_by_id (req, _item_id) () =
  *   let _include_meta = EzAPI.Req.find_param include_meta_param req in
  *   return (Error (bad_request ""))
@@ -216,7 +216,7 @@ let get_required_maker_param req =
  *   {path="/v0.1/items/{itemId:string}";
  *    output=nft_item_enc;
  *    errors=[rarible_error_500]}]
- * 
+ *
  * let get_nft_items_by_owner req () =
  *   let _owner = EzAPI.Req.find_param owner_param req in
  *   let _continuation = EzAPI.Req.find_param continuation_param req in
@@ -227,7 +227,7 @@ let get_required_maker_param req =
  *   {path="/v0.1/items/byOwner";
  *    output=nft_items_enc;
  *    errors=[rarible_error_500]}]
- * 
+ *
  * let get_nft_items_by_creator req () =
  *   let _creator = EzAPI.Req.find_param creator_param req in
  *   let _continuation = EzAPI.Req.find_param continuation_param req in
@@ -238,7 +238,7 @@ let get_required_maker_param req =
  *   {path="/v0.1/items/byCreator";
  *    output=nft_items_enc;
  *    errors=[rarible_error_500]}]
- * 
+ *
  * let get_nft_items_by_collection req () =
  *   let _collection = EzAPI.Req.find_param collection_param req in
  *   let _continuation = EzAPI.Req.find_param continuation_param req in
@@ -249,7 +249,7 @@ let get_required_maker_param req =
  *   {path="/v0.1/items/byCollection";
  *    output=nft_items_enc;
  *    errors=[rarible_error_500]}]
- * 
+ *
  * let get_nft_all_items req () =
  *   let _continuation = EzAPI.Req.find_param continuation_param req in
  *   let _size = EzAPI.Req.find_param size_param req in
@@ -271,14 +271,14 @@ let get_required_maker_param req =
  *   {path="/v0.1/collections/{collection:string}/generate_token_id";
  *    output=nft_token_id_enc;
  *    errors=[rarible_error_500]}]
- * 
+ *
  * let get_nft_collection_by_id (_req, _collection) () =
  *   return (Error (bad_request ""))
  * [@@get
  *   {path="/v0.1/collections/{collection:string}";
  *    output=nft_collection_enc;
  *    errors=[rarible_error_500]}]
- * 
+ *
  * let search_nft_collections_by_owner req () =
  *   let _owner = EzAPI.Req.find_param owner_param req in
  *   let _continuation = EzAPI.Req.find_param continuation_param req in
@@ -288,7 +288,7 @@ let get_required_maker_param req =
  *   {path="/v0.1/collections/byOwner";
  *    output=nft_collections_enc;
  *    errors=[rarible_error_500]}]
- * 
+ *
  * let search_nft_all_collections req () =
  *   let _continuation = EzAPI.Req.find_param continuation_param req in
  *   let _size = EzAPI.Req.find_param size_param req in
@@ -311,7 +311,15 @@ let get_required_maker_param req =
 
 let validate_signature order =
   let order_elt = order.order_elt in
-  let$> msg = hash_order order in
+  let data_type, payouts, origin_fees = match order.order_data with
+    | RaribleV2Order d ->
+      d.order_rarible_v2_data_v1_data_type, d.order_rarible_v2_data_v1_payouts,
+      d.order_rarible_v2_data_v1_origin_fees
+    | _ -> assert false in
+  let$> msg = hash_order_form order_elt.order_elt_maker order_elt.order_elt_make
+      order_elt.order_elt_taker order_elt.order_elt_take
+      order_elt.order_elt_salt order_elt.order_elt_start order_elt.order_elt_end
+      data_type payouts origin_fees in
   Format.eprintf "validate_signature\n%!";
   let signature = order_elt.order_elt_signature in
   let edpk = order_elt.order_elt_maker in
@@ -421,8 +429,7 @@ let upsert_order _req input =
       end
     | Error err -> return (Error err)
 [@@post
-  {debug;
-   path="/v0.1/orders";
+  {path="/v0.1/orders";
    input=order_form_enc;
    output=order_enc;
    errors=[rarible_error_500]}]
@@ -434,7 +441,7 @@ let upsert_order _req input =
  *    input=prepare_order_tx_form_enc;
  *    output=prepare_order_tx_response_enc;
  *    errors=[rarible_error_500]}]
- * 
+ *
  * let prepare_order_cancel_transaction _req () =
  *   return (Error (unexpected_api_error ""))
  * [@@post
@@ -599,7 +606,7 @@ let get_sell_orders_by_maker req () =
  *   {path="/v0.1/aggregations/nftSellByMaker";
  *    output=aggregation_datas_enc;
  *    errors=[rarible_error_500]}]
- * 
+ *
  * let aggregate_nft_purchase_by_taker req () =
  *   let _start_date = EzAPI.Req.find_param start_date_param req in
  *   let _end_date = EzAPI.Req.find_param end_date_param req in
@@ -610,7 +617,7 @@ let get_sell_orders_by_maker req () =
  *   {path="/v0.1/aggregations/nftPurchaseByTaker";
  *    output=aggregation_datas_enc;
  *    errors=[rarible_error_500]}]
- * 
+ *
  * let aggregate_nft_purchase_buy_collection req () =
  *   let _start_date = EzAPI.Req.find_param start_date_param req in
  *   let _end_date = EzAPI.Req.find_param end_date_param req in
@@ -657,7 +664,7 @@ let get_sell_orders_by_maker req () =
  *   {path="/v0.1/item/{itemId:string}/lock";
  *    input=lock_form_enc;output=lock_enc;
  *    errors=[rarible_error_400]}]
- * 
+ *
  * let get_lock_content _req _input =
  *   return (Error (ownership_error ""))
  * [@@get
@@ -665,7 +672,7 @@ let get_sell_orders_by_maker req () =
  *    input=signature_form_enc;
  *    output=Json_encoding.string;
  *    errors=[rarible_error_400]}]
- * 
+ *
  * let is_unlockable _req () =
  *   return (Error (unknown_error ""))
  * [@@get
