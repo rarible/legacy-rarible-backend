@@ -321,9 +321,8 @@ let asset_data = function
   | ATXTZ -> Ok "\000"
   | ATFA_1_2 a -> Tzfunc.Forge.pack (prim `address) (Mstring a)
   | ATFA_2 { asset_fa2_contract; asset_fa2_token_id } ->
-    let token_id = Option.get asset_fa2_token_id in
     Tzfunc.Forge.pack (prim `pair ~args:[ prim `address; prim `nat ])
-      (prim `Pair ~args:[ Mstring asset_fa2_contract; Mint (Z.of_string token_id) ])
+      (prim `Pair ~args:[ Mstring asset_fa2_contract; Mint (Z.of_string asset_fa2_token_id) ])
   | ATETH -> assert false
   | ATERC721 _ -> assert false
 
@@ -449,7 +448,45 @@ let hash_order_form maker make taker take salt start_date end_date data_type pay
  *     pack(iorder.salt)]))
  * } *)
 
-let order_elt_from_order_form_elt elt =
+let calculate_remaining make_value take_value fill cancelled =
+  if cancelled then 0, 0
+  else
+    let take = take_value - fill in
+    let make = take * make_value / take_value in
+    make, take
+
+let calculate_fee data protocol_commission = match data with
+  | RaribleV2Order { order_rarible_v2_data_v1_origin_fees ; _ } ->
+    List.fold_left (fun acc p -> acc + p.part_value)
+      protocol_commission
+      order_rarible_v2_data_v1_origin_fees
+  | _ -> assert false
+
+let calculate_rounded_make_balance make_value take_value make_balance =
+  let max_take = make_balance * take_value / make_value in
+  make_value * max_take / take_value
+
+let calculate_make_stock
+    make_value take_value fill data make_balance protocol_commission fee_side cancelled =
+  let make, _take = calculate_remaining make_value take_value fill cancelled in
+  let fee = match fee_side with
+    | None | Some FeeSideTake -> 0
+    | Some FeeSideMake -> calculate_fee data protocol_commission in
+  let make_balance = (make_balance * 10000) / (fee + 10000) in
+  let rounded_make_balance = calculate_rounded_make_balance make_value take_value make_balance in
+  min make rounded_make_balance
+
+let get_fee_side make_asset take_asset =
+  match make_asset.asset_type, take_asset.asset_type with
+  | ATXTZ, _ -> Some FeeSideMake
+  | _, ATXTZ -> Some FeeSideTake
+  (* | ATERC20 _, _ -> Some FeeSideMake
+   * | _, ATERC20 _ -> Some FeeSideTake
+   * | ATERC1155 _, _ -> Some FeeSideMake
+   * | _, ATERC1155 _ -> Some FeeSideTake *)
+  | _, _ -> None
+
+let order_elt_from_order_form_elt elt data =
   let make_asset = elt.order_form_elt_make in
   let take_asset = elt.order_form_elt_take in
   (* TODO *)
@@ -459,8 +496,23 @@ let order_elt_from_order_form_elt elt =
       make_asset.asset_type
       take_asset.asset_type
       elt.order_form_elt_salt in
+  (* TODO : QUERY BALANCE FOR MAKER ON MAKE ASSET *)
   let make_balance = None in
-  let make_stock = "0" in
+  (* TODO *)
+  (* TODO : QUERY PROTOCOL COMMISSION *)
+  let protocol_commission = 0 in
+  let fee_side = get_fee_side make_asset take_asset in
+  let make_stock =
+    calculate_make_stock
+      (int_of_string make_asset.asset_value)
+      (int_of_string take_asset.asset_value)
+      0
+      data
+      (match make_balance with None -> 0 | Some b -> b)
+      protocol_commission
+      fee_side
+      false
+  in
   let now = CalendarLib.Calendar.now () in
   Ok {
     order_elt_maker = elt.order_form_elt_maker ;
@@ -470,7 +522,7 @@ let order_elt_from_order_form_elt elt =
     order_elt_fill = "0";
     order_elt_start = elt.order_form_elt_start;
     order_elt_end = elt.order_form_elt_end;
-    order_elt_make_stock = make_stock;
+    order_elt_make_stock = string_of_int make_stock;
     order_elt_cancelled = false;
     order_elt_salt = elt.order_form_elt_salt;
     order_elt_signature = elt.order_form_elt_signature;
@@ -485,7 +537,7 @@ let order_elt_from_order_form_elt elt =
   }
 
 let order_from_order_form form =
-  let$ order_elt = order_elt_from_order_form_elt form.order_form_elt in
+  let$ order_elt = order_elt_from_order_form_elt form.order_form_elt form.order_form_data in
   Ok { order_elt; order_data = form.order_form_data }
 
 let order_form_elt_from_order_elt order_elt = {

@@ -98,11 +98,8 @@ let generate_fa1_2_asset () =
 
 let generate_fa2_asset () =
   let asset_fa2_contract = List.nth fa2_contracts (Random.int fa2_contracts_len) in
-  let asset_fa2_token_id = generate_option (fun () -> string_of_int @@ (Random.int 1000) + 1) in
-  ATFA_2 { asset_fa2_contract ; asset_fa2_token_id },
-  match asset_fa2_token_id with
-  | None -> Random.int64 100L
-  | Some _id -> 1L
+  let asset_fa2_token_id = string_of_int @@ (Random.int 1000) + 1 in
+  ATFA_2 { asset_fa2_contract ; asset_fa2_token_id }, 1L
 
 let generate_asset () =
   let kind = Random.int 3 in

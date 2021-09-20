@@ -99,6 +99,44 @@ let get_required_maker_param req =
     with _ ->
       Error (invalid_argument "maker must be an edpk")
 
+let get_maker_param req =
+  let open Tzfunc.Crypto in
+  match EzAPI.Req.find_param maker_param req with
+  | None -> Ok None
+  | Some o ->
+    try
+      ignore @@ Base58.decode Prefix.ed25519_public_key o ;
+      Ok (Some o)
+    with _ ->
+      Error (invalid_argument "maker must be an edpk")
+
+let get_required_contract_param req =
+  let open Tzfunc.Crypto in
+  match EzAPI.Req.find_param contract_param req with
+  | None -> Error (invalid_argument "Query param contract is required")
+  | Some o ->
+    try
+      ignore @@ Base58.decode Prefix.contract_public_key_hash o ;
+      Ok o
+    with _ ->
+      Error (invalid_argument "contract must be an tezos smart contract address")
+
+let get_required_token_id_param req =
+  match EzAPI.Req.find_param token_id_param req with
+  | None -> Error (invalid_argument "Query param token is required")
+  | Some o -> Ok o
+
+let get_required_collection_param req =
+  let open Tzfunc.Crypto in
+  match EzAPI.Req.find_param collection_param req with
+  | None -> Error (invalid_argument "Query param collection is required")
+  | Some o ->
+    try
+      ignore @@ Base58.decode Prefix.contract_public_key_hash o ;
+      Ok o
+    with _ ->
+      Error (invalid_argument "collection must be an tezos smart contract address")
+
 (* (\* gateway-controller *\)
  * let create_gateway_pending_transactions _req _input =
  *   return (Error (unknown_error ""))
@@ -374,60 +412,52 @@ let upsert_order _req input =
   | Error err -> return (Error (unexpected_api_error @@ string_of_error err))
   | Ok order ->
     validate_order order >>= function
-    | Ok () ->
-      begin
-        get_existing_order order.order_elt.order_elt_hash >>= function
-        | Ok existing_order ->
-          begin
-            begin match existing_order with
-              | Some existing_order ->
-                begin
-                  validate existing_order order >>= function
-                  | Ok () ->
-                    let now = CalendarLib.Calendar.now () in
-                    let asset_value = order.order_elt.order_elt_make.asset_value in
-                    let old_make_asset = existing_order.order_elt.order_elt_make in
-                    let order_elt_make = { old_make_asset with asset_value } in
-                    let asset_value = order.order_elt.order_elt_take.asset_value in
-                    let old_take_asset = existing_order.order_elt.order_elt_take in
-                    let order_elt_take = { old_take_asset with asset_value } in
-                    let order_elt_make_stock = order.order_elt.order_elt_make_stock in
-                    let order_elt_signature = order.order_elt.order_elt_signature in
-                    Lwt.return @@ Ok
-                      { existing_order with
-                        order_elt =
-                          { existing_order.order_elt with
-                            order_elt_make ;
-                            order_elt_take ;
-                            order_elt_make_stock ;
-                            order_elt_signature ;
-                            order_elt_last_update_at = now ;
-                          }
-                      }
-                  | Error err -> Lwt.return @@ Error err
-                end
-              | None -> Lwt.return @@ Ok order
-            end >>= function
-            | Ok order ->
-              begin
-                (* TODO : USDVALUES *)
-                (* TODO : pricehistory *)
-                Db.upsert_order order >>= function
-                | Ok () ->
-                  (* kafkta.push order *)
-                  return_ok order
-                | Error db_err ->
-                  let str = Crawlori.Rp.string_of_error db_err in
-                  return (Error (unexpected_api_error str))
-              end
-            | Error err ->
-              return (Error err)
-          end
-        | Error db_err ->
-          let str = Crawlori.Rp.string_of_error db_err in
-          return (Error (unexpected_api_error str))
-      end
     | Error err -> return (Error err)
+    | Ok () ->
+      get_existing_order order.order_elt.order_elt_hash >>= function
+      | Error db_err ->
+        let str = Crawlori.Rp.string_of_error db_err in
+        return (Error (unexpected_api_error str))
+      | Ok existing_order ->
+        begin match existing_order with
+          | None -> Lwt.return @@ Ok order
+          | Some existing_order ->
+            validate existing_order order >>= function
+            | Error err -> Lwt.return @@ Error err
+            | Ok () ->
+              let now = CalendarLib.Calendar.now () in
+              let asset_value = order.order_elt.order_elt_make.asset_value in
+              let old_make_asset = existing_order.order_elt.order_elt_make in
+              let order_elt_make = { old_make_asset with asset_value } in
+              let asset_value = order.order_elt.order_elt_take.asset_value in
+              let old_take_asset = existing_order.order_elt.order_elt_take in
+              let order_elt_take = { old_take_asset with asset_value } in
+              let order_elt_make_stock = order.order_elt.order_elt_make_stock in
+              let order_elt_signature = order.order_elt.order_elt_signature in
+              Lwt.return @@ Ok
+                { existing_order with
+                  order_elt =
+                    { existing_order.order_elt with
+                      order_elt_make ;
+                      order_elt_take ;
+                      order_elt_make_stock ;
+                      order_elt_signature ;
+                      order_elt_last_update_at = now ;
+                    }
+                }
+        end >>= function
+        | Error err ->
+          return (Error err)
+        | Ok order ->
+          (* TODO : USDVALUES *)
+          (* TODO : pricehistory *)
+          Db.upsert_order order >>= function
+          | Error db_err ->
+            let str = Crawlori.Rp.string_of_error db_err in
+            return (Error (unexpected_api_error str))
+          | Ok () ->
+            (* kafkta.push order *)
+            return_ok order
 [@@post
   {path="/v0.1/orders";
    input=order_form_enc;
@@ -450,26 +480,22 @@ let upsert_order _req input =
  *    errors=[rarible_error_500]}] *)
 
 let get_orders_all req () =
-  Format.eprintf "get_orders_all\n%!";
   (* let _platform = EzAPI.Req.find_param platform_param req in *)
+  Format.eprintf "get_orders_all\n%!";
   match get_origin_param req with
+  | Error err -> return @@ Error err
   | Ok origin ->
-    begin match get_size_param req with
-      | Ok size ->
-        begin match get_continuation_last_update_param req with
-          | Ok continuation ->
-            begin
-              Db.get_orders_all ?origin ?continuation ?size () >>= function
-              | Ok res -> return_ok res
-              | Error db_err ->
-                let str = Crawlori.Rp.string_of_error db_err in
-                return (Error (unexpected_api_error str))
-            end
-          | Error err -> return @@ Error err
-        end
-      | Error err -> return (Error err)
-    end
-  | Error err -> return (Error err)
+    match get_size_param req with
+    | Error err -> return @@ Error err
+    | Ok size ->
+      match get_continuation_last_update_param req with
+      | Error err -> return @@ Error err
+      | Ok continuation ->
+        Db.get_orders_all ?origin ?continuation ?size () >>= function
+        | Error db_err ->
+          let str = Crawlori.Rp.string_of_error db_err in
+          return (Error (unexpected_api_error str))
+        | Ok res -> return_ok res
 [@@get
   {path="/v0.1/orders-all";
    output=orders_pagination_enc;
@@ -504,96 +530,166 @@ let get_order_by_hash (_req, hash) () =
  *    errors=[rarible_error_500]}] *)
 
 let get_sell_orders_by_maker req () =
-  let _platform = EzAPI.Req.find_param platform_param req in
+  (* let _platform = EzAPI.Req.find_param platform_param req in *)
+  Format.eprintf "get_sell_orders_by_maker\n%!";
   match get_required_maker_param req with
+  | Error err -> return @@ Error err
   | Ok maker ->
-    begin match get_origin_param req with
-      | Ok origin ->
-        begin match get_size_param req with
-          | Ok size ->
-            begin match get_continuation_last_update_param req with
-              | Ok continuation ->
-                begin
-                  Db.get_sell_orders_by_maker ?origin ?continuation ?size maker >>= function
-                  | Ok res -> return_ok res
-                  | Error db_err ->
-                    let str = Crawlori.Rp.string_of_error db_err in
-                    return (Error (unexpected_api_error str))
-                end
-              | Error err -> return @@ Error err
-            end
-          | Error err -> return @@ Error err
-        end
+    match get_origin_param req with
+    | Error err -> return @@ Error err
+    | Ok origin ->
+      match get_size_param req with
       | Error err -> return @@ Error err
-    end
-  | Error err -> return (Error err)
+      | Ok size ->
+        match get_continuation_last_update_param req with
+        | Error err -> return @@ Error err
+        | Ok continuation ->
+          Db.get_sell_orders_by_maker ?origin ?continuation ?size maker >>= function
+          | Error db_err ->
+            let str = Crawlori.Rp.string_of_error db_err in
+            return (Error (unexpected_api_error str))
+          | Ok res -> return_ok res
 [@@get
   {path="/v0.1/orders-sell/byMaker";
    output=orders_pagination_enc;
    errors=[rarible_error_500]}]
 
-(* let get_sell_orders_by_item req () =
- *   let _contract = EzAPI.Req.find_param contract_param req in
- *   let _token_id = EzAPI.Req.find_param token_id_param req in
- *   let _maker = EzAPI.Req.find_param maker_param req in
- *   let _origin = EzAPI.Req.find_param origin_param req in
- *   let _platform = EzAPI.Req.find_param platform_param req in
- *   let _continuation = EzAPI.Req.find_param continuation_param req in
- *   let _size = EzAPI.Req.find_param size_param req in
- *   return (Error (unexpected_api_error ""))
- * [@@get
- *   {path="/v0.1/orders/sell/byItem";
- *    output=orders_pagination_enc;
- *    errors=[rarible_error_500]}] *)
+let get_sell_orders_by_item req () =
+  (* let _platform = EzAPI.Req.find_param platform_param req in *)
+  Format.eprintf "get_sell_orders_by_item\n%!";
+  match get_required_contract_param req with
+  | Error err -> return @@ Error err
+  | Ok contract ->
+    match get_required_token_id_param req with
+    | Error err -> return @@ Error err
+    | Ok token_id ->
+      match get_maker_param req with
+      | Error err -> return @@ Error err
+      | Ok maker ->
+        match get_origin_param req with
+        | Error err -> return @@ Error err
+        | Ok origin ->
+          match get_size_param req with
+          | Error err -> return @@ Error err
+          | Ok size ->
+            match get_continuation_last_update_param req with
+            | Error err -> return @@ Error err
+            | Ok continuation ->
+              Db.get_sell_orders_by_item
+                ?origin ?continuation ?size ?maker contract token_id >>= function
+                | Error db_err ->
+                  let str = Crawlori.Rp.string_of_error db_err in
+                  return (Error (unexpected_api_error str))
+                | Ok res -> return_ok res
+[@@get
+  {path="/v0.1/orders-sell/byItem";
+   output=orders_pagination_enc;
+   errors=[rarible_error_500]}]
 
-(* let get_sell_orders_by_collection req () =
- *   let _collection = EzAPI.Req.find_param collection_param req in
- *   let _origin = EzAPI.Req.find_param origin_param req in
- *   let _platform = EzAPI.Req.find_param platform_param req in
- *   let _continuation = EzAPI.Req.find_param continuation_param req in
- *   let _size = EzAPI.Req.find_param size_param req in
- *   return (Error (unexpected_api_error ""))
- * [@@get
- *   {path="/v0.1/orders/sell/byCollection";
- *    output=orders_pagination_enc;
- *    errors=[rarible_error_500]}] *)
+let get_sell_orders_by_collection req () =
+  (* let _platform = EzAPI.Req.find_param platform_param req in *)
+  Format.eprintf "get_sell_orders_by_collection\n%!";
+  match get_required_collection_param req with
+  | Error err -> return @@ Error err
+  | Ok collection ->
+    match get_origin_param req with
+    | Error err -> return @@ Error err
+    | Ok origin ->
+      match get_size_param req with
+      | Error err -> return @@ Error err
+      | Ok size ->
+        match get_continuation_last_update_param req with
+        | Error err -> return @@ Error err
+        | Ok continuation ->
+          Db.get_sell_orders_by_collection
+            ?origin ?continuation ?size collection >>= function
+          | Error db_err ->
+            let str = Crawlori.Rp.string_of_error db_err in
+            return (Error (unexpected_api_error str))
+          | Ok res -> return_ok res
+[@@get
+  {path="/v0.1/orders-sell/byCollection";
+   output=orders_pagination_enc;
+   errors=[rarible_error_500]}]
 
-(* let get_sell_orders req () =
- *   let _origin = EzAPI.Req.find_param origin_param req in
- *   let _platform = EzAPI.Req.find_param platform_param req in
- *   let _continuation = EzAPI.Req.find_param continuation_param req in
- *   let _size = EzAPI.Req.find_param size_param req in
- *   return (Error (unexpected_api_error ""))
- * [@@get
- *   {path="/v0.1/orders/sell";
- *    output=orders_pagination_enc;
- *    errors=[rarible_error_500]}] *)
+let get_sell_orders req () =
+  (* let _platform = EzAPI.Req.find_param platform_param req in *)
+  Format.eprintf "get_sell_orders\n%!";
+  match get_origin_param req with
+  | Error err -> return @@ Error err
+  | Ok origin ->
+    match get_size_param req with
+    | Error err -> return @@ Error err
+    | Ok size ->
+      match get_continuation_last_update_param req with
+      | Error err -> return @@ Error err
+      | Ok continuation ->
+        Db.get_sell_orders ?origin ?continuation ?size () >>= function
+        | Error db_err ->
+          let str = Crawlori.Rp.string_of_error db_err in
+          return (Error (unexpected_api_error str))
+        | Ok res -> return_ok res
+[@@get
+  {path="/v0.1/orders/sell";
+   output=orders_pagination_enc;
+   errors=[rarible_error_500]}]
 
-(* let get_order_bids_by_maker req () =
- *   let _maker = EzAPI.Req.find_param maker_param req in
- *   let _origin = EzAPI.Req.find_param origin_param req in
- *   let _platform = EzAPI.Req.find_param platform_param req in
- *   let _continuation = EzAPI.Req.find_param continuation_param req in
- *   let _size = EzAPI.Req.find_param size_param req in
- *   return (Error (unexpected_api_error ""))
- * [@@get
- *   {path="/v0.1/orders/bids/byMaker";
- *    output=orders_pagination_enc;
- *    errors=[rarible_error_500]}] *)
+let get_order_bids_by_maker req () =
+  (* let _platform = EzAPI.Req.find_param platform_param req in *)
+  Format.eprintf "get_order_bids_by_maker\n%!";
+  match get_required_maker_param req with
+  | Error err -> return @@ Error err
+  | Ok maker ->
+    match get_origin_param req with
+    | Error err -> return @@ Error err
+    | Ok origin ->
+      match get_size_param req with
+      | Error err -> return @@ Error err
+      | Ok size ->
+        match get_continuation_last_update_param req with
+        | Error err -> return @@ Error err
+        | Ok continuation ->
+          Db.get_bid_orders_by_maker ?origin ?continuation ?size maker >>= function
+          | Error db_err ->
+            let str = Crawlori.Rp.string_of_error db_err in
+            return (Error (unexpected_api_error str))
+          | Ok res -> return_ok res
+[@@get
+  {path="/v0.1/orders/bids/byMaker";
+   output=orders_pagination_enc;
+   errors=[rarible_error_500]}]
 
-(* let get_order_bids_by_item req () =
- *   let _contract = EzAPI.Req.find_param contract_param req in
- *   let _token_id = EzAPI.Req.find_param token_id_param req in
- *   let _maker = EzAPI.Req.find_param maker_param req in
- *   let _origin = EzAPI.Req.find_param origin_param req in
- *   let _platform = EzAPI.Req.find_param platform_param req in
- *   let _continuation = EzAPI.Req.find_param continuation_param req in
- *   let _size = EzAPI.Req.find_param size_param req in
- *   return (Error (unexpected_api_error ""))
- * [@@get
- *   {path="/v0.1/orders/bids/byItem";
- *    output=orders_pagination_enc;
- *    errors=[rarible_error_500]}] *)
+let get_order_bids_by_item req () =
+  (* let _platform = EzAPI.Req.find_param platform_param req in *)
+  Format.eprintf "get_order_bids_by_item\n%!";
+  match get_required_contract_param req with
+  | Error err -> return @@ Error err
+  | Ok contract ->
+    match get_required_token_id_param req with
+    | Error err -> return @@ Error err
+    | Ok token_id ->
+      match get_maker_param req with
+      | Error err -> return @@ Error err
+      | Ok maker ->
+        match get_origin_param req with
+        | Error err -> return @@ Error err
+        | Ok origin ->
+          match get_size_param req with
+          | Error err -> return @@ Error err
+          | Ok size ->
+            match get_continuation_last_update_param req with
+            | Error err -> return @@ Error err
+            | Ok continuation ->
+              Db.get_bid_orders_by_item
+                ?origin ?continuation ?size ?maker contract token_id >>= function
+                | Error db_err ->
+                  let str = Crawlori.Rp.string_of_error db_err in
+                  return (Error (unexpected_api_error str))
+                | Ok res -> return_ok res
+[@@get
+  {path="/v0.1/orders/bids/byItem";
+   output=orders_pagination_enc;
+   errors=[rarible_error_500]}]
 
 (* (\* order-aggregation-controller *\)
  * let aggregate_nft_sell_by_maker req () =

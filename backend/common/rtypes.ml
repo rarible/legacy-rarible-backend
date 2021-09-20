@@ -464,7 +464,7 @@ type asset_type_lazy_nft = {
 
 type asset_fa2 = {
   asset_fa2_contract : A.address ;
-  asset_fa2_token_id : A.big_integer option ;
+  asset_fa2_token_id : A.big_integer ;
 } [@@deriving encoding {camel}]
 
 type asset_type =
@@ -574,6 +574,7 @@ type order_side =
   | OSLEFT
   | OSRIGHT
 [@@deriving encoding]
+
 
 type order_side_match = {
   order_side_match_elt : order_exchange_history_elt [@merge];
@@ -848,3 +849,5 @@ type signature_form = {
   signature_form_signature : A.binary option ;
   signature_form_content : string ;
 } [@@deriving encoding]
+
+type fee_side = FeeSideMake | FeeSideTake

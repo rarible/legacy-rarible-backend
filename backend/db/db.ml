@@ -392,7 +392,7 @@ let mk_asset asset_class contract token_id asset_value =
   | "FA_2" ->
     begin
       match contract, token_id with
-      | Some c, id ->
+      | Some c, Some id ->
         let asset_type =
           ATFA_2
             { asset_fa2_contract = c ; asset_fa2_token_id = id } in
@@ -431,7 +431,7 @@ let db_from_asset asset =
     Lwt.return_ok
       (string_of_asset_type asset.asset_type,
        Some fa2.asset_fa2_contract,
-       fa2.asset_fa2_token_id,
+       Some fa2.asset_fa2_token_id,
        asset_value)
 
 let get_order_pending ?dbh hash_key =
@@ -592,7 +592,7 @@ let get_order ?dbh hash_key =
          fill, start_date, end_date, make_stock, cancelled, salt, \
          signature, created_at, last_update_at, hash, \
          make_balance, make_price_usd, take_price_usd \
-         from orders where hash = $hash_key"] in
+         from orders where make_stock > 0 and hash = $hash_key"] in
   match l with
   | [] -> Lwt.return_ok None
   | _ ->
@@ -614,33 +614,11 @@ let get_orders_all ?dbh ?origin ?continuation ?(size=50) () =
     size ;
   use dbh @@ fun dbh ->
   let size64 = Int64.of_int size in
-  let>? l = match origin, continuation with
-    | Some origin, Some (ts, h) ->
-      [%pgsql.object dbh
-          "select maker, taker, \
-           make_asset_type_class, make_asset_type_contract, make_asset_type_token_id, \
-           make_asset_value, \
-           take_asset_type_class, take_asset_type_contract, take_asset_type_token_id, \
-           take_asset_value, \
-           fill, start_date, end_date, make_stock, cancelled, salt, \
-           signature, created_at, last_update_at, hash, \
-           make_balance, make_price_usd, take_price_usd \
-           from orders where hash in (select hash from origin_fees where account = $origin) \
-           and ((last_update_at = $ts and hash > $h) or (last_update_at < $ts)) \
-           order by last_update_at desc, hash asc limit $size64"]
-    | Some origin, None ->
-      [%pgsql.object dbh
-          "select maker, taker, \
-           make_asset_type_class, make_asset_type_contract, make_asset_type_token_id, \
-           make_asset_value, \
-           take_asset_type_class, take_asset_type_contract, take_asset_type_token_id, \
-           take_asset_value, \
-           fill, start_date, end_date, make_stock, cancelled, salt, \
-           signature, created_at, last_update_at, hash, \
-           make_balance, make_price_usd, take_price_usd \
-           from orders where hash in (select hash from origin_fees where account = $origin) \
-           order by last_update_at desc, hash asc limit $size64"]
-    | None, Some (ts, h) ->
+  let no_origin, origin_v = origin = None, (match origin with None -> "" | Some o -> o) in
+  let no_continuation, (ts, h) =
+    continuation = None,
+    (match continuation with None -> CalendarLib.Calendar.now (), "" | Some (ts, h) -> (ts, h)) in
+  let>? l =
       [%pgsql.object dbh
           "select maker, taker, \
            make_asset_type_class, make_asset_type_contract, make_asset_type_token_id, \
@@ -651,19 +629,10 @@ let get_orders_all ?dbh ?origin ?continuation ?(size=50) () =
            signature, created_at, last_update_at, hash, \
            make_balance, make_price_usd, take_price_usd \
            from orders where \
-           ((last_update_at = $ts and hash > $h) or (last_update_at < $ts)) \
-           order by last_update_at desc, hash asc limit $size64"]
-    | None, None ->
-      [%pgsql.object dbh
-          "select maker, taker, \
-           make_asset_type_class, make_asset_type_contract, make_asset_type_token_id, \
-           make_asset_value, \
-           take_asset_type_class, take_asset_type_contract, take_asset_type_token_id, \
-           take_asset_value, \
-           fill, start_date, end_date, make_stock, cancelled, salt, \
-           signature, created_at, last_update_at, hash, make_balance, \
-           make_price_usd, take_price_usd \
-           from orders order by last_update_at desc, hash asc limit $size64"] in
+           ($no_origin or (hash in (select hash from origin_fees where account = $origin_v))) and \
+           ($no_continuation or (last_update_at = $ts and hash > $h) or (last_update_at < $ts)) and \
+           make_stock > 0 \
+           order by last_update_at desc, hash asc limit $size64"] in
   map_rp (fun r -> mk_order r) l >>=? fun orders ->
   let len = List.length orders in
   let orders_pagination_contination =
@@ -674,9 +643,8 @@ let get_orders_all ?dbh ?origin ?continuation ?(size=50) () =
     { orders_pagination_orders = orders ; orders_pagination_contination }
 
 (* SELL ORDERS -> make asset = nft *)
-(* BID ORDERS -> take asset = nft *)
-let get_sell_orders_by_maker ?dbh ?origin ?continuation ?(size=20) maker =
-  Format.eprintf "get_orders_all_by_maker %s %s %s %d@."
+let get_sell_orders_by_maker ?dbh ?origin ?continuation ?(size=50) maker =
+  Format.eprintf "get_sell_orders_by_maker %s %s %s %d@."
     maker
     (match origin with None -> "None" | Some s -> s)
     (match continuation with
@@ -685,8 +653,11 @@ let get_sell_orders_by_maker ?dbh ?origin ?continuation ?(size=20) maker =
     size ;
   use dbh @@ fun dbh ->
   let size64 = Int64.of_int size in
-  let>? l = match origin, continuation with
-    | Some origin, Some (ts, h) ->
+  let no_origin, origin_v = origin = None, (match origin with None -> "" | Some o -> o) in
+  let no_continuation, (ts, h) =
+    continuation = None,
+    (match continuation with None -> CalendarLib.Calendar.now (), "" | Some (ts, h) -> (ts, h)) in
+  let>? l =
       [%pgsql.object dbh
           "select maker, taker, \
            make_asset_type_class, make_asset_type_contract, make_asset_type_token_id, \
@@ -697,12 +668,155 @@ let get_sell_orders_by_maker ?dbh ?origin ?continuation ?(size=20) maker =
            signature, created_at, last_update_at, hash, \
            make_balance, make_price_usd, take_price_usd \
            from orders where \
-           hash in (select hash from origin_fees where account = $origin) and \
-           (make_asset_type_class = 'FA_2' and make_asset_type_token_id is not null ) and \
-           maker = $maker and \
-           ((last_update_at = $ts and hash > $h) or (last_update_at < $ts)) \
+           (make_asset_type_class = 'FA_2') and \
+           maker = $maker and make_stock > 0 and \
+           ($no_origin or (hash in (select hash from origin_fees where account = $origin_v))) and \
+           ($no_continuation or (last_update_at = $ts and hash > $h) or (last_update_at < $ts)) \
+           order by last_update_at desc, hash asc limit $size64"] in
+  map_rp (fun r -> mk_order r) l >>=? fun orders ->
+  let len = List.length orders in
+  let orders_pagination_contination =
+    if len <> size then None
+    else Some
+        (mk_last_update_continuation @@ List.hd (List.rev orders)) in
+  Lwt.return_ok
+    { orders_pagination_orders = orders ; orders_pagination_contination }
+
+let get_sell_orders_by_item ?dbh ?origin ?continuation ?(size=50) ?maker contract token_id =
+  Format.eprintf "get_sell_orders_by_maker %s %s %s %d@."
+    (match maker with None -> "None" | Some s -> s)
+    (match origin with None -> "None" | Some s -> s)
+    (match continuation with
+     | None -> "None"
+     | Some (ts, s) -> (Tzfunc.Proto.A.cal_to_str ts) ^ "_" ^ s)
+    size ;
+  use dbh @@ fun dbh ->
+  let size64 = Int64.of_int size in
+  let no_maker, maker_v = maker = None, (match maker with None -> "" | Some m -> m) in
+  let no_origin, origin_v = origin = None, (match origin with None -> "" | Some o -> o) in
+  let no_continuation, (ts, h) =
+    continuation = None,
+    (match continuation with None -> CalendarLib.Calendar.now (), "" | Some (ts, h) -> (ts, h)) in
+  let>? l =
+      [%pgsql.object dbh
+          "select maker, taker, \
+           make_asset_type_class, make_asset_type_contract, make_asset_type_token_id, \
+           make_asset_value, \
+           take_asset_type_class, take_asset_type_contract, take_asset_type_token_id, \
+           take_asset_value, \
+           fill, start_date, end_date, make_stock, cancelled, salt, \
+           signature, created_at, last_update_at, hash, make_balance, \
+           make_price_usd, take_price_usd \
+           from orders where \
+           make_asset_type_contract = $contract and make_stock > 0 and \
+           make_asset_type_token_id = $token_id and \
+           ($no_maker or (maker = $maker_v)) and \
+           ($no_origin or (hash in (select hash from origin_fees where account = $origin_v))) and \
+           ($no_continuation or ((last_update_at = $ts and hash > $h) or (last_update_at < $ts))) \
            order by last_update_at desc, hash asc limit $size64"]
-    | Some origin, None ->
+  in
+  map_rp (fun r -> mk_order r) l >>=? fun orders ->
+  let len = List.length orders in
+  let orders_pagination_contination =
+    if len <> size then None
+    else Some
+        (mk_last_update_continuation @@ List.hd (List.rev orders)) in
+  Lwt.return_ok
+    { orders_pagination_orders = orders ; orders_pagination_contination }
+
+let get_sell_orders_by_collection ?dbh ?origin ?continuation ?(size=50) collection =
+  Format.eprintf "get_sell_orders_by_collection %s %s %s %d@."
+    collection
+    (match origin with None -> "None" | Some s -> s)
+    (match continuation with
+     | None -> "None"
+     | Some (ts, s) -> (Tzfunc.Proto.A.cal_to_str ts) ^ "_" ^ s)
+    size ;
+  use dbh @@ fun dbh ->
+  let size64 = Int64.of_int size in
+  let no_origin, origin_v = origin = None, (match origin with None -> "" | Some o -> o) in
+  let no_continuation, (ts, h) =
+    continuation = None,
+    (match continuation with None -> CalendarLib.Calendar.now (), "" | Some (ts, h) -> (ts, h)) in
+  let>? l =
+      [%pgsql.object dbh
+          "select maker, taker, \
+           make_asset_type_class, make_asset_type_contract, make_asset_type_token_id, \
+           make_asset_value, \
+           take_asset_type_class, take_asset_type_contract, take_asset_type_token_id, \
+           take_asset_value, \
+           fill, start_date, end_date, make_stock, cancelled, salt, \
+           signature, created_at, last_update_at, hash, make_balance, \
+           make_price_usd, take_price_usd \
+           from orders where \
+           make_asset_type_contract = $collection and make_stock > 0 and \
+           ($no_origin or (hash in (select hash from origin_fees where account = $origin_v))) and \
+           ($no_continuation or ((last_update_at = $ts and hash > $h) or (last_update_at < $ts))) \
+           order by last_update_at desc, hash asc limit $size64"]
+  in
+  map_rp (fun r -> mk_order r) l >>=? fun orders ->
+  let len = List.length orders in
+  let orders_pagination_contination =
+    if len <> size then None
+    else Some
+        (mk_last_update_continuation @@ List.hd (List.rev orders)) in
+  Lwt.return_ok
+    { orders_pagination_orders = orders ; orders_pagination_contination }
+
+let get_sell_orders ?dbh ?origin ?continuation ?(size=50) () =
+  Format.eprintf "get_sell_orders %s %s %d@."
+    (match origin with None -> "None" | Some s -> s)
+    (match continuation with
+     | None -> "None"
+     | Some (ts, s) -> (Tzfunc.Proto.A.cal_to_str ts) ^ "_" ^ s)
+    size ;
+  use dbh @@ fun dbh ->
+  let size64 = Int64.of_int size in
+  let no_origin, origin_v = origin = None, (match origin with None -> "" | Some o -> o) in
+  let no_continuation, (ts, h) =
+    continuation = None,
+    (match continuation with None -> CalendarLib.Calendar.now (), "" | Some (ts, h) -> (ts, h)) in
+  let>? l =
+      [%pgsql.object dbh
+          "select maker, taker, \
+           make_asset_type_class, make_asset_type_contract, make_asset_type_token_id, \
+           make_asset_value, \
+           take_asset_type_class, take_asset_type_contract, take_asset_type_token_id, \
+           take_asset_value, \
+           fill, start_date, end_date, make_stock, cancelled, salt, \
+           signature, created_at, last_update_at, hash, make_balance, \
+           make_price_usd, take_price_usd \
+           from orders where \
+           make_stock > 0 and \
+           ($no_origin or (hash in (select hash from origin_fees where account = $origin_v))) and \
+           ($no_continuation or ((last_update_at = $ts and hash > $h) or (last_update_at < $ts))) \
+           order by last_update_at desc, hash asc limit $size64"]
+  in
+  map_rp (fun r -> mk_order r) l >>=? fun orders ->
+  let len = List.length orders in
+  let orders_pagination_contination =
+    if len <> size then None
+    else Some
+        (mk_last_update_continuation @@ List.hd (List.rev orders)) in
+  Lwt.return_ok
+    { orders_pagination_orders = orders ; orders_pagination_contination }
+
+(* BID ORDERS -> take asset = nft *)
+let get_bid_orders_by_maker ?dbh ?origin ?continuation ?(size=50) maker =
+  Format.eprintf "get_sell_orders_by_maker %s %s %s %d@."
+    maker
+    (match origin with None -> "None" | Some s -> s)
+    (match continuation with
+     | None -> "None"
+     | Some (ts, s) -> (Tzfunc.Proto.A.cal_to_str ts) ^ "_" ^ s)
+    size ;
+  use dbh @@ fun dbh ->
+  let size64 = Int64.of_int size in
+  let no_origin, origin_v = origin = None, (match origin with None -> "" | Some o -> o) in
+  let no_continuation, (ts, h) =
+    continuation = None,
+    (match continuation with None -> CalendarLib.Calendar.now (), "" | Some (ts, h) -> (ts, h)) in
+  let>? l =
       [%pgsql.object dbh
           "select maker, taker, \
            make_asset_type_class, make_asset_type_contract, make_asset_type_token_id, \
@@ -713,11 +827,36 @@ let get_sell_orders_by_maker ?dbh ?origin ?continuation ?(size=20) maker =
            signature, created_at, last_update_at, hash, \
            make_balance, make_price_usd, take_price_usd \
            from orders where \
-           hash in (select hash from origin_fees where account = $origin) and \
-           (make_asset_type_class = 'FA_2' and make_asset_type_token_id is not null) and \
-           maker = $maker \
-           order by last_update_at desc, hash asc limit $size64"]
-    | None, Some (ts, h) ->
+           (take_asset_type_class = 'FA_2') and \
+           maker = $maker and make_stock > 0 and \
+           ($no_origin or (hash in (select hash from origin_fees where account = $origin_v))) and \
+           ($no_continuation or (last_update_at = $ts and hash > $h) or (last_update_at < $ts)) \
+           order by last_update_at desc, hash asc limit $size64"] in
+  map_rp (fun r -> mk_order r) l >>=? fun orders ->
+  let len = List.length orders in
+  let orders_pagination_contination =
+    if len <> size then None
+    else Some
+        (mk_last_update_continuation @@ List.hd (List.rev orders)) in
+  Lwt.return_ok
+    { orders_pagination_orders = orders ; orders_pagination_contination }
+
+let get_bid_orders_by_item ?dbh ?origin ?continuation ?(size=50) ?maker contract token_id =
+  Format.eprintf "get_sell_orders_by_maker %s %s %s %d@."
+    (match maker with None -> "None" | Some s -> s)
+    (match origin with None -> "None" | Some s -> s)
+    (match continuation with
+     | None -> "None"
+     | Some (ts, s) -> (Tzfunc.Proto.A.cal_to_str ts) ^ "_" ^ s)
+    size ;
+  use dbh @@ fun dbh ->
+  let size64 = Int64.of_int size in
+  let no_maker, maker_v = maker = None, (match maker with None -> "" | Some m -> m) in
+  let no_origin, origin_v = origin = None, (match origin with None -> "" | Some o -> o) in
+  let no_continuation, (ts, h) =
+    continuation = None,
+    (match continuation with None -> CalendarLib.Calendar.now (), "" | Some (ts, h) -> (ts, h)) in
+  let>? l =
       [%pgsql.object dbh
           "select maker, taker, \
            make_asset_type_class, make_asset_type_contract, make_asset_type_token_id, \
@@ -728,23 +867,13 @@ let get_sell_orders_by_maker ?dbh ?origin ?continuation ?(size=20) maker =
            signature, created_at, last_update_at, hash, make_balance, \
            make_price_usd, take_price_usd \
            from orders where \
-           (make_asset_type_class = 'FA_2' and make_asset_type_token_id is not null) and \
-           ((last_update_at = $ts and hash > $h) or (last_update_at < $ts)) and \
-           maker = $maker \
+           take_asset_type_contract = $contract and make_stock > 0 and \
+           take_asset_type_token_id = $token_id and \
+           ($no_maker or (maker = $maker_v)) and \
+           ($no_origin or (hash in (select hash from origin_fees where account = $origin_v))) and \
+           ($no_continuation or ((last_update_at = $ts and hash > $h) or (last_update_at < $ts))) \
            order by last_update_at desc, hash asc limit $size64"]
-    | None, None ->
-      [%pgsql.object dbh
-          "select maker, taker, \
-           make_asset_type_class, make_asset_type_contract, make_asset_type_token_id, \
-           make_asset_value, \
-           take_asset_type_class, take_asset_type_contract, take_asset_type_token_id, \
-           take_asset_value, \
-           fill, start_date, end_date, make_stock, cancelled, salt, \
-           signature, created_at, last_update_at, hash, make_balance, \
-           make_price_usd, take_price_usd \
-           from orders where \
-           (make_asset_type_class = 'FA_2' and make_asset_type_token_id is not null) \
-           and maker = $maker order by last_update_at desc, hash asc limit $size64"] in
+  in
   map_rp (fun r -> mk_order r) l >>=? fun orders ->
   let len = List.length orders in
   let orders_pagination_contination =
