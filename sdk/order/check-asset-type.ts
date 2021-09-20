@@ -1,5 +1,4 @@
-import { Provider } from "../utils"
-import { NftAssetType } from "./utils"
+import { Provider, NftAssetType } from "../utils"
 
 export interface UnknownNftAssetType {
   contract: string;

@@ -1,9 +1,9 @@
-import { Provider, TransactionOperation, send, MichelsonData } from "../utils"
+import { Provider, TransactionOperation, BatchOperation, send, batch, MichelsonData, OperationArg } from "../utils"
 import { Part, OrderForm } from "./utils"
 import { invert_order } from "./invert-order"
 import { get_make_fee } from "./get-make-fee"
 import { add_fee } from "./add-fee"
-import { approve } from "./approve"
+import { approve_arg } from "./approve"
 import { order_to_struct, some_struct, none_struct } from "./sign-order"
 
 export interface FillOrderRequest {
@@ -43,15 +43,17 @@ export function match_order_to_struct(
           (right.signature) ? some_struct({string : right.signature}) : none_struct() ] } ] }] }
 }
 
-export async function fill_order(
+export async function fill_order_arg(
   provider: Provider,
   left: OrderForm,
   request: FillOrderRequest
-): Promise<TransactionOperation> {
+): Promise<OperationArg[]> {
   const make = get_make_asset(provider, left, request.amount)
-  if (make.asset_type.asset_class != "XTZ" ) {
-    await approve(provider, left.maker, left.make, request.infinite)
-  }
+  const arg_approve =
+    (make.asset_type.asset_class != "XTZ" )
+    ? await approve_arg(provider, left.maker, left.make, request.infinite)
+    : undefined
+  const args = (arg_approve) ? [ arg_approve ] : []
   const address = await provider.tezos.signer.publicKeyHash()
   const right = {
     ...invert_order(left, request.amount, address),
@@ -67,10 +69,17 @@ export async function fill_order(
     : (right.make.asset_type.asset_class === "XTZ" && right.salt === 0n)
     ? get_real_value(provider, right)
     : undefined
-  return send(
-    provider,
-    provider.config.exchange,
-    "matchOrders",
-    match_order_to_struct(left, right),
-    amount)
+  const parameter = match_order_to_struct(left, right)
+  return args.concat([{
+    destination: provider.config.exchange, entrypoint: "matchOrders", parameter, amount }])
+}
+
+export async function fill_order(
+  provider: Provider,
+  left: OrderForm,
+  request: FillOrderRequest
+): Promise<TransactionOperation | BatchOperation> {
+  const args = await fill_order_arg(provider, left, request)
+  if (args.length == 1) return send(provider, args[0])
+  else return batch(provider, args)
 }

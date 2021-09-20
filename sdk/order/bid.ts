@@ -1,5 +1,5 @@
-import { Provider } from "../utils"
-import { XTZAssetType, FA12AssetType, Part, OrderForm, salt } from "./utils"
+import { Provider, XTZAssetType, FA12AssetType } from "../utils"
+import { Part, OrderForm, salt } from "./utils"
 import { ExtendedAssetType, check_asset_type } from "./check-asset-type"
 import { upsert_order } from "./upsert-order"
 

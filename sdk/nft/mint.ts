@@ -1,10 +1,10 @@
-import { Provider, MichelsonV1Expression, send } from "../utils"
+import { Provider, MichelsonData, send, batch, OperationArg } from "../utils"
 
 function mint_param(
   token_id: bigint,
   owner: string,
   royalties: { [key: string]: bigint },
-  supply?: bigint) : MichelsonV1Expression {
+  supply?: bigint) : MichelsonData {
   if (supply) {
     return {
       prim: 'Pair',
@@ -27,7 +27,7 @@ function mint_param(
   }
 }
 
-function metadata_param(metadata : { [key: string] : string }) : MichelsonV1Expression {
+function metadata_param(metadata : { [key: string] : string }) : MichelsonData {
   return Object.keys(metadata).map(function(k) { return {prim: 'Elt', args: [ {string : k}, {string: metadata[k] }] }})
 }
 
@@ -39,39 +39,73 @@ export async function get_next_token_id(
   return BigInt(JSON.stringify(json))
 }
 
-export async function mintErc721Legacy(
+export async function mint_nft_arg(
+  provider: Provider,
+  contract: string,
+  royalties : { [key: string]: bigint },
+  metadata?: { [key: string]: string }
+) : Promise<[bigint, OperationArg[]]> {
+  const owner = await provider.tezos.signer.publicKeyHash()
+  const next_id = await get_next_token_id(provider, contract)
+  const parameter = mint_param(next_id, owner, royalties)
+  const arg = [ { destination: contract, entrypoint: 'mint', parameter } ]
+  const arg_meta = (metadata)
+    ? [ { destination: contract, entrypoint: "setTokenMetadata", parameter: metadata_param(metadata) } ]
+    : []
+  return [ next_id, arg.concat(arg_meta) ]
+}
+
+export async function mint_nft(
   provider: Provider,
   contract: string,
   royalties : { [key: string]: bigint },
   metadata?: { [key: string]: string }
 ) : Promise<bigint> {
-  const owner = await provider.tezos.signer.publicKeyHash()
-  const next_id = await get_next_token_id(provider, contract)
-  const mint_p = mint_param(next_id, owner, royalties)
-  await send(provider, contract, "mint", mint_p)
-  if (metadata) {
-    const meta_p = metadata_param(metadata)
-    await send(provider, contract, "setTokenMetadata", meta_p)
-  }
+  const [ next_id, args ] = await mint_nft_arg(provider, contract, royalties, metadata)
+  if (args.length == 1) await send(provider, args[0])
+  else await batch(provider, args)
   return next_id
 }
 
-export async function mintErc1155Legacy(
+export async function mint_mt_arg(
+  provider: Provider,
+  contract: string,
+  royalties : { [key: string]: bigint },
+  supply: bigint,
+  metadata?: { [key: string]: string },
+) : Promise<[bigint, OperationArg[]]> {
+  const owner = await provider.tezos.signer.publicKeyHash()
+  const next_id = await get_next_token_id(provider, contract)
+  const parameter = mint_param(next_id, owner, royalties, supply)
+  const arg = [ { destination: contract, entrypoint: 'mint', parameter } ]
+  const arg_meta = (metadata)
+    ? [ { destination: contract, entrypoint: "setTokenMetadata", parameter: metadata_param(metadata) } ]
+    : []
+  return [ next_id, arg.concat(arg_meta) ]
+}
+
+export async function mint_mt(
   provider: Provider,
   contract: string,
   royalties : { [key: string]: bigint },
   supply: bigint,
   metadata?: { [key: string]: string },
 ) : Promise<bigint> {
-  const owner = await provider.tezos.signer.publicKeyHash()
-  const next_id = await get_next_token_id(provider, contract)
-  const mint_p = mint_param(next_id, owner, royalties, supply)
-  await send(provider, contract, "mint", mint_p)
-  if (metadata) {
-    const meta_p = metadata_param(metadata)
-    await send(provider, contract, "setTokenMetadata", meta_p)
-  }
+  const [ next_id, args ] = await mint_mt_arg(provider, contract, royalties, supply, metadata)
+  if (args.length == 1) await send(provider, args[0])
+  else await batch(provider, args)
   return next_id
+}
+
+export async function mint_arg(
+  provider: Provider,
+  contract: string,
+  royalties : { [key: string]: bigint },
+  supply?: bigint,
+  metadata?: { [key: string]: string },
+) : Promise<[bigint, OperationArg[]]> {
+  if (supply) { return mint_mt_arg(provider, contract, royalties, supply, metadata) }
+  else { return mint_nft_arg(provider, contract, royalties, metadata) }
 }
 
 export async function mint(
@@ -81,6 +115,6 @@ export async function mint(
   supply?: bigint,
   metadata?: { [key: string]: string },
 ) : Promise<bigint> {
-  if (supply) { return mintErc1155Legacy(provider, contract, royalties, supply, metadata) }
-  else { return mintErc721Legacy(provider, contract, royalties, metadata) }
+  if (supply) { return mint_mt(provider, contract, royalties, supply, metadata) }
+  else { return mint_nft(provider, contract, royalties, metadata) }
 }

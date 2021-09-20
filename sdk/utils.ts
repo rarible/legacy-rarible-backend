@@ -1,10 +1,8 @@
-import { TezosToolkit, TransactionOperation, BigMapAbstraction } from "@taquito/taquito"
-import { MichelsonV1Expression } from "@taquito/rpc"
+import { TezosToolkit, TransactionOperation, BigMapAbstraction, OpKind, BatchOperation } from "@taquito/taquito"
 import { Config } from "./config/type"
 import { MichelsonData, MichelsonType, packDataBytes } from "@taquito/michel-codec"
 
-export { TezosToolkit, TransactionOperation, BigMapAbstraction } from "@taquito/taquito"
-export { MichelsonV1Expression } from "@taquito/rpc"
+export { TezosToolkit, TransactionOperation, BatchOperation, BigMapAbstraction } from "@taquito/taquito"
 export { MichelsonData, MichelsonType } from "@taquito/michel-codec"
 
 export interface Provider {
@@ -30,24 +28,75 @@ export interface StorageFA1_2 {
 
 export type Storage = StorageFA2 | StorageFA1_2
 
+export interface OperationArg {
+  destination: string,
+  amount?: bigint,
+  entrypoint?: string,
+  parameter?: MichelsonData
+}
+
+export interface XTZAssetType {
+  asset_class: "XTZ";
+}
+
+export interface FA12AssetType {
+  asset_class: "FA_1_2";
+  contract: string;
+}
+
+export interface FA2AssetType {
+  asset_class: "FA_2";
+  contract: string;
+  token_id: bigint;
+}
+
+export type NftAssetType = FA12AssetType | FA2AssetType
+export type AssetType = XTZAssetType | NftAssetType
+
+export interface Asset {
+  asset_type: AssetType;
+  value: bigint;
+}
+
 export async function send(
   provider : Provider,
-  contract: string,
-  entrypoint?: string,
-  value?: MichelsonV1Expression,
-  amount: bigint = 0n) : Promise<TransactionOperation> {
-  if (entrypoint && value) {
+  arg: OperationArg) : Promise<TransactionOperation> {
+  if (arg.entrypoint && arg.parameter) {
     return provider.tezos.contract.transfer({
-      amount: Number(amount),
-      to: contract,
-      parameter: { entrypoint, value }
+      amount: (arg.amount) ? Number(arg.amount) : 0,
+      to: arg.destination,
+      parameter: { entrypoint: arg.entrypoint, value: arg.parameter }
     })
   } else {
     return provider.tezos.contract.transfer({
-      amount: Number(amount),
-      to: contract
+      amount: (arg.amount) ? Number(arg.amount) : 0,
+      to: arg.destination
     })
   }
+}
+
+export async function batch(
+  provider: Provider,
+  args: OperationArg[])
+: Promise<BatchOperation> {
+  const params = args.map(function(p) {
+    if (p.entrypoint && p.parameter) {
+      return {
+        kind: <OpKind.TRANSACTION>OpKind.TRANSACTION,
+        amount: (p.amount) ? Number(p.amount) : 0,
+        to: p.destination,
+        parameter: { entrypoint: p.entrypoint, value: p.parameter }
+      }
+    } else {
+      return {
+        kind: <OpKind.TRANSACTION>OpKind.TRANSACTION,
+        amount: (p.amount) ? Number(p.amount) : 0,
+        to: p.destination,
+      }
+    }
+  })
+  const batch_op = provider.tezos.contract.batch(params)
+  return batch_op.send()
 }
 
 export async function storage<T>(
@@ -60,8 +109,8 @@ export async function storage<T>(
 }
 
 export async function wait_for_confirmation(
-  op: TransactionOperation,
-  confirmations?: number) : Promise<TransactionOperation> {
+  op: TransactionOperation | BatchOperation,
+  confirmations?: number) : Promise<TransactionOperation | BatchOperation> {
   await op.confirmation(confirmations)
   return op
 }

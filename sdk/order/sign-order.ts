@@ -1,5 +1,5 @@
-import { Provider, pack, MichelsonType, MichelsonData } from "../utils"
-import { OrderForm, AssetType, Asset, OrderRaribleV2DataV1 } from "./utils"
+import { Provider, pack, MichelsonType, MichelsonData, AssetType, Asset } from "../utils"
+import { OrderForm, OrderRaribleV2DataV1 } from "./utils"
 const keccak_base = require("keccak")
 
 export function keccak(s : string) : string {
