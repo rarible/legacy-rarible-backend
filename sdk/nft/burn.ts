@@ -1,4 +1,5 @@
 import { Provider, MichelsonData, OperationArg, send } from "../utils"
+import { check_asset_type, ExtendedAssetType } from "../check-asset-type"
 
 // todo : choose type of burn parameter
 function burn_param(
@@ -13,20 +14,23 @@ function burn_param(
 
 export async function burn_arg(
   provider: Provider,
-  contract: string,
-  token_id: bigint,
+  asset_type: ExtendedAssetType,
   amount? : bigint) : Promise<OperationArg> {
   const owner = await provider.tezos.signer.publicKeyHash()
-  const parameter = burn_param(token_id, owner, amount)
-  return { destination: contract, entrypoint: "burn", parameter }
+  const checked_asset = await check_asset_type(provider, asset_type)
+  switch (checked_asset.asset_class) {
+    case "FA_2":
+      const parameter = burn_param(checked_asset.token_id, owner, amount)
+      return { destination: checked_asset.contract, entrypoint: "burn", parameter }
+    default: throw new Error("Cannot burn non FA2 tokens")
+  }
 }
 
 export async function burn(
   provider: Provider,
-  contract: string,
-  token_id: bigint,
+  asset_type: ExtendedAssetType,
   amount? : bigint) : Promise<string> {
-  const arg = await burn_arg(provider, contract, token_id, amount)
+  const arg = await burn_arg(provider, asset_type, amount)
   const op = await send(provider, arg)
   return op.hash
 }

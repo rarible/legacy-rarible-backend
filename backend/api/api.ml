@@ -790,3 +790,11 @@ let get_order_bids_by_item req () =
  *   end
  *
  * end *)
+
+
+let next_token_id (_, contract) () =
+  let> r = Db.next_token_id contract in
+  match r with
+  | Ok x -> return (Ok x)
+  | Error e -> return (Error (invalid_argument @@ string_of_error (e :> error)))
+[@@get {path="/v0.1/next_token_id/{arg_hash}"; output=z_enc; errors=[rarible_error_500]}]

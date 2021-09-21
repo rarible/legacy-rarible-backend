@@ -80,7 +80,7 @@ export async function transfer_arg(
       else
         return transfer_nft_arg(checked_asset.contract, from, to, checked_asset.token_id)
     default:
-      throw new Error("Cannot transfer array of ERC721 tokens")
+      throw new Error("Cannot transfer non FA2 tokens")
   }
 }
 

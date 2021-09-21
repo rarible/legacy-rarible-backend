@@ -1043,3 +1043,10 @@ let upsert_order ?dbh order =
     else Lwt.return_ok ()
   end >>=? fun () ->
   insert_payouts payouts hash_key
+
+let next_token_id ?dbh contract =
+  use dbh @@ fun dbh ->
+  let|>? r = [%pgsql dbh "select tokens_number from contracts where address = $contract"] in
+  match r with
+  | [ i ] -> Z.(succ @@ of_int64 i)
+  | _ -> Z.zero

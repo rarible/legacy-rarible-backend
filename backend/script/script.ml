@@ -261,14 +261,14 @@ let main () =
     | [ "compile"; "contract"; filename ] -> Some (compile_contract filename)
     | [ "deploy"; filename; storage ] -> deploy ~filename storage
     | [ "deploy_fa2"; admin; royalties ] ->
-      deploy ~filename:"../contracts/arl/nft/fa2.arl" (storage_fa2 ~admin ~royalties)
+      deploy ~filename:"contracts/arl/fa2.arl" (storage_fa2 ~admin ~royalties)
     | [ "deploy_royalties"; admin ] ->
-      deploy ~filename:"../contracts/arl/nft/royalties.arl" (storage_royalties ~admin)
+      deploy ~filename:"contracts/arl/royalties.arl" (storage_royalties ~admin)
     | [ "deploy_exchange"; admin; receiver; fee ] ->
-      deploy ~filename:"../contracts/arl/nft/exchangeV2.arl"
+      deploy ~filename:"contracts/arl/exchangeV2.arl"
         (storage_exchange ~admin ~receiver ~fee:(Int64.of_string fee))
     | [ "deploy_validator"; exchange; royalties ] ->
-      deploy ~filename:"../contracts/arl/nft/validator.arl"
+      deploy ~filename:"contracts/arl/validator.arl"
         (storage_validator ~exchange ~royalties)
     | [ "storage" ] -> get_storage ()
     | [ "value"; bm_id; key; typ ] -> Some (get_bigmap_value bm_id key typ)

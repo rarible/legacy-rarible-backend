@@ -1,7 +1,5 @@
-import { TezosToolkit, pack } from "./rarible"
-
+import { TezosToolkit, burn } from "./rarible"
 import { InMemorySigner } from '@taquito/signer'
-const keccak_base = require('keccak')
 
 async function main() {
 
@@ -10,35 +8,25 @@ async function main() {
     signer: new InMemorySigner('edsk4RqeRTrhdKfJKBTndA9x1RLp4A3wtNL1iMFRXDvfs5ANeZAncZ'),
   });
 
-  // const config = {
-  //   exchange: "",
-  //   proxies: { fa_1_2: "", nft: "" },
-  //   fees: 0
-  // }
+  const config = {
+    exchange: "KT1C5kWbfzASApxCMHXFLbHuPtnRaJXE4WMu",
+    proxies: { fa_1_2: "", nft: "" },
+    fees: 0n
+  }
 
-  // const provider = {
-  //   tezos,
-  //   api: "https://api.todo-tezos.rarible.io",
-  //   config
-  // }
+  const provider = {
+    tezos,
+    api: "https://localhost:8080/v0.1",
+    config
+  }
 
-  console.log(keccak_base)
-  let s = pack({ string: 'V1' }, { prim: 'string'} )
-  console.log('V1', keccak_base('keccak256').update(s, 'hex').digest('hex'))
+  // mint(provider, "KT1MWv7oH8JJhxJJs8co21XiByBEAYx2QDjY", { tz1ibJRnL6hHjAfmEzM7QtGyTsS6ZtHdgE2S: 10000n }, 100n, 1n)
 
-  // let s = await tezos.signer.sign("002a")
-  // console.log(s)
+  // transfer(provider, { asset_class: "FA_2", contract: "KT1MWv7oH8JJhxJJs8co21XiByBEAYx2QDjY", token_id: 1n }, "tz1Mxsc66En4HsVHr6rppYZW82ZpLhpupToC", 1n).then(console.log).catch(console.log)
 
-  // transfer(
-  //   provider, 'KT1MWv7oH8JJhxJJs8co21XiByBEAYx2QDjY',
-  //   'tz1ibJRnL6hHjAfmEzM7QtGyTsS6ZtHdgE2S', 'tz1Mxsc66En4HsVHr6rppYZW82ZpLhpupToC',
-  //   0n, 3n)
-  //   .then(hash =>
-  //     console.log("done", hash))
-  //   .catch(e => console.log("error", e))
+  burn(provider, { asset_class: "FA_2", contract: "KT1MWv7oH8JJhxJJs8co21XiByBEAYx2QDjY", token_id: 1n }, 1n)
 
-  // const st : StorageFA2 = await storage(provider, 'KT1MWv7oH8JJhxJJs8co21XiByBEAYx2QDjY')
-  // console.log(st.ledger.toJSON())
-}
+ }
+
 
 main()

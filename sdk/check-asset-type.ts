@@ -19,6 +19,6 @@ export async function check_asset_type(
   provider: Provider,
   asset: ExtendedAssetType,
 ): Promise<TokenAssetType> {
-  if ("assetClass" in asset) return asset
+  if ("asset_class" in asset) return asset
   else return get_asset_type(provider, asset.contract)
 }
