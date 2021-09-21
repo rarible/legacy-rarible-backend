@@ -15,8 +15,9 @@ function burn_param(
 export async function burn_arg(
   provider: Provider,
   asset_type: ExtendedAssetType,
-  amount? : bigint) : Promise<OperationArg> {
-  const owner = await provider.tezos.signer.publicKeyHash()
+  amount?: bigint,
+  owner?: string) : Promise<OperationArg> {
+  owner = (owner) ? owner : await provider.tezos.signer.publicKeyHash()
   const checked_asset = await check_asset_type(provider, asset_type)
   switch (checked_asset.asset_class) {
     case "FA_2":
@@ -29,8 +30,9 @@ export async function burn_arg(
 export async function burn(
   provider: Provider,
   asset_type: ExtendedAssetType,
-  amount? : bigint) : Promise<string> {
-  const arg = await burn_arg(provider, asset_type, amount)
+  amount?: bigint,
+  owner?: string) : Promise<string> {
+  const arg = await burn_arg(provider, asset_type, amount, owner)
   const op = await send(provider, arg)
   return op.hash
 }
