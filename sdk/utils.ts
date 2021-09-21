@@ -50,8 +50,8 @@ export interface FA2AssetType {
   token_id: bigint;
 }
 
-export type NftAssetType = FA12AssetType | FA2AssetType
-export type AssetType = XTZAssetType | NftAssetType
+export type TokenAssetType = FA12AssetType | FA2AssetType
+export type AssetType = XTZAssetType | TokenAssetType
 
 export interface Asset {
   asset_type: AssetType;

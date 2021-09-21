@@ -1,7 +1,6 @@
 export * from "./utils"
 export * from "./add-fee"
 export * from "./approve"
-export * from "./check-asset-type"
 export * from "./bid"
 export * from "./sell"
 export * from "./get-make-fee"

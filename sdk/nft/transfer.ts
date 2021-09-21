@@ -1,5 +1,5 @@
-import { Provider, MichelsonData, send, Asset, OperationArg } from "../utils"
-import { check_asset_type, ExtendedAssetType } from "../order/check-asset-type"
+import { Provider, MichelsonData, send, OperationArg } from "../utils"
+import { check_asset_type, ExtendedAssetType } from "../check-asset-type"
 
 function transfer_param(
   from: string,

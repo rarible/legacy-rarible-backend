@@ -1,6 +1,6 @@
 import { Provider, XTZAssetType, FA12AssetType } from "../utils"
 import { Part, OrderForm, salt } from "./utils"
-import { ExtendedAssetType, check_asset_type } from "./check-asset-type"
+import { ExtendedAssetType, check_asset_type } from "../check-asset-type"
 import { upsert_order } from "./upsert-order"
 
 export type BidRequest = {

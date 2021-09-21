@@ -22,11 +22,12 @@ async function main() {
   //   config
   // }
 
-  // let s = pack_bytes({ string: 'V1' }, { prim: 'string'} )
-  // console.log('V1', keccak('keccak256').update(s, 'hex').digest('hex'))
+  console.log(keccak_base)
+  let s = pack({ string: 'V1' }, { prim: 'string'} )
+  console.log('V1', keccak_base('keccak256').update(s, 'hex').digest('hex'))
 
-  let s = await tezos.signer.sign("002a")
-  console.log(s)
+  // let s = await tezos.signer.sign("002a")
+  // console.log(s)
 
   // transfer(
   //   provider, 'KT1MWv7oH8JJhxJJs8co21XiByBEAYx2QDjY',
