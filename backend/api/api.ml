@@ -33,8 +33,8 @@ let owner_param = EzAPI.Param.string "owner"
 let creator_param = EzAPI.Param.string "creator"
 let collection_param = EzAPI.Param.string "collection"
 let show_deleted_param = EzAPI.Param.bool "showDeleted"
-let last_update_from_param = EzAPI.Param.string "lastUpdateFrom"
-let last_update_to_param = EzAPI.Param.string "lastUpdateTo"
+let last_updated_from_param = EzAPI.Param.string "lastUpdateFrom"
+let last_updated_to_param = EzAPI.Param.string "lastUpdateTo"
 let minter_param = EzAPI.Param.string "minter"
 let origin_param = EzAPI.Param.string "origin"
 (* TODO : ALL | RARIBLE | OPEN_SEA *)
@@ -51,6 +51,9 @@ let status_param = EzAPI.Param.string "status"
 
 let arg_hash = EzAPI.Arg.string "hash"
 
+let mk_invalid_argument param msg =
+  Error (invalid_argument (Printf.sprintf "%s %s" param.EzAPI.Param.param_id msg))
+
 let get_origin_param req =
   let open Tzfunc.Crypto in
   match EzAPI.Req.find_param origin_param req with
@@ -60,7 +63,7 @@ let get_origin_param req =
       ignore @@ Base58.decode Prefix.ed25519_public_key o ;
       Ok (Some o)
     with _ ->
-      Error (invalid_argument "origin must be an edpk")
+      mk_invalid_argument origin_param "must be an edpk"
 
 let get_size_param req =
   match EzAPI.Req.find_param size_param req with
@@ -69,9 +72,9 @@ let get_size_param req =
     try
       let s = int_of_string s in
       if s < 1000 then Ok (Some s)
-      else Error (invalid_argument "max size is 1000")
+      else mk_invalid_argument size_param "maximum is 1000"
     with _ ->
-      Error (invalid_argument "size must be an int")
+      mk_invalid_argument size_param "must be an int"
 
 let get_continuation_last_update_param req =
   match EzAPI.Req.find_param continuation_param req with
@@ -84,20 +87,20 @@ let get_continuation_last_update_param req =
         let ts = CalendarLib.Calendar.from_unixfloat (float_of_string ts) in
         Ok (Some (ts, h))
       | _ ->
-        Error (invalid_argument "continuation must be in format TIMETAMP_HASH")
+        mk_invalid_argument continuation_param "must be in format TIMETAMP_HASH"
     with _ ->
-      Error (invalid_argument "continuation must be in format TIMETAMP_HASH")
+      mk_invalid_argument continuation_param "must be in format TIMETAMP_HASH"
 
 let get_required_maker_param req =
   let open Tzfunc.Crypto in
   match EzAPI.Req.find_param maker_param req with
-  | None -> Error (invalid_argument "Query param maker is required")
+  | None -> mk_invalid_argument maker_param "param is required"
   | Some o ->
     try
       ignore @@ Base58.decode Prefix.ed25519_public_key o ;
       Ok o
     with _ ->
-      Error (invalid_argument "maker must be an edpk")
+      mk_invalid_argument maker_param "must be an epdk"
 
 let get_maker_param req =
   let open Tzfunc.Crypto in
@@ -108,34 +111,127 @@ let get_maker_param req =
       ignore @@ Base58.decode Prefix.ed25519_public_key o ;
       Ok (Some o)
     with _ ->
-      Error (invalid_argument "maker must be an edpk")
+      mk_invalid_argument maker_param "must be an epdk"
 
 let get_required_contract_param req =
   let open Tzfunc.Crypto in
   match EzAPI.Req.find_param contract_param req with
-  | None -> Error (invalid_argument "Query param contract is required")
+  | None -> mk_invalid_argument contract_param "param is required"
   | Some o ->
     try
       ignore @@ Base58.decode Prefix.contract_public_key_hash o ;
       Ok o
     with _ ->
-      Error (invalid_argument "contract must be an tezos smart contract address")
+      mk_invalid_argument contract_param "must be a tezos smart contract address"
 
 let get_required_token_id_param req =
   match EzAPI.Req.find_param token_id_param req with
-  | None -> Error (invalid_argument "Query param token is required")
+  | None -> mk_invalid_argument token_id_param "param is required"
   | Some o -> Ok o
 
 let get_required_collection_param req =
   let open Tzfunc.Crypto in
   match EzAPI.Req.find_param collection_param req with
-  | None -> Error (invalid_argument "Query param collection is required")
+  | None -> mk_invalid_argument collection_param "param is required"
   | Some o ->
     try
       ignore @@ Base58.decode Prefix.contract_public_key_hash o ;
       Ok o
     with _ ->
-      Error (invalid_argument "collection must be an tezos smart contract address")
+      mk_invalid_argument collection_param "must be a tezos smart contract address"
+
+let get_required_owner_param req =
+  match EzAPI.Req.find_param owner_param req with
+  | None -> mk_invalid_argument owner_param "param is required"
+  | Some o ->
+    try
+      match Tzfunc.Binary.Writer.contract o with
+      | Error _ -> mk_invalid_argument owner_param "must be a pkh"
+      | Ok o -> Ok o
+    with _ ->
+      mk_invalid_argument owner_param "must be a pkh"
+
+let get_include_meta_param req =
+  match EzAPI.Req.find_param include_meta_param req with
+  | None -> Ok None
+  | Some s ->
+    try
+      Ok (Some (bool_of_string s))
+    with _ ->
+      mk_invalid_argument include_meta_param "must be a boolean"
+
+let get_last_updated_to_param req =
+  match EzAPI.Req.find_param last_updated_to_param req with
+  | None -> Ok None
+  | Some s ->
+    try
+      Ok (Some (CalendarLib.Calendar.from_unixfloat (float_of_string s)))
+    with _ ->
+      mk_invalid_argument last_updated_to_param "must be a date"
+
+let get_last_updated_from_param req =
+  match EzAPI.Req.find_param last_updated_from_param req with
+  | None -> Ok None
+  | Some s ->
+    try
+      Ok (Some (CalendarLib.Calendar.from_unixfloat (float_of_string s)))
+    with _ ->
+      mk_invalid_argument last_updated_from_param "must be a date"
+
+let get_show_deleted_param req =
+  match EzAPI.Req.find_param show_deleted_param req with
+  | None -> Ok None
+  | Some s ->
+    try
+      Ok (Some (bool_of_string s))
+    with _ ->
+      mk_invalid_argument show_deleted_param "must be a boolean"
+
+let parse_item_id s =
+  let open Tzfunc.Crypto in
+  try
+    let l = String.split_on_char ':' s in
+    match l with
+    | c :: tid :: [] ->
+      Ok
+        (Base58.decode Prefix.contract_public_key_hash c,
+         Int64.(to_string @@ of_string tid))
+    | _ ->
+      Error (invalid_argument "itemId must be in format contract:token_id")
+  with _ ->
+    Error (invalid_argument "itemId must be in format contract:token_id")
+
+let get_continuation_item_param req =
+  match EzAPI.Req.find_param continuation_param req with
+  | None -> Ok None
+  | Some s ->
+    try
+      let l = String.split_on_char '_' s in
+      match l with
+      | ts :: id:: [] ->
+        let ts = CalendarLib.Calendar.from_unixfloat (float_of_string ts) in
+        begin match parse_item_id id with
+          | Error _ ->
+            mk_invalid_argument continuation_param "must be in format TIMESTAMP_CONTRACT:TOKEN_ID"
+          | Ok (_contract, _token_id) ->
+            Ok (Some (ts, id))
+        end
+      | _ ->
+        mk_invalid_argument continuation_param "must be in format TIMESTAMP_CONTRACT:TOKEN_ID"
+    with _ ->
+      mk_invalid_argument continuation_param "must be in format TIMESTAMP_"
+
+let get_required_creator_param req =
+  let param = creator_param in
+  match EzAPI.Req.find_param param req with
+  | None -> mk_invalid_argument param "param is required"
+  | Some o ->
+    try
+      match Tzfunc.Binary.Writer.contract o with
+      | Error _ -> mk_invalid_argument param "must be a pkh"
+      | Ok o -> Ok o
+    with _ ->
+      mk_invalid_argument param "must be a pkh"
 
 (* (\* gateway-controller *\)
  * let create_gateway_pending_transactions _req _input =
@@ -211,7 +307,7 @@ let get_required_collection_param req =
  *   {path="/v0.1/ownerships/{ownershipId:string}";
  *    output=nft_ownership_enc;
  *    errors=[rarible_error_500]}]
- *
+ * 
  * let get_nft_ownerships_by_item req () =
  *   let _contract = EzAPI.Req.find_param contract_param req in
  *   let _token_id = EzAPI.Req.find_param token_id_param req in
@@ -222,7 +318,7 @@ let get_required_collection_param req =
  *   {path="/v0.1/ownerships/byItem";
  *    output=nft_ownerships_enc;
  *    errors=[rarible_error_500]}]
- *
+ * 
  * let get_nft_all_ownerships req () =
  *   let _continuation = EzAPI.Req.find_param continuation_param req in
  *   let _size = EzAPI.Req.find_param size_param req in
@@ -230,76 +326,151 @@ let get_required_collection_param req =
  * [@@get
  *   {path="/v0.1/ownerships/all";
  *    output=nft_ownerships_enc;
- *    errors=[rarible_error_500]}]
- *
- * (\* nft-item-controller *\)
- * let get_nft_item_meta_by_id (_req, _item_id) () =
- *   return (Error (bad_request ""))
- * [@@get
- *   {path="/v0.1/items/{itemId:string}/meta";
- *    output=nft_item_meta_enc;
- *    errors=[rarible_error_500]}]
- *
- * let get_nft_lazy_item_by_id (_req, _item_id) () =
+ *    errors=[rarible_error_500]}] *)
+
+(* nft-item-controller *)
+let get_nft_item_meta_by_id (_req, item_id) () =
+  match parse_item_id item_id with
+  | Error err -> return @@ Error err
+  | Ok (contract, token_id) ->
+    Db.get_nft_item_meta_by_id contract token_id >>= function
+    | Error db_err ->
+      let str = Crawlori.Rp.string_of_error db_err in
+      return (Error (unexpected_api_error str))
+    | Ok res -> return_ok res
+[@@get
+  {path="/v0.1/items/{itemId:string}/meta";
+   output=nft_item_meta_enc;
+   errors=[rarible_error_500]}]
+
+(* let get_nft_lazy_item_by_id (_req, _item_id) () =
  *   return (Error (bad_request ""))
  * [@@get
  *   {path="/v0.1/items/{itemId:string}/lazy";
  *    output=lazy_nft_enc;
- *    errors=[rarible_error_500]}]
- *
- * let get_nft_item_by_id (req, _item_id) () =
- *   let _include_meta = EzAPI.Req.find_param include_meta_param req in
- *   return (Error (bad_request ""))
- * [@@get
- *   {path="/v0.1/items/{itemId:string}";
- *    output=nft_item_enc;
- *    errors=[rarible_error_500]}]
- *
- * let get_nft_items_by_owner req () =
- *   let _owner = EzAPI.Req.find_param owner_param req in
- *   let _continuation = EzAPI.Req.find_param continuation_param req in
- *   let _size = EzAPI.Req.find_param size_param req in
- *   let _include_meta = EzAPI.Req.find_param include_meta_param req in
- *   return (Error (bad_request ""))
- * [@@get
- *   {path="/v0.1/items/byOwner";
- *    output=nft_items_enc;
- *    errors=[rarible_error_500]}]
- *
- * let get_nft_items_by_creator req () =
- *   let _creator = EzAPI.Req.find_param creator_param req in
- *   let _continuation = EzAPI.Req.find_param continuation_param req in
- *   let _size = EzAPI.Req.find_param size_param req in
- *   let _include_meta = EzAPI.Req.find_param include_meta_param req in
- *   return (Error (bad_request ""))
- * [@@get
- *   {path="/v0.1/items/byCreator";
- *    output=nft_items_enc;
- *    errors=[rarible_error_500]}]
- *
- * let get_nft_items_by_collection req () =
- *   let _collection = EzAPI.Req.find_param collection_param req in
- *   let _continuation = EzAPI.Req.find_param continuation_param req in
- *   let _size = EzAPI.Req.find_param size_param req in
- *   let _include_meta = EzAPI.Req.find_param include_meta_param req in
- *   return (Error (bad_request ""))
- * [@@get
- *   {path="/v0.1/items/byCollection";
- *    output=nft_items_enc;
- *    errors=[rarible_error_500]}]
- *
- * let get_nft_all_items req () =
- *   let _continuation = EzAPI.Req.find_param continuation_param req in
- *   let _size = EzAPI.Req.find_param size_param req in
- *   let _show_deleted = EzAPI.Req.find_param show_deleted_param req in
- *   let _last_update_from = EzAPI.Req.find_param last_update_from_param req in
- *   let _last_update_to = EzAPI.Req.find_param last_update_to_param req in
- *   let _include_meta = EzAPI.Req.find_param include_meta_param req in
- *   return (Error (bad_request ""))
- * [@@get
- *   {path="/v0.1/items/all";
- *    output=nft_items_enc;
  *    errors=[rarible_error_500]}] *)
+
+let get_nft_item_by_id (req, item_id) () =
+  match parse_item_id item_id with
+  | Error err -> return @@ Error err
+  | Ok (contract, token_id) ->
+    match get_include_meta_param req with
+    | Error err -> return @@ Error err
+    | Ok include_meta ->
+      Db.get_nft_item_by_id ?include_meta contract token_id >>= function
+      | Error db_err ->
+        let str = Crawlori.Rp.string_of_error db_err in
+        return (Error (unexpected_api_error str))
+      | Ok res -> return_ok res
+[@@get
+  {path="/v0.1/items/{itemId:string}";
+   output=nft_item_enc;
+   errors=[rarible_error_500]}]
+
+let get_nft_items_by_owner req () =
+  match get_required_owner_param req with
+  | Error err -> return (Error err)
+  | Ok owner ->
+    match get_include_meta_param req with
+    | Error err -> return @@ Error err
+    | Ok include_meta ->
+      match get_size_param req with
+      | Error err -> return @@ Error err
+      | Ok size ->
+        match get_continuation_last_update_param req with
+        | Error err -> return @@ Error err
+        | Ok continuation ->
+          Db.get_nft_items_by_owner ?include_meta ?continuation ?size owner >>= function
+          | Error db_err ->
+            let str = Crawlori.Rp.string_of_error db_err in
+            return (Error (unexpected_api_error str))
+          | Ok res -> return_ok res
+[@@get
+  {path="/v0.1/items/byOwner";
+   output=nft_items_enc;
+   errors=[rarible_error_500]}]
+
+let get_nft_items_by_creator req () =
+  match get_required_creator_param req with
+  | Error err -> return (Error err)
+  | Ok creator ->
+    match get_include_meta_param req with
+    | Error err -> return @@ Error err
+    | Ok include_meta ->
+      match get_size_param req with
+      | Error err -> return @@ Error err
+      | Ok size ->
+        match get_continuation_last_update_param req with
+        | Error err -> return @@ Error err
+        | Ok continuation ->
+          Db.get_nft_items_by_creator ?include_meta ?continuation ?size creator >>= function
+          | Error db_err ->
+            let str = Crawlori.Rp.string_of_error db_err in
+            return (Error (unexpected_api_error str))
+          | Ok res -> return_ok res
+[@@get
+  {path="/v0.1/items/byCreator";
+   output=nft_items_enc;
+   errors=[rarible_error_500]}]
+
+let get_nft_items_by_collection req () =
+  match get_required_collection_param req with
+  | Error err -> return (Error err)
+  | Ok collection ->
+    match get_include_meta_param req with
+    | Error err -> return @@ Error err
+    | Ok include_meta ->
+      match get_size_param req with
+      | Error err -> return @@ Error err
+      | Ok size ->
+        match get_continuation_last_update_param req with
+        | Error err -> return @@ Error err
+        | Ok continuation ->
+          Db.get_nft_items_by_collection ?include_meta ?continuation ?size collection >>= function
+          | Error db_err ->
+            let str = Crawlori.Rp.string_of_error db_err in
+            return (Error (unexpected_api_error str))
+          | Ok res -> return_ok res
+[@@get
+  {path="/v0.1/items/byCollection";
+   output=nft_items_enc;
+   errors=[rarible_error_500]}]
+
+let get_nft_all_items req () =
+  match get_last_updated_from_param req with
+  | Error err -> return (Error err)
+  | Ok last_updated_from ->
+    match get_last_updated_to_param req with
+    | Error err -> return (Error err)
+    | Ok last_updated_to ->
+      match get_show_deleted_param req with
+      | Error err -> return (Error err)
+      | Ok show_deleted ->
+        match get_include_meta_param req with
+        | Error err -> return @@ Error err
+        | Ok include_meta ->
+          match get_size_param req with
+          | Error err -> return @@ Error err
+          | Ok size ->
+            match get_continuation_last_update_param req with
+            | Error err -> return @@ Error err
+            | Ok continuation ->
+              Db.get_nft_all_items
+                ?last_updated_to
+                ?last_updated_from
+                ?show_deleted
+                ?include_meta
+                ?continuation
+                ?size
+                () >>= function
+              | Error db_err ->
+                let str = Crawlori.Rp.string_of_error db_err in
+                return (Error (unexpected_api_error str))
+              | Ok res -> return_ok res
+[@@get
+  {path="/v0.1/items-all";
+   output=nft_items_enc;
+   errors=[rarible_error_500]}]
 
 (* (\* nft-collection-controller *\)
  * let generate_nft_token_id (req, _collection) () =

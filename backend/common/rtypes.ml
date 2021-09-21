@@ -233,33 +233,31 @@ type lazy_nft = {
 
 type item_transfer = {
   item_transfer_type_ : string [@kind_label "TRANSFER"];
-  item_transfer_owner : A.address option;
-  item_transfer_value : A.big_integer option;
+  item_transfer_owner : A.address;
+  item_transfer_value : A.big_integer;
   item_transfer_from : A.address;
 } [@@deriving encoding]
 
 type nft_item_attribute = {
-  ntf_item_attribute_key : string ;
-  ntf_item_attribute_value : string option ;
+  nft_item_attribute_key : string ;
+  nft_item_attribute_value : string option ;
 } [@@deriving encoding]
 
-type media_url = {
-  media_url_additionnal_propoterties : string;
-} [@@deriving encoding {camel}]
+type 'a media_size =
+  | MediaSizeOriginal of 'a [@wrap "ORIGINAL"]
+  | MediaSizeBig of 'a [@wrap "BIG"]
+  | MediaSizePreview of 'a [@wrap "PREVIEW"]
+[@@deriving encoding]
 
 type meta = {
   meta_type : string;
-  meta_width : int;
-  meta_height : int;
+  meta_width : int option;
+  meta_height : int option;
 } [@@deriving encoding]
 
-type media_meta = {
-  media_meta_additionnal_propoterties : meta;
-} [@@deriving encoding {camel}]
-
 type nft_media = {
-  nft_media_url : media_url ;
-  mtf_media_meta : media_meta;
+  nft_media_url : string media_size ;
+  nft_media_meta : meta media_size;
 } [@@deriving encoding]
 
 type nft_item_meta = {
@@ -279,7 +277,7 @@ type nft_item = {
   nft_item_lazy_supply : A.big_integer;
   nft_item_owners : A.address list;
   nft_item_royalties : part list;
-  nft_item_date : A.date option;
+  nft_item_date : A.date;
   nft_item_pending : item_transfer list option;
   nft_item_deleted : bool option;
   nft_item_meta : nft_item_meta option;
@@ -287,7 +285,7 @@ type nft_item = {
 
 type nft_items = {
   nft_items_total : int64;
-  nft_items_contination : string option;
+  nft_items_continuation : string option;
   nft_items : nft_item list;
 } [@@deriving encoding]
 
