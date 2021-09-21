@@ -23,6 +23,7 @@ let upgrade_1_to_2 dbh version =
     {|create table contracts(
       kind varchar not null,
       address varchar primary key,
+      owner varchar not null,
       block varchar not null,
       level int not null,
       main boolean not null default false,

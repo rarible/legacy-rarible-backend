@@ -431,9 +431,15 @@ type nft_collection_feature =
   | NCFMINT_AND_TRANSFER
 [@@deriving encoding]
 
+type nft_collection_type =
+  | CTFA_2 [@kind_label "type"] [@kind "FA_2"]
+  | CTPUNKS [@kind_label "type"] [@kind "PUNKS"]
+[@@deriving encoding]
+
 type nft_collection = {
   nft_collection_id : A.address ;
   nft_collection_owner : A.address option ;
+  nft_collection_type : nft_collection_type ;
   nft_collection_name : string ;
   nft_collection_symbol : string option ;
   nft_collection_features : nft_collection_feature list ;

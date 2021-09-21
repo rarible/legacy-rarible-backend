@@ -233,6 +233,24 @@ let get_required_creator_param req =
     with _ ->
       mk_invalid_argument param "must be a pkh"
 
+let parse_collection_id s =
+  let open Tzfunc.Crypto in
+  try
+    Ok (Base58.decode Prefix.contract_public_key_hash s)
+  with _ ->
+    Error (invalid_argument  "collection must be a tezos smart contract address")
+
+let get_continuation_collection_param req =
+  match EzAPI.Req.find_param continuation_param req with
+  | None -> Ok None
+  | Some s ->
+    try
+      match parse_collection_id s with
+      | Error _ -> mk_invalid_argument continuation_param "must be a tezos smart contract address"
+      | Ok c -> Ok (Some c)
+    with _ ->
+      mk_invalid_argument continuation_param "must be a tezos smart contract address"
+
 (* (\* gateway-controller *\)
  * let create_gateway_pending_transactions _req _input =
  *   return (Error (unknown_error ""))
@@ -342,7 +360,6 @@ let get_nft_item_meta_by_id (_req, item_id) () =
   {path="/v0.1/items/{itemId:string}/meta";
    output=nft_item_meta_enc;
    errors=[rarible_error_500]}]
-
 (* let get_nft_lazy_item_by_id (_req, _item_id) () =
  *   return (Error (bad_request ""))
  * [@@get
@@ -363,9 +380,10 @@ let get_nft_item_by_id (req, item_id) () =
         return (Error (unexpected_api_error str))
       | Ok res -> return_ok res
 [@@get
-  {path="/v0.1/items/{itemId:string}";
+  {path="/v0.1/items/byId/{itemId:string}";
    output=nft_item_enc;
    errors=[rarible_error_500]}]
+(* TODO path="/v0.1/items/{itemId:string}" *)
 
 let get_nft_items_by_owner req () =
   match get_required_owner_param req with
@@ -468,44 +486,70 @@ let get_nft_all_items req () =
                 return (Error (unexpected_api_error str))
               | Ok res -> return_ok res
 [@@get
-  {path="/v0.1/items-all";
+  {path="/v0.1/items/all";
    output=nft_items_enc;
    errors=[rarible_error_500]}]
 
-(* (\* nft-collection-controller *\)
- * let generate_nft_token_id (req, _collection) () =
- *   let _minter = EzAPI.Req.find_param minter_param req in
- *   return (Error (bad_request ""))
- * [@@get
- *   {path="/v0.1/collections/{collection:string}/generate_token_id";
- *    output=nft_token_id_enc;
- *    errors=[rarible_error_500]}]
- *
- * let get_nft_collection_by_id (_req, _collection) () =
- *   return (Error (bad_request ""))
- * [@@get
- *   {path="/v0.1/collections/{collection:string}";
- *    output=nft_collection_enc;
- *    errors=[rarible_error_500]}]
- *
- * let search_nft_collections_by_owner req () =
- *   let _owner = EzAPI.Req.find_param owner_param req in
- *   let _continuation = EzAPI.Req.find_param continuation_param req in
- *   let _size = EzAPI.Req.find_param size_param req in
- *   return (Error (bad_request ""))
- * [@@get
- *   {path="/v0.1/collections/byOwner";
- *    output=nft_collections_enc;
- *    errors=[rarible_error_500]}]
- *
- * let search_nft_all_collections req () =
- *   let _continuation = EzAPI.Req.find_param continuation_param req in
- *   let _size = EzAPI.Req.find_param size_param req in
- *   return (Error (bad_request ""))
- * [@@get
- *   {path="/v0.1/collections/all";
- *    output=nft_collections_enc;
- *    errors=[rarible_error_500]}] *)
+(* nft-collection-controller *)
+let generate_nft_token_id (req, _collection) () =
+  let _minter = EzAPI.Req.find_param minter_param req in
+  return (Error (bad_request ""))
+[@@get
+  {path="/v0.1/collections/{collection:string}/generate_token_id";
+   output=nft_token_id_enc;
+   errors=[rarible_error_500]}]
+
+let get_nft_collection_by_id (_req, collection) () =
+  match parse_collection_id collection with
+  | Error err -> return @@ Error err
+  | Ok collection ->
+    Db.get_nft_collection_by_id collection >>= function
+    | Error db_err ->
+      let str = Crawlori.Rp.string_of_error db_err in
+      return (Error (unexpected_api_error str))
+    | Ok res -> return_ok res
+[@@get
+  {path="/v0.1/collections/byId/{collection:string}";
+   output=nft_collection_enc;
+   errors=[rarible_error_500]}]
+(* TODO : path="/v0.1/collections/{collection:string}" *)
+
+let search_nft_collections_by_owner req () =
+  match get_required_owner_param req with
+  | Error err -> return (Error err)
+  | Ok owner ->
+    match get_size_param req with
+    | Error err -> return @@ Error err
+    | Ok size ->
+      match get_continuation_collection_param req with
+      | Error err -> return @@ Error err
+      | Ok continuation ->
+        Db.get_nft_collections_by_owner ?continuation ?size owner >>= function
+        | Error db_err ->
+          let str = Crawlori.Rp.string_of_error db_err in
+          return (Error (unexpected_api_error str))
+        | Ok res -> return_ok res
+[@@get
+  {path="/v0.1/collections/byOwner";
+   output=nft_collections_enc;
+   errors=[rarible_error_500]}]
+
+let search_nft_all_collections req () =
+  match get_size_param req with
+  | Error err -> return @@ Error err
+  | Ok size ->
+    match get_continuation_collection_param req with
+    | Error err -> return @@ Error err
+    | Ok continuation ->
+      Db.get_nft_all_collections ?continuation ?size () >>= function
+      | Error db_err ->
+        let str = Crawlori.Rp.string_of_error db_err in
+        return (Error (unexpected_api_error str))
+      | Ok res -> return_ok res
+[@@get
+  {path="/v0.1/collections/all";
+   output=nft_collections_enc;
+   errors=[rarible_error_500]}]
 
 (* (\* order-transaction-controller *\)
  * let create_order_pending_transaction _req _input =
@@ -668,7 +712,7 @@ let get_orders_all req () =
           return (Error (unexpected_api_error str))
         | Ok res -> return_ok res
 [@@get
-  {path="/v0.1/orders-all";
+  {path="/v0.1/orders/all";
    output=orders_pagination_enc;
    errors=[rarible_error_500]}]
 
@@ -680,9 +724,10 @@ let get_order_by_hash (_req, hash) () =
     let str = Crawlori.Rp.string_of_error db_err in
     return (Error (unexpected_api_error str))
 [@@get
-  {path="/v0.1/orders/{arg_hash}";
+  {path="/v0.1/orders/byHash/{arg_hash}";
    output=order_enc;
    errors=[rarible_error_500]}]
+(* TODO : path="/v0.1/orders/{arg_hash}" *)
 
 (* let update_order_make_stock _req () =
  *   return (Error (unexpected_api_error ""))
@@ -721,7 +766,7 @@ let get_sell_orders_by_maker req () =
             return (Error (unexpected_api_error str))
           | Ok res -> return_ok res
 [@@get
-  {path="/v0.1/orders-sell/byMaker";
+  {path="/v0.1/orders/sell/byMaker";
    output=orders_pagination_enc;
    errors=[rarible_error_500]}]
 
@@ -753,7 +798,7 @@ let get_sell_orders_by_item req () =
                   return (Error (unexpected_api_error str))
                 | Ok res -> return_ok res
 [@@get
-  {path="/v0.1/orders-sell/byItem";
+  {path="/v0.1/orders/sell/byItem";
    output=orders_pagination_enc;
    errors=[rarible_error_500]}]
 
@@ -779,7 +824,7 @@ let get_sell_orders_by_collection req () =
             return (Error (unexpected_api_error str))
           | Ok res -> return_ok res
 [@@get
-  {path="/v0.1/orders-sell/byCollection";
+  {path="/v0.1/orders/sell/byCollection";
    output=orders_pagination_enc;
    errors=[rarible_error_500]}]
 
