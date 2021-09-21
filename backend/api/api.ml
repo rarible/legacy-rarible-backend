@@ -35,7 +35,6 @@ let collection_param = EzAPI.Param.string "collection"
 let show_deleted_param = EzAPI.Param.bool "showDeleted"
 let last_updated_from_param = EzAPI.Param.string "lastUpdateFrom"
 let last_updated_to_param = EzAPI.Param.string "lastUpdateTo"
-let minter_param = EzAPI.Param.string "minter"
 let origin_param = EzAPI.Param.string "origin"
 (* TODO : ALL | RARIBLE | OPEN_SEA *)
 let platform_param = EzAPI.Param.string "platform"
@@ -557,13 +556,19 @@ let get_nft_all_items req () =
    errors=[rarible_error_500]}]
 
 (* nft-collection-controller *)
-(* let generate_nft_token_id (req, _collection) () =
- *   let _minter = EzAPI.Req.find_param minter_param req in
- *   return (Error (bad_request ""))
- * [@@get
- *   {path="/v0.1/collections/{collection:string}/generate_token_id";
- *    output=nft_token_id_enc;
- *    errors=[rarible_error_500]}] *)
+let generate_nft_token_id (_req, collection) () =
+  match parse_collection_id collection with
+  | Error err -> return @@ Error err
+  | Ok collection ->
+    Db.generate_nft_token_id collection >>= function
+    | Error db_err ->
+      let str = Crawlori.Rp.string_of_error db_err in
+      return (Error (unexpected_api_error str))
+    | Ok res -> return_ok res
+[@@get
+  {path="/v0.1/collections/{collection:string}/generate_token_id";
+   output=nft_token_id_enc;
+   errors=[rarible_error_500]}]
 
 let get_nft_collection_by_id (_req, collection) () =
   match parse_collection_id collection with
@@ -1072,11 +1077,3 @@ let get_order_bids_by_item req () =
  *   end
  *
  * end *)
-
-
-let next_token_id (_, contract) () =
-  let> r = Db.next_token_id contract in
-  match r with
-  | Ok x -> return (Ok x)
-  | Error e -> return (Error (invalid_argument @@ string_of_error (e :> error)))
-[@@get {path="/v0.1/next_token_id/{arg_hash}"; output=z_enc; errors=[rarible_error_500]}]

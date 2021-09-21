@@ -805,6 +805,18 @@ let get_nft_all_ownerships ?dbh ?continuation ?(size=50) () =
   Lwt.return_ok
     { nft_ownerships ; nft_ownerships_continuation ; nft_ownerships_total }
 
+let generate_nft_token_id ?dbh contract =
+  Format.eprintf "generate_nft_token_id %s@."
+    contract ;
+  use dbh @@ fun dbh ->
+  let>? r = [%pgsql dbh "select tokens_number from contracts where address = $contract"] in
+  match r with
+  | [ i ] -> Lwt.return_ok {
+      nft_token_id = Int64.(to_string @@ succ i) ;
+      nft_token_id_signatures = [] ;
+    }
+  | _ -> Lwt.return_error (`hook_error "no contracts entry for this contract")
+
 let mk_nft_collection_name_symbol metadata =
   try
     let l = EzEncoding.destruct token_metadata_enc metadata in
@@ -1558,10 +1570,3 @@ let upsert_order ?dbh order =
     else Lwt.return_ok ()
   end >>=? fun () ->
   insert_payouts dbh payouts hash_key
-
-let next_token_id ?dbh contract =
-  use dbh @@ fun dbh ->
-  let|>? r = [%pgsql dbh "select tokens_number from contracts where address = $contract"] in
-  match r with
-  | [ i ] -> Z.(succ @@ of_int64 i)
-  | _ -> Z.zero
