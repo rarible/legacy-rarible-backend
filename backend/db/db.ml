@@ -698,6 +698,113 @@ let get_nft_all_items
   Lwt.return_ok
     { nft_items ; nft_items_continuation ; nft_items_total }
 
+let mk_nft_ownerships_continuation nft_ownership =
+  Printf.sprintf "%Ld_%s"
+    (Int64.of_float @@ CalendarLib.Calendar.to_unixfloat nft_ownership.nft_ownership_date)
+    nft_ownership.nft_ownership_id
+
+let mk_nft_ownership obj =
+  let creators = get_nft_item_creators_from_metadata obj#metadata in
+  (* TODO : pending *)
+  (* TODO : last <> mint date *)
+  Lwt.return_ok {
+  nft_ownership_id = Option.get obj#id ;
+  nft_ownership_contract = obj#contract ;
+  nft_ownership_token_id = Int64.to_string obj#token_id ;
+  nft_ownership_owner = obj#owner ;
+  nft_ownership_creators = creators ;
+  nft_ownership_value = Int64.to_string obj#amount ;
+  nft_ownership_lazy_value = "0" ;
+  nft_ownership_date = obj#last ;
+  nft_ownership_pending = [] ;
+}
+
+let get_nft_ownership_by_id ?dbh contract token_id owner =
+  Format.eprintf "get_nft_ownership_by_id %s %s %s@." contract token_id owner ;
+  let id64 = Int64.of_string token_id in
+  use dbh @@ fun dbh ->
+  let>? l = [%pgsql.object dbh
+      "select concat(contract, ':', token_id, ':', owner) as id, \
+       contract, token_id, owner, last, amount, supply, metadata \
+       from tokens where \
+       main and contract = $contract and token_id = $id64 and owner = $owner"] in
+  let>? obj = one l in
+  let>? nft_ownership = mk_nft_ownership obj in
+  Lwt.return_ok nft_ownership
+
+let get_nft_ownerships_by_item ?dbh ?continuation ?(size=50) contract token_id =
+  Format.eprintf "get_nft_ownerships_by_item %s %s %s %d@."
+    contract
+    token_id
+    (match continuation with
+     | None -> "None"
+     | Some (ts, s) -> (Tzfunc.Proto.A.cal_to_str ts) ^ "_" ^ s)
+    size ;
+  let id64 = Int64.of_string token_id in
+  let size64 = Int64.of_int size in
+  let no_continuation, (ts, id) =
+    continuation = None,
+    (match continuation with None -> CalendarLib.Calendar.now (), "" | Some (ts, h) -> (ts, h)) in
+  use dbh @@ fun dbh ->
+  let>? l = [%pgsql.object dbh
+      "select concat(contract, ':', token_id, ':', owner) as id, \
+       contract, token_id, owner, last, amount, supply, metadata \
+       from tokens where \
+       main and contract = $contract and token_id = $id64 and \
+       ($no_continuation or \
+       (last = $ts and concat(contract, ':', token_id, ':', owner) > $id) or \
+       (last < $ts)) \
+       order by last desc, id asc limit $size64"] in
+  let>? nft_ownerships_total = [%pgsql dbh
+      "select count(owner) from tokens where main"] in
+  let>? nft_ownerships_total = match nft_ownerships_total with
+    | [ None ] -> Lwt.return_ok 0L
+    | [ Some i64 ] -> Lwt.return_ok i64
+    | _ -> Lwt.return_error (`hook_error "count with more then one row") in
+  map_rp (fun r -> mk_nft_ownership r) l >>=? fun nft_ownerships ->
+  let len = List.length nft_ownerships in
+  let nft_ownerships_continuation =
+    if len <> size then None
+    else Some
+        (mk_nft_ownerships_continuation @@ List.hd (List.rev nft_ownerships)) in
+  Lwt.return_ok
+    { nft_ownerships ; nft_ownerships_continuation ; nft_ownerships_total }
+
+let get_nft_all_ownerships ?dbh ?continuation ?(size=50) () =
+  Format.eprintf "get_nft_all_ownerships %s %d@."
+    (match continuation with
+     | None -> "None"
+     | Some (ts, s) -> (Tzfunc.Proto.A.cal_to_str ts) ^ "_" ^ s)
+    size ;
+  let size64 = Int64.of_int size in
+  let no_continuation, (ts, id) =
+    continuation = None,
+    (match continuation with None -> CalendarLib.Calendar.now (), "" | Some (ts, h) -> (ts, h)) in
+  use dbh @@ fun dbh ->
+  let>? l = [%pgsql.object dbh
+      "select concat(contract, ':', token_id, ':', owner) as id, \
+       contract, token_id, owner, last, amount, supply, metadata \
+       from tokens where \
+       main and \
+       ($no_continuation or \
+       (last = $ts and concat(contract, ':', token_id, ':', owner) > $id) or \
+       (last < $ts)) \
+       order by last desc, id asc limit $size64"] in
+  let>? nft_ownerships_total = [%pgsql dbh
+      "select count(owner) from tokens where main"] in
+  let>? nft_ownerships_total = match nft_ownerships_total with
+    | [ None ] -> Lwt.return_ok 0L
+    | [ Some i64 ] -> Lwt.return_ok i64
+    | _ -> Lwt.return_error (`hook_error "count with more then one row") in
+  map_rp (fun r -> mk_nft_ownership r) l >>=? fun nft_ownerships ->
+  let len = List.length nft_ownerships in
+  let nft_ownerships_continuation =
+    if len <> size then None
+    else Some
+        (mk_nft_ownerships_continuation @@ List.hd (List.rev nft_ownerships)) in
+  Lwt.return_ok
+    { nft_ownerships ; nft_ownerships_continuation ; nft_ownerships_total }
+
 let mk_nft_collection_name_symbol metadata =
   try
     let l = EzEncoding.destruct token_metadata_enc metadata in
@@ -838,7 +945,6 @@ let mk_asset asset_class contract token_id asset_value =
       | _, _ ->
         Lwt.return_error (`hook_error ("no contract addr for FA2 asset"))
     end
-
   | _ ->
     Lwt.return_error (`hook_error ("invalid asset class " ^ asset_class))
 
