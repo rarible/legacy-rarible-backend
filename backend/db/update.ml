@@ -28,7 +28,7 @@ let upgrade_1_to_2 dbh version =
       main boolean not null default false,
       last timestamp not null,
       tokens_number bigint not null default 0,
-      ledger_id bigint not null,
+      ledger_id bigint not null default 0,
       metadata jsonb not null default '{}')|};
 
     {|create table tokens(
