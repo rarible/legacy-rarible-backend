@@ -1,0 +1,17 @@
+[Unit]
+Description  = Rarible API
+Wants        = network-online.target
+After        = network-online.target
+
+[Service]
+User         = $USER
+Group        = $USER
+ExecStart    = $PATH_TO_RARIBLE_PROJECT/deployment/scripts/rarible-api.sh start
+ExecStop     = $PATH_TO_RARIBLE_PROJECT/deployment/scripts/rarible-api.sh stop
+Type         = forking
+Restart      = always
+RestartSec   = 10
+StartLimitBurst = 10000
+
+[Install]
+WantedBy     = multi-user.target
