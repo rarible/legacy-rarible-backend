@@ -3,6 +3,7 @@ type z = Z.t [@encoding Json_encoding.(conv Z.to_string Z.of_string string)] [@@
 (** Config *)
 
 type config = {
+  mutable admin_wallet: string; [@dft ""]
   mutable exchange_v2: string; [@dft ""]
   mutable validator: string; [@dft ""]
   mutable royalties: string; [@dft ""]

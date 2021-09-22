@@ -4,9 +4,9 @@ open Make(Pg)(struct type extra = Rtypes.config end)
 open Rtypes
 open Config
 
-let dummmy_extra = { exchange_v2 = ""; royalties = ""; validator = "" }
+let dummy_extra = { admin_wallet = ""; exchange_v2 = ""; royalties = ""; validator = "" }
 
-let rarible_contracts config db =
+let rarible_contracts ?(db=dummy_extra) config =
   let>? () =
     if config.extra.exchange_v2 = "" && db.exchange_v2 = "" ||
        config.extra.royalties = "" && db.royalties = "" ||
@@ -34,8 +34,8 @@ let fill_config config =
       let|>? () = iter_rp Db.insert_fake (SSet.elements s) in
       config.accounts <- Some (List.fold_left (fun acc a -> SSet.add a acc) s l) in
   let>? db_extra = Db.get_extra_config () in
-  let>? () = rarible_contracts config db_extra in
-  Db.update_extra_config config.Cconfig.extra
+  let>? () = rarible_contracts ?db:db_extra config in
+  Db.update_extra_config config.extra
 
 let () =
   EzLwtSys.run @@ fun () ->
@@ -44,6 +44,7 @@ let () =
   Hooks.set_operation Db.set_operation;
   Hooks.set_block Db.set_block;
   Hooks.set_main Db.set_main;
+
   let>? () = fill_config config in
   let>? () = init config in
   loop config

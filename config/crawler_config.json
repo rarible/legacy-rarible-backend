@@ -1,10 +1,12 @@
 {
-  "nodes": [ "http://granada.tz.functori.com" ],
-  "start": 410880,
+  "nodes": [ "https://granadanet.smartpy.io" ],
+  "start": 462400,
   "db_kind": "pg",
   "step_forward": 30,
   "accounts": [
-    "KT1SGf3Z1TLm7SWqQrNbA7qFqhkGNxjymRB3"
+    "KT1MWv7oH8JJhxJJs8co21XiByBEAYx2QDjY"
   ],
-  "allow_no_metadata": true
+  "validator": "KT1Vx7UddodXEVAjvgC2et267JqKSYX7WAr7",
+  "exchange_v2": "KT1C5kWbfzASApxCMHXFLbHuPtnRaJXE4WMu",
+  "royalties": "KT1BkQiZcEL8kvx66WZCnFBCCjhJHsQsScw7"
 }

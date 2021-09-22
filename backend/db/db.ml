@@ -22,10 +22,17 @@ let get_contracts ?dbh () =
 
 let get_extra_config ?dbh () =
   use dbh @@ fun dbh ->
-  let>? r = [%pgsql dbh
-      "select exchange_v2_contract, royalties_contract, validator_contract from state"] in
-  let|>? (exchange_v2, royalties, validator) = one r in
-  { exchange_v2; royalties; validator }
+  let>? r = [%pgsql.object dbh
+      "select admin_wallet, exchange_v2_contract, royalties_contract, \
+       validator_contract from state"] in
+  match r with
+  | [ r ] ->  Lwt.return_ok (Some {
+      admin_wallet = r#admin_wallet;
+      exchange_v2 = r#exchange_v2_contract;
+      royalties = r#royalties_contract;
+      validator = r#validator_contract})
+  | [] -> Lwt.return_ok None
+  | _ -> Lwt.return_error (`hook_error "wrong_state")
 
 let update_extra_config ?dbh e =
   use dbh @@ fun dbh ->
@@ -189,7 +196,8 @@ let set_transaction config dbh op tr =
         | Ok (Operator_updates_all t) -> set_update_all dbh op tr t
         | Ok (Metadata_uri s) -> set_uri dbh op tr s
         | Ok (Token_metadata x) -> set_metadata dbh op tr x
-        | Error _ -> Lwt.return_ok ()
+        | Error _ ->
+          Lwt.return_ok ()
       end
 
 let filter_contracts dbh ori =

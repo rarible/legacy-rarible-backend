@@ -34,20 +34,23 @@ let rec flatten = function
   | Mseq l -> Mseq (List.map flatten l)
   | m -> m
 
+let parse_address = function
+  | Mstring s -> Ok s
+  | Mbytes h ->
+    Result.map fst
+      Tzfunc.Binary.Reader.(contract {s = Hex.to_string h; offset = 0})
+  | _ -> Error `unexpected_michelson_value
+
 let parse_update_operators m =
   let rec aux acc = function
     | [] -> Ok acc
     | Mprim { prim = add; args = [
-        Mprim { prim = `Pair; args = [
-            Mstring op_owner;
-            Mstring op_operator;
-            Mint id;
-          ]; _ }
+        Mprim { prim = `Pair; args = [ owner; operator; Mint id ]; _ }
       ]; _ } :: t ->
-      begin match add with
-        | `Left ->
+      begin match add, parse_address owner, parse_address operator with
+        | `Left, Ok op_owner, Ok op_operator ->
           aux ({op_owner; op_operator; op_token_id = Z.to_int64 id; op_add=true} :: acc) t
-        | `Right ->
+        | `Right, Ok op_owner, Ok op_operator ->
           aux ({op_owner; op_operator; op_token_id = Z.to_int64 id; op_add=false} :: acc) t
         | _ -> Error `unexpected_michelson_value
       end
@@ -62,10 +65,16 @@ let parse_update_operators m =
 let parse_update_operators_all m =
   let rec aux acc = function
     | [] -> Ok acc
-    | Mprim { prim = `Left; args = [ Mstring operator ]; _} :: t ->
-      aux ((operator, true) :: acc) t
-    | Mprim { prim = `Right; args = [ Mstring operator ]; _} :: t ->
-      aux ((operator, false) :: acc) t
+    | Mprim { prim = `Left; args = [ operator ]; _} :: t ->
+      begin match parse_address operator with
+        | Ok operator -> aux ((operator, true) :: acc) t
+        | _ -> Error `unexpected_michelson_value
+      end
+    | Mprim { prim = `Right; args = [ operator ]; _} :: t ->
+      begin match parse_address operator with
+        | Ok operator -> aux ((operator, false) :: acc) t
+        | _ -> Error `unexpected_michelson_value
+      end
     | _ -> Error `unexpected_michelson_value in
   match m with
   | Mseq l -> begin match aux [] l with
@@ -78,21 +87,27 @@ let parse_transfer m =
   let rec aux_to acc = function
     | [] -> Ok acc
     | Mprim { prim = `Pair; args = [
-        Mstring tr_destination;
+        destination;
         Mint id;
         Mint amount;
       ]; _} :: t ->
-      aux_to ({tr_destination; tr_token_id = Z.to_int64 id; tr_amount = Z.to_int64 amount} :: acc) t
+      begin match parse_address destination with
+        | Ok tr_destination ->
+          aux_to ({tr_destination; tr_token_id = Z.to_int64 id; tr_amount = Z.to_int64 amount} :: acc) t
+        | _ ->
+          Error `unexpected_michelson_value
+      end
     | _ -> Error `unexpected_michelson_value in
   let rec aux_from acc = function
     | [] -> Ok acc
     | Mprim { prim = `Pair; args = [
-          Mstring tr_source;
+          source;
           Mseq txs
         ]; _} :: t ->
-      begin match aux_to [] txs with
-        | Error e -> Error e
-        | Ok txs -> aux_from ({ tr_source; tr_txs = List.rev txs } :: acc) t
+      begin match aux_to [] txs, parse_address source with
+        | Ok txs, Ok tr_source ->
+          aux_from ({ tr_source; tr_txs = List.rev txs } :: acc) t
+        | _ -> Error `unexpected_michelson_value
       end
     | _ -> Error `unexpected_michelson_value in
   match m with
@@ -105,24 +120,33 @@ let parse_transfer m =
 let parse_mint = function
   | Mprim { prim = `Pair; args = [
       Mint id;
-      Mstring tk_owner;
+      owner;
       Mint amount;
       Mseq royalties ]; _ } ->
     let mi_meta = [] in
-    let mi_royalties = List.filter_map (function
-        | Mprim { prim = `Elt; args = [ Mstring s; Mint i ]; _ } -> Some (s, Z.to_int64 i)
-        | _ -> None) royalties in
-    Ok (Mint_tokens {
-        mi_op = { tk_op = { tk_token_id = Z.to_int64 id; tk_amount = Z.to_int64 amount };
-                  tk_owner };
-        mi_royalties; mi_meta })
+    begin match parse_address owner with
+      | Error _ -> Error `unexpected_michelson_value
+      | Ok tk_owner ->
+        let mi_royalties = List.filter_map (function
+            | Mprim { prim = `Elt; args = [ Mstring s; Mint i ]; _ } -> Some (s, Z.to_int64 i)
+            | _ -> None) royalties in
+
+        Ok (Mint_tokens {
+            mi_op = { tk_op = { tk_token_id = Z.to_int64 id; tk_amount = Z.to_int64 amount };
+                      tk_owner };
+            mi_royalties; mi_meta })
+    end
   | _ -> Error `unexpected_michelson_value
 
 let parse_burn = function
-  | Mprim {prim = `Pair; args = [Mint id; Mstring tk_owner; Mint amount]; _ } ->
-    Ok (Burn_tokens { tk_owner; tk_op = {
-        tk_token_id = Z.to_int64 id; tk_amount = Z.to_int64 amount } })
-  | _ -> Error `unexpected_michelson_value
+  | Mprim {prim = `Pair; args = [Mint id; owner; Mint amount]; _ } ->
+    begin match parse_address owner with
+      | Ok tk_owner ->
+        Ok (Burn_tokens { tk_owner; tk_op = {
+            tk_token_id = Z.to_int64 id; tk_amount = Z.to_int64 amount } })
+      | _ -> Error `unexpected_michelson_value
+    end
+    | _ -> Error `unexpected_michelson_value
 
 let parse_metadata_uri = function
   | Mbytes h -> Ok (Metadata_uri (Hex.to_string h))
@@ -181,12 +205,19 @@ let rec parse_nft e p =
 
 let parse_set_royalties m = match m with
   | Mprim { prim = `Pair; args = [
-      Mstring roy_contract; Mint id; Mseq l ]; _ } ->
-    let roy_royalties = List.filter_map (function
-        | Mprim { prim = `Pair; args = [ Mstring account; Mint value ]; _ } ->
-          Some (account, Z.to_int64 value)
-        | _ -> None) l in
-    Ok {roy_contract; roy_token_id = Z.to_int64 id; roy_royalties}
+      contract; Mint id; Mseq l ]; _ } ->
+    begin match parse_address contract with
+      | Ok roy_contract ->
+        let roy_royalties = List.filter_map (function
+            | Mprim { prim = `Pair; args = [ account; Mint value ]; _ } ->
+              begin match parse_address account with
+                | Ok account -> Some (account, Z.to_int64 value)
+                | _ -> None
+              end
+            | _ -> None) l in
+        Ok {roy_contract; roy_token_id = Z.to_int64 id; roy_royalties}
+      | _ -> Error `unexpected_michelson_value
+    end
   | _ -> Error `unexpected_michelson_value
 
 let rec parse_royalties e p =
