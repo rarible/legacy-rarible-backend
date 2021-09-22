@@ -27,6 +27,7 @@ let upgrade_1_to_2 dbh version =
       block varchar not null,
       level int not null,
       main boolean not null default false,
+      tsp timestamp not null,
       last timestamp not null,
       tokens_number bigint not null default 0,
       ledger_id bigint not null default 0,
@@ -38,6 +39,7 @@ let upgrade_1_to_2 dbh version =
       block varchar not null,
       level int not null,
       main boolean not null default false,
+      tsp timestamp not null,
       last timestamp not null,
       transaction varchar not null,
       owner varchar not null,
@@ -45,7 +47,7 @@ let upgrade_1_to_2 dbh version =
       supply bigint not null,
       operators varchar[] not null default '{}',
       metadata jsonb not null default '{}',
-      royalties jsonb[] not null default '{}',
+      royalties jsonb not null default '{}',
       primary key (contract, owner, token_id))|};
 
     {|create table accounts(
@@ -84,6 +86,7 @@ let upgrade_1_to_2 dbh version =
       token_id bigint,
       amount bigint,
       metadata jsonb,
+      royalties jsonb,
       primary key (transaction, id))|};
 
     {|create table orders(

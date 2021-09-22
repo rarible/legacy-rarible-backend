@@ -140,7 +140,6 @@ let parse_token_metadata = function
 let rec parse_nft e p =
   let p = flatten p in
   match e, p with
-  (* main *)
   | EPdefault, Mprim { prim = `Left; args = [ m ]; _ } ->
     parse_nft (EPnamed "left") m
   | EPdefault, Mprim { prim = `Right; args = [ m ]; _ } ->
@@ -178,6 +177,34 @@ let rec parse_nft e p =
   | EPnamed "setMetadataUri", m -> parse_metadata_uri m
   | EPnamed "setTokenMetadata", m -> parse_token_metadata m
 
+  | _ -> Error `unexpected_michelson_value
+
+let parse_set_royalties m = match m with
+  | Mprim { prim = `Pair; args = [
+      Mstring roy_contract; Mint id; Mseq l ]; _ } ->
+    let roy_royalties = List.filter_map (function
+        | Mprim { prim = `Pair; args = [ Mstring account; Mint value ]; _ } ->
+          Some (account, Z.to_int64 value)
+        | _ -> None) l in
+    Ok {roy_contract; roy_token_id = Z.to_int64 id; roy_royalties}
+  | _ -> Error `unexpected_michelson_value
+
+let rec parse_royalties e p =
+  let p = flatten p in
+  match e, p with
+  | EPdefault, Mprim { prim = `Left; args = [ m ]; _ } ->
+    parse_royalties (EPnamed "left") m
+  | EPdefault, Mprim { prim = `Right; args = [ m ]; _ } ->
+    parse_royalties (EPnamed "right") m
+  | EPnamed "left", Mprim { prim = `Left; args = [ m ]; _ } ->
+    parse_royalties (EPnamed "getRoyalties") m
+  | EPnamed "left", Mprim { prim = `Right; args = [ m ]; _ } ->
+    parse_royalties (EPnamed "transferOwnership") m
+  | EPnamed "right", Mprim { prim = `Left; args = [ m ]; _ } ->
+    parse_royalties (EPnamed "claimOwnership") m
+  | EPnamed "right", Mprim { prim = `Right; args = [ m ]; _ } ->
+    parse_royalties (EPnamed "setRoyalties") m
+  | EPnamed "setRoyalties", m -> parse_set_royalties m
   | _ -> Error `unexpected_michelson_value
 
 let rec list_entrypoints acc = function

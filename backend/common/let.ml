@@ -1,5 +1,10 @@
 module Utils = Utils
 
+type error = [
+  | Crawlori.Rp.error
+  | `unexpected_michelson_value
+]
+
 let (let>) = Lwt.bind
 let (let|>) p f = Lwt.map f p
 let (let>?) p f = Lwt.bind p (function Error e -> Lwt.return_error e | Ok x -> f x)
@@ -9,12 +14,6 @@ let (>>=) = Lwt.bind
 let (>|=) p f = Lwt.map f p
 let (>>=?) p f = Lwt.bind p (function Error e -> Lwt.return_error e | Ok x -> f x)
 let (>|=?) p f = Lwt.map (function Error e -> Error e| Ok x -> Ok (f x)) p
-
-type error = [
-  | Crawlori.Rp.error
-  | `unexpected_michelson_value
-  | `wrong_order
-]
 
 let fold_rp f acc l =
   let rec aux acc = function
@@ -39,4 +38,3 @@ let map_rp f l =
 let string_of_error : error -> string = function
   | #Crawlori.Rp.error as e -> Crawlori.Rp.string_of_error e
   | `unexpected_michelson_value -> "unexpected_michelson_value"
-  | `wrong_order -> "unhandled order"

@@ -12,15 +12,32 @@ let use dbh f = match dbh with
   | None -> Pg.PG.Pool.use f
   | Some dbh -> f dbh
 
+let one ?(err="expected unique roaw not found") l = match l with
+  | [ x ] -> Lwt.return_ok x
+  | _ -> Lwt.return_error (`hook_error err)
+
 let get_contracts ?dbh () =
   use dbh @@ fun dbh ->
   [%pgsql dbh "select address from contracts where main"]
 
+let get_extra_config ?dbh () =
+  use dbh @@ fun dbh ->
+  let>? r = [%pgsql dbh
+      "select exchange_v2_contract, royalties_contract, validator_contract from state"] in
+  let|>? (exchange_v2, royalties, validator) = one r in
+  { exchange_v2; royalties; validator }
+
+let update_extra_config ?dbh e =
+  use dbh @@ fun dbh ->
+  [%pgsql dbh
+      "update state set exchange_v2_contract = ${e.exchange_v2}, \
+       royalties_contract = ${e.royalties}, validator_contract = ${e.validator}"]
+
 let insert_fake ?dbh address =
   use dbh @@ fun dbh ->
   [%pgsql dbh
-      "insert into contracts(kind, address, block, level, last, main) \
-       values('', $address, '', 0, now(), true) \
+      "insert into contracts(kind, address, owner, block, level, tsp, last, main) \
+       values('', $address, '', '', 0, now(), now(), true) \
        on conflict do nothing"]
 
 let get_balance ?dbh ~contract ~owner token_id =
@@ -32,10 +49,6 @@ let get_balance ?dbh ~contract ~owner token_id =
   match l with
   | [ amount ] -> Some amount
   | _ -> None
-
-let one ?(err="expected unique roaw not found") l = match l with
-  | [ x ] -> Lwt.return_ok x
-  | _ -> Lwt.return_error (`hook_error err)
 
 let set_account dbh addr ~block ~tsp ~level =
   [%pgsql dbh
@@ -52,15 +65,11 @@ let set_mint dbh op kt1 m =
   let meta = EzEncoding.construct token_metadata_enc m.mi_meta in
   let token_id = m.mi_op.tk_op.tk_token_id in
   let owner = m.mi_op.tk_owner in
-  let royalties = List.map (fun r ->
-      Some (EzEncoding.construct
-              Json_encoding.(obj2 (req "account" string) (req "value" int53)) r))
-      m.mi_royalties in
   let>? () = [%pgsql dbh
-      "insert into tokens(contract, token_id, block, level, last, owner, amount, \
-       metadata, royalties, transaction, supply) \
+      "insert into tokens(contract, token_id, block, level, tsp, last, owner, \
+       amount, metadata, transaction, supply) \
        values($kt1, $token_id, ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, \
-       $owner, 0, $meta, $royalties, ${op.bo_hash}, 0) on conflict do nothing"] in
+       ${op.bo_tsp}, $owner, 0, $meta, ${op.bo_hash}, 0) on conflict do nothing"] in
   let>? () = set_account dbh owner ~block:op.bo_block ~level:op.bo_level ~tsp:op.bo_tsp in
   let mint = EzEncoding.construct token_op_owner_enc m.mi_op in
   let>? id = transaction_id op in
@@ -71,7 +80,7 @@ let set_mint dbh op kt1 m =
        ${op.bo_tsp}, $kt1, $mint) \
        on conflict do nothing"]
   (* TODO : KAFKA *)
-  
+
 
 let set_burn dbh op tr m =
   let burn = EzEncoding.construct token_op_owner_enc m in
@@ -89,9 +98,9 @@ let set_transfer dbh op tr lt =
   let|>? () = iter_rp (fun {tr_source; tr_txs} ->
       let|>? () = iter_rp (fun {tr_destination; tr_token_id; tr_amount} ->
           let>? () = [%pgsql dbh
-              "insert into tokens(contract, token_id, block, level, last, owner, amount, \
+              "insert into tokens(contract, token_id, block, level, tsp, last, owner, amount, \
                metadata, transaction, supply) \
-               values($kt1, $tr_token_id, ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, \
+               values($kt1, $tr_token_id, ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, ${op.bo_tsp}, \
                $tr_destination, 0, '{}', ${op.bo_hash}, 0) on conflict do nothing"] in
           [%pgsql dbh
               "insert into token_updates(transaction, id, block, level, tsp, \
@@ -149,20 +158,39 @@ let set_metadata dbh op tr (token_id, l) =
        ${op.bo_tsp}, $source, $token_id, $kt1, $meta) \
        on conflict do nothing"]
 
-let set_transaction dbh op tr =
+let set_royalties dbh op roy =
+  let royalties = EzEncoding.(construct token_royalties_enc roy.roy_royalties) in
+  let>? id = transaction_id op in
+  let source = op.bo_op.source in
+  [%pgsql dbh
+      "insert into token_updates(transaction, id, block, level, tsp, \
+       source, token_id, contract, royalties) \
+       values(${op.bo_hash}, $id, ${op.bo_block}, ${op.bo_level}, \
+       ${op.bo_tsp}, $source, ${roy.roy_token_id}, ${roy.roy_contract}, $royalties) \
+       on conflict do nothing"]
+
+let set_transaction config dbh op tr =
   match tr.parameters with
+  | None | Some { value = Other _; _ } | Some { value = Bytes _; _ } -> Lwt.return_ok ()
   | Some {entrypoint; value = Micheline m} ->
-    begin match Utils.parse_nft entrypoint m with
-      | Ok (Mint_tokens m) -> set_mint dbh op tr.destination m
-      | Ok (Burn_tokens b) -> set_burn dbh op tr b
-      | Ok (Transfers t) -> set_transfer dbh op tr t
-      | Ok (Operator_updates t) -> set_update dbh op tr t
-      | Ok (Operator_updates_all t) -> set_update_all dbh op tr t
-      | Ok (Metadata_uri s) -> set_uri dbh op tr s
-      | Ok (Token_metadata x) -> set_metadata dbh op tr x
-      | Error _ -> Lwt.return_ok ()
-    end
-  | _ -> Lwt.return_ok ()
+    if tr.destination = config.Crawlori.Config.extra.royalties then (* royalties *)
+      match Utils.parse_royalties entrypoint m with
+      | Ok roy -> set_royalties dbh op roy
+      | _ -> Lwt.return_ok ()
+    else if tr.destination = config.Crawlori.Config.extra.exchange_v2 then (* exchange_v2 *)
+      (* todo : match order *)
+      Lwt.return_ok ()
+    else (* nft *)
+      begin match Utils.parse_nft entrypoint m with
+        | Ok (Mint_tokens m) -> set_mint dbh op tr.destination m
+        | Ok (Burn_tokens b) -> set_burn dbh op tr b
+        | Ok (Transfers t) -> set_transfer dbh op tr t
+        | Ok (Operator_updates t) -> set_update dbh op tr t
+        | Ok (Operator_updates_all t) -> set_update_all dbh op tr t
+        | Ok (Metadata_uri s) -> set_uri dbh op tr s
+        | Ok (Token_metadata x) -> set_metadata dbh op tr x
+        | Error _ -> Lwt.return_ok ()
+      end
 
 let filter_contracts dbh ori =
   let|>? r = [%pgsql.object dbh "select admin_wallet, royalties_contract from state"] in
@@ -186,9 +214,9 @@ let set_origination config dbh op ori =
   | Some (`nft (owner, ledger_id)) ->
     let kt1 = Tzfunc.Crypto.op_to_KT1 op.bo_hash in
     let|>? () = [%pgsql dbh
-        "insert into contracts(kind, address, owner, block, level, last, ledger_id) \
-         values('nft', $kt1, $owner, ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, $ledger_id) \
-         on conflict do nothing"] in
+        "insert into contracts(kind, address, owner, block, level, tsp, last, ledger_id) \
+         values('nft', $kt1, $owner, ${op.bo_block}, ${op.bo_level}, \
+         ${op.bo_tsp}, ${op.bo_tsp}, $ledger_id) on conflict do nothing"] in
     let open Crawlori.Config in
     match config.accounts with
     | None -> config.accounts <- Some (SSet.singleton kt1)
@@ -197,8 +225,8 @@ let set_origination config dbh op ori =
 let set_operation config dbh op =
   let open Hooks in
   match op.bo_op.kind with
-  | Transaction tr -> set_transaction dbh op tr
-  | Origination ori -> set_origination config dbh op ori
+  | Transaction tr -> set_transaction config dbh op tr
+  (* | Origination ori -> set_origination config dbh op ori *)
   | _ -> Lwt.return_ok ()
 
 let set_block config dbh b =
@@ -292,14 +320,15 @@ let transfer_updates dbh main ~contract ~block ~level ~tsp ~token_id ~source amo
        block = case when $main then $block else block end, \
        level = case when $main then $level else level end, \
        last = case when $main then $tsp else last end where token_id = $token_id and \
-       owner = $source and contract = $contract returning amount, metadata, supply, transaction"] in
-  let>? new_src_amount, meta, supply, transaction = one ~err:"source token not found for transfer update" info in
+       owner = $source and contract = $contract returning amount, metadata, supply, transaction, tsp"] in
+  let>? new_src_amount, meta, supply, transaction, tsp = one ~err:"source token not found for transfer update" info in
   let>? l_new_dst_amount =
     [%pgsql dbh
         "update tokens set amount = amount + $amount, \
          metadata = case when amount = 0 then $meta else metadata end, \
          supply = case when amount = 0 then $supply else supply end, \
          transaction = case when amount = 0 then $transaction else transaction end, \
+         tsp = case when amount = 0 then $tsp else tsp end, \
          block = case when $main then $block else block end, \
          level = case when $main then $level else level end, \
          last = case when $main then $tsp else last end where token_id = $token_id and \
@@ -330,16 +359,22 @@ let token_updates dbh main l =
   iter_rp (fun r ->
       let contract, block, level, tsp, source =
         r#contract, r#block, r#level, r#tsp, r#source in
-      match r#destination, r#token_id, r#amount, r#operator, r#add, r#metadata  with
-      | Some destination, Some token_id, Some amount, _, _, _ ->
+      match r#destination, r#token_id, r#amount, r#operator, r#add, r#metadata, r#royalties  with
+      | Some destination, Some token_id, Some amount, _, _, _, _ ->
         transfer_updates dbh main ~contract ~block ~level ~tsp ~token_id ~source amount destination
-      | _, token_id, _, Some operator, Some add, _ ->
+      | _, token_id, _, Some operator, Some add, _, _ ->
         operator_updates dbh main ~operator ~add ~contract ~block ~level ~tsp ?token_id ~source
-      | _, Some token_id, _, _, _, Some meta ->
+      | _, Some token_id, _, _, _, Some meta, _ ->
         if main then
           [%pgsql dbh
             "update tokens set metadata = $meta where contract = $contract and \
              token_id = $token_id"]
+        else Lwt.return_ok ()
+      | _, Some token_id, _, _, _, _, Some royalties ->
+        if main then
+          [%pgsql dbh
+              "update tokens set royalties = $royalties where contract = $contract and \
+               token_id = $token_id"]
         else Lwt.return_ok ()
       | _ -> Lwt.return_error (`hook_error "invalid token_update")) l
 
@@ -401,7 +436,7 @@ let get_nft_item_owners ?dbh contract token_id =
  *         meta_width = Option.map Int32.to_int obj#width ;
  *         meta_height = Option.map Int32.to_int obj#height ;
  *       })
- * 
+ *
  * let mk_nft_media obj =
  *   let|>? nft_media_meta = mk_media_meta obj in
  *   {

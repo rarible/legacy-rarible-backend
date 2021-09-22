@@ -1,5 +1,13 @@
 type z = Z.t [@encoding Json_encoding.(conv Z.to_string Z.of_string string)] [@@deriving encoding]
 
+(** Config *)
+
+type config = {
+  mutable exchange_v2: string; [@dft ""]
+  mutable validator: string; [@dft ""]
+  mutable royalties: string; [@dft ""]
+} [@@deriving encoding]
+
 (** Api *)
 
 type erc20_balance = {
@@ -58,7 +66,7 @@ type account_token = {
   at_amount : int64;
 } [@@deriving encoding]
 
-type param =
+type nft_param =
   | Transfers of transfer list
   | Operator_updates of operator_update list
   | Operator_updates_all of (string * bool) list
@@ -67,6 +75,12 @@ type param =
   | Metadata_uri of string
   | Token_metadata of (int64 * (string * string) list)
 [@@deriving encoding]
+
+type set_royalties = {
+  roy_contract: string;
+  roy_token_id: int64;
+  roy_royalties: token_royalties;
+} [@@deriving encoding]
 
 module A = struct
   let big_integer_enc =
