@@ -68,6 +68,75 @@ let transaction_id op =
   | _, Some nonce -> Lwt.return_ok ("nonce_" ^ Int32.to_string nonce)
   | _ -> Lwt.return_error (`hook_error "no counter or nonce in transaction")
 
+let insert_nft_activity dbh timestamp nft_activity =
+  let act_type, act_from =
+    match nft_activity.nft_activity_type with
+    | NftActivityMint -> "mint", None
+    | NftActivityBurn -> "burn", None
+    | NftActivityTransfer fr -> "transfer", Some fr in
+  let token_id =
+    Int64.of_string nft_activity.nft_activity_elt.nft_activity_token_id in
+  let value =
+    Int64.of_string nft_activity.nft_activity_elt.nft_activity_value in
+  let level =
+    Int64.to_int32 nft_activity.nft_activity_elt.nft_activity_block_number in
+  [%pgsql dbh
+      "insert into nft_activities(\
+       activity_type, transaction, block, level, date, contract, token_id, \
+       owner, amount, tr_from) values ($act_type, \
+       ${nft_activity.nft_activity_elt.nft_activity_transaction_hash}, \
+       ${nft_activity.nft_activity_elt.nft_activity_block_hash}, \
+       $level, $timestamp, \
+       ${nft_activity.nft_activity_elt.nft_activity_contract}, \
+       $token_id, \
+       ${nft_activity.nft_activity_elt.nft_activity_owner}, $value, $?act_from) \
+       on conflict do nothing"]
+
+let create_nft_activity_elt op contract mi_op = {
+  nft_activity_owner = mi_op.tk_owner ;
+  nft_activity_contract = contract ;
+  nft_activity_token_id = Int64.to_string mi_op.tk_op.tk_token_id ;
+  nft_activity_value = Int64.to_string mi_op.tk_op.tk_amount ;
+  nft_activity_transaction_hash = op.bo_hash ;
+  nft_activity_block_hash = op.bo_block ;
+  nft_activity_block_number = Int64.of_int32 op.bo_level ;
+}
+
+let insert_nft_activity_mint dbh op kt1 mi_op =
+  let nft_activity_elt = create_nft_activity_elt op kt1 mi_op in
+  let nft_activity = {
+    nft_activity_type = NftActivityMint ;
+    nft_activity_elt ;
+  } in
+  insert_nft_activity dbh op.bo_tsp nft_activity
+  (* TODO : KAFKA *)
+
+let insert_nft_activity_burn dbh op kt1 mi_op =
+  let nft_activity_elt = create_nft_activity_elt op kt1 mi_op in
+  let nft_activity = {
+    nft_activity_type = NftActivityBurn ;
+    nft_activity_elt ;
+  } in
+  insert_nft_activity dbh op.bo_tsp nft_activity
+  (* TODO : KAFKA *)
+
+let insert_nft_activity_transfer dbh op kt1 source owner token_id amount =
+  let nft_activity_elt = {
+    nft_activity_owner = owner ;
+    nft_activity_contract = kt1;
+    nft_activity_token_id = Int64.to_string token_id ;
+    nft_activity_value = Int64.to_string amount ;
+    nft_activity_transaction_hash = op.bo_hash ;
+    nft_activity_block_hash = op.bo_block ;
+    nft_activity_block_number = Int64.of_int32 op.bo_level ;
+  } in
+  let nft_activity = {
+    nft_activity_type = NftActivityTransfer source ;
+    nft_activity_elt ;
+  } in
+  insert_nft_activity dbh op.bo_tsp nft_activity
+(* TODO : KAFKA *)
+
 let set_mint dbh op kt1 m =
   let meta = EzEncoding.construct token_metadata_enc m.mi_meta in
   let token_id = m.mi_op.tk_op.tk_token_id in
@@ -80,24 +149,24 @@ let set_mint dbh op kt1 m =
   let>? () = set_account dbh owner ~block:op.bo_block ~level:op.bo_level ~tsp:op.bo_tsp in
   let mint = EzEncoding.construct token_op_owner_enc m.mi_op in
   let>? id = transaction_id op in
-  [%pgsql dbh
+  let>? () = [%pgsql dbh
       "insert into contract_updates(transaction, id, block, level, tsp, \
        contract, mint) \
        values(${op.bo_hash}, $id, ${op.bo_block}, ${op.bo_level}, \
        ${op.bo_tsp}, $kt1, $mint) \
-       on conflict do nothing"]
-  (* TODO : KAFKA *)
-
+       on conflict do nothing"] in
+  insert_nft_activity_mint dbh op kt1 m.mi_op
 
 let set_burn dbh op tr m =
   let burn = EzEncoding.construct token_op_owner_enc m in
   let>? id = transaction_id op in
-  [%pgsql dbh
+  let>? () = [%pgsql dbh
       "insert into contract_updates(transaction, id, block, level, tsp, \
        contract, burn) \
        values(${op.bo_hash}, $id, ${op.bo_block}, ${op.bo_level}, \
        ${op.bo_tsp}, ${tr.destination}, $burn) \
-       on conflict do nothing"]
+       on conflict do nothing"] in
+  insert_nft_activity_burn dbh op tr.destination m
 
 let set_transfer dbh op tr lt =
   let>? id = transaction_id op in
@@ -109,13 +178,15 @@ let set_transfer dbh op tr lt =
                metadata, transaction, supply) \
                values($kt1, $tr_token_id, ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, ${op.bo_tsp}, \
                $tr_destination, 0, '{}', ${op.bo_hash}, 0) on conflict do nothing"] in
-          [%pgsql dbh
+          let>? () = [%pgsql dbh
               "insert into token_updates(transaction, id, block, level, tsp, \
                source, destination, contract, token_id, amount) \
                values(${op.bo_hash}, $id, ${op.bo_block}, ${op.bo_level}, \
                ${op.bo_tsp}, $tr_source, $tr_destination, ${tr.destination}, \
                $tr_token_id, $tr_amount) \
-               on conflict do nothing"]
+               on conflict do nothing"] in
+          insert_nft_activity_transfer
+            dbh op kt1 tr_source tr_destination tr_token_id tr_amount
         ) tr_txs in
       ()) lt in
   ()
@@ -392,6 +463,7 @@ let set_main _config dbh {Hooks.m_main; m_hash} =
   let>? () = [%pgsql dbh "update contracts set main = $m_main where block = $m_hash"] in
   let>? () = [%pgsql dbh "update tokens set main = $m_main where block = $m_hash"] in
   let>? () = [%pgsql dbh "update accounts set main = $m_main where block = $m_hash"] in
+  let>? () = [%pgsql dbh "update nft_activities set main = $m_main where block = $m_hash"] in
   let>? t_updates = [%pgsql.object dbh "update token_updates set main = $m_main where block = $m_hash returning *"] in
   let>? c_updates = [%pgsql.object dbh "update contract_updates set main = $m_main where block = $m_hash returning *"] in
   let>? () = contract_updates dbh m_main c_updates in
@@ -741,6 +813,151 @@ let get_nft_all_items
   Lwt.return_ok
     { nft_items ; nft_items_continuation ; nft_items_total }
 
+let mk_nft_activity_continuation obj =
+  Printf.sprintf "%Ld_%s"
+    (Int64.of_float @@ CalendarLib.Calendar.to_unixfloat obj#date)
+    obj#transaction
+
+let mk_nft_activity_elt obj = {
+  nft_activity_owner = obj#owner ;
+  nft_activity_contract = obj#contract ;
+  nft_activity_token_id = Int64.to_string obj#token_id ;
+  nft_activity_value = Int64.to_string obj#amount ;
+  nft_activity_transaction_hash = obj#transaction ;
+  nft_activity_block_hash = obj#block ;
+  nft_activity_block_number = Int64.of_int32 obj#level ;
+}
+
+let mk_nft_activity obj = match obj#activity_type with
+  | "mint" ->
+    let nft_activity_elt = mk_nft_activity_elt obj in
+    Lwt.return_ok {
+      nft_activity_type = NftActivityMint ;
+      nft_activity_elt ;
+    }
+  | "burn" ->
+    let nft_activity_elt = mk_nft_activity_elt obj in
+    Lwt.return_ok {
+      nft_activity_type = NftActivityBurn ;
+      nft_activity_elt ;
+    }
+  | "transfer" ->
+    let nft_activity_elt = mk_nft_activity_elt obj in
+    let tr_from = Option.get obj#tr_from in
+    Lwt.return_ok {
+      nft_activity_type = NftActivityTransfer tr_from ;
+      nft_activity_elt ;
+    }
+  | _ as t -> Lwt.return_error (`hook_error ("unknown nft activity type " ^ t))
+
+let get_nft_activities_by_collection ?dbh ?continuation ?(size=50) filter =
+  use dbh @@ fun dbh ->
+  let contract = filter.nft_activity_by_collection_contract in
+  let types = filter_all_type_to_array filter.nft_activity_by_collection_types in
+  let size64 = Int64.of_int size in
+  let no_continuation, (ts, h) =
+    continuation = None,
+    (match continuation with None -> CalendarLib.Calendar.now (), "" | Some (ts, h) -> (ts, h)) in
+  let>? l = [%pgsql.object dbh
+      "select activity_type, transaction, block, level, date, contract, \
+       token_id, owner, amount, tr_from from nft_activities where \
+       main and contract = $contract and activity_type = any($types) and \
+       ($no_continuation or \
+       (date = $ts and transaction > $h) or (date < $ts)) \
+       order by date desc, transaction asc limit $size64"] in
+  map_rp (fun r -> let|>? a = mk_nft_activity r in a, r) l >>=? fun activities ->
+  let len = List.length activities in
+  let nft_activities_continuation =
+    if len <> size then None
+    else Some
+        (mk_nft_activity_continuation @@ snd @@ List.hd (List.rev activities)) in
+  Lwt.return_ok
+    { nft_activities_items = List.map fst activities ; nft_activities_continuation }
+
+let get_nft_activities_by_item ?dbh ?continuation ?(size=50) filter =
+  use dbh @@ fun dbh ->
+  let contract = filter.nft_activity_by_item_contract in
+  let token_id = Int64.of_string filter.nft_activity_by_item_token_id in
+  let types = filter_all_type_to_array filter.nft_activity_by_item_types in
+  let size64 = Int64.of_int size in
+  let no_continuation, (ts, h) =
+    continuation = None,
+    (match continuation with None -> CalendarLib.Calendar.now (), "" | Some (ts, h) -> (ts, h)) in
+  let>? l = [%pgsql.object dbh
+      "select activity_type, transaction, block, level, date, contract, \
+       token_id, owner, amount, tr_from from nft_activities where \
+       main and contract = $contract and token_id = $token_id and \
+       activity_type = any($types) and \
+       ($no_continuation or \
+       (date = $ts and transaction > $h) or (date < $ts)) \
+       order by date desc, transaction asc limit $size64"] in
+  map_rp (fun r -> let|>? a = mk_nft_activity r in a, r) l >>=? fun activities ->
+  let len = List.length activities in
+  let nft_activities_continuation =
+    if len <> size then None
+    else Some
+        (mk_nft_activity_continuation @@ snd @@ List.hd (List.rev activities)) in
+  Lwt.return_ok
+    { nft_activities_items = List.map fst activities ; nft_activities_continuation }
+
+let get_nft_activities_by_user ?dbh ?continuation ?(size=50) filter =
+  use dbh @@ fun dbh ->
+  let users = List.map Option.some filter.nft_activity_by_user_users in
+  let types = filter_user_type_to_array filter.nft_activity_by_user_types in
+  let size64 = Int64.of_int size in
+  let no_continuation, (ts, h) =
+    continuation = None,
+    (match continuation with None -> CalendarLib.Calendar.now (), "" | Some (ts, h) -> (ts, h)) in
+  let>? l = [%pgsql.object dbh
+      "select activity_type, transaction, block, level, date, contract, \
+       token_id, owner, amount, tr_from from nft_activities where \
+       main and owner = any($users) and \
+       activity_type = any($types) and \
+       ($no_continuation or \
+       (date = $ts and transaction > $h) or (date < $ts)) \
+       order by date desc, transaction asc limit $size64"] in
+  map_rp (fun r -> let|>? a = mk_nft_activity r in a, r) l >>=? fun activities ->
+  let len = List.length activities in
+  let nft_activities_continuation =
+    if len <> size then None
+    else Some
+        (mk_nft_activity_continuation @@ snd @@ List.hd (List.rev activities)) in
+  Lwt.return_ok
+    { nft_activities_items = List.map fst activities ; nft_activities_continuation }
+
+let get_nft_activities_all ?dbh ?continuation ?(size=50) types =
+  use dbh @@ fun dbh ->
+  let types = filter_all_type_to_array types in
+  let size64 = Int64.of_int size in
+  let no_continuation, (ts, h) =
+    continuation = None,
+    (match continuation with None -> CalendarLib.Calendar.now (), "" | Some (ts, h) -> (ts, h)) in
+  let>? l = [%pgsql.object dbh
+      "select activity_type, transaction, block, level, date, contract, \
+       token_id, owner, amount, tr_from from nft_activities where \
+       main and activity_type = any($types) and \
+       ($no_continuation or \
+       (date = $ts and transaction > $h) or (date < $ts)) \
+       order by date desc, transaction asc limit $size64"] in
+  map_rp (fun r -> let|>? a = mk_nft_activity r in a, r) l >>=? fun activities ->
+  let len = List.length activities in
+  let nft_activities_continuation =
+    if len <> size then None
+    else Some
+        (mk_nft_activity_continuation @@ snd @@ List.hd (List.rev activities)) in
+  Lwt.return_ok
+    { nft_activities_items = List.map fst activities ; nft_activities_continuation }
+
+let get_nft_activities ?dbh ?continuation ?size = function
+  | ActivityFilterByCollection filter ->
+    get_nft_activities_by_collection ?dbh ?continuation ?size filter
+  | ActivityFilterByItem filter ->
+    get_nft_activities_by_item ?dbh ?continuation ?size filter
+  | ActivityFilterByUser filter ->
+    get_nft_activities_by_user ?dbh ?continuation ?size filter
+  | ActivityFilterAll filter ->
+    get_nft_activities_all ?dbh ?continuation ?size filter
+
 let mk_nft_ownerships_continuation nft_ownership =
   Printf.sprintf "%Ld_%s"
     (Int64.of_float @@ CalendarLib.Calendar.to_unixfloat nft_ownership.nft_ownership_date)
@@ -749,7 +966,7 @@ let mk_nft_ownerships_continuation nft_ownership =
 let mk_nft_ownership obj =
   let creators = get_nft_item_creators_from_metadata obj#metadata in
   (* TODO : pending *)
-  (* TODO : last <> mint date *)
+  (* TODO : last <> mint date ? *)
   Lwt.return_ok {
   nft_ownership_id = Option.get obj#id ;
   nft_ownership_contract = obj#contract ;

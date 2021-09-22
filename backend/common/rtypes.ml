@@ -308,45 +308,28 @@ type nft_activity_filter_all_type =
   | AllTRANSFER
   | AllMINT
   | AllBURN
-  | AllBID
-  | AllLIST
-  | AllSELL
 [@@deriving encoding]
 
-type nft_activty_filter_user_type =
+type nft_activity_filter_user_type =
   | UserTRANSFER_FROM
   | UserTRANSFER_TO
   | UserMINT
   | UserBURN
-  | UserMAKE_BID
-  | UserGET_BID
-  | UserLIST
-  | UserBUY
-  | UserSELL
-[@@deriving encoding]
-
-type nft_activity_filter_item_type =
-  | ItemTRANSFER
-  | ItemMINT
-  | ItemBURN
-  | ItemBID
-  | ItemLIST
-  | ItemMATCH
 [@@deriving encoding]
 
 type nft_activity_by_user = {
-  nft_activity_by_user_types : nft_activty_filter_user_type list ;
+  nft_activity_by_user_types : nft_activity_filter_user_type list ;
   nft_activity_by_user_users : A.address list
 } [@@deriving encoding]
 
 type nft_activity_by_item = {
-  nft_activity_by_item_types : nft_activity_filter_item_type list;
+  nft_activity_by_item_types : nft_activity_filter_all_type list;
   nft_activity_by_item_contract : A.address;
   nft_activity_by_item_token_id : A.big_integer;
 } [@@deriving encoding {camel}]
 
 type nft_activity_by_collection = {
-  nft_activity_by_collection_types : nft_activity_filter_item_type list;
+  nft_activity_by_collection_types : nft_activity_filter_all_type list;
   nft_activity_by_collection_contract : A.address;
 } [@@deriving encoding]
 
@@ -356,13 +339,12 @@ type nft_activity_filter =
   | ActivityFilterByUser of
       nft_activity_by_user [@kind_label "by_user"] [@kind "@type"]
   | ActivityFilterByItem of
-      nft_activity_by_item  [@kind_label "by_item"] [@kind "@type"]
+      nft_activity_by_item [@kind_label "by_item"] [@kind "@type"]
   | ActivityFilterByCollection of
       nft_activity_by_collection [@kind_label "by_collection"] [@kind "@type"]
 [@@deriving encoding]
 
 type nft_activity_elt = {
-  (* nft_activity_type : activity_type ; *)
   nft_activity_owner : A.address;
   nft_activity_contract : A.address ;
   nft_activity_token_id : A.big_integer ;
@@ -370,22 +352,22 @@ type nft_activity_elt = {
   nft_activity_transaction_hash : A.word ;
   nft_activity_block_hash : A.word ;
   nft_activity_block_number : A.block_number ;
-  nft_activity_log_index : int ;
 } [@@deriving encoding {camel}]
 
-type nft_activity_transfer = {
-  nft_activity_tranfer_elt : nft_activity_elt ; [@merge]
-  nft_activity_tranfer_from : A.address ;
-} [@@deriving encoding]
+type nft_activity_type =
+  | NftActivityMint [@kind_label "mint"] [@kind "@type"]
+  | NftActivityBurn [@kind_label "burn"] [@kind "@type"]
+  | NftActivityTransfer of (A.address [@wrap "transfer"]) [@kind_label "mint"] [@kind "@type"]
+[@@deriving encoding]
 
-type nft_activity =
-  | NftActivityMint of nft_activity_elt [@kind_label "mint"] [@kind "@type"]
-  | NftActivityBurn of nft_activity_elt [@kind_label "burn"] [@kind "@type"]
-  | NftActivityTransfer of nft_activity_transfer [@kind_label "mint"] [@kind "@type"]
+type nft_activity = {
+  nft_activity_elt : nft_activity_elt ;
+  nft_activity_type : nft_activity_type ;
+}
 [@@deriving encoding]
 
 type nft_activities = {
-  nft_activities_continuation : string ;
+  nft_activities_continuation : string option ;
   nft_activities_items : nft_activity list
 } [@@deriving encoding]
 
@@ -720,13 +702,13 @@ type order_activity_by_collection = {
 } [@@deriving encoding]
 
 type order_activity_filter =
-  | ActivityFilterAll of
+  | OrderActivityFilterAll of
       (order_activity_filter_all_type list [@wrap "types"]) [@kind_label "all"] [@kind "@type"]
-  | ActivityFilterByUser of
+  | OrderActivityFilterByUser of
       order_activity_by_user [@kind_label "by_user"] [@kind "@type"]
-  | ActivityFilterByItem of
+  | OrderActivityFilterByItem of
       order_activity_by_item  [@kind_label "by_item"] [@kind "@type"]
-  | ActivityFilterByCollection of
+  | OrderActivityFilterByCollection of
       order_activity_by_collection [@kind_label "by_collection"] [@kind "@type"]
 [@@deriving encoding]
 

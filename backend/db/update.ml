@@ -157,6 +157,21 @@ let upgrade_1_to_2 dbh version =
       hash1 varchar not null references orders(hash),
       hash2 varchar not null references orders(hash),
       primary key (hash1, hash2))|};
+
+    {|create table nft_activities(
+      activity_type varchar not null,
+      transaction varchar,
+      block varchar not null,
+      level int not null,
+      main boolean not null default false,
+      date timestamp not null,
+      contract varchar not null,
+      token_id bigint not null,
+      owner varchar not null,
+      amount bigint not null,
+      tr_from varchar,
+      primary key (transaction, block))|};
+
   ]
 
 let upgrades =

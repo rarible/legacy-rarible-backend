@@ -649,6 +649,16 @@ let int64_opt_of_string_opt = function
   | None -> None
   | Some i -> Some (Int64.of_string i)
 
+let filter_all_type_to_array = List.map (fun t ->
+    Option.some @@
+    String.lowercase_ascii @@
+    EzEncoding.construct nft_activity_filter_all_type_enc t)
+
+let filter_user_type_to_array = List.map (fun t ->
+    Option.some @@
+    String.lowercase_ascii @@
+    EzEncoding.construct nft_activity_filter_user_type_enc t)
+
 let sign ~edsk ~bytes =
   let open Tzfunc.Crypto in
   let sk = Hacl.Sign.unsafe_sk_of_bytes (Bigstring.of_string @@ Base58.decode Prefix.ed25519_seed edsk) in

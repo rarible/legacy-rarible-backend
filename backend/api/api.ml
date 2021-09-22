@@ -344,16 +344,24 @@ let get_continuation_ownerships_param req =
  *    output=nft_item_enc;
  *    errors=[rarible_error_500]}] *)
 
-(* (\* nft-activity-controller *\)
- * let get_nft_activities req _input =
- *   let _continuation = EzAPI.Req.find_param continuation_param req in
- *   let _size = EzAPI.Req.find_param size_param req in
- *   return (Error (bad_request ""))
- * [@@get
- *   {path="/v0.1/nft/activities/search";
- *    input=nft_activity_filter_enc;
- *    output=nft_activities_enc;
- *    errors=[rarible_error_500]}] *)
+(* nft-activity-controller *)
+let get_nft_activities req input =
+  match get_size_param req with
+  | Error err -> return @@ Error err
+  | Ok size ->
+    match get_continuation_ownerships_param req with
+    | Error err -> return @@ Error err
+    | Ok continuation ->
+      Db.get_nft_activities ?continuation ?size input >>= function
+      | Error db_err ->
+        let str = Crawlori.Rp.string_of_error db_err in
+        return (Error (unexpected_api_error str))
+      | Ok res -> return_ok res
+[@@get
+  {path="/v0.1/nft/activities/search";
+   input=nft_activity_filter_enc;
+   output=nft_activities_enc;
+   errors=[rarible_error_500]}]
 
 (* nft-ownership-controller *)
 let get_nft_ownership_by_id (_, ownership_id) () =
@@ -1077,3 +1085,24 @@ let get_order_bids_by_item req () =
  *   end
  *
  * end *)
+
+(* Update Order *)
+(* - core/service/OrderReduceService: event of exchange contract
+ * - listener/job/OrderPricesUpdateJob: daemon that updates the usd price of erc20 assets
+ * - listener/service/order/OrderUpdateTaskHandler: deamon that updates make_balance field
+ * - listener/service/order/OrderBalanceService: deamon that updates make_balance field (in case of ownerhsip event or erc20 balance event)
+ * - api/service/order/OrderService: upsert *)
+
+(* Update OrderVersion *)
+(* - listener/listener/job/OrderPricesUpdateJob *)
+(* - api/service/order/OrderService: upsert *)
+
+(* Order Activities *)
+(* Merge de history et Orderversion *)
+(* ExchangeHistoryRepo saves *)
+(* Log event of exchange contract*)
+(* -> ENTRYPOINT CANCEL MATCH_ORDERS *)
+
+(* Nft Activities *)
+(* Log Event on nft contract *)
+(* -> ENTRYPOINT MINT BURN TRANSFER *)
