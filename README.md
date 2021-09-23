@@ -124,3 +124,22 @@ Then you can deploy (which will compile again):
 We use [Crawlori](https://gitlab.com/functori/crawlori) to crawl the Tezos blockchain.
 [TODO]
 
+
+## Deployment
+
+The `deployment` directory allows to:
+- start/stop the crawler with systemd
+  (`deployment/systemd/rarible-crawler.service`) which will start the
+  crawler using the script `deployment/scripts/rarible-crawler.sh)
+- start/stop the API with systemd
+  (`deployment/systemd/rarible-api.service`) which will start the API
+  using the script `deployment/scripts/rarible-api.sh)
+- update and compile the project with the latest version of master
+  using `deployment/scripts/rarigle-git-update.sh`
+
+First you need to edit the `deployment/scripts/rarigle-env.sh` to
+setup the right pathes for different binaries and configuration files.
+
+Then you can either edit and copy the systemd file or make a symbolic
+link to these files. You can also use the bash scripts to start/stop
+the crawler without systemd.
