@@ -1,3 +1,5 @@
 export * from "./burn"
 export * from "./mint"
 export * from "./transfer"
+export * from "./fa2"
+export * from "./deploy"

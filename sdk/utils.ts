@@ -2,7 +2,7 @@ import { TezosToolkit, TransactionOperation, BigMapAbstraction, OpKind, BatchOpe
 import { Config } from "./config/type"
 import { MichelsonData, MichelsonType, packDataBytes } from "@taquito/michel-codec"
 
-export { TezosToolkit, TransactionOperation, BatchOperation, BigMapAbstraction } from "@taquito/taquito"
+export { TezosToolkit, TransactionOperation, BatchOperation, OriginationOperation, BigMapAbstraction } from "@taquito/taquito"
 export { MichelsonData, MichelsonType } from "@taquito/michel-codec"
 
 export interface Provider {
