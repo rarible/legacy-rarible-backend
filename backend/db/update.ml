@@ -104,7 +104,8 @@ let upgrade_1_to_2 dbh version =
       start_date timestamp,
       end_date timestamp,
       make_stock bigint not null,
-      cancelled boolean not null,
+      cancelled boolean not null default false,
+      applied boolean not null default false,
       salt varchar not null,
       signature varchar not null,
       created_at timestamp not null,
@@ -153,11 +154,6 @@ let upgrade_1_to_2 dbh version =
       take_value bigint not null,
       hash varchar not null references orders(hash) on delete cascade)|};
 
-    {|create table match_orders(
-      hash1 varchar not null references orders(hash),
-      hash2 varchar not null references orders(hash),
-      primary key (hash1, hash2))|};
-
     {|create table nft_activities(
       activity_type varchar not null,
       transaction varchar,
@@ -172,6 +168,18 @@ let upgrade_1_to_2 dbh version =
       tr_from varchar,
       primary key (transaction, block))|};
 
+    {|create table order_updates(
+      transaction varchar not null,
+      id varchar not null,
+      block varchar not null,
+      level int not null,
+      main boolean not null default false,
+      tsp timestamp not null,
+      source varchar not null,
+      cancel varchar,
+      hash_left varchar,
+      hash_right varchar,
+      primary key (transaction, id))|};
   ]
 
 let upgrades =

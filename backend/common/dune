@@ -8,5 +8,5 @@
 (library
  (name let)
  (package rarible)
- (modules utils let)
+ (modules parameters utils let)
  (libraries crawlori rtypes))

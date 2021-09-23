@@ -63,10 +63,9 @@ let set_account dbh addr ~block ~tsp ~level =
        values($addr, $block, $level, $tsp) on conflict do nothing"]
 
 let transaction_id op =
-  match op.bo_numbers, op.bo_nonce with
-  | Some n, _ -> Lwt.return_ok ("counter_" ^ Z.to_string n.counter)
-  | _, Some nonce -> Lwt.return_ok ("nonce_" ^ Int32.to_string nonce)
-  | _ -> Lwt.return_error (`hook_error "no counter or nonce in transaction")
+  match op.bo_nonce with
+  | None -> Z.to_string op.bo_counter
+  | Some nonce -> Z.to_string op.bo_counter ^ "_" ^ Int32.to_string nonce
 
 let insert_nft_activity dbh timestamp nft_activity =
   let act_type, act_from =
@@ -137,7 +136,7 @@ let insert_nft_activity_transfer dbh op kt1 source owner token_id amount =
   insert_nft_activity dbh op.bo_tsp nft_activity
 (* TODO : KAFKA *)
 
-let set_mint dbh op kt1 m =
+let set_mint dbh ~id op kt1 m =
   let meta = EzEncoding.construct token_metadata_enc m.mi_meta in
   let token_id = m.mi_op.tk_op.tk_token_id in
   let owner = m.mi_op.tk_owner in
@@ -148,7 +147,6 @@ let set_mint dbh op kt1 m =
        ${op.bo_tsp}, $owner, 0, $meta, ${op.bo_hash}, 0) on conflict do nothing"] in
   let>? () = set_account dbh owner ~block:op.bo_block ~level:op.bo_level ~tsp:op.bo_tsp in
   let mint = EzEncoding.construct token_op_owner_enc m.mi_op in
-  let>? id = transaction_id op in
   let>? () = [%pgsql dbh
       "insert into contract_updates(transaction, id, block, level, tsp, \
        contract, mint) \
@@ -157,9 +155,8 @@ let set_mint dbh op kt1 m =
        on conflict do nothing"] in
   insert_nft_activity_mint dbh op kt1 m.mi_op
 
-let set_burn dbh op tr m =
+let set_burn dbh ~id op tr m =
   let burn = EzEncoding.construct token_op_owner_enc m in
-  let>? id = transaction_id op in
   let>? () = [%pgsql dbh
       "insert into contract_updates(transaction, id, block, level, tsp, \
        contract, burn) \
@@ -168,8 +165,7 @@ let set_burn dbh op tr m =
        on conflict do nothing"] in
   insert_nft_activity_burn dbh op tr.destination m
 
-let set_transfer dbh op tr lt =
-  let>? id = transaction_id op in
+let set_transfer dbh ~id op tr lt =
   let kt1 = tr.destination in
   let|>? () = iter_rp (fun {tr_source; tr_txs} ->
       let|>? () = iter_rp (fun {tr_destination; tr_token_id; tr_amount} ->
@@ -191,8 +187,7 @@ let set_transfer dbh op tr lt =
       ()) lt in
   ()
 
-let set_update dbh op tr lt =
-  let>? id = transaction_id op in
+let set_update dbh ~id op tr lt =
   let kt1 = tr.destination in
   iter_rp (fun {op_owner; op_operator; op_token_id; op_add} ->
       let>? () = [%pgsql dbh
@@ -203,8 +198,7 @@ let set_update dbh op tr lt =
            $kt1, $op_token_id) on conflict do nothing"] in
       set_account dbh op_operator ~block:op.bo_block ~level:op.bo_level ~tsp:op.bo_tsp) lt
 
-let set_update_all dbh op tr lt =
-  let>? id = transaction_id op in
+let set_update_all dbh ~id op tr lt =
   let kt1 = tr.destination in
   let source = op.bo_op.source in
   iter_rp (fun (operator, add) ->
@@ -215,8 +209,7 @@ let set_update_all dbh op tr lt =
            ${op.bo_tsp}, $source, $operator, $add, $kt1) on conflict do nothing"] in
       set_account dbh operator ~block:op.bo_block ~level:op.bo_level ~tsp:op.bo_tsp) lt
 
-let set_uri dbh op tr s =
-  let>? id = transaction_id op in
+let set_uri dbh ~id op tr s =
   [%pgsql dbh
       "insert into contract_updates(transaction, id, block, level, tsp, \
        contract, uri) \
@@ -224,9 +217,8 @@ let set_uri dbh op tr s =
        ${op.bo_tsp}, ${tr.destination}, $s) \
        on conflict do nothing"]
 
-let set_metadata dbh op tr (token_id, l) =
+let set_metadata dbh ~id op tr (token_id, l) =
   let meta = EzEncoding.construct token_metadata_enc l in
-  let>? id = transaction_id op in
   let source = op.bo_op.source in
   let kt1 = tr.destination in
   [%pgsql dbh
@@ -236,9 +228,8 @@ let set_metadata dbh op tr (token_id, l) =
        ${op.bo_tsp}, $source, $token_id, $kt1, $meta) \
        on conflict do nothing"]
 
-let set_royalties dbh op roy =
+let set_royalties dbh ~id op roy =
   let royalties = EzEncoding.(construct token_royalties_enc roy.roy_royalties) in
-  let>? id = transaction_id op in
   let source = op.bo_op.source in
   [%pgsql dbh
       "insert into token_updates(transaction, id, block, level, tsp, \
@@ -247,28 +238,69 @@ let set_royalties dbh op roy =
        ${op.bo_tsp}, $source, ${roy.roy_token_id}, ${roy.roy_contract}, $royalties) \
        on conflict do nothing"]
 
-let set_transaction config dbh op tr =
+let set_cancel dbh ~id op hash =
+  let source = op.bo_op.source in
+  [%pgsql dbh
+      "insert into order_updates(transaction, id, block, level, tsp, source, cancel) \
+       values(${op.bo_hash}, $id, ${op.bo_block}, ${op.bo_level}, \
+       ${op.bo_tsp}, $source, $hash) \
+       on conflict do nothing"]
+
+let set_do_transfers dbh ~id op ~left ~right =
+  let source = op.bo_op.source in
+  [%pgsql dbh
+      "insert into order_updates(transaction, id, block, level, tsp, source, \
+       hash_left, hash_right) \
+       values(${op.bo_hash}, $id, ${op.bo_block}, ${op.bo_level}, \
+       ${op.bo_tsp}, $source, $left, $right) \
+       on conflict do nothing"]
+
+let set_transaction config dbh ~id op tr =
   match tr.parameters with
   | None | Some { value = Other _; _ } | Some { value = Bytes _; _ } -> Lwt.return_ok ()
   | Some {entrypoint; value = Micheline m} ->
     if tr.destination = config.Crawlori.Config.extra.royalties then (* royalties *)
-      match Utils.parse_royalties entrypoint m with
-      | Ok roy -> set_royalties dbh op roy
+      match Parameters.parse_royalties entrypoint m with
+      | Ok roy ->
+        Format.printf "\027[0;35mset royalties %s %s\027[0m@." (short op.bo_hash) id;
+        set_royalties dbh ~id op roy
       | _ -> Lwt.return_ok ()
     else if tr.destination = config.Crawlori.Config.extra.exchange_v2 then (* exchange_v2 *)
-      (* todo : match order *)
-      Lwt.return_ok ()
-    else (* nft *)
-      begin match Utils.parse_nft entrypoint m with
-        | Ok (Mint_tokens m) -> set_mint dbh op tr.destination m
-        | Ok (Burn_tokens b) -> set_burn dbh op tr b
-        | Ok (Transfers t) -> set_transfer dbh op tr t
-        | Ok (Operator_updates t) -> set_update dbh op tr t
-        | Ok (Operator_updates_all t) -> set_update_all dbh op tr t
-        | Ok (Metadata_uri s) -> set_uri dbh op tr s
-        | Ok (Token_metadata x) -> set_metadata dbh op tr x
-        | Error _ ->
+      begin match Parameters.parse_exchange entrypoint m with
+        | Ok (Cancel hash) ->
+          Format.printf "\027[0;35mcancel order %s %s %s\027[0m@." (short op.bo_hash) id hash;
+          set_cancel dbh ~id op hash
+        | Ok (DoTransfers {left; right}) ->
+          Format.printf "\027[0;35mapply orders %s %s %s %s\027[0m@." (short op.bo_hash) id left right;
+          set_do_transfers dbh ~id op ~left ~right
+        | _ ->
+          (* todo : match order *)
           Lwt.return_ok ()
+      end
+    else (* nft *)
+      begin match Parameters.parse_nft entrypoint m with
+        | Ok (Mint_tokens m) ->
+          Format.printf "\027[0;35mmint %s %s %s\027[0m@." (short op.bo_hash) id (short tr.destination);
+          set_mint dbh ~id op tr.destination m
+        | Ok (Burn_tokens b) ->
+          Format.printf "\027[0;35mburn %s %s %s\027[0m@." (short op.bo_hash) id (short tr.destination);
+          set_burn dbh ~id op tr b
+        | Ok (Transfers t) ->
+          Format.printf "\027[0;35mtransfer %s %s %s\027[0m@." (short op.bo_hash) id (short tr.destination);
+          set_transfer dbh ~id op tr t
+        | Ok (Operator_updates t) ->
+          Format.printf "\027[0;35mupdate operator %s %s %s\027[0m@." (short op.bo_hash) id (short tr.destination);
+          set_update dbh ~id op tr t
+        | Ok (Operator_updates_all t) ->
+          Format.printf "\027[0;35mupdate operator all %s %s %s\027[0m@." (short op.bo_hash) id (short tr.destination);
+          set_update_all dbh ~id op tr t
+        | Ok (Metadata_uri s) ->
+          Format.printf "\027[0;35mset uri %s %s %s\027[0m@." (short op.bo_hash) id (short tr.destination);
+          set_uri dbh ~id op tr s
+        | Ok (Token_metadata x) ->
+          Format.printf "\027[0;35mset metadata %s %s %s\027[0m@." (short op.bo_hash) id (short tr.destination);
+          set_metadata dbh ~id op tr x
+        | Error _ -> Lwt.return_ok ()
       end
 
 let filter_contracts dbh ori =
@@ -303,8 +335,9 @@ let set_origination config dbh op ori =
 
 let set_operation config dbh op =
   let open Hooks in
+  let id = transaction_id op in
   match op.bo_op.kind with
-  | Transaction tr -> set_transaction config dbh op tr
+  | Transaction tr -> set_transaction config dbh ~id op tr
   (* | Origination ori -> set_origination config dbh op ori *)
   | _ -> Lwt.return_ok ()
 
@@ -317,7 +350,8 @@ let set_block config dbh b =
               bo_tsp = b.header.shell.timestamp; bo_hash = op.op_hash;
               bo_op = c.man_info;
               bo_meta = Option.map (fun m -> m.man_operation_result) c.man_metadata;
-              bo_numbers = Some c.man_numbers; bo_nonce = None } in
+              bo_numbers = Some c.man_numbers; bo_nonce = None;
+              bo_counter = c.man_numbers.counter } in
             set_origination config dbh op ori
           | _ -> Lwt.return_ok ()
         ) op.op_contents
@@ -457,6 +491,16 @@ let token_updates dbh main l =
         else Lwt.return_ok ()
       | _ -> Lwt.return_error (`hook_error "invalid token_update")) l
 
+let order_updates dbh main l =
+  iter_rp (fun r -> match r#cancel, r#hash_left, r#hash_right with
+      | Some hash, _, _ ->
+        [%pgsql dbh "update orders set cancelled = $main where hash = $hash"]
+      | _, Some left, Some right ->
+        let>? () = [%pgsql dbh "update orders set applied = $main where hash = $left"] in
+        [%pgsql dbh "update orders set applied = $main where hash = $right"]
+      | _ ->
+        Lwt.return_error (`hook_error "invalid token_update")) l
+
 
 let set_main _config dbh {Hooks.m_main; m_hash} =
   use (Some dbh) @@ fun dbh ->
@@ -466,8 +510,11 @@ let set_main _config dbh {Hooks.m_main; m_hash} =
   let>? () = [%pgsql dbh "update nft_activities set main = $m_main where block = $m_hash"] in
   let>? t_updates = [%pgsql.object dbh "update token_updates set main = $m_main where block = $m_hash returning *"] in
   let>? c_updates = [%pgsql.object dbh "update contract_updates set main = $m_main where block = $m_hash returning *"] in
+  let>? o_updates = [%pgsql.object dbh "update order_updates set main = $m_main where block = $m_hash returning *"] in
   let>? () = contract_updates dbh m_main c_updates in
-  token_updates dbh m_main t_updates
+  let>? () = token_updates dbh m_main t_updates in
+  let>? () = order_updates dbh m_main o_updates in
+  Lwt.return_ok ()
 
 let to_parts l =
   List.map (fun (part_account, v) -> {

@@ -83,6 +83,7 @@ type set_royalties = {
   roy_royalties: token_royalties;
 } [@@deriving encoding]
 
+
 module A = struct
   let big_integer_enc =
     let open Json_encoding in
@@ -852,3 +853,7 @@ type signature_form = {
 } [@@deriving encoding]
 
 type fee_side = FeeSideMake | FeeSideTake
+
+type exchange_param =
+  | Cancel of string
+  | DoTransfers of {left: string; right: string}
