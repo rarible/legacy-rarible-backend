@@ -19,6 +19,8 @@ rarible_compile () {
     $ROTATE $LOGFILE
     cd $WORKING_DIRECTORY
     $MAKE clean
+    $MAKE deps
+    opam upgrade ez_pgocaml ez_api digestif hacl ppx_deriving_encoding ppx_deriving_jsoo tzfunc crawlori
     $MAKE &> $LOGFILE
     echo $! > $PIDFILE
 }
