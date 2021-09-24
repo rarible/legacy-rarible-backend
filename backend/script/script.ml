@@ -185,6 +185,22 @@ let update_operators_for_all l =
       Format.sprintf "%s %S"
         (if add then "Left" else "Right") operator) l
 
+let set_token_metadata id l =
+  Format.sprintf "Pair %Ld %s" id @@ String.concat "; " @@
+  List.map (fun (k, v) -> Format.sprintf "Elt %S %S" k v) l
+
+let hex s =
+  let shift i =
+    if i < 10 then Char.chr @@ i + 48
+    else Char.chr @@ i + 87 in
+  String.init (2 * String.length s) (fun i ->
+      let pos = i / 2 in
+      if i mod 2 = 0 then shift @@ Char.code (String.get s pos) / 16
+      else shift @@ (Char.code (String.get s pos)) mod 16)
+
+let set_metadata_uri s =
+  Format.sprintf "0x%s" (hex s)
+
 (** entrypoints *)
 
 let mint_tokens id owner amount l =
@@ -229,6 +245,16 @@ let update_operators_for_all l =
       String.sub s 1 (String.length s - 1), add) l in
   call ~entrypoint:"update_operators_for_all" @@ update_operators_for_all l
 
+let set_token_metadata id l =
+  let l = List.filter_map (fun s ->
+      match String.index_opt s '=' with
+      | None -> None
+      | Some i -> Some (String.sub s 0 i, String.sub s (i+1) (String.length s - i - 1))) l in
+  call ~entrypoint:"setTokenMetadata" @@ set_token_metadata (Int64.of_string id) l
+
+let set_metadata_uri s =
+  call ~entrypoint:"setMetadataUri" @@ set_metadata_uri s
+
 (** main *)
 
 let actions = [
@@ -246,6 +272,8 @@ let actions = [
   ["transfer (<source> (<token_id>\\*<amount>?=<destination>)*)*"], "transfer tokens";
   ["update_operators (<token_id>=<owner>< + | - ><operator>)*"], "update operators";
   ["update_operators_for_all (< + | - ><operator>)*"], "update operators for all token_ids";
+  ["set_token_metadata <token_id> (<key>=<value>)*"], "set token metadata";
+  ["set_metadata_uri <string>"], "set metadata uri";
 ]
 
 let usage =
@@ -278,6 +306,8 @@ let main () =
     | "transfer" :: l -> transfer l
     | "update_operators" :: l -> update_operators l
     | "update_operators_for_all" :: l -> update_operators_for_all l
+    | "set_token_metadata" :: id :: l -> set_token_metadata id l
+    | "set_metadata_uri" :: [ s ] -> set_metadata_uri s
     | "owners" :: bm_id :: l -> owners bm_id l
     | _ -> Arg.usage spec usage; None in
   match cmd with
