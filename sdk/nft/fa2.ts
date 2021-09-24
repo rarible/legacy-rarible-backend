@@ -34,7 +34,7 @@ export const code : any =
                          },
                          {  "prim": "pair",
                             "args": [
-                              {  "prim": "set",
+                              {  "prim": "big_map",
                                  "args": [
                                    {  "prim": "pair",
                                       "args": [
@@ -46,7 +46,8 @@ export const code : any =
                                            ]
                                         }
                                       ]
-                                   }
+                                   },
+                                   {  "prim": "unit"  }
                                  ]
                                  ,
                                  "annots": [
@@ -55,14 +56,15 @@ export const code : any =
                               },
                               {  "prim": "pair",
                                  "args": [
-                                   {  "prim": "set",
+                                   {  "prim": "big_map",
                                       "args": [
                                         {  "prim": "pair",
                                            "args": [
                                              {  "prim": "address"  },
                                              {  "prim": "address"  }
                                            ]
-                                        }
+                                        },
+                                        {  "prim": "unit"  }
                                       ]
                                       ,
                                       "annots": [
@@ -811,10 +813,11 @@ export const code : any =
                                            },
                                            {  "prim": "PUSH",
                                               "args": [
-                                                {  "prim": "bool"  },
-                                                {  "prim": "True"  }
+                                                {  "prim": "unit"  },
+                                                {  "prim": "Unit"  }
                                               ]
                                            },
+                                           {  "prim": "SOME"  },
                                            {  "prim": "DIG",
                                               "args": [
                                                 {  "int": "2"  }
@@ -952,10 +955,9 @@ export const code : any =
                                            {  "int": "7"  }
                                          ]
                                       },
-                                      {  "prim": "PUSH",
+                                      {  "prim": "NONE",
                                          "args": [
-                                           {  "prim": "bool"  },
-                                           {  "prim": "False"  }
+                                           {  "prim": "unit"  }
                                          ]
                                       },
                                       {  "prim": "DIG",
@@ -1128,10 +1130,11 @@ export const code : any =
                                            },
                                            {  "prim": "PUSH",
                                               "args": [
-                                                {  "prim": "bool"  },
-                                                {  "prim": "True"  }
+                                                {  "prim": "unit"  },
+                                                {  "prim": "Unit"  }
                                               ]
                                            },
+                                           {  "prim": "SOME"  },
                                            {  "prim": "SOURCE"  },
                                            {  "prim": "DIG",
                                               "args": [
@@ -1184,10 +1187,9 @@ export const code : any =
                                            {  "int": "6"  }
                                          ]
                                       },
-                                      {  "prim": "PUSH",
+                                      {  "prim": "NONE",
                                          "args": [
-                                           {  "prim": "bool"  },
-                                           {  "prim": "False"  }
+                                           {  "prim": "unit"  }
                                          ]
                                       },
                                       {  "prim": "SOURCE"  },
@@ -3003,15 +3005,15 @@ export const code : any =
           ]
        }  ]
      ]
-  }  ];
+  }  ]
 
-export function make_storage(owner: string, royaltiesContract: string) : any {
+export function make_storage(owner: string, royalties_contract: string) : any {
   return {  "prim": "Pair",
             "args": [
               {  "string": owner  },
               {  "prim": "Pair",
                  "args": [
-                   {  "string": royaltiesContract  },
+                   {  "string": royalties_contract  },
                    {  "prim": "Pair",
                       "args": [
                         [    ],
