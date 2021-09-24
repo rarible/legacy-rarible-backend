@@ -146,7 +146,7 @@ let get_required_owner_param req =
     try
       match Tzfunc.Binary.Writer.contract o with
       | Error _ -> mk_invalid_argument owner_param "must be a pkh"
-      | Ok o -> Ok o
+      | Ok _o -> Ok o
     with _ ->
       mk_invalid_argument owner_param "must be a pkh"
 
@@ -192,9 +192,8 @@ let parse_item_id s =
     let l = String.split_on_char ':' s in
     match l with
     | c :: tid :: [] ->
-      Ok
-        (Base58.decode Prefix.contract_public_key_hash c,
-         Int64.(to_string @@ of_string tid))
+      ignore @@ Base58.decode Prefix.contract_public_key_hash c ;
+      Ok (c, Int64.(to_string @@ of_string tid))
     | _ ->
       Error (invalid_argument "itemId must be in format contract:token_id")
   with _ ->
@@ -228,14 +227,15 @@ let get_required_creator_param req =
     try
       match Tzfunc.Binary.Writer.contract o with
       | Error _ -> mk_invalid_argument param "must be a pkh"
-      | Ok o -> Ok o
+      | Ok _o -> Ok o
     with _ ->
       mk_invalid_argument param "must be a pkh"
 
 let parse_collection_id s =
   let open Tzfunc.Crypto in
   try
-    Ok (Base58.decode Prefix.contract_public_key_hash s)
+    ignore @@ Base58.decode Prefix.contract_public_key_hash s ;
+    Ok s
   with _ ->
     Error (invalid_argument  "collection must be a tezos smart contract address")
 
@@ -256,10 +256,9 @@ let parse_ownership_id s =
     let l = String.split_on_char ':' s in
     match l with
     | c :: tid :: owner :: [] ->
-      Ok
-        (Base58.decode Prefix.contract_public_key_hash c,
-         Int64.(to_string @@ of_string tid),
-         Base58.decode Prefix.contract_public_key_hash owner)
+      ignore @@ Base58.decode Prefix.contract_public_key_hash c ;
+      ignore @@ Base58.decode Prefix.contract_public_key_hash owner ;
+      Ok (c, Int64.(to_string @@ of_string tid), owner)
     | _ ->
       Error (invalid_argument "itemId must be in format contract:token_id:owner")
   with _ ->
@@ -359,6 +358,7 @@ let get_nft_activities req input =
       | Ok res -> return_ok res
 [@@get
   {path="/v0.1/nft/activities/search";
+   params=[size_param;continuation_param];
    input=nft_activity_filter_enc;
    output=nft_activities_enc;
    errors=[rarible_error_500]}]
@@ -398,6 +398,7 @@ let get_nft_ownerships_by_item req () =
           | Ok res -> return_ok res
 [@@get
   {path="/v0.1/ownerships/byItem";
+   params=[contract_param;token_id_param;size_param;continuation_param];
    output=nft_ownerships_enc;
    errors=[rarible_error_500]}]
 
@@ -415,6 +416,7 @@ let get_nft_all_ownerships req () =
       | Ok res -> return_ok res
 [@@get
   {path="/v0.1/ownerships/all";
+   params=[size_param;continuation_param];
    output=nft_ownerships_enc;
    errors=[rarible_error_500]}]
 
@@ -454,6 +456,7 @@ let get_nft_item_by_id (req, item_id) () =
       | Ok res -> return_ok res
 [@@get
   {path="/v0.1/items/byId/{itemId:string}";
+   params=[include_meta_param];
    output=nft_item_enc;
    errors=[rarible_error_500]}]
 (* TODO path="/v0.1/items/{itemId:string}" *)
@@ -478,6 +481,7 @@ let get_nft_items_by_owner req () =
           | Ok res -> return_ok res
 [@@get
   {path="/v0.1/items/byOwner";
+   params=[owner_param;include_meta_param;size_param;continuation_param];
    output=nft_items_enc;
    errors=[rarible_error_500]}]
 
@@ -501,6 +505,7 @@ let get_nft_items_by_creator req () =
           | Ok res -> return_ok res
 [@@get
   {path="/v0.1/items/byCreator";
+   params=[creator_param;include_meta_param;size_param;continuation_param];
    output=nft_items_enc;
    errors=[rarible_error_500]}]
 
@@ -524,6 +529,7 @@ let get_nft_items_by_collection req () =
           | Ok res -> return_ok res
 [@@get
   {path="/v0.1/items/byCollection";
+   params=[collection_param;include_meta_param;size_param;continuation_param];
    output=nft_items_enc;
    errors=[rarible_error_500]}]
 
@@ -560,6 +566,8 @@ let get_nft_all_items req () =
               | Ok res -> return_ok res
 [@@get
   {path="/v0.1/items/all";
+   params=[last_updated_from_param;last_updated_to_param;show_deleted_param;
+           include_meta_param;size_param;continuation_param];
    output=nft_items_enc;
    errors=[rarible_error_500]}]
 
@@ -603,13 +611,14 @@ let search_nft_collections_by_owner req () =
       match get_continuation_collections_param req with
       | Error err -> return @@ Error err
       | Ok continuation ->
-        Db.get_nft_collections_by_owner ?continuation ?size owner >>= function
+        Db.search_nft_collections_by_owner ?continuation ?size owner >>= function
         | Error db_err ->
           let str = Crawlori.Rp.string_of_error db_err in
           return (Error (unexpected_api_error str))
         | Ok res -> return_ok res
 [@@get
   {path="/v0.1/collections/byOwner";
+   params=[owner_param;size_param;continuation_param];
    output=nft_collections_enc;
    errors=[rarible_error_500]}]
 
@@ -627,6 +636,7 @@ let search_nft_all_collections req () =
       | Ok res -> return_ok res
 [@@get
   {path="/v0.1/collections/all";
+   params=[size_param;continuation_param];
    output=nft_collections_enc;
    errors=[rarible_error_500]}]
 
@@ -792,6 +802,7 @@ let get_orders_all req () =
         | Ok res -> return_ok res
 [@@get
   {path="/v0.1/orders/all";
+   params=[origin_param;size_param;continuation_param];
    output=orders_pagination_enc;
    errors=[rarible_error_500]}]
 
@@ -846,6 +857,7 @@ let get_sell_orders_by_maker req () =
           | Ok res -> return_ok res
 [@@get
   {path="/v0.1/orders/sell/byMaker";
+   params=[maker_param;origin_param;size_param;continuation_param];
    output=orders_pagination_enc;
    errors=[rarible_error_500]}]
 
@@ -878,6 +890,8 @@ let get_sell_orders_by_item req () =
                 | Ok res -> return_ok res
 [@@get
   {path="/v0.1/orders/sell/byItem";
+   params=[contract_param;token_id_param;maker_param;origin_param;
+           size_param;continuation_param];
    output=orders_pagination_enc;
    errors=[rarible_error_500]}]
 
@@ -904,6 +918,7 @@ let get_sell_orders_by_collection req () =
           | Ok res -> return_ok res
 [@@get
   {path="/v0.1/orders/sell/byCollection";
+   params=[collection_param;origin_param;size_param;continuation_param];
    output=orders_pagination_enc;
    errors=[rarible_error_500]}]
 
@@ -926,6 +941,7 @@ let get_sell_orders req () =
         | Ok res -> return_ok res
 [@@get
   {path="/v0.1/orders/sell";
+   params=[origin_param;size_param;continuation_param];
    output=orders_pagination_enc;
    errors=[rarible_error_500]}]
 
@@ -951,6 +967,7 @@ let get_order_bids_by_maker req () =
           | Ok res -> return_ok res
 [@@get
   {path="/v0.1/orders/bids/byMaker";
+   params=[maker_param;origin_param;size_param;continuation_param];
    output=orders_pagination_enc;
    errors=[rarible_error_500]}]
 
@@ -983,6 +1000,8 @@ let get_order_bids_by_item req () =
                 | Ok res -> return_ok res
 [@@get
   {path="/v0.1/orders/bids/byItem";
+   params=[contract_param;token_id_param;maker_param;origin_param;
+           size_param;continuation_param];
    output=orders_pagination_enc;
    errors=[rarible_error_500]}]
 

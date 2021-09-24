@@ -77,25 +77,41 @@ let storage_validator ~exchange ~royalties =
 let compile_contract filename =
   Filename.quote_command "completium-cli" [ "generate"; "michelson"; filename ]
 
-let deploy ~filename storage = match !source, !contract with
-  | Some source, Some contract ->
-    let dry_run = if !dry_run then [ "--dry-run" ] else [] in
+let deploy_aux
+    ?(dry_run=false) ?(burn_cap=2.5) ?fee ?(verbose=0) ?endpoint
+    ~filename storage source contract =
+    let dry_run = if dry_run then [ "--dry-run" ] else [] in
     let mich = match Filename.extension filename with
       | ".tz" -> filename
       | ".arl" -> command_result ~f:(String.concat "\n") @@ compile_contract filename
       | _ -> failwith (Format.sprintf "extension of %S not handled" filename) in
-    let fee = match !fee with None -> [] | Some f -> [ "--fee"; Format.sprintf "%F" f ] in
-    let log = if !verbose > 1 then ["-l"] else [] in
-    let endpoint = match !endpoint with None -> [] | Some e -> [ "-E"; e ] in
+    let fee = match fee with None -> [] | Some f -> [ "--fee"; Format.sprintf "%F" f ] in
+    let log = if verbose > 1 then ["-l"] else [] in
+    let endpoint = match endpoint with None -> [] | Some e -> [ "-E"; e ] in
     let s = Filename.quote_command !client ( endpoint @ [
         "originate"; "contract"; contract; "transferring"; "0";
         "from"; source; "running"; mich; "--init"; storage; "--burn-cap";
-        Format.sprintf "%F" !burn_cap] @ fee @ log @ dry_run) in
-    if !verbose > 0 then Format.printf "Command:\n%s@." s;
-    Some s
+        Format.sprintf "%F" burn_cap] @ fee @ log @ dry_run) in
+    if verbose > 0 then Format.printf "Command:\n%s@." s;
+    s
+
+let deploy ~filename storage = match !source, !contract with
+  | Some source, Some contract ->
+    Some
+      (deploy_aux
+         ~dry_run:!dry_run ~burn_cap:!burn_cap
+         ?fee:!fee ~verbose:!verbose ?endpoint:!endpoint
+         ~filename storage source contract)
   | source, contract ->
     missing ["--source", source; "--contract", contract ];
     None
+
+let import_key ?(verbose=0) alias sk =
+  let sk = Printf.sprintf "unencrypted:%s" sk in
+  let s =
+    Filename.quote_command !client  (["import"; "secret"; "key"; alias; sk]) in
+  if verbose > 0 then Format.printf "Command:\n%s@." s;
+  s
 
 let get_storage () = match !contract with
   | Some contract ->
@@ -146,6 +162,21 @@ let call ~entrypoint param = match !source, !contract with
     if !verbose > 0 then Format.printf "Command:\n%s@." s;
     Some s
   | src, contract -> missing [ "--source", src; "--contract", contract ]; None
+
+let call_aux
+    ?(dry_run=false) ?(burn_cap=2.5) ?fee ?(verbose=0) ?endpoint
+    ~entrypoint ~param source contract =
+  let fee = match fee with None -> [] | Some f -> [ "--fee"; Format.sprintf "%F" f ] in
+  let log = if verbose > 1 then ["-l"] else [] in
+  let dry_run = if dry_run then [ "--dry-run" ] else [] in
+  let endpoint = match endpoint with None -> [] | Some e -> [ "-E"; e ] in
+  let s = Filename.quote_command !client (endpoint @ [
+      "call"; contract; "from"; source;
+      "--entrypoint"; entrypoint;
+      "--arg"; param; "--burn-cap";
+      Format.sprintf "%F" burn_cap ] @ fee @ log @ dry_run) in
+  if verbose > 0 then Format.printf "Command:\n%s@." s;
+  s
 
 let owner bm_id token_id =
   command_result @@ get_bigmap_value bm_id token_id "nat"
@@ -203,6 +234,11 @@ let set_metadata_uri s =
 
 (** entrypoints *)
 
+let mint_tokens_aux ?endpoint id owner amount royalties source contract =
+  let param =
+    mint_tokens ~id:(Int64.of_string id) ~owner ~amount:(Int64.of_string amount) royalties in
+  call_aux ?endpoint ~entrypoint:"mint" ~param source contract
+
 let mint_tokens id owner amount l =
   let l = List.fold_left (fun acc s ->
       match String.split_on_char '=' s with
@@ -211,9 +247,28 @@ let mint_tokens id owner amount l =
   call ~entrypoint:"mint" @@
   mint_tokens ~id:(Int64.of_string id) ~owner ~amount:(Int64.of_string amount) l
 
+let burn_tokens_aux ?endpoint id amount source contract =
+  let param =
+    burn_tokens ~id:(Int64.of_string id) ~owner:source ~amount:(Int64.of_string amount) in
+  call_aux ?endpoint ~entrypoint:"burn" ~param source contract
+
 let burn_tokens id owner amount =
   call ~entrypoint:"burn" @@
   burn_tokens ~id:(Int64.of_string id) ~owner ~amount:(Int64.of_string amount)
+
+let transfer_aux ?endpoint l source contract =
+  let l = List.fold_left (fun acc s ->
+      match acc, String.split_on_char '=' s with
+      | (src, l) :: t, [ id; dst ] ->
+        begin match String.split_on_char '*' id with
+          | [ id; amount ] ->
+            (src, l @ [ Int64.of_string id, Int64.of_string amount, dst ]) :: t
+          | _ ->
+            (src, l @ [ Int64.of_string id, 1L, dst ]) :: t
+        end
+      | _ -> (s, []) :: acc) [] l in
+  let param = transfer (List.rev l) in
+  call_aux ?endpoint ~entrypoint:"transfer" ~param source contract
 
 let transfer l =
   let l = List.fold_left (fun acc s ->

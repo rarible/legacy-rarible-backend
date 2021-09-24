@@ -36,9 +36,16 @@ let get_extra_config ?dbh () =
 
 let update_extra_config ?dbh e =
   use dbh @@ fun dbh ->
-  [%pgsql dbh
-      "update state set exchange_v2_contract = ${e.exchange_v2}, \
-       royalties_contract = ${e.royalties}, validator_contract = ${e.validator}"]
+  let>? r = [%pgsql.object dbh "select * from state"] in
+  match r with
+  | [] ->
+    [%pgsql dbh
+        "insert into state(exchange_v2_contract, royalties_contract, validator_contract) \
+         values (${e.exchange_v2}, ${e.royalties}, ${e.validator})"]
+  | _ ->
+    [%pgsql dbh
+        "update state set exchange_v2_contract = ${e.exchange_v2}, \
+         royalties_contract = ${e.royalties}, validator_contract = ${e.validator}"]
 
 let insert_fake ?dbh address =
   use dbh @@ fun dbh ->
@@ -310,9 +317,9 @@ let filter_contracts dbh ori =
     let open Utils in
     if match_entrypoints (fa2_entrypoints @ fa2_ext_entrypoints) ori.script.code then
       match match_fields [ "ledger"; "owner"; "royaltiesContract" ] ori.script with
-      | Ok [ Some (Mint ledger_id); Some (Mstring owner); Some (Mstring royalties_contract) ] ->
+      | Ok [ Some _; Some (Mstring owner); Some (Mstring royalties_contract) ] ->
         if r#royalties_contract = royalties_contract then
-          Some (`nft (owner, (Z.to_int64 ledger_id)))
+          Some (`nft (owner, (Z.to_int64 Z.zero)))
         else None
       | _ -> None
     else None
@@ -695,14 +702,14 @@ let get_nft_items_by_owner ?dbh ?include_meta ?continuation ?(size=50) owner =
     | [ None ] -> Lwt.return_ok 0L
     | [ Some i64 ] -> Lwt.return_ok i64
     | _ -> Lwt.return_error (`hook_error "count with more then one row") in
-  map_rp (fun r -> mk_nft_item ?include_meta r) l >>=? fun nft_items ->
-  let len = List.length nft_items in
+  map_rp (fun r -> mk_nft_item ?include_meta r) l >>=? fun nft_items_items ->
+  let len = List.length nft_items_items in
   let nft_items_continuation =
     if len <> size then None
     else Some
-        (mk_nft_items_continuation @@ List.hd (List.rev nft_items)) in
+        (mk_nft_items_continuation @@ List.hd (List.rev nft_items_items)) in
   Lwt.return_ok
-    { nft_items ; nft_items_continuation ; nft_items_total }
+    { nft_items_items ; nft_items_continuation ; nft_items_total }
 
 let get_nft_items_by_creator ?dbh ?include_meta ?continuation ?(size=50) creator =
   Format.eprintf "get_nft_items_by_creator %s %s %s %d@."
@@ -734,14 +741,14 @@ let get_nft_items_by_creator ?dbh ?include_meta ?continuation ?(size=50) creator
     | [ None ] -> Lwt.return_ok 0L
     | [ Some i64 ] -> Lwt.return_ok i64
     | _ -> Lwt.return_error (`hook_error "count with more then one row") in
-  map_rp (fun r -> mk_nft_item ?include_meta r) l >>=? fun nft_items ->
-  let len = List.length nft_items in
+  map_rp (fun r -> mk_nft_item ?include_meta r) l >>=? fun nft_items_items ->
+  let len = List.length nft_items_items in
   let nft_items_continuation =
     if len <> size then None
     else Some
-        (mk_nft_items_continuation @@ List.hd (List.rev nft_items)) in
+        (mk_nft_items_continuation @@ List.hd (List.rev nft_items_items)) in
   Lwt.return_ok
-    { nft_items ; nft_items_continuation ; nft_items_total }
+    { nft_items_items ; nft_items_continuation ; nft_items_total }
 
 let get_nft_item_by_id ?dbh ?include_meta contract token_id =
   Format.eprintf "get_nft_item_by_id %s %s %s@."
@@ -755,9 +762,11 @@ let get_nft_item_by_id ?dbh ?include_meta contract token_id =
        last, amount, supply, metadata \
        from tokens where \
        main and contract = $contract and token_id = $id64"] in
-  let>? obj = one l in
-  let>? nft_item = mk_nft_item ?include_meta obj in
-  Lwt.return_ok nft_item
+  match l with
+  | obj :: _ ->
+    let>? nft_item = mk_nft_item ?include_meta obj in
+    Lwt.return_ok nft_item
+  | [] -> Lwt.return_error (`hook_error "nft_item not found")
 
 let get_nft_items_by_collection ?dbh ?include_meta ?continuation ?(size=50) contract =
   Format.eprintf "get_nft_items_by_collection %s %s %s %d@."
@@ -787,14 +796,14 @@ let get_nft_items_by_collection ?dbh ?include_meta ?continuation ?(size=50) cont
     | [ None ] -> Lwt.return_ok 0L
     | [ Some i64 ] -> Lwt.return_ok i64
     | _ -> Lwt.return_error (`hook_error "count with more then one row") in
-  map_rp (fun r -> mk_nft_item ?include_meta r) l >>=? fun nft_items ->
-  let len = List.length nft_items in
+  map_rp (fun r -> mk_nft_item ?include_meta r) l >>=? fun nft_items_items ->
+  let len = List.length nft_items_items in
   let nft_items_continuation =
     if len <> size then None
     else Some
-        (mk_nft_items_continuation @@ List.hd (List.rev nft_items)) in
+        (mk_nft_items_continuation @@ List.hd (List.rev nft_items_items)) in
   Lwt.return_ok
-    { nft_items ; nft_items_continuation ; nft_items_total }
+    { nft_items_items ; nft_items_continuation ; nft_items_total }
 
 let get_nft_item_meta_by_id ?dbh contract token_id =
   Format.eprintf "get_nft_meta_by_id %s %s@." contract token_id ;
@@ -851,14 +860,14 @@ let get_nft_all_items
     | [ None ] -> Lwt.return_ok 0L
     | [ Some i64 ] -> Lwt.return_ok i64
     | _ -> Lwt.return_error (`hook_error "count with more then one row") in
-  map_rp (fun r -> mk_nft_item ?include_meta r) l >>=? fun nft_items ->
-  let len = List.length nft_items in
+  map_rp (fun r -> mk_nft_item ?include_meta r) l >>=? fun nft_items_items ->
+  let len = List.length nft_items_items in
   let nft_items_continuation =
     if len <> size then None
     else Some
-        (mk_nft_items_continuation @@ List.hd (List.rev nft_items)) in
+        (mk_nft_items_continuation @@ List.hd (List.rev nft_items_items)) in
   Lwt.return_ok
-    { nft_items ; nft_items_continuation ; nft_items_total }
+    { nft_items_items ; nft_items_continuation ; nft_items_total }
 
 let mk_nft_activity_continuation obj =
   Printf.sprintf "%Ld_%s"
@@ -1068,14 +1077,14 @@ let get_nft_ownerships_by_item ?dbh ?continuation ?(size=50) contract token_id =
     | [ None ] -> Lwt.return_ok 0L
     | [ Some i64 ] -> Lwt.return_ok i64
     | _ -> Lwt.return_error (`hook_error "count with more then one row") in
-  map_rp (fun r -> mk_nft_ownership r) l >>=? fun nft_ownerships ->
-  let len = List.length nft_ownerships in
+  map_rp (fun r -> mk_nft_ownership r) l >>=? fun nft_ownerships_ownerships ->
+  let len = List.length nft_ownerships_ownerships in
   let nft_ownerships_continuation =
     if len <> size then None
     else Some
-        (mk_nft_ownerships_continuation @@ List.hd (List.rev nft_ownerships)) in
+        (mk_nft_ownerships_continuation @@ List.hd (List.rev nft_ownerships_ownerships)) in
   Lwt.return_ok
-    { nft_ownerships ; nft_ownerships_continuation ; nft_ownerships_total }
+    { nft_ownerships_ownerships ; nft_ownerships_continuation ; nft_ownerships_total }
 
 let get_nft_all_ownerships ?dbh ?continuation ?(size=50) () =
   Format.eprintf "get_nft_all_ownerships %s %d@."
@@ -1103,14 +1112,14 @@ let get_nft_all_ownerships ?dbh ?continuation ?(size=50) () =
     | [ None ] -> Lwt.return_ok 0L
     | [ Some i64 ] -> Lwt.return_ok i64
     | _ -> Lwt.return_error (`hook_error "count with more then one row") in
-  map_rp (fun r -> mk_nft_ownership r) l >>=? fun nft_ownerships ->
-  let len = List.length nft_ownerships in
+  map_rp (fun r -> mk_nft_ownership r) l >>=? fun nft_ownerships_ownerships ->
+  let len = List.length nft_ownerships_ownerships in
   let nft_ownerships_continuation =
     if len <> size then None
     else Some
-        (mk_nft_ownerships_continuation @@ List.hd (List.rev nft_ownerships)) in
+        (mk_nft_ownerships_continuation @@ List.hd (List.rev nft_ownerships_ownerships)) in
   Lwt.return_ok
-    { nft_ownerships ; nft_ownerships_continuation ; nft_ownerships_total }
+    { nft_ownerships_ownerships ; nft_ownerships_continuation ; nft_ownerships_total }
 
 let generate_nft_token_id ?dbh contract =
   Format.eprintf "generate_nft_token_id %s@."
@@ -1130,7 +1139,7 @@ let mk_nft_collection_name_symbol metadata =
     let name = List.assoc "name" l in
     let symbol = try Some (List.assoc "symbol" l) with Not_found -> None in
     Lwt.return_ok (name, symbol)
-  with Not_found -> Lwt.return_error (`hook_error "no name in token metadata")
+  with Not_found -> Lwt.return_error (`hook_error "no name in contract metadata")
      | EzEncoding.DestructError ->
        Lwt.return_error (`hook_error ("metadata destruct error"))
 
@@ -1156,8 +1165,8 @@ let get_nft_collection_by_id ?dbh collection =
   let>? nft_item = mk_nft_collection obj in
   Lwt.return_ok nft_item
 
-let get_nft_collections_by_owner ?dbh ?continuation ?(size=50) owner =
-  Format.eprintf "get_nft_collections_by_owner %s %s %d@."
+let search_nft_collections_by_owner ?dbh ?continuation ?(size=50) owner =
+  Format.eprintf "search_nft_collections_by_owner %s %s %d@."
     owner
     (match continuation with None -> "None" | Some c -> c)
     size ;
@@ -1168,7 +1177,7 @@ let get_nft_collections_by_owner ?dbh ?continuation ?(size=50) owner =
   let>? l = [%pgsql.object dbh
       "select address, owner, metadata \
        from contracts where \
-       main and owner = $owner and \
+       main and owner = $owner and metadata <> '{}' and \
        ($no_continuation or (address > $collection)) \
        order by address asc limit $size64"] in
   let>? nft_collections_total = [%pgsql dbh
@@ -1177,13 +1186,13 @@ let get_nft_collections_by_owner ?dbh ?continuation ?(size=50) owner =
     | [ None ] -> Lwt.return_ok 0L
     | [ Some i64 ] -> Lwt.return_ok i64
     | _ -> Lwt.return_error (`hook_error "count with more then one row") in
-  map_rp (fun r -> mk_nft_collection r) l >>=? fun nft_collections ->
-  let len = List.length nft_collections in
+  map_rp (fun r -> mk_nft_collection r) l >>=? fun nft_collections_collections ->
+  let len = List.length nft_collections_collections in
   let nft_collections_continuation =
     if len <> size then None
-    else Some (List.hd (List.rev nft_collections)).nft_collection_id in
+    else Some (List.hd (List.rev nft_collections_collections)).nft_collection_id in
   Lwt.return_ok
-    { nft_collections ; nft_collections_continuation ; nft_collections_total }
+    { nft_collections_collections ; nft_collections_continuation ; nft_collections_total }
 
 let get_nft_all_collections ?dbh ?continuation ?(size=50) () =
   Format.eprintf "get_nft_all_collections %s %d@."
@@ -1195,7 +1204,7 @@ let get_nft_all_collections ?dbh ?continuation ?(size=50) () =
     continuation = None, (match continuation with None -> "" | Some c -> c) in
   let>? l = [%pgsql.object dbh
       "select address, owner, metadata \
-       from contracts where main and \
+       from contracts where main and metadata <> '{}' and \
        ($no_continuation or (address > $collection)) \
        order by address asc limit $size64"] in
   let>? nft_collections_total = [%pgsql dbh
@@ -1204,13 +1213,13 @@ let get_nft_all_collections ?dbh ?continuation ?(size=50) () =
     | [ None ] -> Lwt.return_ok 0L
     | [ Some i64 ] -> Lwt.return_ok i64
     | _ -> Lwt.return_error (`hook_error "count with more then one row") in
-  map_rp (fun r -> mk_nft_collection r) l >>=? fun nft_collections ->
-  let len = List.length nft_collections in
+  map_rp (fun r -> mk_nft_collection r) l >>=? fun nft_collections_collections ->
+  let len = List.length nft_collections_collections in
   let nft_collections_continuation =
     if len <> size then None
-    else Some (List.hd (List.rev nft_collections)).nft_collection_id in
+    else Some (List.hd (List.rev nft_collections_collections)).nft_collection_id in
   Lwt.return_ok
-    { nft_collections ; nft_collections_continuation ; nft_collections_total }
+    { nft_collections_collections ; nft_collections_continuation ; nft_collections_total }
 
 let mk_asset asset_class contract token_id asset_value =
   let asset_value = Int64.to_string asset_value in

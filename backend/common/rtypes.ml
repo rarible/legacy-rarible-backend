@@ -302,7 +302,7 @@ type nft_item = {
 type nft_items = {
   nft_items_total : int64;
   nft_items_continuation : string option;
-  nft_items : nft_item list;
+  nft_items_items : nft_item list;
 } [@@deriving encoding]
 
 type nft_activity_filter_all_type =
@@ -406,7 +406,7 @@ type nft_ownership = {
 type nft_ownerships = {
   nft_ownerships_total : int64 ;
   nft_ownerships_continuation : string option ;
-  nft_ownerships : nft_ownership list ;
+  nft_ownerships_ownerships : nft_ownership list ;
 } [@@deriving encoding]
 
 type nft_signature = {
@@ -447,7 +447,7 @@ type nft_collection = {
 type nft_collections = {
   nft_collections_total : int64 ;
   nft_collections_continuation : string option ;
-  nft_collections : nft_collection list ;
+  nft_collections_collections : nft_collection list ;
 } [@@deriving encoding]
 
 type asset_type_nft = {

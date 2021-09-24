@@ -6,18 +6,38 @@ let cwd = Sys.getcwd ()
 let exe = Sys.argv.(0)
 
 let api = ref "http://localhost:8080"
+let sdk = ref false
 let verbose = ref 0
+let endpoint = ref "http://granada.tz.functori.com"
 
-(* EDPK * EDSK *)
+let validator = "KT1Vx7UddodXEVAjvgC2et267JqKSYX7WAr7"
+let exchange_v2 = "KT1C5kWbfzASApxCMHXFLbHuPtnRaJXE4WMu"
+
+let config = {
+  admin_wallet = "" ;
+  exchange_v2 ;
+  validator ;
+  royalties = "" ;
+}
+
+let api_pid = ref None
+let crawler_pid = ref None
+
+(* ALIAS * EDPK * EDSK *)
 let accounts = [
+  "rarible5",
   "edpktjwGH2VwKJkAVztZvr5Gkifg5bKx99GT6wDCctQL6xgRHB3pRc",
   "edsk4XzV1K3Td1fVUhRv33iduTdNCxmHidUsCKRkvK2NgnersFdEUY" ;
+  "rarible4",
   "edpkuiqLaC3YvwMQTKezCV9pJs2vjqPxoonMJDBdNqnwQxiMx3ag8h",
   "edsk3LVprL8yNHpVcbLrbaFm25njKkyjJrZEGCweuxqkCh7SiEyH4L" ;
+  "rarible3",
   "edpkuDUy4h4y2qqSHDgdid8WxESu3YwaPmWZ42p4G3ZCnE5epgtXhH",
   "edsk49SC61Sb1QYRQQRW7M6SRmWMvjoaVsfCftkdoERv8BENe7ssV4" ;
+  "rarible2",
   "edpktoPwmCz9Wbr8BKByJPnasrPq1BfoAVURtAhxpw7WafbktMnkrp",
   "edsk35jq62PmRmRB5vH1rUE5W6wzE7P6sn3r58C3TKcDtnwx6MpFUU" ;
+  "rarible1",
   "edpku7dXXEdSPb2nMJMEbGSuPZtPcfRZ8RLpX5FGKZ629ezW1YjaWa" ,
   "edsk2kPLkNyYQi9kqQnh6VTip9MS7c6rEnUastw1BMb1hf9FgDfRBu";
 ]
@@ -41,6 +61,20 @@ let origins = [
 ]
 let origins_len = List.length origins
 
+let royalties_contracts = [
+  "KT1EZBkhGkRDxP6N1opkN8ULvnssG7f3PWoH" ;
+  "KT1VCEefbNuB8iBuuu2tganKmMu4ex548ewG"
+]
+let royalties_contracts_len = List.length royalties_contracts
+
+let exchange_contracts = [
+]
+let exchange_contracts_len = List.length exchange_contracts
+
+let validator_contracts = [
+]
+let validator_contracts_len = List.length exchange_contracts
+
 let set_opt_string r = Arg.String (fun s -> r := Some s)
 let set_opt_float r = Arg.Float (fun f -> r := Some f)
 let set_opt_int r = Arg.Int (fun i -> r := Some i)
@@ -50,28 +84,51 @@ let arg_parse ~spec ~usage f =
 
 let spec = [
   "--api", Arg.Set_string api, "api address (default: http://localhost:8080)";
+  "--endpoint", Arg.Set_string endpoint, "node endpoint (default: http://granada.tz.functori.com)";
+  "--client", Arg.Set_string Script.client, "tezos client" ;
+  "--sdk", Arg.Set sdk, "use sdk to make tezos operations (default: false, uses tezos-client)";
   "--verbose", Arg.Set_int verbose, "verbosity";
 ]
 
-let missing l =
-  List.iter (fun (name, opt) ->
-      match opt with
-      | None ->
-        let _, _, descr = List.find (fun (n, _, _) -> n = name) spec in
-        Format.eprintf "Missing argument: %s %s@." name descr
-      | _ -> ()) l
+let by_pk i =
+  try
+    List.find (fun (_, pk, _) -> pk = i) accounts
+  with Not_found ->
+    Printf.eprintf "Not_found by_alias %s\n%!" i ;
+    raise Not_found
 
-let command_result ?(f=(fun l -> String.concat " " @@ List.map String.trim l)) cmd =
-  if !verbose > 0 then Format.printf "Command:\n%s@." cmd;
-  let ic = Unix.open_process_in cmd in
-  let rec aux acc =
-    try aux ((input_line ic) :: acc)
-    with End_of_file -> List.rev acc in
-  let s = f (aux []) in
-  match s, Unix.close_process_in ic with
-  | "", _ -> failwith "Empty result"
-  | _, Unix.WEXITED 0 -> s
-  | _ -> failwith (Format.sprintf "Error processing %S" cmd)
+let by_sk i =
+  try
+    List.find (fun (_, _, sk) -> sk = i) accounts
+  with Not_found ->
+    Printf.eprintf "Not_found by_sk %s\n%!" i ;
+    raise Not_found
+
+let by_alias i =
+  try
+    List.find (fun (alias, _, _) -> alias = i) accounts
+  with Not_found ->
+    Printf.eprintf "Not_found by_alias %s\n%!" i ;
+    raise Not_found
+
+let sys_command ?(verbose=0) c =
+  if verbose > 0 then Printf.eprintf "cmd: %s\n%!" c ;
+  let oldstdout = Unix.dup Unix.stdout in
+  let oldstderr = Unix.dup Unix.stderr in
+  let out_temp_fn = Filename.temp_file "sys_command" "stdout_redirect" in
+  let err_temp_fn = Filename.temp_file "sys_command" "stderr_redirect" in
+  let newstdout = open_out out_temp_fn in
+  let newstderr = open_out err_temp_fn in
+  Unix.dup2 (Unix.descr_of_out_channel newstdout) Unix.stdout;
+  Unix.dup2 (Unix.descr_of_out_channel newstderr) Unix.stderr;
+  let code = Sys.command c in
+  flush newstdout ;
+  flush newstderr ;
+  Unix.dup2 oldstdout Unix.stdout ;
+  Unix.dup2 oldstderr Unix.stderr ;
+  close_out newstdout ;
+  close_out newstderr ;
+  code, out_temp_fn, err_temp_fn
 
 let generate_option f =
   if Random.bool () then
@@ -88,7 +145,7 @@ let generate_maker () =
   generate_address ()
 
 let generate_taker () =
-  generate_option (fun () -> fst @@ generate_address ())
+  generate_option (fun () -> let _, pk, _ = generate_address () in pk)
 
 let tezos_asset () = ATXTZ, Random.int64 10000000000L
 
@@ -114,6 +171,10 @@ let generate_asset () =
 let generate_salt () =
   string_of_int @@ (Random.int 10000) + 1
 
+let generate_amount ?(max=100_000) () = Random.int max
+
+let generate_token_id () = string_of_int @@ generate_amount ~max:1_000_000 ()
+
 let generate_part () =
   let part_account = generate_origin () in
   let part_value = (Random.int 50) * 100 in
@@ -121,6 +182,27 @@ let generate_part () =
 
 let generate_parts () =
   [ generate_part () ]
+
+let pick_royalties () =
+  List.nth royalties_contracts (Random.int royalties_contracts_len)
+
+let generate_alias prefix =
+  Printf.sprintf "%s_%d" prefix (Random.int 100000)
+
+let generate_royalties () =
+  let rec aux royalties =
+    let total =
+      List.fold_left (fun acc (_addr, v) -> acc + v) 0 royalties in
+    if total = 10000 then royalties
+    else
+      let _, addr_pk, _ = generate_address () in
+      let v = (Random.int 9999) + 1 in
+      try
+        let old = List.assoc addr_pk royalties in
+        aux ((addr_pk, v + old) :: (List.remove_assoc addr_pk royalties))
+      with Not_found ->
+        (addr_pk, v) :: royalties in
+  List.map (fun (addr, v) -> Tzfunc.Crypto.pk_to_tz1 addr, Int64.of_int v) @@ aux []
 
 let mk_order_form
     maker taker make take salt start_date end_date signature data_type payouts origin_fees =
@@ -144,7 +226,7 @@ let mk_order_form
   }
 
 let generate_order () =
-  let maker_pk, maker_sk = generate_maker () in
+  let _alias, maker_pk, maker_sk = generate_maker () in
   let taker = generate_taker () in
   let make = generate_asset () in
   let take = generate_asset () in
@@ -164,45 +246,194 @@ let generate_order () =
   Ok order_form
 
 let call_upsert_order order_form =
-    Format.eprintf "%s@." (EzEncoding.construct order_form_enc order_form) ;
+    Format.eprintf "%s\n%!" (EzEncoding.construct order_form_enc order_form) ;
     let url = EzAPI.BASE !api in
     EzReq.post0
       ~input:order_form
       url
       ~error:(fun code msg ->
-          Format.eprintf "ERROR %d %s@." code (match msg with None -> "None" | Some s -> s))
+          Format.eprintf "ERROR %d %s\n%!" code (match msg with None -> "None" | Some s -> s))
       Api.upsert_order_s
       (function
-        | Ok order -> Format.eprintf "RES %s@." order.order_elt.order_elt_hash
+        | Ok order -> Format.eprintf "RES %s\n%!" order.order_elt.order_elt_hash
         | Error _err -> Format.eprintf "ERROR" )
 
+let call_generate_token_id collection =
+  let url = EzAPI.BASE !api in
+  EzReq_lwt.get1
+    url
+    Api.generate_nft_token_id_s
+    collection
+
+let call_get_nft_collection_by_id collection =
+  let url = EzAPI.BASE !api in
+  EzReq_lwt.get1
+    url
+    Api.get_nft_collection_by_id_s
+    collection
+
+let call_search_nft_collections_by_owner owner =
+  let open EzAPI in
+  let url = EzAPI.BASE !api in
+  let rec aux ?continuation acc =
+    let params = match continuation with
+      | None -> [ Api.owner_param , S owner ]
+      | Some c -> [ Api.owner_param , S owner ; Api.continuation_param, S c ] in
+    EzReq_lwt.get0
+      url
+      ~params
+      Api.search_nft_collections_by_owner_s
+      >>=? fun collections ->
+      match collections.nft_collections_continuation with
+      | None -> Lwt.return_ok @@ collections.nft_collections_collections @ acc
+      | Some continuation ->
+        aux ~continuation (collections.nft_collections_collections @ acc) in
+  aux []
+
+let call_search_nft_all_collections () =
+  let open EzAPI in
+  let url = EzAPI.BASE !api in
+  let rec aux ?continuation acc =
+    let params = match continuation with
+      | None -> []
+      | Some c -> [ Api.continuation_param, S c ] in
+    EzReq_lwt.get0
+      url
+      ~params
+       Api.search_nft_all_collections_s
+    >>=? fun collections ->
+    match collections.nft_collections_continuation with
+    | None -> Lwt.return_ok @@ collections.nft_collections_collections @ acc
+    | Some continuation ->
+      aux ~continuation (collections.nft_collections_collections @ acc) in
+  aux []
+
+let call_get_nft_item_by_id collection tid =
+  let url = EzAPI.BASE !api in
+  EzReq_lwt.get1
+    url
+    Api.get_nft_item_by_id_s
+    (Printf.sprintf "%s:%s" collection tid)
+
+let call_get_nft_items_by_owner owner =
+  let open EzAPI in
+  let url = EzAPI.BASE !api in
+  let rec aux ?continuation acc =
+    let params = match continuation with
+      | None -> [ Api.owner_param , S owner ]
+      | Some c -> [ Api.owner_param , S owner ; Api.continuation_param, S c ] in
+    EzReq_lwt.get0
+      url
+      ~params
+      Api.get_nft_items_by_owner_s >>=? fun items ->
+    match items.nft_items_continuation with
+    | None -> Lwt.return_ok @@ items.nft_items_items @ acc
+    | Some continuation ->
+      aux ~continuation (items.nft_items_items @ acc) in
+  aux []
+
+let call_get_nft_items_by_collection collection =
+  let open EzAPI in
+  let url = EzAPI.BASE !api in
+  let rec aux ?continuation acc =
+    let params = match continuation with
+      | None -> [ Api.collection_param , S collection ]
+      | Some c -> [ Api.collection_param , S collection ; Api.continuation_param, S c ] in
+    EzReq_lwt.get0
+      url
+      ~params
+      Api.get_nft_items_by_collection_s >>=? fun items ->
+    match items.nft_items_continuation with
+    | None -> Lwt.return_ok @@ items.nft_items_items @ acc
+    | Some continuation ->
+      aux ~continuation (items.nft_items_items @ acc) in
+  aux []
+
+let call_get_nft_all_items () =
+  let open EzAPI in
+  let url = EzAPI.BASE !api in
+  let rec aux ?continuation acc =
+    let params = match continuation with
+      | None -> [ ]
+      | Some c -> [ Api.continuation_param, S c ] in
+    EzReq_lwt.get0
+      url
+      ~params
+      Api.get_nft_all_items_s >>=? fun items ->
+    match items.nft_items_continuation with
+    | None -> Lwt.return_ok @@ items.nft_items_items @ acc
+    | Some continuation ->
+      aux ~continuation (items.nft_items_items @ acc) in
+  aux []
+
+let call_get_nft_ownership_by_id collection tid owner  =
+  let url = EzAPI.BASE !api in
+  EzReq_lwt.get1
+    url
+    Api.get_nft_ownership_by_id_s
+    (Printf.sprintf "%s:%s:%s" collection tid owner)
+
+let call_get_nft_ownerships_by_item contract tid =
+  let open EzAPI in
+  let url = EzAPI.BASE !api in
+  let params = [ Api.contract_param, S contract ; Api.token_id_param, S tid  ] in
+  let rec aux ?continuation acc =
+    let params = match continuation with
+      | None -> params
+      | Some c -> params @ [ Api.continuation_param, S c ] in
+    EzReq_lwt.get0
+      url
+      ~params
+      Api.get_nft_ownerships_by_item_s >>=? fun ownerships ->
+    match ownerships.nft_ownerships_continuation with
+    | None -> Lwt.return_ok @@ ownerships.nft_ownerships_ownerships @ acc
+    | Some continuation ->
+      aux ~continuation (ownerships.nft_ownerships_ownerships @ acc) in
+  aux []
+
+let call_get_nft_all_ownerships () =
+  let open EzAPI in
+  let url = EzAPI.BASE !api in
+  let rec aux ?continuation acc =
+    let params = match continuation with
+      | None -> [ ]
+      | Some c -> [ Api.continuation_param, S c ] in
+    EzReq_lwt.get0
+      url
+      ~params
+      Api.get_nft_all_ownerships_s >>=? fun ownerships ->
+    match ownerships.nft_ownerships_continuation with
+    | None -> Lwt.return_ok @@ ownerships.nft_ownerships_ownerships @ acc
+    | Some continuation ->
+      aux ~continuation (ownerships.nft_ownerships_ownerships @ acc) in
+  aux []
+
 let upsert_order () =
-  Random.self_init () ;
   match generate_order () with
   | Ok order_form -> call_upsert_order order_form
   | Error err ->
-    Format.eprintf "Error %s@." @@ Let.string_of_error err
+    Format.eprintf "Error %s\n%!" @@ Let.string_of_error err
 
 let get_order hash =
   let url = EzAPI.BASE !api in
   EzReq.get1
     url
     ~error:(fun code msg ->
-        Format.eprintf "ERROR %d %s@." code (match msg with None -> "None" | Some s -> s))
+        Format.eprintf "ERROR %d %s\n%!" code (match msg with None -> "None" | Some s -> s))
     Api.get_order_by_hash_s
     hash
     (function
-      | Ok order -> Format.eprintf "RES %s@." order.order_elt.order_elt_hash
+      | Ok order -> Format.eprintf "RES %s\n%!" order.order_elt.order_elt_hash
       | Error _err -> Format.eprintf "ERROR" )
 
 let update_order_make_value hash make_value =
   Db.get_order hash >|= function
-  | Error err -> Format.eprintf "ERROR %s@." @@ Crp.string_of_error err ;
+  | Error err -> Format.eprintf "ERROR %s\n%!" @@ Crp.string_of_error err ;
   | Ok None -> Format.eprintf "get_order None"
   | Ok (Some order) ->
     let order_form = order_form_from_order order in
     let maker = order_form.order_form_elt.order_form_elt_maker in
-    let maker_sk = List.assoc maker accounts in
+    let _, _, maker_sk = by_pk maker in
     let taker = order_form.order_form_elt.order_form_elt_taker in
     let make = order_form.order_form_elt.order_form_elt_make in
     let make = { make with asset_value = make_value } in
@@ -224,19 +455,19 @@ let update_order_make_value hash make_value =
           mk_order_form
             maker taker make take salt start_date end_date signature data_type payouts origin_fees in
         call_upsert_order order_form
-      | Error err -> Format.eprintf "Error %s@." @@ string_of_error err
+      | Error err -> Format.eprintf "Error %s\n%!" @@ string_of_error err
       end
     | _ ->
-      Format.eprintf "Wrong order type @."
+      Format.eprintf "Wrong order type \n%!"
 
 let update_order_take_value hash take_value =
   Db.get_order hash >|= function
-  | Error err -> Format.eprintf "ERROR %s@." @@ Crp.string_of_error err ;
+  | Error err -> Format.eprintf "ERROR %s\n%!" @@ Crp.string_of_error err ;
   | Ok None -> Format.eprintf "get_order None"
   | Ok (Some order) ->
     let order_form = order_form_from_order order in
     let maker = order_form.order_form_elt.order_form_elt_maker in
-    let maker_sk = List.assoc maker accounts in
+    let _, _, maker_sk = by_pk maker in
     let taker = order_form.order_form_elt.order_form_elt_taker in
     let make = order_form.order_form_elt.order_form_elt_make in
     let take = order_form.order_form_elt.order_form_elt_take in
@@ -258,19 +489,19 @@ let update_order_take_value hash take_value =
           mk_order_form
             maker taker make take salt start_date end_date signature data_type payouts origin_fees in
         call_upsert_order order_form
-      | Error err -> Format.eprintf "Error %s@." @@ string_of_error err
+      | Error err -> Format.eprintf "Error %s\n%!" @@ string_of_error err
       end
     | _ ->
-      Format.eprintf "Wrong order type @."
+      Format.eprintf "Wrong order type \n%!"
 
 let update_order_taker hash taker =
   Db.get_order hash >|= function
-  | Error err -> Format.eprintf "ERROR %s@." @@ Crp.string_of_error err ;
+  | Error err -> Format.eprintf "ERROR %s\n%!" @@ Crp.string_of_error err ;
   | Ok None -> Format.eprintf "get_order None"
   | Ok (Some order) ->
     let order_form = order_form_from_order order in
     let maker = order_form.order_form_elt.order_form_elt_maker in
-    let maker_sk = List.assoc maker accounts in
+    let _, _, maker_sk = by_pk maker in
     let taker = taker in
     let make = order_form.order_form_elt.order_form_elt_make in
     let take = order_form.order_form_elt.order_form_elt_take in
@@ -291,10 +522,588 @@ let update_order_taker hash taker =
           mk_order_form
             maker taker make take salt start_date end_date signature data_type payouts origin_fees in
         call_upsert_order order_form
-      | Error err -> Format.eprintf "Error %s@." @@ string_of_error err
+      | Error err -> Format.eprintf "Error %s\n%!" @@ string_of_error err
       end
     | _ ->
-      Format.eprintf "Wrong order type @."
+      Format.eprintf "Wrong order type \n%!"
+
+let may_import_key ?(verbose=0) alias sk =
+  let cmd = Script.import_key ~verbose alias sk in
+  ignore @@ sys_command cmd
+
+let read_whole_file filename =
+  let ch = open_in filename in
+  let s = really_input_string ch (in_channel_length ch) in
+  close_in ch;
+  s
+
+let create_descr prefix suffix =
+  let temp_fn = Filename.temp_file prefix suffix in
+  let c = open_out temp_fn in
+  Unix.descr_of_out_channel c, temp_fn
+
+let create_process ?(stdin=Unix.stdin) ?(stdout=Unix.stdout) ?(stderr=Unix.stderr) prog args =
+  Unix.create_process prog args stdin stdout stderr
+
+let show_address alias =
+  let prog = !Script.client in
+  let args = Array.of_list [prog ; "show" ; "address" ; alias ; "-S" ] in
+  let stdout, temp_fn = create_descr "tezos-client" "show_address" in
+  let pid = create_process ~stdout prog args in
+  let _, status = Unix.waitpid [] pid in
+  Unix.close stdout ;
+  match status with
+  | Unix.WEXITED code ->
+    if code <> 0 then failwith "show address failure"
+    else
+      let content = read_whole_file temp_fn in
+      begin match String.split_on_char ':' content with
+      | _before :: tz1 :: pk :: _unencrypted :: sk :: [] ->
+        String.sub tz1 1 36,
+        String.sub pk 1 36,
+        sk
+      | _ -> failwith "show address : can't parse result"
+      end
+  | Unix.WSIGNALED _ | Unix.WSTOPPED _ -> failwith "show address failure"
+
+let find_kt1 contract_alias  =
+  let prog = !Script.client in
+  let args =
+    Array.of_list
+      [ prog ; "-E"; !endpoint; "list" ; "known" ; "contracts" ] in
+  let stdout, out_temp_fn = create_descr "tezos-client" "list_known_contracts" in
+  let stderr, _err_temp_fn = create_descr "tezos-client" "list_known_contracts" in
+  let pid = create_process ~stdout ~stderr prog args in
+  let _, status = Unix.waitpid [] pid in
+  Unix.close stdout ;
+  Unix.close stderr ;
+  match status with
+  | Unix.WEXITED code ->
+    begin if code <> 0 then failwith "list_known_contracts failure"
+    else
+      let contract = ref None in
+      let ch = open_in out_temp_fn in
+      begin try
+          while true; do
+            let line = input_line ch in
+            match String.split_on_char ':' line with
+            | alias :: kt1 :: [] ->
+              if alias = contract_alias then
+                begin
+                  contract := Some (String.sub kt1 1 36) ;
+                  raise End_of_file
+                end
+            | _ -> ()
+          done
+        with End_of_file -> ()
+      end ;
+      close_in ch ;
+      match !contract with
+      | None -> failwith "can't find kt1"
+      | Some kt1 -> kt1
+  end
+  | Unix.WSIGNALED _ | Unix.WSTOPPED _ -> failwith "list_known_address failure"
+
+let deploy ?(verbose=0) filename storage source alias =
+  let cmd = Script.deploy_aux ~verbose ~endpoint:!endpoint ~filename storage source alias in
+  let code, out, err = sys_command cmd in
+  if code <> 0 then
+    failwith (Printf.sprintf "deploy failure : out %S err %S" out err)
+
+let create_collection ?(royalties=pick_royalties ()) () =
+  let alias_new = generate_alias "collection" in
+  let alias_admin, pk_admin, sk_admin = generate_address () in
+  may_import_key alias_admin sk_admin ;
+  let alias_source, _pk_source, sk_source = generate_address () in
+  let admin = Tzfunc.Crypto.pk_to_tz1 pk_admin in
+  may_import_key alias_source sk_source ;
+  admin, alias_source, alias_new, royalties
+
+let create_collections ?royalties nb =
+  let rec aux acc cpt =
+    if cpt = 0 then acc
+    else aux ((create_collection ?royalties ()) :: acc) (cpt - 1) in
+  aux [] nb
+
+let deploy_collection admin alias_source alias_new royalties =
+  Printf.eprintf "Deploying new collection\n%!" ;
+  let filename = "contracts/arl/fa2.arl" in
+  let storage = Script.storage_fa2 ~admin:admin ~royalties in
+  deploy filename storage alias_source alias_new ;
+  Printf.eprintf "  deployed collection %s\n%!" alias_new ;
+  let kt1 = find_kt1 alias_new in
+  Printf.eprintf "  --> %s:%s\n%!" alias_new kt1 ;
+  alias_new, kt1, admin, royalties
+
+let create_royalties () =
+  Printf.eprintf "Creating new royalties\n%!" ;
+  let alias_new = generate_alias "royalties" in
+  let alias_admin, pk_admin, sk_admin = generate_address () in
+  may_import_key alias_admin sk_admin ;
+  let alias_source, _pk_source, sk_source = generate_address () in
+  let admin = Tzfunc.Crypto.pk_to_tz1 pk_admin in
+  may_import_key alias_source sk_source ;
+  let filename = "contracts/arl/royalties.arl" in
+  let storage = Script.storage_royalties ~admin:admin in
+  deploy filename storage alias_source alias_new ;
+  alias_new, alias_admin
+
+let mint_tokens id owner amount royalties source contract =
+  let cmd = Script.mint_tokens_aux ~endpoint:!endpoint id owner amount royalties source contract in
+  let code, out, err = sys_command cmd in
+  if code <> 0 then
+    Lwt.fail_with ("mint failure : log " ^ out ^ " & " ^ err)
+  else Lwt.return_ok ()
+
+let burn_tokens id amount source contract =
+  let cmd = Script.burn_tokens_aux ~endpoint:!endpoint id amount source contract in
+  let code, out, err = sys_command cmd in
+  if code <> 0 then
+    Lwt.fail_with ("burn failure : log " ^ out ^ " & " ^ err)
+  else Lwt.return_ok ()
+
+let transfer_tokens id amount source contract new_owner =
+  let param = [ source ; Printf.sprintf "%s*%s=%s" id amount new_owner ] in
+  let cmd = Script.transfer_aux ~endpoint:!endpoint param source contract in
+  let code, out, err = sys_command cmd in
+  if code <> 0 then
+    Lwt.fail_with ("tranfer failure : log " ^ out ^ " & " ^ err)
+  else Lwt.return_ok ()
+
+let mint_with_random_token_id ~source ~contract =
+  Printf.eprintf "mint_with_random_token_id for %s on %s\n%!" source contract ;
+  let _owner_alias, owner_pk, _owner_sk = generate_address () in
+  let owner =  Tzfunc.Crypto.pk_to_tz1 owner_pk in
+  let tid = generate_token_id () in
+  let amount = string_of_int @@ generate_amount ~max:10 () in
+  let royalties = generate_royalties () in
+  let metadata = [] in
+  mint_tokens tid owner amount royalties source contract >|=? fun () ->
+  (owner, amount, tid, royalties, metadata)
+
+let mint_with_token_id_from_api ~source ~contract =
+  Printf.eprintf "mint_with_token_id_from_api for %s on %s\n%!" source contract ;
+  let _owner_alias, owner_pk, _owner_sk = generate_address () in
+  let owner =  Tzfunc.Crypto.pk_to_tz1 owner_pk in
+  let amount = string_of_int @@ generate_amount ~max:10 () in
+  let royalties = generate_royalties () in
+  let metadata = [] in
+  call_generate_token_id contract >>=? fun tid ->
+  mint_tokens tid.nft_token_id owner amount royalties source contract >|=? fun () ->
+  (owner, amount, tid.nft_token_id, royalties, metadata)
+
+let burn_with_token_id ~source ~contract tid amount =
+  Printf.eprintf "burn_with_token_id for %s on %s\n%!" source contract ;
+  burn_tokens tid amount source contract
+
+let transfer_with_token_id ~source ~contract tid amount new_owner =
+  Printf.eprintf "tranfer_with_token_id for %s on %s\n%!" source contract ;
+  transfer_tokens tid amount source contract new_owner
+
+let mint ~source ~contract =
+  let random = Random.bool () in
+  if random then mint_with_random_token_id ~source ~contract
+  else
+    mint_with_token_id_from_api ~source ~contract
+
+let burn ~source ~contract tid max_amount =
+  let full = Random.bool () in
+  let amount =
+    if full then max_amount else Random.int max_amount + 1 in
+  burn_with_token_id ~source ~contract tid (string_of_int amount) >|=? fun () ->
+  max_amount - amount
+
+let transfer ~source ~contract tid max_amount =
+  let full = Random.bool () in
+  let _alias, pk, _sk = generate_address () in
+  let new_owner =  Tzfunc.Crypto.pk_to_tz1 pk in
+  let new_owner_amount =
+    if full then max_amount else generate_amount ~max:max_amount () + 1 in
+  transfer_with_token_id ~source ~contract tid (string_of_int new_owner_amount) new_owner
+  >|=? fun () -> (new_owner_amount, new_owner)
+
+let random_mint collections =
+  let _alias_collection, kt1, admin, _owner =
+    List.nth collections (Random.int @@ List.length collections) in
+  mint ~source:admin ~contract:kt1 >|=? fun infos ->
+  kt1, infos
+
+let random_burn items =
+  let selected = Random.int @@ List.length items in
+  let (kt1, (owner, amount, tid, royalties, metadata)) = List.nth items selected in
+  burn ~source:owner ~contract:kt1 tid (int_of_string amount) >|=? fun new_amount ->
+  let new_item = kt1, (owner, string_of_int new_amount, tid, royalties, metadata) in
+  List.mapi (fun i itm -> if i = selected then new_item else itm) items,
+  new_item
+
+let random_transfer items =
+  let selected = Random.int @@ List.length items in
+  let (kt1, (owner, amount_str, tid, royalties, metadata)) = List.nth items selected in
+  transfer ~source:owner ~contract:kt1 tid (int_of_string amount_str)
+  >|=? fun (new_owner_amount_i, new_owner) ->
+  let new_owner_amount_str = string_of_int new_owner_amount_i in
+  let amount_i = int_of_string amount_str in
+  let new_item = kt1, (new_owner, new_owner_amount_str, tid, royalties, metadata) in
+  let updated_source_item =
+    kt1, (owner, string_of_int (amount_i - new_owner_amount_i), tid, royalties, metadata) in
+  if amount_i = new_owner_amount_i then
+    (* full tranfer *)
+    List.mapi (fun i itm -> if i = selected then new_item else itm) items,
+    [ new_item ]
+  else
+    new_item :: (List.mapi (fun i itm -> if i = selected then updated_source_item else itm) items),
+    [ updated_source_item ; new_item ]
+
+let check_royalties item_royalties royalties =
+  List.for_all (fun p ->
+      try
+        let v = List.assoc p.part_account royalties in
+        v = Int64.of_int p.part_value
+      with Not_found ->
+  false) item_royalties
+
+let check_owners item_owners owner =
+  List.exists (fun o -> owner = o) item_owners
+
+let check_strick_owners item_owners owner = match item_owners with
+  | [ o ] when o = owner -> true
+  | _ -> false
+
+let check_supply item_supply amount =
+  item_supply >= amount
+
+let check_strict_supply item_supply amount =
+  item_supply = amount
+
+let check_metadata itm_metadata metadata = match itm_metadata, metadata with
+  | Some im, Some m ->
+    im.nft_item_meta_name = m.nft_item_meta_name &&
+    im.nft_item_meta_description = m.nft_item_meta_description &&
+    im.nft_item_meta_attributes = m.nft_item_meta_attributes &&
+    im.nft_item_meta_image = m.nft_item_meta_image &&
+    im.nft_item_meta_animation = m.nft_item_meta_animation
+  | _, _ -> false
+
+let check_nft_item ?(strict=true) itm kt1 owner amount tid royalties _metadata =
+  itm.nft_item_id = (Printf.sprintf "%s:%s" kt1 tid) &&
+  itm.nft_item_contract = kt1 &&
+  itm.nft_item_token_id = tid &&
+  check_royalties itm.nft_item_royalties royalties &&
+  (if strict then check_strick_owners itm.nft_item_owners owner
+   else check_owners itm.nft_item_owners owner) &&
+  (if strict then check_strict_supply itm.nft_item_supply amount
+   else check_supply itm.nft_item_supply amount)(*  &&
+   * check_metadata itm.nft_item_meta metadata *)
+
+let check_nft_ownership ow kt1 owner amount tid _metadata =
+  ow.nft_ownership_id = (Printf.sprintf "%s:%s:%s" kt1 tid owner) &&
+  ow.nft_ownership_contract = kt1 &&
+  ow.nft_ownership_token_id = tid &&
+  ow.nft_ownership_owner = owner &&
+  ow.nft_ownership_value = amount(*  &&
+   * check_creators ow.nft_ownership_creators metadata *)
+
+let check_item (kt1, (owner, amount, tid, royalties, metadata)) =
+  let nft_item_exists items =
+    List.exists (fun i ->
+        check_nft_item i kt1 owner amount tid royalties metadata) items in
+  let nft_ownership_exists ownerships =
+    List.exists (fun o ->
+        check_nft_ownership o kt1 owner amount tid metadata) ownerships in
+  call_get_nft_item_by_id kt1 tid >|= begin function
+  | Ok nft_item ->
+    if check_nft_item nft_item kt1 owner amount tid royalties metadata then
+      Printf.eprintf "[OK] API: get_nft_item_by_id\n%!"
+    else
+      Printf.eprintf "[KO] API: get_nft_item_by_id (no matching nft_item)\n%!"
+  | Error err ->
+    Printf.eprintf
+      "[KO] API: get_nft_item_by_id (error : %s)\n%!" @@
+    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+  end >>= fun () ->
+  call_get_nft_items_by_owner owner >|= begin function
+  | Ok nft_items ->
+    if nft_item_exists nft_items then
+      Printf.eprintf "[OK] API: get_nft_items_by_owner\n%!"
+    else
+      Printf.eprintf "[KO] API: get_nft_items_by_owner (no matching nft_item)\n%!"
+  | Error err ->
+    Printf.eprintf
+      "[KO] API: get_nft_items_by_owner (error : %s)\n%!" @@
+    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+  end >>= fun () ->
+  call_get_nft_items_by_collection kt1 >|= begin function
+  | Ok nft_items ->
+    if nft_item_exists nft_items then
+      Printf.eprintf "[OK] API: get_nft_items_by_owner\n%!"
+    else
+      Printf.eprintf "[KO] API: get_nft_items_by_owner (no matching nft_item)\n%!"
+  | Error err ->
+    Printf.eprintf
+      "[KO] API: get_nft_items_by_owner (error : %s)\n%!" @@
+    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+  end >>= fun () ->
+  call_get_nft_all_items () >|= begin function
+  | Ok nft_items ->
+    if nft_item_exists nft_items then
+      Printf.eprintf "[OK] API: get_nft_all_items\n%!"
+    else
+      Printf.eprintf "[KO] API: get_nft_all_items (no matching nft_item)\n%!"
+  | Error err ->
+    Printf.eprintf
+      "[KO] API: get_nft_all_items (error : %s)\n%!" @@
+    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+  end >>= fun () ->
+  call_get_nft_ownership_by_id kt1 tid owner >|= begin function
+  | Ok nft_ownership ->
+    if check_nft_ownership nft_ownership kt1 owner amount tid metadata then
+      Printf.eprintf "[OK] API: get_nft_ownership_by_id\n%!"
+    else
+      Printf.eprintf "[KO] API: get_nft_ownership_by_id (no matching nft_item)\n%!"
+  | Error err ->
+    Printf.eprintf
+      "[KO] API: get_nft_ownership_by_id (error : %s)\n%!" @@
+    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+  end >>= fun () ->
+  call_get_nft_ownerships_by_item kt1 tid >|= begin function
+  | Ok nft_ownerships ->
+    if nft_ownership_exists nft_ownerships then
+      Printf.eprintf "[OK] API: get_nft_ownerships_by_item\n%!"
+    else
+      Printf.eprintf "[KO] API: get_nft_ownerships_by_item (no matching nft_ownership)\n%!"
+  | Error err ->
+    Printf.eprintf
+      "[KO] API: get_nft_ownerships_by_item (error : %s)\n%!" @@
+    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+  end >>= fun () ->
+  call_get_nft_all_ownerships () >|= begin function
+  | Ok nft_ownerships ->
+    if nft_ownership_exists nft_ownerships then
+      Printf.eprintf "[OK] API: get_nft_all_ownerships\n%!"
+    else
+      Printf.eprintf "[KO] API: get_nft_all_ownerships (no matching nft_ownership)\n%!"
+  | Error err ->
+    Printf.eprintf
+      "[KO] API: get_nft_all_ownerships (error : %s)\n%!" @@
+    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+  end
+  (* get_nft_activities ;
+   * get_nft_item_meta_by_id ;
+   * get_nft_items_by_creator ; *)
+
+let mint_check_random collections =
+  random_mint collections >>=? fun item ->
+  Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
+  Unix.sleep 6 ;
+  check_item item >>= fun () ->
+  Lwt.return_ok item
+
+let burn_check_random items =
+  random_burn items >>=? fun (items, updated_item) ->
+  Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
+  Unix.sleep 6 ;
+  check_item updated_item >>= fun () ->
+  Lwt.return_ok items
+
+let transfer_check_random items =
+  random_transfer items >>=? fun (items, updated_items) ->
+  Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
+  Unix.sleep 6 ;
+  Lwt_list.iter_p check_item updated_items >>= fun () ->
+  Lwt.return_ok items
+
+let mints_check_random ?(max=30) collections =
+  let nb = Random.int max + 1 in
+  let rec aux acc cpt =
+    if cpt = 0 then Lwt.return_ok acc
+    else
+      mint_check_random collections >>=? fun item ->
+      aux (item :: acc) (cpt - 1) in
+  aux [] nb
+
+let burns_check_random ?(max=30) mints =
+  let nb = Random.int max + 1 in
+  let rec aux acc cpt =
+    if cpt = 0 then Lwt.return_ok acc
+    else
+      burn_check_random mints >>=? fun item ->
+      aux (item :: acc) (cpt - 1) in
+  aux [] nb
+
+let transfers_check_random ?(max=30) mints =
+  let nb = Random.int max + 1 in
+  let rec aux acc cpt =
+    if cpt = 0 then Lwt.return_ok acc
+    else
+      transfer_check_random mints >>=? fun items ->
+      aux (items @ acc) (cpt - 1) in
+  aux [] nb
+
+let check_collection alias kt1 owner =
+  Printf.eprintf "Checking new collection %s of %s\n%!" alias owner ;
+  let collection_exists collections =
+    List.find_all (fun c ->
+        c.nft_collection_id = kt1 &&
+        c.nft_collection_owner = Some owner) collections in
+  call_get_nft_collection_by_id kt1 >>=? fun c ->
+  begin
+    if c.nft_collection_id = kt1 &&
+       c.nft_collection_owner = Some owner then
+      Printf.eprintf "[OK] API: get_nft_collection_by_id %s\n%!" alias
+    else
+      Printf.eprintf "[KO] API: get_nft_collection_by_id %s (no matching collection)\n%!" alias
+  end ;
+  call_search_nft_collections_by_owner owner >>=? fun c ->
+  begin match collection_exists c with
+    | [ _ ] -> Printf.eprintf "[OK] API: search_nft_collection_by_owner %s\n%!" alias
+    | [] ->
+      Printf.eprintf "[KO] API: search_nft_collection_by_owner %s (no matching collection)\n%!" alias
+    | _ ->
+      Printf.eprintf
+        "[KO] API: search_nft_collection_by_owner %s (more than 1 matching collection)\n%!" alias
+  end ;
+  call_search_nft_all_collections () >|=? fun c ->
+  begin match collection_exists c with
+  | [ _ ] -> Printf.eprintf "[OK] API: search_nft_all_collection %s\n%!" alias
+  | [] ->
+    Printf.eprintf "[KO] API: search_nft_all_collection %s (no matching collection)\n%!" alias
+  | _ ->
+    Printf.eprintf
+      "[KO] API: search_nft_all_collection %s (more than 1 matching collection)\n%!" alias
+  end
+
+let set_metadata _source _kt1 =
+  Lwt.return_unit
+
+let deploy_check_random_collections ?royalties ?(max=10) () =
+  let nb = Random.int max + 1 in
+  Printf.eprintf "Deploying and checking %d collection(s)\n%!" nb ;
+  let collections = create_collections ?royalties nb in
+  let agg =
+    List.fold_left (fun acc ((admin, _alias_source, _alias_new, _royalties) as collection) ->
+      try
+        let old = List.assoc admin acc in
+        (admin, (collection :: old)) :: (List.remove_assoc admin acc)
+      with Not_found ->
+        (admin, [ collection ]) ::  acc)
+      [] collections in
+  Lwt_list.map_p (fun (admin, collections) ->
+      Printf.eprintf "  deploying %d collection for %s\n%!" (List.length collections) admin ;
+      Lwt_list.map_s (fun (admin, alias_source, alias_new, royalties) ->
+          Lwt.return @@
+          deploy_collection admin alias_source alias_new royalties) collections)
+    agg >>= fun new_collections ->
+  let new_collections = List.flatten new_collections in
+  Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
+  Lwt_unix.sleep 6. >>= fun () ->
+  Lwt_list.map_p (fun (alias, kt1, admin, _) ->
+      check_collection alias kt1 admin) new_collections >>= fun _ ->
+  Lwt.return new_collections
+
+let reset_db () =
+  Printf.eprintf "Resetting db\n%!" ;
+  let c, o, e = sys_command "make drop" in
+  if c <> 0 then failwith ("failure when resetting db : log " ^ o ^ " & " ^ e)
+  else
+    let c, o, e =  sys_command "make" in
+    if c <> 0 then failwith ("failure when resetting db : log " ^ o ^ " & " ^ e)
+
+let start_api () =
+  let prog = "./_bin/api" in
+  let args = [| prog |] in
+  let stdout, fn_out = create_descr "api" "out" in
+  let stderr, fn_err = create_descr "api" "err" in
+  let pid = create_process ~stdout ~stderr prog args in
+  Printf.eprintf "API STARTED (out %s, err %s)\n%!" fn_out fn_err ;
+  pid
+
+let get_head () =
+  EzReq_lwt.get
+    (EzAPI.URL "https://api.granadanet.tzkt.io/v1/blocks/count")
+
+let make_config admin_wallet validator exchange_v2 royalties =
+  let open Crawlori.Config in
+  get_head () >>= function
+  | Error (code, str) ->
+    failwith (Printf.sprintf "get_head error %d %s" code (Option.value ~default:"" str))
+  | Ok level ->
+    let config = {
+      nodes = [ "https://granadanet.smartpy.io" ] ;
+      start = Some Int32.(sub (of_string level) 30l)  ;
+      db_kind = `pg ;
+      step_forward = 30 ;
+      accounts = None ;
+      sleep = 5. ;
+      forward = None ;
+      confirmations_needed = 5l ;
+      verbose = 0 ;
+      register_kinds = None ;
+      allow_no_metadata = false ;
+      extra = { admin_wallet ; validator ; exchange_v2 ; royalties } ;
+    } in
+    let temp_fn = Filename.temp_file "config" "" in
+    let json = EzEncoding.construct (Cconfig.enc Rtypes.config_enc) config in
+    Printf.eprintf "Crawler config:\n%s\n\n%!" json ;
+    let c = open_out temp_fn in
+    output_string c json ;
+    close_out c ;
+    Lwt.return temp_fn
+
+let start_crawler admin_wallet validator exchange_v2 royalties =
+  make_config admin_wallet validator exchange_v2 royalties >>= fun config ->
+  let prog = "./_bin/crawler" in
+  let args = [| prog ; config |] in
+  let stdout, fn_out = create_descr "crawler" "out" in
+  let stderr, fn_err = create_descr "crawler" "err" in
+  let pid = create_process ~stdout ~stderr prog args in
+  Printf.eprintf "CRAWLER STARTED (out %S err %S)\n%!" fn_out fn_err ;
+  Lwt.return pid
+
+let random_test () =
+  reset_db () ;
+  let r_kt1 = List.hd royalties_contracts in
+  (* let r_alias, _r_source = create_royalties () in
+   * let r_kt1 = find_kt1 r_alias in *)
+  Printf.eprintf "New royalties %s\n%!" r_kt1 ;
+  api_pid := Some (start_api ()) ;
+  start_crawler "" validator exchange_v2 r_kt1 >>= fun cpid ->
+  crawler_pid := Some cpid ;
+  Printf.eprintf "Waiting 6sec to let crawler catch up...\n%!" ;
+  Lwt_unix.sleep 6. >>= fun () ->
+  deploy_check_random_collections ~royalties:r_kt1 ~max:1 () >>= fun collections ->
+  (* let collections = [ "collection_19760", "KT1MvNHPsHpHZDJ7HfkUDx71qyYvU7nLi9N7", "tz1KiZygjrVaS1fjs9iW4YSKNiqoopHK8Hdj", r_kt1 ] in *)
+  mints_check_random ~max:1 collections >>= begin function
+    | Error err ->
+      Lwt.return @@
+      Printf.eprintf "mint error %s" @@
+      EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+    | Ok items ->
+      transfers_check_random ~max:1 items >|= begin function
+        | Error err ->
+          Printf.eprintf "burn error %s" @@
+          EzReq_lwt.string_of_error (fun r ->
+              Some (EzEncoding.construct rarible_error_500_enc r)) err
+        | Ok _items -> ()
+      end
+  end >>= fun () ->
+  (* let (_alias, contract, source, _r) = List.hd collections in *)
+  (* let source = "tz1f6TuKe38VPURr6gA1xiQq9dzuVuzNZoP6" in
+   * let contract = "KT1RYUvuCP7YgoXihfEXWNKgzkZgxPYCWWUi" in
+   * mint_with_token_id_from_api ~source ~contract >>= begin function
+   *   | Ok infos ->
+   *     Printf.eprintf "Waiting 6sec to let crawler catch up...\n%!" ;
+   *     Lwt_unix.sleep 6. >>= fun () ->
+   *     check_mint contract infos
+   *   | Error err ->
+   *     Printf.eprintf "mint error %s" @@
+   *     EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err ;
+   *     Lwt.return_unit
+   * end >>= fun () -> *)
+
+  begin match !api_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
+  begin match !crawler_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
+  Lwt.return_unit
+
 
 (** main *)
 
@@ -304,14 +1113,21 @@ let actions = [
   ["update_order_take_value <order_hash> <new_take_value>"], "change order's take value";
   (* ["update_order_date <order_hash> <start_date> <end_date>"], "change order's start date and end date"; *)
   ["update_order_taker <order_hash> <new_taker>"], "change order's taker (should fail)";
+  ["create_collection <royalties_contract?>"], "create collection (optionnal royalties contract)" ;
+  ["mint_nft <contract_alias> <dest>"], "mint an nft" ;
+  ["mint_multi <contract_alias> <dest> <amount>"], "mint amount nfts in contract for dest" ;
+  ["transfer_nft <contract_alias> <token_id> <dest>"], "transfer a nft" ;
+  ["tranfer_multi <contract_alias> <token_id> <dest> <amount>"], "transfer amount nft" ;
+  ["run_test"], "will run some test (orig, mint, burn and trasnfer (will erase rarible db)";
 ]
 
 let usage =
-  "usage: rarible_api.mlt <options> <actions>\nactions:\n  " ^
+  "usage: " ^ (Filename.basename Sys.executable_name) ^ " <options> <actions>\nactions:\n  " ^
   (String.concat "\n  " @@ List.map (fun (cmds, descr) ->
        Format.sprintf "- %s -> %s" (String.concat " | " cmds) descr) actions) ^ "\noptions:"
 
 let main () =
+  Random.self_init () ;
   let action = ref [] in
   Arg.parse spec (fun s -> action := s :: !action) usage;
   match List.rev !action with
@@ -324,6 +1140,20 @@ let main () =
      *   update_order_date hash start_date end_date *)
     | "update_order_taker" :: hash :: taker :: [] ->
       Lwt_main.run (update_order_taker hash (Some taker))
+    | [ "create_collection" ] -> ignore @@ create_collection ()
+    | "create_collection" :: royalties :: [] -> ignore @@ create_collection ~royalties ()
+    (* | "mint_token_id" :: contract :: token_id :: [] -> mint contract token_id
+     * | "mint" :: contract :: [] -> mint_with_random_token_id contract *)
+    (* | "transfer_nft" :: contract :: token_id :: dest :: [] ->
+     *   transfer_nft contract token_id dest
+     * | "tranfer_multi" :: contract :: token_id :: dest :: amount :: [] ->
+     *   transfer_multi contract token_id dest amount *)
+    | [ "run_test" ] -> Lwt_main.run (
+        Lwt.catch random_test (fun exn ->
+            Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
+            begin match !api_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
+            begin match !crawler_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
+            Lwt.return_unit))
     | _ -> Arg.usage spec usage
 
 let _ = main ()

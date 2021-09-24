@@ -10,24 +10,41 @@ let rec flatten = function
         | _ -> acc @ [ x ]) [] args in
     let args = List.map flatten args in
     Mprim { prim = `Pair; args; annots }
+  | Mprim { prim = `pair; args; annots } ->
+    let args = List.fold_left (fun acc x -> match flatten x with
+        | Mprim { prim = `pair; args; _ } -> acc @ args
+        | _ -> acc @ [ x ]) [] args in
+    let args = List.map flatten args in
+    Mprim { prim = `pair; args; annots }
   | Mprim {prim; args; annots} ->
     Mprim {prim; args = List.map flatten args; annots}
   | Mseq l -> Mseq (List.map flatten l)
   | m -> m
 
 let rec list_entrypoints acc = function
-  | Mprim { prim = `or_; args = [ arg1; arg2 ] ; _ } ->
+  | Mprim { prim = `or_; args = l ; _ } ->
+    let arg1 = List.nth l 0 in
+    let arg2 = List.nth l 1 in
     begin match list_entrypoints acc arg1 with
       | Error e -> Error e
       | Ok acc -> list_entrypoints acc arg2
     end
   | Mprim { annots = [ s ]; _ } as m when String.get s 0 = '%' ->
     Ok (m :: acc)
-  | _ -> Error `unexpected_michelson_value
+  | _ ->
+    Error `unexpected_michelson_value
 
 let entrypoints m = match flatten m with
-  | Mseq [ Mprim { prim = `parameter; args = [ arg ]; _} ; _; _] ->
-    list_entrypoints [] arg
+  | Mseq l ->
+    begin match
+        List.find_map
+          (function
+            | Mprim { prim = `parameter; args = [ arg ]; _} -> Some arg
+            | _ -> None) l with
+    | Some arg ->
+      list_entrypoints [] arg
+    | None -> Error `unexpected_michelson_value
+    end
   | _ -> Error `unexpected_michelson_value
 
 let rec michelson_type_eq m1 m2 = match m1, m2 with
@@ -88,15 +105,23 @@ let fa2_ext_entrypoints = [
 let storage_fields = function
   | None | Some (Other _) | Some (Bytes _) -> Error `not_michelson
   | Some (Micheline m) -> match flatten m with
-    | Mseq [ _; Mprim { prim = `storage; args = [ arg ]; _} ; _] ->
-      begin match arg with
-        | Mprim { prim = `pair; args ; _ } ->
-          Result.ok @@
-          snd @@ List.fold_left (fun (i, acc) m ->
-              match m with
-              | Mprim { annots = [ name ]; _ } -> i+1, ((name, i) :: acc)
-              | _ -> i, acc) (0, []) args
-        | _ -> Error `unexpected_michelson_value
+    | Mseq l ->
+      begin match
+          List.find_map
+            (function
+              | Mprim { prim = `storage; args = [ arg ]; _} -> Some arg
+              | _ -> None) l with
+      | Some arg ->
+        begin match arg with
+          | Mprim { prim = `pair; args ; _ } ->
+            Result.ok @@
+            snd @@ List.fold_left (fun (i, acc) m ->
+                match m with
+                | Mprim { annots = [ name ]; _ } -> i+1, ((name, i) :: acc)
+                | _ -> i, acc) (0, []) args
+          | _ -> Error `unexpected_michelson_value
+        end
+      | None -> Error `unexpected_michelson_value
       end
     | _ -> Error `unexpected_michelson_value
 
