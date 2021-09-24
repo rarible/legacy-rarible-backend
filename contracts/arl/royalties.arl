@@ -26,14 +26,14 @@ record part {
   partValue   : nat;
 }
 
-asset royalties identified by rtoken rtokenId {
+asset royalties identified by rtoken rtokenId to big_map {
   rtoken : address;
   rtokenId : nat;
   rvalue : list<part>;
 }
 
 entry setRoyalties(token : address, tokenId : nat, value : list<part>) {
-  sourced by owner
+  called by token
   effect {
     royalties.addupdate((token, tokenId), {rvalue = value})
   }

@@ -160,7 +160,7 @@ let owners bm_id l =
 
 let mint_tokens ~id ~owner ~amount l =
   Format.sprintf "Pair %Ld %S %Ld {%s}" id owner amount
-    (String.concat "; " @@ List.map (fun (ad, am) -> Format.sprintf "Pair %S %Ld)" ad  am) l)
+    (String.concat "; " @@ List.map (fun (ad, am) -> Format.sprintf "Pair %S %Ld" ad  am) l)
 
 let burn_tokens ~id ~owner ~amount =
   Format.sprintf "Pair %Ld %S %Ld" id owner amount

@@ -40,7 +40,7 @@ deps:
 
 ts-deps:
 	@sudo npm i -g typescript
-	@npm --prefix sdk --no-audit --no-fund i @taquito/signer hacl-wasm
+	@npm --prefix sdk --no-audit --no-fund i @taquito/signer keccak yargs
 
 ts:
 	@tsc -p sdk/tsconfig.json

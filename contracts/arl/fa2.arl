@@ -16,11 +16,13 @@ asset operator identified by oaddr otoken oowner to big_map {
   oaddr       : address;
   otoken      : nat;
   oowner      : address;
+  oempty      : unit = Unit;
 }
 
 asset operator_for_all identified by fa_oaddr fa_oowner to big_map {
-  fa_oaddr       : address;
-  fa_oowner      : address;
+  fa_oaddr    : address;
+  fa_oowner   : address;
+  fa_empty    : unit = Unit;
 }
 
 asset token_metadata to big_map {
@@ -39,7 +41,7 @@ entry update_operators (upl : list<or<operator_param, operator_param>>) {
     match up with
     | left(param)  -> (* add *)
       dorequire(ledger.contains((param.opp_token_id, source)), "CALLER NOT OWNER");
-      operator.add({param.opp_operator; param.opp_token_id; param.opp_owner})
+      operator.add({oaddr = param.opp_operator; otoken = param.opp_token_id; oowner = param.opp_owner })
     | right(param) -> (* remove *)
       dorequire(ledger.contains((param.opp_token_id, source)), "CALLER NOT OWNER");
       operator.remove((param.opp_operator, param.opp_token_id, param.opp_owner))
@@ -51,7 +53,7 @@ entry update_operators_for_all (upl : list<or<address, address>>) {
   for up in upl do
     match up with
     | left(op)  -> (* add *)
-      operator_for_all.add({op; source})
+      operator_for_all.add({fa_oaddr = op; fa_oowner = source})
     | right(op) -> (* remove *)
       operator_for_all.remove((op, source))
     end;
