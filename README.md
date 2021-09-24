@@ -41,7 +41,7 @@ CTRL+D (to quit)
 Create a `Makefile.config` file with something like:
 
     DB=my_db_name
-    
+
 to provide a personalized name for the database
 
 ### Npm dev env
@@ -73,7 +73,7 @@ Similarty to npm for nodeJS or Cargo for Haskell, OCaml has its own packages man
 
 - then, running the following target should install needed dependencies:
 
-      $ make deps 
+      $ make deps
 
 ### Tezos Client: Getting/Compiling Tezos
 
@@ -143,3 +143,10 @@ setup the right pathes for different binaries and configuration files.
 Then you can either edit and copy the systemd file or make a symbolic
 link to these files. You can also use the bash scripts to start/stop
 the crawler without systemd.
+
+To configure nginx, you can use the draft in
+`deployment/nginx/rarible-api.nginx`. We use certbot to enable https:
+
+ ```bash
+certbot --authenticator webroot --installer nginx
+```

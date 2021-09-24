@@ -1,0 +1,49 @@
+#upstream backend {
+#  #par defaut sans rien c'est round robin
+#  #ip_hash;
+#  #least_conn;
+#  server api1.URL.URL;
+#  server api2.URL.URL;
+#  server api3.URL.URL;
+#}
+
+server {
+        listen 80;
+        listen [::]:80;
+
+        server_name rarible-api.functori.com;
+
+#        access_log /var/log/nginx/access.log upstreamlog;
+
+        root /var/www/rarible-api;
+        gzip on;
+        gzip_disable "msie6";
+
+        gzip_comp_level 6;
+        gzip_min_length 1100;
+        gzip_buffers 16 8k;
+        gzip_proxied any;
+        gzip_types
+            text/plain
+            text/css
+            text/js
+            text/xml
+            text/javascript
+            application/javascript
+            application/x-javascript
+            application/json
+            application/xml
+            application/rss+xml
+            image/svg+xml;
+
+        location /.well-known/acme-challenge/ {
+            root /var/www/rarible-api;
+        }
+
+        location / {
+             proxy_set_header X-Real-IP $remote_addr;
+             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+             proxy_pass http://127.0.0.1:8080;
+        }
+
+}
