@@ -90,6 +90,11 @@ let spec = [
   "--verbose", Arg.Set_int verbose, "verbosity";
 ]
 
+let ko_colored = Fmt.styled (`Fg (`Hi `Red)) Format.pp_print_string
+let ok_colored = Fmt.styled (`Fg `Green) Format.pp_print_string
+(* let print_ok msg = Printf.eprintf "%a %s" ok_colored "[Ok]" msg *)
+
+
 let by_pk i =
   try
     List.find (fun (_, pk, _) -> pk = i) accounts
@@ -111,7 +116,7 @@ let by_alias i =
     Printf.eprintf "Not_found by_alias %s\n%!" i ;
     raise Not_found
 
-let sys_command ?(verbose=0) c =
+let rec sys_command ?(verbose=0) ?(retry=0) c =
   if verbose > 0 then Printf.eprintf "cmd: %s\n%!" c ;
   let oldstdout = Unix.dup Unix.stdout in
   let oldstderr = Unix.dup Unix.stderr in
@@ -128,7 +133,14 @@ let sys_command ?(verbose=0) c =
   Unix.dup2 oldstderr Unix.stderr ;
   close_out newstdout ;
   close_out newstderr ;
-  code, out_temp_fn, err_temp_fn
+  if code <> 0 && retry > 0 then
+    begin
+    Printf.eprintf "Failure on Sys.command (%s)... retrying in 2sec\n%!" err_temp_fn ;
+    Unix.sleep 2 ;
+    sys_command ~verbose ~retry:(retry-1) c
+  end
+  else
+    code, out_temp_fn, err_temp_fn
 
 let generate_option f =
   if Random.bool () then
@@ -138,8 +150,14 @@ let generate_option f =
 let generate_origin () =
   List.nth origins (Random.int origins_len)
 
-let generate_address () =
-  List.nth accounts (Random.int accounts_len)
+let rec generate_address ?(diff=None) () = match diff with
+  | None ->
+    List.nth accounts (Random.int accounts_len)
+  | Some a ->
+    let (_, pk, _) as r = List.nth accounts (Random.int accounts_len) in
+    let tz1 = Tzfunc.Crypto.pk_to_tz1 pk in
+    if a = tz1 then generate_address ~diff ()
+    else r
 
 let generate_maker () =
   generate_address ()
@@ -313,7 +331,13 @@ let call_get_nft_item_by_id collection tid =
   EzReq_lwt.get1
     url
     Api.get_nft_item_by_id_s
-    (Printf.sprintf "%s:%s" collection tid)
+    (Printf.sprintf "%s:%s" collection tid)(*  >>= fun res ->
+   * begin match res with
+   *   | Ok item ->
+   *     Printf.eprintf "%s\n%!" @@ EzEncoding.construct nft_item_enc item ;
+   *   | _ -> ()
+   * end ;
+   * Lwt.return res *)
 
 let call_get_nft_items_by_owner owner =
   let open EzAPI in
@@ -407,6 +431,107 @@ let call_get_nft_all_ownerships () =
     | Some continuation ->
       aux ~continuation (ownerships.nft_ownerships_ownerships @ acc) in
   aux []
+
+let call_get_activities filter =
+  (* Format.eprintf "%s\n%!" (EzEncoding.construct nft_activity_filter_enc filter) ; *)
+  let open EzAPI in
+  let url = EzAPI.BASE !api in
+  let rec aux ?continuation acc =
+    let params = match continuation with
+      | None -> [ ]
+      | Some c -> [ Api.continuation_param, S c ] in
+    EzReq_lwt.post0
+      ~input:filter
+      ~params
+      url
+      Api.get_nft_activities_s >>=? fun activities ->
+    match activities.nft_activities_continuation with
+    | None -> Lwt.return_ok @@ activities.nft_activities_items @ acc
+    | Some continuation ->
+      aux ~continuation (activities.nft_activities_items @ acc) in
+  aux []
+ (* >>= fun res ->
+  *  begin match res with
+  *    | Ok a ->
+  *      Printf.eprintf "%s\n%!" @@ EzEncoding.construct (Json_encoding.list nft_activity_enc) a ;
+  *    | _ -> ()
+  *  end ;
+  *  Lwt.return res *)
+
+let call_get_nft_all_activities types =
+  call_get_activities @@ ActivityFilterAll types
+
+let call_get_nft_activities_by_user types user =
+  call_get_activities @@
+  ActivityFilterByUser {
+    nft_activity_by_user_types = types ;
+    nft_activity_by_user_users = [ user ] ;
+}
+
+let call_get_nft_activities_by_item types contract token_id =
+  call_get_activities @@
+  ActivityFilterByItem {
+    nft_activity_by_item_types = types ;
+    nft_activity_by_item_contract = contract ;
+    nft_activity_by_item_token_id = token_id ;
+}
+
+let call_get_nft_activities_by_collection types collection =
+  call_get_activities @@
+  ActivityFilterByCollection {
+    nft_activity_by_collection_types = types ;
+    nft_activity_by_collection_contract = collection ;
+}
+
+let call_get_nft_all_activities_all () =
+  call_get_nft_all_activities [ ALLTRANSFER; ALLMINT; ALLBURN ]
+
+let call_get_nft_activities_by_user_all user =
+  call_get_nft_activities_by_user
+    [ USERMINT; USERBURN ; USERTRANSFER_FROM ; USERTRANSFER_TO ]
+    user
+
+let call_get_nft_activities_by_item_all contract token_id =
+  call_get_nft_activities_by_item [ ALLTRANSFER; ALLMINT; ALLBURN ] contract token_id
+
+let call_get_nft_activities_by_collection_all collection =
+  call_get_nft_activities_by_collection [ ALLTRANSFER; ALLMINT; ALLBURN ] collection
+
+let call_get_nft_all_activities_mint () =
+  call_get_nft_all_activities [ ALLMINT ]
+
+let call_get_nft_activities_by_user_mint user =
+  call_get_nft_activities_by_user [ USERMINT ] user
+
+let call_get_nft_activities_by_item_mint contract token_id =
+  call_get_nft_activities_by_item [ ALLMINT ] contract token_id
+
+let call_get_nft_activities_by_collection_mint collection =
+  call_get_nft_activities_by_collection [ ALLMINT ] collection
+
+let call_get_nft_all_activities_burn () =
+  call_get_nft_all_activities [ ALLBURN ]
+
+let call_get_nft_activities_by_user_burn user =
+  call_get_nft_activities_by_user [ USERBURN ] user
+
+let call_get_nft_activities_by_item_burn contract token_id =
+  call_get_nft_activities_by_item [ ALLBURN ] contract token_id
+
+let call_get_nft_activities_by_collection_burn collection =
+  call_get_nft_activities_by_collection [ ALLBURN ] collection
+
+let call_get_nft_all_activities_transfer () =
+  call_get_nft_all_activities [ ALLTRANSFER ]
+
+let call_get_nft_activities_by_user_transfer user =
+  call_get_nft_activities_by_user [ USERTRANSFER_FROM ; USERTRANSFER_TO ] user
+
+let call_get_nft_activities_by_item_transfer contract token_id =
+  call_get_nft_activities_by_item [ ALLTRANSFER ] contract token_id
+
+let call_get_nft_activities_by_collection_transfer collection =
+  call_get_nft_activities_by_collection [ ALLTRANSFER ] collection
 
 let upsert_order () =
   match generate_order () with
@@ -605,8 +730,9 @@ let find_kt1 contract_alias  =
   | Unix.WSIGNALED _ | Unix.WSTOPPED _ -> failwith "list_known_address failure"
 
 let deploy ?(verbose=0) filename storage source alias =
-  let cmd = Script.deploy_aux ~verbose ~endpoint:!endpoint ~filename storage source alias in
-  let code, out, err = sys_command cmd in
+  let cmd =
+    Script.deploy_aux ~verbose ~endpoint:!endpoint ~force:true ~filename storage source alias in
+  let code, out, err = sys_command ~retry:1 cmd in
   if code <> 0 then
     failwith (Printf.sprintf "deploy failure : out %S err %S" out err)
 
@@ -650,14 +776,14 @@ let create_royalties () =
 
 let mint_tokens id owner amount royalties source contract =
   let cmd = Script.mint_tokens_aux ~endpoint:!endpoint id owner amount royalties source contract in
-  let code, out, err = sys_command cmd in
+  let code, out, err = sys_command ~retry:1 cmd in
   if code <> 0 then
     Lwt.fail_with ("mint failure : log " ^ out ^ " & " ^ err)
   else Lwt.return_ok ()
 
 let burn_tokens id amount source contract =
   let cmd = Script.burn_tokens_aux ~endpoint:!endpoint id amount source contract in
-  let code, out, err = sys_command cmd in
+  let code, out, err = sys_command ~retry:1 cmd in
   if code <> 0 then
     Lwt.fail_with ("burn failure : log " ^ out ^ " & " ^ err)
   else Lwt.return_ok ()
@@ -665,9 +791,9 @@ let burn_tokens id amount source contract =
 let transfer_tokens id amount source contract new_owner =
   let param = [ source ; Printf.sprintf "%s*%s=%s" id amount new_owner ] in
   let cmd = Script.transfer_aux ~endpoint:!endpoint param source contract in
-  let code, out, err = sys_command cmd in
+  let code, out, err = sys_command ~retry:1 cmd in
   if code <> 0 then
-    Lwt.fail_with ("tranfer failure : log " ^ out ^ " & " ^ err)
+    Lwt.fail_with ("transfer failure : log " ^ out ^ " & " ^ err)
   else Lwt.return_ok ()
 
 let mint_with_random_token_id ~source ~contract =
@@ -697,7 +823,7 @@ let burn_with_token_id ~source ~contract tid amount =
   burn_tokens tid amount source contract
 
 let transfer_with_token_id ~source ~contract tid amount new_owner =
-  Printf.eprintf "tranfer_with_token_id for %s on %s\n%!" source contract ;
+  Printf.eprintf "transfer_with_token_id for %s on %s\n%!" source contract ;
   transfer_tokens tid amount source contract new_owner
 
 let mint ~source ~contract =
@@ -715,7 +841,7 @@ let burn ~source ~contract tid max_amount =
 
 let transfer ~source ~contract tid max_amount =
   let full = Random.bool () in
-  let _alias, pk, _sk = generate_address () in
+  let _alias, pk, _sk = generate_address ~diff:(Some source) () in
   let new_owner =  Tzfunc.Crypto.pk_to_tz1 pk in
   let new_owner_amount =
     if full then max_amount else generate_amount ~max:max_amount () + 1 in
@@ -725,8 +851,8 @@ let transfer ~source ~contract tid max_amount =
 let random_mint collections =
   let _alias_collection, kt1, admin, _owner =
     List.nth collections (Random.int @@ List.length collections) in
-  mint ~source:admin ~contract:kt1 >|=? fun infos ->
-  kt1, infos
+  mint ~source:admin ~contract:kt1
+  >|=? fun infos -> kt1, infos
 
 let random_burn items =
   let selected = Random.int @@ List.length items in
@@ -747,12 +873,12 @@ let random_transfer items =
   let updated_source_item =
     kt1, (owner, string_of_int (amount_i - new_owner_amount_i), tid, royalties, metadata) in
   if amount_i = new_owner_amount_i then
-    (* full tranfer *)
+    (* full transfer *)
     List.mapi (fun i itm -> if i = selected then new_item else itm) items,
-    [ new_item ]
+    updated_source_item, new_item
   else
     new_item :: (List.mapi (fun i itm -> if i = selected then updated_source_item else itm) items),
-    [ updated_source_item ; new_item ]
+    updated_source_item, new_item
 
 let check_royalties item_royalties royalties =
   List.for_all (fun p ->
@@ -765,7 +891,7 @@ let check_royalties item_royalties royalties =
 let check_owners item_owners owner =
   List.exists (fun o -> owner = o) item_owners
 
-let check_strick_owners item_owners owner = match item_owners with
+let check_strict_owners item_owners owner = match item_owners with
   | [ o ] when o = owner -> true
   | _ -> false
 
@@ -784,12 +910,32 @@ let check_metadata itm_metadata metadata = match itm_metadata, metadata with
     im.nft_item_meta_animation = m.nft_item_meta_animation
   | _, _ -> false
 
-let check_nft_item ?(strict=true) itm kt1 owner amount tid royalties _metadata =
+let check_nft_item ?(verbose=0) ?(strict=true) itm kt1 owner amount tid _royalties _metadata =
+  if verbose > 0 then
+    Printf.eprintf "%s\n%s %s %s %s\n%!"
+      (EzEncoding.construct nft_item_enc itm)
+      kt1
+      owner
+      amount
+      tid
+      (* (String.concat "\n  " @@
+       *  List.map (fun (acc, i64) ->
+       *      Printf.sprintf "%s -> %Ld" acc i64) royalties) *) ;
+  if verbose > 0 then
+  Printf.eprintf "%b %b %b %b %b\n%!"
+    (itm.nft_item_id = (Printf.sprintf "%s:%s" kt1 tid))
+    (itm.nft_item_contract = kt1)
+    (itm.nft_item_token_id = tid)
+    (if strict then check_strict_owners itm.nft_item_owners owner
+     else check_owners itm.nft_item_owners owner)
+    (if strict then check_strict_supply itm.nft_item_supply amount
+     else check_supply itm.nft_item_supply amount) ;
+
   itm.nft_item_id = (Printf.sprintf "%s:%s" kt1 tid) &&
   itm.nft_item_contract = kt1 &&
   itm.nft_item_token_id = tid &&
-  check_royalties itm.nft_item_royalties royalties &&
-  (if strict then check_strick_owners itm.nft_item_owners owner
+  (* check_royalties itm.nft_item_royalties royalties && *)
+  (if strict then check_strict_owners itm.nft_item_owners owner
    else check_owners itm.nft_item_owners owner) &&
   (if strict then check_strict_supply itm.nft_item_supply amount
    else check_supply itm.nft_item_supply amount)(*  &&
@@ -803,16 +949,16 @@ let check_nft_ownership ow kt1 owner amount tid _metadata =
   ow.nft_ownership_value = amount(*  &&
    * check_creators ow.nft_ownership_creators metadata *)
 
-let check_item (kt1, (owner, amount, tid, royalties, metadata)) =
-  let nft_item_exists items =
+let check_item ?strict (kt1, (owner, amount, tid, royalties, metadata)) =
+  let nft_item_exists ?verbose items =
     List.exists (fun i ->
-        check_nft_item i kt1 owner amount tid royalties metadata) items in
+        check_nft_item ?verbose ?strict i kt1 owner amount tid royalties metadata) items in
   let nft_ownership_exists ownerships =
     List.exists (fun o ->
         check_nft_ownership o kt1 owner amount tid metadata) ownerships in
   call_get_nft_item_by_id kt1 tid >|= begin function
   | Ok nft_item ->
-    if check_nft_item nft_item kt1 owner amount tid royalties metadata then
+    if check_nft_item ~verbose:1 nft_item kt1 owner amount tid royalties metadata then
       Printf.eprintf "[OK] API: get_nft_item_by_id\n%!"
     else
       Printf.eprintf "[KO] API: get_nft_item_by_id (no matching nft_item)\n%!"
@@ -835,9 +981,9 @@ let check_item (kt1, (owner, amount, tid, royalties, metadata)) =
   call_get_nft_items_by_collection kt1 >|= begin function
   | Ok nft_items ->
     if nft_item_exists nft_items then
-      Printf.eprintf "[OK] API: get_nft_items_by_owner\n%!"
+      Printf.eprintf "[OK] API: get_nft_items_by_collection\n%!"
     else
-      Printf.eprintf "[KO] API: get_nft_items_by_owner (no matching nft_item)\n%!"
+      Printf.eprintf "[KO] API: get_nft_items_by_collection (no matching nft_item)\n%!"
   | Error err ->
     Printf.eprintf
       "[KO] API: get_nft_items_by_owner (error : %s)\n%!" @@
@@ -887,15 +1033,412 @@ let check_item (kt1, (owner, amount, tid, royalties, metadata)) =
       "[KO] API: get_nft_all_ownerships (error : %s)\n%!" @@
     EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
   end
-  (* get_nft_activities ;
-   * get_nft_item_meta_by_id ;
+  (* get_nft_item_meta_by_id ;
    * get_nft_items_by_creator ; *)
+
+let check_nft_activity ?(from=false) activity kt1 owner amount tid =
+  (* Printf.eprintf "check_nft_activity %s %s %s %s\n%!" kt1 owner amount tid ; *)
+  if from then
+    activity.nft_activity_contract = kt1 &&
+    activity.nft_activity_owner <> owner &&
+    activity.nft_activity_token_id = tid
+  else
+    activity.nft_activity_contract = kt1 &&
+    activity.nft_activity_owner = owner &&
+    activity.nft_activity_value = amount &&
+    activity.nft_activity_token_id = tid
+
+let check_mint_activity (kt1, (owner, amount, tid, _royalties, _metadata)) =
+  let mint_activity_exists activities =
+    List.exists (fun act -> match act.nft_activity_type with
+        | NftActivityMint -> check_nft_activity act.nft_activity_elt kt1 owner amount tid
+        | _ -> false) activities in
+  (* MINT ONLY ACTIVITIES *)
+  call_get_nft_activities_by_item_mint kt1 tid >|= begin function
+  | Ok nft_activities ->
+    if mint_activity_exists nft_activities then
+      Printf.eprintf "[OK] API: get_nft_activities_by_item_mint\n%!"
+    else
+      Printf.eprintf "[KO] API: get_nft_activities_by_item_mint (no matching mint activity)\n%!"
+  | Error err ->
+    Printf.eprintf
+      "[KO] API: get_nft_activities_by_item_mint (error : %s)\n%!" @@
+    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+  end >>= fun () ->
+  call_get_nft_activities_by_user_mint owner >|= begin function
+  | Ok nft_activities ->
+    if mint_activity_exists nft_activities then
+      Printf.eprintf "[OK] API: get_nft_activities_by_user_mint\n%!"
+    else
+      Printf.eprintf "[KO] API: get_nft_activities_by_user_mint (no matching mint activity)\n%!"
+  | Error err ->
+    Printf.eprintf
+      "[KO] API: get_nft_activities_by_user_mint (error : %s)\n%!" @@
+    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+  end >>= fun () ->
+  call_get_nft_activities_by_collection_mint kt1 >|= begin function
+  | Ok nft_activities ->
+    if mint_activity_exists nft_activities then
+      Printf.eprintf "[OK] API: get_nft_activities_by_collection_mint\n%!"
+    else
+      Printf.eprintf
+        "[KO] API: get_nft_activities_by_collection_mint (no matching mint activity)\n%!"
+  | Error err ->
+    Printf.eprintf
+      "[KO] API: get_nft_activities_by_collection_mint (error : %s)\n%!" @@
+    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+  end >>= fun () ->
+  call_get_nft_all_activities_mint () >|= begin function
+  | Ok nft_activities ->
+    if mint_activity_exists nft_activities then
+      Printf.eprintf "[OK] API: get_nft_all_activities_mint\n%!"
+    else
+      Printf.eprintf "[KO] API: get_nft_all_activities_mint (no matching mint activity)\n%!"
+  | Error err ->
+    Printf.eprintf
+      "[KO] API: get_nft_all_activities_mint (error : %s)\n%!" @@
+    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+  end >>= fun () ->
+
+  (* ALL ACTIVITIES *)
+  call_get_nft_activities_by_item_all kt1 tid >|= begin function
+  | Ok nft_activities ->
+    if mint_activity_exists nft_activities then
+      Printf.eprintf "[OK] API: get_nft_activities_by_item_all\n%!"
+    else
+      Printf.eprintf "[KO] API: get_nft_activities_by_item_all (no matching mint activity)\n%!"
+  | Error err ->
+    Printf.eprintf
+      "[KO] API: get_nft_activities_by_item_all (error : %s)\n%!" @@
+    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+  end >>= fun () ->
+  call_get_nft_activities_by_user_all owner >|= begin function
+  | Ok nft_activities ->
+    if mint_activity_exists nft_activities then
+      Printf.eprintf "[OK] API: get_nft_activities_by_user_all\n%!"
+    else
+      Printf.eprintf "[KO] API: get_nft_activities_by_user_all (no matching mint activity)\n%!"
+  | Error err ->
+    Printf.eprintf
+      "[KO] API: get_nft_activities_by_user_all (error : %s)\n%!" @@
+    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+  end >>= fun () ->
+  call_get_nft_activities_by_collection_all kt1 >|= begin function
+  | Ok nft_activities ->
+    if mint_activity_exists nft_activities then
+      Printf.eprintf "[OK] API: get_nft_activities_by_collection_all\n%!"
+    else
+      Printf.eprintf "[KO] API: get_nft_activities_by_collection_all (no matching mint activity)\n%!"
+  | Error err ->
+    Printf.eprintf
+      "[KO] API: get_nft_activities_by_collection_all (error : %s)\n%!" @@
+    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+  end >>= fun () ->
+  call_get_nft_all_activities_all () >|= begin function
+  | Ok nft_activities ->
+    if mint_activity_exists nft_activities then
+      Printf.eprintf "[OK] API: get_nft_all_activities_all\n%!"
+    else
+      Printf.eprintf "[KO] API: get_nft_all_activities_all (no matching mint activity)\n%!"
+  | Error err ->
+    Printf.eprintf
+      "[KO] API: get_nft_all_activities_all (error : %s)\n%!" @@
+    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+  end >>= fun () ->
+
+  (* BURN ONLY ACTIVITIES *)
+  call_get_nft_activities_by_item_burn kt1 tid >|= begin function
+  | Ok nft_activities ->
+    if not @@ mint_activity_exists nft_activities then
+      Printf.eprintf "[OK] API: get_nft_activities_by_item_burn\n%!"
+    else
+      Printf.eprintf "[KO] API: get_nft_activities_by_item_burn (matching mint activity)\n%!"
+  | Error err ->
+    Printf.eprintf
+      "[KO] API: get_nft_activities_by_item_burn (error : %s)\n%!" @@
+    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+  end >>= fun () ->
+  call_get_nft_activities_by_user_burn owner >|= begin function
+  | Ok nft_activities ->
+    if not @@ mint_activity_exists nft_activities then
+      Printf.eprintf "[OK] API: get_nft_activities_by_user_burn\n%!"
+    else
+      Printf.eprintf "[KO] API: get_nft_activities_by_user_burn (matching mint activity)\n%!"
+  | Error err ->
+    Printf.eprintf
+      "[KO] API: get_nft_activities_by_user_burn (error : %s)\n%!" @@
+    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+  end >>= fun () ->
+  call_get_nft_activities_by_collection_burn kt1 >|= begin function
+  | Ok nft_activities ->
+    if not @@ mint_activity_exists nft_activities then
+      Printf.eprintf "[OK] API: get_nft_activities_by_collection_burn\n%!"
+    else
+      Printf.eprintf "[KO] API: get_nft_activities_by_collection_burn (matching mint activity)\n%!"
+  | Error err ->
+    Printf.eprintf
+      "[KO] API: get_nft_activities_by_collection_burn (error : %s)\n%!" @@
+    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+  end >>= fun () ->
+  call_get_nft_all_activities_burn () >|= begin function
+  | Ok nft_activities ->
+    if not @@ mint_activity_exists nft_activities then
+      Printf.eprintf "[OK] API: get_nft_all_activities_burn\n%!"
+    else
+      Printf.eprintf "[KO] API: get_nft_all_activities_burn (matching mint activity)\n%!"
+  | Error err ->
+    Printf.eprintf
+      "[KO] API: get_nft_all_activities_burn (error : %s)\n%!" @@
+    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+  end >>= fun () ->
+
+  (* TRANSFER ONLY ACTIVITIES *)
+  call_get_nft_activities_by_item_transfer kt1 tid >|= begin function
+  | Ok nft_activities ->
+    if not @@ mint_activity_exists nft_activities then
+      Printf.eprintf "[OK] API: get_nft_activities_by_item_transfer\n%!"
+    else
+      Printf.eprintf "[KO] API: get_nft_activities_by_item_transfer (matching mint activity)\n%!"
+  | Error err ->
+    Printf.eprintf
+      "[KO] API: get_nft_activities_by_item_transfer (error : %s)\n%!" @@
+    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+  end >>= fun () ->
+  call_get_nft_activities_by_user_transfer owner >|= begin function
+  | Ok nft_activities ->
+    if not @@ mint_activity_exists nft_activities then
+      Printf.eprintf "[OK] API: get_nft_activities_by_user_transfer\n%!"
+    else
+      Printf.eprintf "[KO] API: get_nft_activities_by_user_transfer (matching mint activity)\n%!"
+  | Error err ->
+    Printf.eprintf
+      "[KO] API: get_nft_activities_by_user_transfer (error : %s)\n%!" @@
+    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+  end >>= fun () ->
+  call_get_nft_activities_by_collection_transfer kt1 >|= begin function
+  | Ok nft_activities ->
+    if not @@ mint_activity_exists nft_activities then
+      Printf.eprintf "[OK] API: get_nft_activities_by_collection_transfer\n%!"
+    else
+      Printf.eprintf
+        "[KO] API: get_nft_activities_by_collection_transfer (matching mint activity)\n%!"
+  | Error err ->
+    Printf.eprintf
+      "[KO] API: get_nft_activities_by_collection_transfer (error : %s)\n%!" @@
+    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+  end >>= fun () ->
+  call_get_nft_all_activities_transfer () >|= begin function
+  | Ok nft_activities ->
+    if not @@ mint_activity_exists nft_activities then
+      Printf.eprintf "[OK] API: get_nft_all_activities_transfer\n%!"
+    else
+      Printf.eprintf "[KO] API: get_nft_all_activities_transfer (matching mint activity)\n%!"
+  | Error err ->
+    Printf.eprintf
+      "[KO] API: get_nft_all_activities_transfer (error : %s)\n%!" @@
+    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+  end
+
+let check_transfer_activity ?(from=false) (kt1, (owner, amount, tid, _royalties, _metadata)) =
+  let transfer_activity_exists activities =
+    List.exists (fun act -> match act.nft_activity_type with
+        | NftActivityTransfer addr ->
+          if from then
+            check_nft_activity ~from act.nft_activity_elt kt1 addr amount tid
+          else check_nft_activity act.nft_activity_elt kt1 owner amount tid
+        | _ -> false) activities in
+  (* MINT ONLY ACTIVITIES *)
+  call_get_nft_activities_by_item_mint kt1 tid >|= begin function
+  | Ok nft_activities ->
+    if not @@ transfer_activity_exists nft_activities then
+      Printf.eprintf "[OK] API: get_nft_activities_by_item_mint\n%!"
+    else
+      Printf.eprintf "[KO] API: get_nft_activities_by_item_mint (matching transfer activity)\n%!"
+  | Error err ->
+    Printf.eprintf
+      "[KO] API: get_nft_activities_by_item_mint (error : %s)\n%!" @@
+    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+  end >>= fun () ->
+  call_get_nft_activities_by_user_mint owner >|= begin function
+  | Ok nft_activities ->
+    if not @@ transfer_activity_exists nft_activities then
+      Printf.eprintf "[OK] API: get_nft_activities_by_user_mint\n%!"
+    else
+      Printf.eprintf "[KO] API: get_nft_activities_by_user_mint (matching transfer activity)\n%!"
+  | Error err ->
+    Printf.eprintf
+      "[KO] API: get_nft_activities_by_user_mint (error : %s)\n%!" @@
+    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+  end >>= fun () ->
+  call_get_nft_activities_by_collection_mint kt1 >|= begin function
+  | Ok nft_activities ->
+    if not @@ transfer_activity_exists nft_activities then
+      Printf.eprintf "[OK] API: get_nft_activities_by_collection_mint\n%!"
+    else
+      Printf.eprintf
+        "[KO] API: get_nft_activities_by_collection_mint (matching transfer activity)\n%!"
+  | Error err ->
+    Printf.eprintf
+      "[KO] API: get_nft_activities_by_collection_mint (error : %s)\n%!" @@
+    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+  end >>= fun () ->
+  call_get_nft_all_activities_mint () >|= begin function
+  | Ok nft_activities ->
+    if not @@ transfer_activity_exists nft_activities then
+      Printf.eprintf "[OK] API: get_nft_all_activities_mint\n%!"
+    else
+      Printf.eprintf "[KO] API: get_nft_all_activities_mint (matching transfer activity)\n%!"
+  | Error err ->
+    Printf.eprintf
+      "[KO] API: get_nft_all_activities_mint (error : %s)\n%!" @@
+    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+  end >>= fun () ->
+
+  (* ALL ACTIVITIES *)
+  call_get_nft_activities_by_item_all kt1 tid >|= begin function
+  | Ok nft_activities ->
+    if transfer_activity_exists nft_activities then
+      Printf.eprintf "[OK] API: get_nft_activities_by_item_all\n%!"
+    else
+      Printf.eprintf "[KO] API: get_nft_activities_by_item_all (no matching transfer activity)\n%!"
+  | Error err ->
+    Printf.eprintf
+      "[KO] API: get_nft_activities_by_item_all (error : %s)\n%!" @@
+    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+  end >>= fun () ->
+  call_get_nft_activities_by_user_all owner >|= begin function
+  | Ok nft_activities ->
+    if transfer_activity_exists nft_activities then
+      Printf.eprintf "[OK] API: get_nft_activities_by_user_all\n%!"
+    else
+      Printf.eprintf "[KO] API: get_nft_activities_by_user_all (no matching transfer activity)\n%!"
+  | Error err ->
+    Printf.eprintf
+      "[KO] API: get_nft_activities_by_user_all (error : %s)\n%!" @@
+    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+  end >>= fun () ->
+  call_get_nft_activities_by_collection_all kt1 >|= begin function
+  | Ok nft_activities ->
+    if transfer_activity_exists nft_activities then
+      Printf.eprintf "[OK] API: get_nft_activities_by_collection_all\n%!"
+    else
+      Printf.eprintf "[KO] API: get_nft_activities_by_collection_all (no matching transfer activity)\n%!"
+  | Error err ->
+    Printf.eprintf
+      "[KO] API: get_nft_activities_by_collection_all (error : %s)\n%!" @@
+    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+  end >>= fun () ->
+  call_get_nft_all_activities_all () >|= begin function
+  | Ok nft_activities ->
+    if transfer_activity_exists nft_activities then
+      Printf.eprintf "[OK] API: get_nft_all_activities_all\n%!"
+    else
+      Printf.eprintf "[KO] API: get_nft_all_activities_all (no matching transfer activity)\n%!"
+  | Error err ->
+    Printf.eprintf
+      "[KO] API: get_nft_all_activities_all (error : %s)\n%!" @@
+    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+  end >>= fun () ->
+
+  (* BURN ONLY ACTIVITIES *)
+  call_get_nft_activities_by_item_burn kt1 tid >|= begin function
+  | Ok nft_activities ->
+    if not @@ transfer_activity_exists nft_activities then
+      Printf.eprintf "[OK] API: get_nft_activities_by_item_burn\n%!"
+    else
+      Printf.eprintf "[KO] API: get_nft_activities_by_item_burn (matching transfer activity)\n%!"
+  | Error err ->
+    Printf.eprintf
+      "[KO] API: get_nft_activities_by_item_burn (error : %s)\n%!" @@
+    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+  end >>= fun () ->
+  call_get_nft_activities_by_user_burn owner >|= begin function
+  | Ok nft_activities ->
+    if not @@ transfer_activity_exists nft_activities then
+      Printf.eprintf "[OK] API: get_nft_activities_by_user_burn\n%!"
+    else
+      Printf.eprintf "[KO] API: get_nft_activities_by_user_burn (matching transfer activity)\n%!"
+  | Error err ->
+    Printf.eprintf
+      "[KO] API: get_nft_activities_by_user_burn (error : %s)\n%!" @@
+    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+  end >>= fun () ->
+  call_get_nft_activities_by_collection_burn kt1 >|= begin function
+  | Ok nft_activities ->
+    if not @@ transfer_activity_exists nft_activities then
+      Printf.eprintf "[OK] API: get_nft_activities_by_collection_burn\n%!"
+    else
+      Printf.eprintf "[KO] API: get_nft_activities_by_collection_burn (matching transfer activity)\n%!"
+  | Error err ->
+    Printf.eprintf
+      "[KO] API: get_nft_activities_by_collection_burn (error : %s)\n%!" @@
+    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+  end >>= fun () ->
+  call_get_nft_all_activities_burn () >|= begin function
+  | Ok nft_activities ->
+    if not @@ transfer_activity_exists nft_activities then
+      Printf.eprintf "[OK] API: get_nft_all_activities_burn\n%!"
+    else
+      Printf.eprintf "[KO] API: get_nft_all_activities_burn (matching transfer activity)\n%!"
+  | Error err ->
+    Printf.eprintf
+      "[KO] API: get_nft_all_activities_burn (error : %s)\n%!" @@
+    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+  end >>= fun () ->
+
+  (* TRANSFER ONLY ACTIVITIES *)
+  call_get_nft_activities_by_item_transfer kt1 tid >|= begin function
+  | Ok nft_activities ->
+    if transfer_activity_exists nft_activities then
+      Printf.eprintf "[OK] API: get_nft_activities_by_item_transfer\n%!"
+    else
+      Printf.eprintf "[KO] API: get_nft_activities_by_item_transfer (no matching transfer activity)\n%!"
+  | Error err ->
+    Printf.eprintf
+      "[KO] API: get_nft_activities_by_item_transfer (error : %s)\n%!" @@
+    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+  end >>= fun () ->
+  call_get_nft_activities_by_user_transfer owner >|= begin function
+  | Ok nft_activities ->
+    if transfer_activity_exists nft_activities then
+      Printf.eprintf "[OK] API: get_nft_activities_by_user_transfer\n%!"
+    else
+      Printf.eprintf "[KO] API: get_nft_activities_by_user_transfer (no matching transfer activity)\n%!"
+  | Error err ->
+    Printf.eprintf
+      "[KO] API: get_nft_activities_by_user_transfer (error : %s)\n%!" @@
+    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+  end >>= fun () ->
+  call_get_nft_activities_by_collection_transfer kt1 >|= begin function
+  | Ok nft_activities ->
+    if transfer_activity_exists nft_activities then
+      Printf.eprintf "[OK] API: get_nft_activities_by_collection_transfer\n%!"
+    else
+      Printf.eprintf
+        "[KO] API: get_nft_activities_by_collection_transfer (no matching transfer activity)\n%!"
+  | Error err ->
+    Printf.eprintf
+      "[KO] API: get_nft_activities_by_collection_transfer (error : %s)\n%!" @@
+    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+  end >>= fun () ->
+  call_get_nft_all_activities_transfer () >|= begin function
+  | Ok nft_activities ->
+    if transfer_activity_exists nft_activities then
+      Printf.eprintf "[OK] API: get_nft_all_activities_transfer\n%!"
+    else
+      Printf.eprintf "[KO] API: get_nft_all_activities_transfer (no matching transfer activity)\n%!"
+  | Error err ->
+    Printf.eprintf
+      "[KO] API: get_nft_all_activities_transfer (error : %s)\n%!" @@
+    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+  end
 
 let mint_check_random collections =
   random_mint collections >>=? fun item ->
   Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
   Unix.sleep 6 ;
   check_item item >>= fun () ->
+  check_mint_activity item >>= fun () ->
   Lwt.return_ok item
 
 let burn_check_random items =
@@ -906,10 +1449,23 @@ let burn_check_random items =
   Lwt.return_ok items
 
 let transfer_check_random items =
-  random_transfer items >>=? fun (items, updated_items) ->
+  random_transfer items >>=? fun (items, updated_item, new_item) ->
   Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
   Unix.sleep 6 ;
-  Lwt_list.iter_p check_item updated_items >>= fun () ->
+  let (kt1, (owner1, owner_1_amount, token_id, royalties, metadata)) = updated_item in
+  let (_, (owner2, owner_2_amount, _, _, _)) = new_item in
+  let total_amount =
+    string_of_int @@
+    (int_of_string owner_1_amount) +
+    (int_of_string owner_2_amount) in
+  begin
+    if owner_1_amount <> "0" then
+      check_item ~strict:false (kt1, (owner1, total_amount, token_id, royalties, metadata))
+    else Lwt.return_unit
+  end >>= fun () ->
+  check_item ~strict:false (kt1, (owner2, total_amount, token_id, royalties, metadata)) >>= fun () ->
+  check_transfer_activity ~from:true updated_item >>= fun () ->
+  check_transfer_activity new_item >>= fun () ->
   Lwt.return_ok items
 
 let mints_check_random ?(max=30) collections =
@@ -921,21 +1477,21 @@ let mints_check_random ?(max=30) collections =
       aux (item :: acc) (cpt - 1) in
   aux [] nb
 
-let burns_check_random ?(max=30) mints =
+let burns_check_random ?(max=30) items =
   let nb = Random.int max + 1 in
   let rec aux acc cpt =
     if cpt = 0 then Lwt.return_ok acc
     else
-      burn_check_random mints >>=? fun item ->
+      burn_check_random items >>=? fun item ->
       aux (item :: acc) (cpt - 1) in
   aux [] nb
 
-let transfers_check_random ?(max=30) mints =
+let transfers_check_random ?(max=30) items =
   let nb = Random.int max + 1 in
   let rec aux acc cpt =
     if cpt = 0 then Lwt.return_ok acc
     else
-      transfer_check_random mints >>=? fun items ->
+      transfer_check_random items >>=? fun items ->
       aux (items @ acc) (cpt - 1) in
   aux [] nb
 
@@ -949,7 +1505,7 @@ let check_collection alias kt1 owner =
   begin
     if c.nft_collection_id = kt1 &&
        c.nft_collection_owner = Some owner then
-      Printf.eprintf "[OK] API: get_nft_collection_by_id %s\n%!" alias
+      Printf.eprintf "[Ok] API: get_nft_collection_by_id %s\n%!" alias
     else
       Printf.eprintf "[KO] API: get_nft_collection_by_id %s (no matching collection)\n%!" alias
   end ;
@@ -981,11 +1537,11 @@ let deploy_check_random_collections ?royalties ?(max=10) () =
   let collections = create_collections ?royalties nb in
   let agg =
     List.fold_left (fun acc ((admin, _alias_source, _alias_new, _royalties) as collection) ->
-      try
-        let old = List.assoc admin acc in
-        (admin, (collection :: old)) :: (List.remove_assoc admin acc)
-      with Not_found ->
-        (admin, [ collection ]) ::  acc)
+        try
+          let old = List.assoc admin acc in
+          (admin, (collection :: old)) :: (List.remove_assoc admin acc)
+        with Not_found ->
+          (admin, [ collection ]) ::  acc)
       [] collections in
   Lwt_list.map_p (fun (admin, collections) ->
       Printf.eprintf "  deploying %d collection for %s\n%!" (List.length collections) admin ;
@@ -997,7 +1553,16 @@ let deploy_check_random_collections ?royalties ?(max=10) () =
   Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
   Lwt_unix.sleep 6. >>= fun () ->
   Lwt_list.map_p (fun (alias, kt1, admin, _) ->
-      check_collection alias kt1 admin) new_collections >>= fun _ ->
+      check_collection alias kt1 admin) new_collections >>= fun res ->
+  Lwt_list.iter_s (function
+      | Ok _ -> Lwt.return_unit
+      | Error err ->
+        Lwt.return @@
+        Printf.eprintf
+          "[KO] API: check_collection (error : %s)\n%!" @@
+        EzReq_lwt.string_of_error (fun r ->
+            Some (EzEncoding.construct rarible_error_500_enc r)) err)
+    res >>= fun () ->
   Lwt.return new_collections
 
 let reset_db () =
@@ -1061,9 +1626,9 @@ let start_crawler admin_wallet validator exchange_v2 royalties =
 
 let random_test () =
   reset_db () ;
-  let r_kt1 = List.hd royalties_contracts in
-  (* let r_alias, _r_source = create_royalties () in
-   * let r_kt1 = find_kt1 r_alias in *)
+  (* let r_kt1 = List.hd royalties_contracts in *)
+  let r_alias, _r_source = create_royalties () in
+  let r_kt1 = find_kt1 r_alias in
   Printf.eprintf "New royalties %s\n%!" r_kt1 ;
   api_pid := Some (start_api ()) ;
   start_crawler "" validator exchange_v2 r_kt1 >>= fun cpid ->
@@ -1117,7 +1682,7 @@ let actions = [
   ["mint_nft <contract_alias> <dest>"], "mint an nft" ;
   ["mint_multi <contract_alias> <dest> <amount>"], "mint amount nfts in contract for dest" ;
   ["transfer_nft <contract_alias> <token_id> <dest>"], "transfer a nft" ;
-  ["tranfer_multi <contract_alias> <token_id> <dest> <amount>"], "transfer amount nft" ;
+  ["transfer_multi <contract_alias> <token_id> <dest> <amount>"], "transfer amount nft" ;
   ["run_test"], "will run some test (orig, mint, burn and trasnfer (will erase rarible db)";
 ]
 
@@ -1146,7 +1711,7 @@ let main () =
      * | "mint" :: contract :: [] -> mint_with_random_token_id contract *)
     (* | "transfer_nft" :: contract :: token_id :: dest :: [] ->
      *   transfer_nft contract token_id dest
-     * | "tranfer_multi" :: contract :: token_id :: dest :: amount :: [] ->
+     * | "transfer_multi" :: contract :: token_id :: dest :: amount :: [] ->
      *   transfer_multi contract token_id dest amount *)
     | [ "run_test" ] -> Lwt_main.run (
         Lwt.catch random_test (fun exn ->

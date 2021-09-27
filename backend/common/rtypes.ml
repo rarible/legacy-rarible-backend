@@ -306,17 +306,17 @@ type nft_items = {
 } [@@deriving encoding]
 
 type nft_activity_filter_all_type =
-  | AllTRANSFER
-  | AllMINT
-  | AllBURN
-[@@deriving encoding]
+  | ALLTRANSFER
+  | ALLMINT
+  | ALLBURN
+[@@deriving encoding {enum}]
 
 type nft_activity_filter_user_type =
-  | UserTRANSFER_FROM
-  | UserTRANSFER_TO
-  | UserMINT
-  | UserBURN
-[@@deriving encoding]
+  | USERTRANSFER_FROM
+  | USERTRANSFER_TO
+  | USERMINT
+  | USERBURN
+[@@deriving encoding {enum}]
 
 type nft_activity_by_user = {
   nft_activity_by_user_types : nft_activity_filter_user_type list ;
@@ -336,13 +336,13 @@ type nft_activity_by_collection = {
 
 type nft_activity_filter =
   | ActivityFilterAll of
-      (nft_activity_filter_all_type list [@wrap "types"]) [@kind_label "all"] [@kind "@type"]
+      (nft_activity_filter_all_type list [@wrap "types"]) [@kind "all"] [@kind_label "@type"]
   | ActivityFilterByUser of
-      nft_activity_by_user [@kind_label "by_user"] [@kind "@type"]
+      nft_activity_by_user [@kind "by_user"] [@kind_label "@type"]
   | ActivityFilterByItem of
-      nft_activity_by_item [@kind_label "by_item"] [@kind "@type"]
+      nft_activity_by_item [@kind "by_item"] [@kind_label "@type"]
   | ActivityFilterByCollection of
-      nft_activity_by_collection [@kind_label "by_collection"] [@kind "@type"]
+      nft_activity_by_collection [@kind "by_collection"] [@kind_label "@type"]
 [@@deriving encoding]
 
 type nft_activity_elt = {
@@ -356,21 +356,21 @@ type nft_activity_elt = {
 } [@@deriving encoding {camel}]
 
 type nft_activity_type =
-  | NftActivityMint [@kind_label "mint"] [@kind "@type"]
-  | NftActivityBurn [@kind_label "burn"] [@kind "@type"]
-  | NftActivityTransfer of (A.address [@wrap "transfer"]) [@kind_label "mint"] [@kind "@type"]
-[@@deriving encoding]
+  | NftActivityMint [@kind "mint"] [@kind_label "@type"]
+  | NftActivityBurn [@kind "burn"] [@kind_label "@type"]
+  | NftActivityTransfer of (A.address [@wrap "transfer"]) [@kind "mint"] [@kind_label "@type"]
+[@@deriving encoding {debug}]
 
 type nft_activity = {
   nft_activity_elt : nft_activity_elt ;
   nft_activity_type : nft_activity_type ;
 }
-[@@deriving encoding]
+[@@deriving encoding {debug}]
 
 type nft_activities = {
   nft_activities_continuation : string option ;
   nft_activities_items : nft_activity list
-} [@@deriving encoding]
+} [@@deriving encoding {debug}]
 
 type item_history_elt = {
   item_history_owner : A.address option;

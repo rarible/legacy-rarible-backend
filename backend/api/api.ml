@@ -363,7 +363,7 @@ let get_nft_activities req input =
         let str = Crawlori.Rp.string_of_error db_err in
         return (Error (unexpected_api_error str))
       | Ok res -> return_ok res
-[@@get
+[@@post
   {path="/v0.1/nft/activities/search";
    params=[size_param;continuation_param];
    input=nft_activity_filter_enc;

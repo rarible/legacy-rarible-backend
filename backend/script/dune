@@ -8,4 +8,4 @@
  (public_name rarible.api_script)
  (modules api_script)
  (name api_script)
- (libraries script api unix hex let rtypes ez_api.icurl_lwt ez_api.icurl))
+ (libraries script fmt api unix hex let rtypes ez_api.icurl_lwt ez_api.icurl))
