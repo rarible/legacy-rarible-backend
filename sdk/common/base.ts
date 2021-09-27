@@ -1,5 +1,5 @@
-import { TransactionOperation, BigMapAbstraction, OpKind, BatchOperation, TezosToolkit, Wallet, TransferParams, TransactionWalletOperation, OriginateParams, OriginationWalletOperation, OriginationOperation } from "@taquito/taquito"
-import { Config } from "./config/type"
+import { BigMapAbstraction, OpKind, TezosToolkit, TransferParams, OriginateParams } from "@taquito/taquito"
+import { Config } from "../config/type"
 import { MichelsonData, MichelsonType, packDataBytes } from "@taquito/michel-codec"
 import { TempleWallet } from "@temple-wallet/dapp"
 const bs58check = require("bs58check")
@@ -218,6 +218,4 @@ export async function get_transaction(
   else throw new Error("/transaction/" + op_hash + " failed")
 }
 
-
-export { TezosToolkit, TransactionOperation, BatchOperation, OriginationOperation, BigMapAbstraction } from "@taquito/taquito"
 export { MichelsonData, MichelsonType } from "@taquito/michel-codec"

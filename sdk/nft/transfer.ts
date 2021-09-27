@@ -1,5 +1,5 @@
-import { Provider, MichelsonData, send, TransactionArg, get_address } from "../base"
-import { check_asset_type, ExtendedAssetType } from "../check-asset-type"
+import { Provider, MichelsonData, send, TransactionArg, get_address } from "../common/base"
+import { check_asset_type, ExtendedAssetType } from "../common/check-asset-type"
 
 function transfer_param(
   from: string,

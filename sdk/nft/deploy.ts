@@ -1,4 +1,4 @@
-import { Provider, send, originate } from "../base"
+import { Provider, send, originate } from "../common/base"
 import { code, make_storage } from "./fa2"
 
 export async function deploy(

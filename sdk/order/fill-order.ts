@@ -1,4 +1,4 @@
-import { Provider, TransactionOperation, BatchOperation, send, send_batch, MichelsonData, TransactionArg, get_address } from "../base"
+import { Provider, send, send_batch, MichelsonData, TransactionArg, get_address } from "../common/base"
 import { Part, OrderForm } from "./utils"
 import { invert_order } from "./invert-order"
 import { get_make_fee } from "./get-make-fee"
