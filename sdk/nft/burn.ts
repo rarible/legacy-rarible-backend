@@ -1,4 +1,4 @@
-import { Provider, MichelsonData, OperationArg, send } from "../utils"
+import { Provider, MichelsonData, TransactionArg, send, get_address } from "../base"
 import { check_asset_type, ExtendedAssetType } from "../check-asset-type"
 
 // todo : choose type of burn parameter
@@ -16,8 +16,8 @@ export async function burn_arg(
   provider: Provider,
   asset_type: ExtendedAssetType,
   amount?: bigint,
-  owner?: string) : Promise<OperationArg> {
-  owner = (owner) ? owner : await provider.tezos.signer.publicKeyHash()
+  owner?: string) : Promise<TransactionArg> {
+  owner = (owner) ? owner : await get_address(provider)
   const checked_asset = await check_asset_type(provider, asset_type)
   switch (checked_asset.asset_class) {
     case "FA_2":
@@ -31,8 +31,8 @@ export async function burn(
   provider: Provider,
   asset_type: ExtendedAssetType,
   amount?: bigint,
-  owner?: string) : Promise<string> {
+  owner?: string,
+  wait?: boolean) : Promise<string> {
   const arg = await burn_arg(provider, asset_type, amount, owner)
-  const op = await send(provider, arg)
-  return op.hash
+  return send(provider, arg, wait)
 }

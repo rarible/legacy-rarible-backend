@@ -1,4 +1,4 @@
-import { Provider, MichelsonData, send, OperationArg } from "../utils"
+import { Provider, MichelsonData, send, TransactionArg, get_address } from "../base"
 import { check_asset_type, ExtendedAssetType } from "../check-asset-type"
 
 function transfer_param(
@@ -26,7 +26,7 @@ export function transfer_nft_arg(
   contract: string,
   from: string,
   to: string,
-  token_id: bigint) : OperationArg {
+  token_id: bigint) : TransactionArg {
   const parameter = transfer_param(from, to, [ token_id ])
   return { destination: contract, entrypoint: 'transfer', parameter }
 }
@@ -36,10 +36,10 @@ export async function transfer_nft(
   contract: string,
   from: string,
   to: string,
-  token_id: bigint) : Promise<string> {
+  token_id: bigint,
+  wait?: boolean) : Promise<string> {
   const arg = transfer_nft_arg(contract, from, to, token_id)
-  const op = await send(provider, arg)
-  return op.hash
+  return send(provider, arg, wait)
 }
 
 export function transfer_mt_arg(
@@ -47,7 +47,7 @@ export function transfer_mt_arg(
   from: string,
   to: string,
   token_id: bigint | bigint[],
-  token_amount: bigint | bigint[]) : OperationArg {
+  token_amount: bigint | bigint[]) : TransactionArg {
   const ids = (Array.isArray(token_id)) ? token_id : [ token_id ]
   const amounts = (Array.isArray(token_amount)) ? token_amount : [ token_amount ]
   const parameter = transfer_param(from, to, ids, amounts)
@@ -60,18 +60,19 @@ export async function transfer_mt(
   from: string,
   to: string,
   token_id: bigint | bigint[],
-  token_amount: bigint | bigint[]) : Promise<string> {
+  token_amount: bigint | bigint[],
+  wait?: boolean
+) : Promise<string> {
   const arg = transfer_mt_arg(contract, from, to, token_id, token_amount)
-  const op = await send(provider, arg)
-  return op.hash
+  return send(provider, arg, wait)
 }
 
 export async function transfer_arg(
   provider: Provider,
   asset_type: ExtendedAssetType,
   to: string,
-  amount?: bigint) : Promise<OperationArg> {
-  const from = await provider.tezos.signer.publicKeyHash()
+  amount?: bigint) : Promise<TransactionArg> {
+  const from = await get_address(provider)
   const checked_asset = await check_asset_type(provider, asset_type)
   switch (checked_asset.asset_class) {
     case "FA_2" :
@@ -88,8 +89,8 @@ export async function transfer(
   provider: Provider,
   asset_type: ExtendedAssetType,
   to: string,
-  amount?: bigint) : Promise<string> {
+  amount?: bigint,
+  wait?: boolean) : Promise<string> {
   const arg = await transfer_arg(provider, asset_type, to, amount)
-  const op = await send(provider, arg)
-  return op.hash
+  return send(provider, arg, wait)
 }

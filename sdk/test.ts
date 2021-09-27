@@ -1,12 +1,11 @@
-import { TezosToolkit, mint } from "./rarible"
-import { InMemorySigner } from '@taquito/signer'
+import { mint } from "./rarible"
+import { in_memory_provider } from './in_memory_provider'
 
 async function main() {
 
-  const tezos = new TezosToolkit('https://granada.tz.functori.com');
-  tezos.setProvider({
-    signer: new InMemorySigner('edsk4RqeRTrhdKfJKBTndA9x1RLp4A3wtNL1iMFRXDvfs5ANeZAncZ'),
-  });
+  const tezos = in_memory_provider(
+    'edsk4RqeRTrhdKfJKBTndA9x1RLp4A3wtNL1iMFRXDvfs5ANeZAncZ',
+    'https://granada.tz.functori.com')
 
   const config = {
     exchange: "KT1C5kWbfzASApxCMHXFLbHuPtnRaJXE4WMu",

@@ -1,20 +1,19 @@
-import { Provider, OriginationOperation } from "../utils"
+import { Provider, send, originate } from "../base"
 import { code, make_storage } from "./fa2"
-import { send, TransactionOperation } from "../utils"
 
 export async function deploy(
   provider : Provider,
   owner: string,
   royalties_contract: string
-) : Promise<OriginationOperation> {
+) : Promise<string> {
   const init = make_storage(owner, royalties_contract)
-  return provider.tezos.contract.originate({ init, code })
+  return originate(provider, {init, code})
 }
 
 export async function set_metadata_uri(
   provider: Provider,
   contract: string,
-  uri: string) : Promise<TransactionOperation> {
+  uri: string) : Promise<string> {
   const encoder = new TextEncoder();
   const a = encoder.encode(uri)
   return send(provider, {

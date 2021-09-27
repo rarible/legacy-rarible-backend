@@ -1,4 +1,4 @@
-import { Asset } from "../utils"
+import { Asset } from "../base"
 
 // export interface OrderCancel {
 //   type: "CANCEL";

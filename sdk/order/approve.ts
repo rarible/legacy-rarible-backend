@@ -1,4 +1,4 @@
-import { Provider, TransactionOperation, storage, send, StorageFA1_2, StorageFA2, Asset, OperationArg, MichelsonData } from "../utils"
+import { Provider, TransactionOperation, storage, send, StorageFA1_2, StorageFA2, Asset, TransactionArg, MichelsonData } from "../base"
 
 export async function approve_fa1_2_arg(
   provider: Provider,
@@ -6,7 +6,7 @@ export async function approve_fa1_2_arg(
   contract: string,
   value: bigint,
   infinite: boolean = true
-) : Promise<OperationArg | undefined > {
+) : Promise<TransactionArg | undefined > {
   const spender = provider.config.proxies.fa_1_2
   const st : StorageFA1_2 = await storage(provider, contract)
   let r = await st.allowance.get({ 0 : owner, 1 : spender })
@@ -23,10 +23,11 @@ export async function approve_fa1_2(
   owner: string,
   contract: string,
   value: bigint,
-  infinite: boolean = true
-) : Promise<TransactionOperation | undefined> {
+  infinite: boolean = true,
+  wait?: boolean
+) : Promise<string | undefined> {
   const arg = await approve_fa1_2_arg(provider, owner, contract, value, infinite)
-  if (arg) return send(provider, arg)
+  if (arg) return send(provider, arg, wait)
   else return undefined
 }
 
@@ -34,7 +35,7 @@ export async function approve_fa2_arg(
   provider: Provider,
   owner: string,
   contract: string,
-  token_id?: bigint) : Promise<OperationArg | undefined> {
+  token_id?: bigint) : Promise<TransactionArg | undefined> {
   const operator = provider.config.proxies.fa_1_2
   const st : StorageFA2 = await storage(provider, contract)
   if (token_id) {
@@ -64,9 +65,10 @@ export async function approve_fa2(
   provider: Provider,
   owner: string,
   contract: string,
-  token_id?: bigint) : Promise<TransactionOperation | undefined> {
+  token_id?: bigint,
+  wait?: boolean) : Promise<string | undefined> {
   const arg = await approve_fa2_arg(provider, owner, contract, token_id)
-  if (arg) return send(provider, arg)
+  if (arg) return send(provider, arg, wait)
   else return undefined
 }
 
@@ -75,7 +77,7 @@ export async function approve_arg(
   owner: string,
   asset: Asset,
   infinite?: boolean
-): Promise<OperationArg | undefined> {
+): Promise<TransactionArg | undefined> {
   if (asset.asset_type.asset_class == "FA_1_2") {
     return approve_fa1_2_arg(provider, owner, asset.asset_type.contract, asset.value, infinite)
   } else if (asset.asset_type.asset_class == "FA_2") {
@@ -88,12 +90,13 @@ export async function approve(
   provider: Provider,
   owner: string,
   asset: Asset,
-  infinite?: boolean
-): Promise<TransactionOperation | undefined> {
+  infinite?: boolean,
+  wait?: boolean
+): Promise<string | undefined> {
   if (asset.asset_type.asset_class == "FA_1_2") {
-    return approve_fa1_2(provider, owner, asset.asset_type.contract, asset.value, infinite)
+    return approve_fa1_2(provider, owner, asset.asset_type.contract, asset.value, infinite, wait)
   } else if (asset.asset_type.asset_class == "FA_2") {
-    return approve_fa2(provider, owner, asset.asset_type.contract)
+    return approve_fa2(provider, owner, asset.asset_type.contract, undefined, wait)
   } else
     throw new Error("Asset class " + asset.asset_type.asset_class + " not handled for approve")
 }
@@ -103,7 +106,7 @@ export async function approve_token_arg(
   owner: string,
   asset: Asset,
   infinite?: boolean
-): Promise<OperationArg | undefined> {
+): Promise<TransactionArg | undefined> {
   if (asset.asset_type.asset_class == "FA_1_2") {
     return approve_fa1_2_arg(provider, owner, asset.asset_type.contract, asset.value, infinite)
   } else if (asset.asset_type.asset_class == "FA_2") {
@@ -116,12 +119,13 @@ export async function approve_token(
   provider: Provider,
   owner: string,
   asset: Asset,
-  infinite?: boolean
-): Promise<TransactionOperation | undefined> {
+  infinite?: boolean,
+  wait?: boolean
+): Promise<string | undefined> {
   if (asset.asset_type.asset_class == "FA_1_2") {
-    return approve_fa1_2(provider, owner, asset.asset_type.contract, asset.value, infinite)
+    return approve_fa1_2(provider, owner, asset.asset_type.contract, asset.value, infinite, wait)
   } else if (asset.asset_type.asset_class == "FA_2") {
-    return approve_fa2(provider, owner, asset.asset_type.contract, asset.asset_type.token_id)
+    return approve_fa2(provider, owner, asset.asset_type.contract, asset.asset_type.token_id, wait)
   } else
     throw new Error("Asset class " + asset.asset_type.asset_class + " not handled for approve")
 }

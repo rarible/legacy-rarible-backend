@@ -1,5 +1,5 @@
-import { TezosToolkit, transfer, mint, burn, deploy, set_token_metadata, set_metadata_uri } from "./rarible"
-import { InMemorySigner } from '@taquito/signer'
+import { transfer, mint, burn, deploy, set_token_metadata, set_metadata_uri, get_address } from "./rarible"
+import { in_memory_provider } from './in_memory_provider'
 import yargs from 'yargs'
 
 
@@ -27,10 +27,7 @@ async function main() {
   const metadata = (argv.metadata) ? argv.metadata as { [_: string] : string } : {}
   const metadata_uri = (argv.metadata_uri) ? argv.metadata_uri as string : ""
 
-  const tezos = new TezosToolkit(endpoint);
-  tezos.setProvider({
-    signer: new InMemorySigner(edsk),
-  });
+  const tezos = in_memory_provider(edsk, endpoint)
 
   const config = {
     exchange: exchange,
@@ -43,8 +40,8 @@ async function main() {
     api: "https://localhost:8080/v0.1",
     config
   }
-  const to = (argv.to) ? argv.to as string : await provider.tezos.signer.publicKeyHash()
-  const owner = (argv.owner) ? argv.owner as string : await provider.tezos.signer.publicKeyHash()
+  const to = (argv.to) ? argv.to as string : await get_address(provider)
+  const owner = (argv.owner) ? argv.owner as string : await get_address(provider)
 
   switch(argv._[0]) {
     case 'transfer' :
@@ -64,23 +61,17 @@ async function main() {
 
     case 'deploy':
       console.log("deploy")
-      deploy(provider, owner, royalties_contract).then(function(op) {
-        op.confirmation().then(() => console.log(op.hash))
-      })
+      deploy(provider, owner, royalties_contract).then(console.log)
       break
 
     case 'set_token_metadata':
       console.log("set_token_metadata")
-      set_token_metadata(provider, contract, token_id, metadata).then(function(op) {
-        op.confirmation().then(() => console.log(op.hash))
-      })
+      set_token_metadata(provider, contract, token_id, metadata).then(console.log)
       break
 
     case 'set_metadata_uri':
       console.log("set_metadata_uri")
-      set_metadata_uri(provider, contract, metadata_uri).then(function(op) {
-        op.confirmation().then(() => console.log(op.hash))
-      })
+      set_metadata_uri(provider, contract, metadata_uri).then(console.log)
       break
 
 

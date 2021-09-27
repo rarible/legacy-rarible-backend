@@ -41,7 +41,7 @@ deps:
 
 ts-deps:
 	@sudo npm i -g typescript
-	@npm --prefix sdk --no-audit --no-fund i @taquito/signer keccak yargs
+	@npm --prefix sdk --no-audit --no-fund -D i @taquito/signer keccak bs58check yargs @temple-wallet/dapp @types/keccak @types/bs58check
 
 ts:
 	@tsc -p sdk/tsconfig.json

@@ -1,4 +1,4 @@
-import { Provider, MichelsonData, send, batch, OperationArg, TransactionOperation } from "../utils"
+import { Provider, MichelsonData, send, send_batch, TransactionArg, get_address } from "../base"
 
 function mint_param(
   token_id: bigint,
@@ -48,7 +48,7 @@ export function metadata_arg(
   contract: string,
   token_id: bigint,
   metadata: { [key: string]: string }
-) : OperationArg {
+) : TransactionArg {
   return {
     destination: contract,
     entrypoint: "setTokenMetadata",
@@ -60,8 +60,9 @@ export async function set_token_metadata(
   provider: Provider,
   contract: string,
   token_id: bigint,
-  metadata: { [key: string]: string }) : Promise<TransactionOperation> {
-  return send(provider, metadata_arg(contract, token_id, metadata))
+  metadata: { [key: string]: string },
+  wait?: boolean) : Promise<string> {
+  return send(provider, metadata_arg(contract, token_id, metadata), wait)
 }
 
 export async function mint_nft_arg(
@@ -70,11 +71,11 @@ export async function mint_nft_arg(
   royalties: { [key: string]: bigint },
   token_id?: bigint,
   metadata?: { [key: string]: string }
-) : Promise<[bigint, OperationArg[]]> {
-  const owner = await provider.tezos.signer.publicKeyHash()
+) : Promise<[bigint, TransactionArg[]]> {
+  const owner = await get_address(provider)
   const next_id = (token_id) ? token_id : await get_next_token_id(provider, contract)
   const parameter = mint_param(next_id, owner, royalties)
-  const arg : OperationArg[] = [ { destination: contract, entrypoint: 'mint', parameter } ]
+  const arg : TransactionArg[] = [ { destination: contract, entrypoint: 'mint', parameter } ]
   if (metadata) { return [ next_id, arg.concat([metadata_arg(contract, next_id, metadata)]) ] }
   else return [ next_id, arg ]
 }
@@ -84,11 +85,12 @@ export async function mint_nft(
   contract: string,
   royalties : { [key: string]: bigint },
   token_id?: bigint,
-  metadata?: { [key: string]: string }
+  metadata?: { [key: string]: string },
+  wait?: boolean
 ) : Promise<bigint> {
   const [ next_id, args ] = await mint_nft_arg(provider, contract, royalties, token_id, metadata)
   if (args.length == 1) await send(provider, args[0])
-  else await batch(provider, args)
+  else await send_batch(provider, args, wait)
   return next_id
 }
 
@@ -99,11 +101,11 @@ export async function mint_mt_arg(
   supply: bigint,
   token_id?: bigint,
   metadata?: { [key: string]: string },
-) : Promise<[bigint, OperationArg[]]> {
-  const owner = await provider.tezos.signer.publicKeyHash()
+) : Promise<[bigint, TransactionArg[]]> {
+  const owner = await get_address(provider)
   const next_id = (token_id) ? token_id : await get_next_token_id(provider, contract)
   const parameter = mint_param(next_id, owner, royalties, supply)
-  const arg : OperationArg[] = [ { destination: contract, entrypoint: 'mint', parameter } ]
+  const arg : TransactionArg[] = [ { destination: contract, entrypoint: 'mint', parameter } ]
   const arg_meta = (metadata)
     ? [ metadata_arg(contract, next_id, metadata) ]
     : []
@@ -117,10 +119,11 @@ export async function mint_mt(
   supply: bigint,
   token_id?: bigint,
   metadata?: { [key: string]: string },
+  wait?: boolean
 ) : Promise<bigint> {
   const [ next_id, args ] = await mint_mt_arg(provider, contract, royalties, supply, token_id, metadata)
   if (args.length == 1) await send(provider, args[0])
-  else await batch(provider, args)
+  else await send_batch(provider, args, wait)
   return next_id
 }
 
@@ -131,7 +134,7 @@ export async function mint_arg(
   supply?: bigint,
   token_id?: bigint,
   metadata?: { [key: string]: string },
-) : Promise<[bigint, OperationArg[]]> {
+) : Promise<[bigint, TransactionArg[]]> {
   if (supply) { return mint_mt_arg(provider, contract, royalties, supply, token_id, metadata) }
   else { return mint_nft_arg(provider, contract, royalties, token_id, metadata) }
 }
@@ -143,7 +146,8 @@ export async function mint(
   supply?: bigint,
   token_id?: bigint,
   metadata?: { [key: string]: string },
+  wait?: boolean
 ) : Promise<bigint> {
-  if (supply) { return mint_mt(provider, contract, royalties, supply, token_id, metadata) }
-  else { return mint_nft(provider, contract, royalties, token_id, metadata) }
+  if (supply) { return mint_mt(provider, contract, royalties, supply, token_id, metadata, wait) }
+  else { return mint_nft(provider, contract, royalties, token_id, metadata, wait) }
 }

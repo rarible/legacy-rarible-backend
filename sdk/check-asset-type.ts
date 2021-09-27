@@ -1,4 +1,4 @@
-import { Provider, TokenAssetType } from "./utils"
+import { Provider, TokenAssetType } from "./base"
 
 export interface UnknownTokenAssetType {
   contract: string;

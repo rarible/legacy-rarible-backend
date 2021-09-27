@@ -1,4 +1,4 @@
-import { Provider, pack, MichelsonType, MichelsonData, AssetType, Asset } from "../utils"
+import { Provider, pack, sign, MichelsonType, MichelsonData, AssetType, Asset } from "../base"
 import { OrderForm, OrderRaribleV2DataV1 } from "./utils"
 const keccak_base = require("keccak")
 
@@ -115,8 +115,7 @@ export async function sign_order(
   provider: Provider,
   order: OrderForm) : Promise<string> {
   let h = pack(order_to_struct(order), order_type)
-  let sig = await provider.tezos.signer.sign(h)
-  return sig.prefixSig
+  return sign(provider, h)
 }
 
 export async function order_key(

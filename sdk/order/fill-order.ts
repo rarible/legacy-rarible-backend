@@ -1,4 +1,4 @@
-import { Provider, TransactionOperation, BatchOperation, send, batch, MichelsonData, OperationArg } from "../utils"
+import { Provider, TransactionOperation, BatchOperation, send, send_batch, MichelsonData, TransactionArg, get_address } from "../base"
 import { Part, OrderForm } from "./utils"
 import { invert_order } from "./invert-order"
 import { get_make_fee } from "./get-make-fee"
@@ -47,14 +47,14 @@ export async function fill_order_arg(
   provider: Provider,
   left: OrderForm,
   request: FillOrderRequest
-): Promise<OperationArg[]> {
+): Promise<TransactionArg[]> {
   const make = get_make_asset(provider, left, request.amount)
   const arg_approve =
     (make.asset_type.asset_class != "XTZ" )
     ? await approve_arg(provider, left.maker, left.make, request.infinite)
     : undefined
   const args = (arg_approve) ? [ arg_approve ] : []
-  const address = await provider.tezos.signer.publicKeyHash()
+  const address = await get_address(provider)
   const right = {
     ...invert_order(left, request.amount, address),
     data: {
@@ -77,9 +77,10 @@ export async function fill_order_arg(
 export async function fill_order(
   provider: Provider,
   left: OrderForm,
-  request: FillOrderRequest
-): Promise<TransactionOperation | BatchOperation> {
+  request: FillOrderRequest,
+  wait?: boolean
+): Promise<string> {
   const args = await fill_order_arg(provider, left, request)
-  if (args.length == 1) return send(provider, args[0])
-  else return batch(provider, args)
+  if (args.length == 1) return send(provider, args[0], wait)
+  else return send_batch(provider, args, wait)
 }
