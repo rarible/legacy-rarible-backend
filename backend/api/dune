@@ -9,3 +9,14 @@
  (modules main_api)
  (preprocess (pps ez_api.ppx_server))
  (libraries api))
+
+(executable
+ (name openapi)
+ (modules doc openapi)
+ (libraries api ez_api.openAPI))
+
+(rule
+ (deps openapi.exe)
+ (targets openapi.json)
+ (action (with-stdout-to %{targets}
+          (run %{project_root}/backend/api/openapi.exe --title "Tezos Rarible API" --version "0.1"))))
