@@ -1,4 +1,4 @@
-import { Provider, pack, sign, MichelsonType, MichelsonData, AssetType, Asset } from "../base"
+import { Provider, pack, sign, MichelsonType, MichelsonData, AssetType, Asset } from "../common/base"
 import { OrderForm, OrderRaribleV2DataV1 } from "./utils"
 const keccak_base = require("keccak")
 

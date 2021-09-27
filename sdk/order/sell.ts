@@ -1,6 +1,6 @@
-import { Provider, XTZAssetType, FA12AssetType } from "../base"
+import { Provider, XTZAssetType, FA12AssetType } from "../common/base"
+import { ExtendedAssetType, check_asset_type } from "../common/check-asset-type"
 import { Part, OrderForm, salt } from "./utils"
-import { ExtendedAssetType, check_asset_type } from "../check-asset-type"
 import { upsert_order } from "./upsert-order"
 
 export interface SellRequest {

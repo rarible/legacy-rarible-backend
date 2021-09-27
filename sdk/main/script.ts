@@ -1,5 +1,5 @@
 import { transfer, mint, burn, deploy, set_token_metadata, set_metadata_uri, get_address } from "./rarible"
-import { in_memory_provider } from './in_memory_provider'
+import { in_memory_provider } from '../providers/in_memory/in_memory_provider'
 import yargs from 'yargs'
 
 

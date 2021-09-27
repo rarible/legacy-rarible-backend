@@ -1,4 +1,4 @@
-import { Provider } from "../base"
+import { Provider } from "../common/base"
 import { OrderForm } from "./utils"
 import { get_make_fee } from "./get-make-fee"
 import { add_fee } from "./add-fee"

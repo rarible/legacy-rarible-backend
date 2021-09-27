@@ -39,12 +39,17 @@ deps:
 	@opam pin add -n -y --ignore-pin-depends crawlori.~dev git+https://gitlab.com/functori/crawlori.git
 	@CRAWLORI_NO_UPDATE=true PGDATABASE=$(DB) opam install --deps-only --ignore-pin-depends .
 
+ts-global-deps:
+	@sudo npm i -g typescript webpack webpack-cli
+
 ts-deps:
-	@sudo npm i -g typescript
-	@npm --prefix sdk --no-audit --no-fund -D i @taquito/signer keccak bs58check yargs @temple-wallet/dapp @types/keccak @types/bs58check
+	@npm --prefix sdk --no-audit --no-fund i
 
 ts:
 	@tsc -p sdk/tsconfig.json
+
+web: ts
+	@webpack --config sdk/webpack.config.js
 
 mligo-pin:
 	@opam pin add -n -y mligo.~dev git+https://gitlab.com/functori/mligo.git

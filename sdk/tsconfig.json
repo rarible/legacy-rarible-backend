@@ -5,5 +5,5 @@
     "outDir": "dist",
     "target": "es2020"
   },
-  "include": [ "rarible.ts", "test.ts", "script.ts", "temple_provider.ts" ]
+  "include": [ "main/*.ts" ]
 }

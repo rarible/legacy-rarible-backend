@@ -1,4 +1,4 @@
-import { Provider, MichelsonData, send, send_batch, TransactionArg, get_address } from "../base"
+import { Provider, MichelsonData, send, send_batch, TransactionArg, get_address } from "../common/base"
 
 function mint_param(
   token_id: bigint,
