@@ -8,7 +8,7 @@ all: copy
 build:
 	@CRAWLORI_NO_UPDATE=true PGDATABASE=$(DB) PGCUSTOM_CONVERTERS_CONFIG=$(CONVERTERS) dune build backend
 
-copy: build
+copy: build openapi
 	@mkdir -p _bin
 	@cp -f _build/default/backend/crawler/crawler.exe _bin/crawler
 	@cp -f _build/default/backend/api/main_api.exe _bin/api
@@ -63,3 +63,6 @@ arl-deps:
 
 arl:
 	@dune build contracts/arl
+
+openapi:
+	@cp -f _build/default/backend/api/openapi.json .
