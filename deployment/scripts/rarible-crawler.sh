@@ -10,7 +10,7 @@ ARG=
 rarible_crawler_start () {
     $ROTATE $LOGFILE
     cd $WORKING_DIRECTORY
-    $CRAWLER $ARG $CRAWLER_CONFIG_FILE &> $LOGFILE
+    $CRAWLER $ARG $CRAWLER_CONFIG_FILE &> $LOGFILE &
     PID=$!
     echo $PID > $PIDFILE
 }
