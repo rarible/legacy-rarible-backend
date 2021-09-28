@@ -17,11 +17,11 @@ let (let$>) r f = match r with
   | Error e -> Lwt.return_error (invalid_argument (string_of_error e))
   | Ok x -> f x
 
-let nft_section = EzAPI.Doc.{section_name = "NFT"; section_docs = []}
-let ownerships_section = EzAPI.Doc.{section_name = "Ownerships"; section_docs = []}
-let items_section = EzAPI.Doc.{section_name = "Items"; section_docs = []}
-let collections_section = EzAPI.Doc.{section_name = "Collections"; section_docs = []}
-let orders_section = EzAPI.Doc.{section_name = "Orders"; section_docs = []}
+let nft_section = EzAPI.Doc.{section_name = "nft-activity-controller"; section_docs = []}
+let ownerships_section = EzAPI.Doc.{section_name = "nft-ownership-controller"; section_docs = []}
+let items_section = EzAPI.Doc.{section_name = "nft-item-controller"; section_docs = []}
+let collections_section = EzAPI.Doc.{section_name = "nft-collection-controller"; section_docs = []}
+let orders_section = EzAPI.Doc.{section_name = "order-controller"; section_docs = []}
 let sections = [
   nft_section; ownerships_section; items_section; collections_section;
   orders_section ]
