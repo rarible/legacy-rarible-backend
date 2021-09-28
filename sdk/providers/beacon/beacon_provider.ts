@@ -1,10 +1,11 @@
-import { TempleWallet, TempleDAppNetwork } from '@temple-wallet/dapp'
+import { BeaconWallet } from '@taquito/beacon-wallet'
+import { NetworkType } from "@airgap/beacon-sdk"
 import { TezosToolkit, TransferParams, OriginateParams, OpKind } from "@taquito/taquito"
 import { TezosProvider, b58enc } from "../../common/base"
 
-export async function temple_provider(endpoint: string, network: TempleDAppNetwork, name = "rarible") : Promise<TezosProvider> {
-  const wallet = new TempleWallet(name)
-  await wallet.connect(network)
+export async function beacon_provider(endpoint: string, network: NetworkType, name = "rarible") : Promise<TezosProvider> {
+  const wallet = new BeaconWallet({ name })
+  await wallet.requestPermissions({ network: {type: network, rpcUrl: endpoint} })
   const tk = new TezosToolkit(endpoint)
   tk.setProvider({ wallet })
 
@@ -26,8 +27,8 @@ export async function temple_provider(endpoint: string, network: TempleDAppNetwo
     return op.opHash
   }
   const sign = async(bytes: string) => {
-    const sig = await wallet.sign(bytes)
-    return b58enc(sig, new Uint8Array([9, 245, 205, 134, 18]))
+    const { signature } = await wallet.client.requestSignPayload({payload: bytes})
+    return b58enc(signature, new Uint8Array([9, 245, 205, 134, 18]))
   }
   const address = async() => {
     return wallet.getPKH()
@@ -37,7 +38,7 @@ export async function temple_provider(endpoint: string, network: TempleDAppNetwo
     return c.storage()
   }
   return {
-    kind: "temple",
+    kind: "beacon",
     transfer,
     originate,
     batch,

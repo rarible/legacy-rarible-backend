@@ -1,13 +1,15 @@
 {
   "devDependencies": {
+    "@airgap/beacon-sdk": "^2.3.2",
+    "@taquito/beacon-wallet": "^10.1.2",
     "@taquito/signer": "^10.1.2",
     "@temple-wallet/dapp": "^5.0.2",
     "@types/bs58check": "^2.1.0",
     "@types/keccak": "^3.0.1",
     "bs58check": "^2.1.2",
     "keccak": "^3.0.2",
-    "yargs": "^17.2.1",
     "node-polyfill-webpack-plugin": "^1.1.4",
-    "ts-loader": "^9.2.6"
+    "ts-loader": "^9.2.6",
+    "yargs": "^17.2.1"
   }
 }

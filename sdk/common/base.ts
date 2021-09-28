@@ -1,7 +1,6 @@
-import { BigMapAbstraction, OpKind, TezosToolkit, TransferParams, OriginateParams } from "@taquito/taquito"
+import { BigMapAbstraction, TransferParams, OriginateParams } from "@taquito/taquito"
 import { Config } from "../config/type"
 import { MichelsonData, MichelsonType, packDataBytes } from "@taquito/michel-codec"
-import { TempleWallet } from "@temple-wallet/dapp"
 const bs58check = require("bs58check")
 
 // Storages
@@ -48,19 +47,15 @@ export interface Asset {
   value: bigint;
 }
 
-// Provider
-
-export interface TempleProvider {
-  kind: "temple";
-  tk: TempleWallet;
+export interface TezosProvider {
+  kind: 'in_memory' | "temple" | "beacon";
+  transfer: (arg: TransferParams, wait?: boolean) => Promise<string>;
+  originate: (arg: OriginateParams, wait?: boolean) => Promise<string>;
+  batch: (args: TransferParams[], wait?: boolean) => Promise<string>;
+  sign: (bytes: string) => Promise<string>;
+  address: () => Promise<string>;
+  storage: (contract: string) => Promise<any>;
 }
-
-export interface InMemoryProvider {
-  kind: "in_memory";
-  tk: TezosToolkit;
-}
-
-export type TezosProvider = TempleProvider | InMemoryProvider
 
 export interface Provider {
   tezos: TezosProvider ;
@@ -77,68 +72,12 @@ export interface TransactionArg {
   parameter?: MichelsonData
 }
 
-export async function wtransfer(p: Provider, arg: TransferParams, wait = false)
-: Promise<string> {
-  switch (p.tezos.kind) {
-    case "in_memory":
-      const op1 = await p.tezos.tk.contract.transfer(arg)
-      if (wait) { await op1.confirmation() }
-      return op1.hash
-    case "temple":
-      const op2 = await p.tezos.tk.toTezos().wallet.transfer(arg).send()
-      if (wait) { await op2.confirmation() }
-      return op2.opHash
-  }
-}
-
-export async function originate(p: Provider, arg: OriginateParams, wait = false)
-: Promise<string> {
-  switch (p.tezos.kind) {
-    case "in_memory":
-      const op1 = await p.tezos.tk.contract.originate(arg)
-      if (wait) { await op1.confirmation() }
-      return op1.hash
-    case "temple":
-      const op2 = await p.tezos.tk.toTezos().wallet.originate(arg).send()
-      if (wait) { await op2.confirmation() }
-      return op2.opHash
-  }
-}
-
-export async function batch(p: Provider, args: TransferParams[], wait = false)
-: Promise<string> {
-  const args2 = args.map(function(a) {
-    return {...a, kind: <OpKind.TRANSACTION>OpKind.TRANSACTION} })
-  switch (p.tezos.kind) {
-    case "in_memory":
-      const op1 = await p.tezos.tk.contract.batch(args2).send()
-      if (wait) { await op1.confirmation() }
-      return op1.hash
-    case "temple":
-      const op2 = await p.tezos.tk.toTezos().wallet.batch(args2).send()
-      if (wait) { await op2.confirmation() }
-      return op2.opHash
-  }
-}
-
 export function get_address(p: Provider) : Promise<string> {
-  switch (p.tezos.kind) {
-    case "in_memory":
-      return p.tezos.tk.signer.publicKeyHash()
-    case "temple":
-      return p.tezos.tk.getPKH()
-  }
+  return p.tezos.address()
 }
 
 export async function storage<T>(p : Provider, contract: string) : Promise<T> {
-  switch (p.tezos.kind) {
-    case "in_memory":
-      const c1 = await p.tezos.tk.contract.at(contract)
-      return c1.storage()
-    case "temple":
-      const c2 = await p.tezos.tk.toTezos().wallet.at(contract)
-      return c2.storage()
-  }
+  return p.tezos.storage(contract)
 }
 
 export function b58enc(payload: string, prefix: Uint8Array) {
@@ -153,14 +92,7 @@ export function b58enc(payload: string, prefix: Uint8Array) {
 }
 
 export async function sign(p : Provider, bytes: string) : Promise<string> {
-  switch (p.tezos.kind) {
-    case "in_memory":
-      const s1 = await p.tezos.tk.signer.sign(bytes)
-      return s1.prefixSig
-    case "temple":
-      const s2 = await p.tezos.tk.sign(bytes)
-      return b58enc(s2, new Uint8Array([9, 245, 205, 134, 18]))
-  }
+  return p.tezos.sign(bytes)
 }
 
 export async function send(
@@ -169,13 +101,13 @@ export async function send(
   wait?: boolean
 ) : Promise<string> {
   if (arg.entrypoint && arg.parameter) {
-    return wtransfer(provider, {
+    return provider.tezos.transfer({
       amount: (arg.amount) ? Number(arg.amount) : 0,
       to: arg.destination,
       parameter: { entrypoint: arg.entrypoint, value: arg.parameter }
     }, wait)
   } else {
-    return wtransfer(provider, {
+    return provider.tezos.transfer({
       amount: (arg.amount) ? Number(arg.amount) : 0,
       to: arg.destination
     }, wait)
@@ -201,7 +133,7 @@ export async function send_batch(
       }
     }
   })
-  return batch(provider, params, wait)
+  return provider.tezos.batch(params, wait)
 }
 
 export function pack(

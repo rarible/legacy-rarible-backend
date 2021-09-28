@@ -4,27 +4,16 @@ function mint_param(
   token_id: bigint,
   owner: string,
   royalties: { [key: string]: bigint },
-  supply?: bigint) : MichelsonData {
-  if (supply) {
-    return {
-      prim: 'Pair',
-      args: [
-        { int : token_id.toString() },
+  amount = 1n) : MichelsonData {
+  return {
+    prim: 'Pair',
+    args: [
+      { int : token_id.toString() },
+      { prim: 'Pair', args: [
         { string : owner },
-        { int : supply.toString() },
-        Object.keys(royalties).map(function(k) { return {prim: 'Pair', args: [ {string : k}, {int: royalties[k].toString() }] }})
-      ]
-    }
-  } else {
-    return {
-      prim: 'Pair',
-      args: [
-        { int : token_id.toString() },
-        { string : owner },
-        Object.keys(royalties).map(function(k) { return {prim: 'Pair', args: [ {string : k}, {int: royalties[k].toString() }] }})
-      ]
-    }
-  }
+        { prim: 'Pair', args: [
+          { int : amount.toString() },
+          Object.keys(royalties).map(function(k) { return {prim: 'Pair', args: [ {string : k}, {int: royalties[k].toString() }] }}) ] } ] } ] }
 }
 
 function metadata_param(

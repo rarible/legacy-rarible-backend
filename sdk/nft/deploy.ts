@@ -1,4 +1,4 @@
-import { Provider, send, originate } from "../common/base"
+import { Provider, send } from "../common/base"
 import { code, make_storage } from "./fa2"
 
 export async function deploy(
@@ -7,7 +7,7 @@ export async function deploy(
   royalties_contract: string
 ) : Promise<string> {
   const init = make_storage(owner, royalties_contract)
-  return originate(provider, {init, code})
+  return provider.tezos.originate({init, code})
 }
 
 export async function set_metadata_uri(
