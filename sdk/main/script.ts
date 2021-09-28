@@ -1,4 +1,4 @@
-import { transfer, mint, burn, deploy, set_token_metadata, set_metadata_uri, get_address } from "./rarible"
+import { transfer, mint, burn, deploy, set_token_metadata, set_metadata_uri } from "./rarible"
 import { in_memory_provider } from '../providers/in_memory/in_memory_provider'
 import yargs from 'yargs'
 
@@ -40,13 +40,13 @@ async function main() {
     api: "https://localhost:8080/v0.1",
     config
   }
-  const to = (argv.to) ? argv.to as string : await get_address(provider)
-  const owner = (argv.owner) ? argv.owner as string : await get_address(provider)
+  const to = (argv.to) ? argv.to as string : await provider.tezos.address()
+  const owner = (argv.owner) ? argv.owner as string : await provider.tezos.address()
 
   switch(argv._[0]) {
     case 'transfer' :
       console.log("transfer")
-      transfer(provider, { asset_class: "FA_2", contract, token_id }, to, amount).then()
+      transfer(provider, { asset_class: "FA_2", contract, token_id }, to, amount).then(console.log)
       break
 
     case 'mint':

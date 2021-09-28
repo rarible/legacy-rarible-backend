@@ -1,10 +1,10 @@
-import { mint } from "./rarible"
+import { transfer } from "./rarible"
 import { in_memory_provider } from '../providers/in_memory/in_memory_provider'
 
 async function main() {
 
   const tezos = in_memory_provider(
-    'edsk4RqeRTrhdKfJKBTndA9x1RLp4A3wtNL1iMFRXDvfs5ANeZAncZ',
+    'edsk3UUamwmemNBJgDvS8jXCgKsvjL2NoTwYRFpGSRPut4Hmfs6dG8',
     'https://granada.tz.functori.com')
 
   const config = {
@@ -19,9 +19,9 @@ async function main() {
     config
   }
 
-  mint(provider, "KT1VYBd25dw5GjYqPM8T8My6b4g5c4cd4hwu", { tz1ibJRnL6hHjAfmEzM7QtGyTsS6ZtHdgE2S: 10000n }, 100n, 1n)
+  // mint(provider, "KT1VYBd25dw5GjYqPM8T8My6b4g5c4cd4hwu", { tz1ibJRnL6hHjAfmEzM7QtGyTsS6ZtHdgE2S: 10000n }, 100n, 1n)
 
-  // transfer(provider, { asset_class: "FA_2", contract: "KT1MWv7oH8JJhxJJs8co21XiByBEAYx2QDjY", token_id: 1n }, "tz1Mxsc66En4HsVHr6rppYZW82ZpLhpupToC", 1n).then(console.log).catch(console.log)
+  transfer(provider, { asset_class: "FA_2", contract: "KT1MWv7oH8JJhxJJs8co21XiByBEAYx2QDjY", token_id: 1n }, "tz1iQ3DU476h5EUULD1e5yfuiYyk1JNR6HbY", 50n).then(console.log).catch(console.log)
 
   // burn(provider, { asset_class: "FA_2", contract: "KT1MWv7oH8JJhxJJs8co21XiByBEAYx2QDjY", token_id: 1n }, 1n)
 

@@ -1,4 +1,4 @@
-import { Provider, storage, send, StorageFA1_2, StorageFA2, Asset, TransactionArg, MichelsonData } from "../common/base"
+import { Provider, send, StorageFA1_2, StorageFA2, Asset, TransactionArg, MichelsonData } from "../common/base"
 
 export async function approve_fa1_2_arg(
   provider: Provider,
@@ -8,7 +8,7 @@ export async function approve_fa1_2_arg(
   infinite: boolean = true
 ) : Promise<TransactionArg | undefined > {
   const spender = provider.config.proxies.fa_1_2
-  const st : StorageFA1_2 = await storage(provider, contract)
+  const st : StorageFA1_2 = await provider.tezos.storage(contract)
   let r = await st.allowance.get({ 0 : owner, 1 : spender })
   if (r===false) {
     let v = (infinite) ? st.totalsupply.toString() : value.toString()
@@ -37,13 +37,17 @@ export async function approve_fa2_arg(
   contract: string,
   token_id?: bigint) : Promise<TransactionArg | undefined> {
   const operator = provider.config.proxies.fa_1_2
-  const st : StorageFA2 = await storage(provider, contract)
+  const st : StorageFA2 = await provider.tezos.storage(contract)
   if (token_id) {
     let r = await st.operator.get({ 0 : operator, 1 : token_id, 2: owner })
     if (r===false) {
-      let parameter : MichelsonData = [ { prim: 'Left', args: [ { prim: "Pair", args: [
-        { string: owner }, { string : operator }, { int : token_id.toString() }
-      ] } ] } ]
+      let parameter : MichelsonData = [
+        { prim: 'Left', args: [
+          { prim: "Pair", args: [
+            { string: owner },
+            { prim: 'Pair', args: [
+              { string : operator },
+              { int : token_id.toString() } ] } ] } ] } ]
       return { destination: contract, entrypoint: "update_operator", parameter }
     }
     else {

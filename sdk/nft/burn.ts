@@ -8,8 +8,11 @@ function burn_param(
   amount = 1n) : MichelsonData {
   return {
     prim: 'Pair',
-    args: [ { int: token_id.toString() }, { string : owner }, { int : amount.toString() } ]
-  }
+    args: [
+      { int: token_id.toString() },
+      { prim : 'Pair', args: [
+        { string : owner },
+        { int : amount.toString() } ] } ] }
 }
 
 export async function burn_arg(

@@ -1,9 +1,10 @@
 {
   "compilerOptions": {
     "strict": true,
+    "module": "commonjs",
     "moduleResolution": "node",
     "outDir": "dist",
     "target": "es2020"
   },
-  "include": [ "main/*.ts" ]
+  "include": [ "main/*.ts", "providers/*/*.ts" ]
 }

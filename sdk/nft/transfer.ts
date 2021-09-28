@@ -15,8 +15,11 @@ function transfer_param(
         token_id.map(function(id, i) {
           return {
             prim: 'Pair',
-            args: [ { string: to }, { int: id.toString() }, { int: amount[i].toString() } ] }
-        })
+            args: [
+              { string: to },
+              { prim: 'Pair', args:[ { int: id.toString() }, { int: amount[i].toString() } ] }
+            ] }
+        } )
       ]
     }
   ]
@@ -51,6 +54,7 @@ export function transfer_mt_arg(
   const ids = (Array.isArray(token_id)) ? token_id : [ token_id ]
   const amounts = (Array.isArray(token_amount)) ? token_amount : [ token_amount ]
   const parameter = transfer_param(from, to, ids, amounts)
+  console.log({ destination: contract , entrypoint: 'transfer', parameter })
   return { destination: contract , entrypoint: 'transfer', parameter }
 }
 
