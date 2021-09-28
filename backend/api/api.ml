@@ -58,6 +58,7 @@ let status_param = EzAPI.Param.string "status"
 let hash_arg = EzAPI.Arg.string "hash"
 let item_id_arg = EzAPI.Arg.string "itemId"
 let collection_arg = EzAPI.Arg.string "collection"
+let ownership_id_arg = EzAPI.Arg.string "ownershipId"
 
 let mk_invalid_argument param msg =
   Error (invalid_argument (Printf.sprintf "%s %s" param.EzAPI.Param.param_id msg))
@@ -385,7 +386,7 @@ let get_nft_ownership_by_id (_, ownership_id) () =
       return (Error (unexpected_api_error str))
     | Ok res -> return_ok res
 [@@get
-  {path="/v0.1/ownerships/{ownershipId:string}";
+  {path="/v0.1/ownerships/{ownership_id_arg}";
    output=nft_ownership_enc;
    errors=[rarible_error_500];
    name="ownerships";
@@ -864,7 +865,7 @@ let get_order_by_hash (_req, hash) () =
  *   {path="/v0.1/orders/{hash_arg}/updateMakeStock";
  *    output=order_enc;
  *    errors=[rarible_error_500]}]
- * 
+ *
  * let buyer_fee_signature req _input =
  *   let _fee = EzAPI.Req.find_param fee_param req in
  *   return (Error (unexpected_api_error ""))
