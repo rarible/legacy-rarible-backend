@@ -432,7 +432,7 @@ let get_nft_all_ownerships req () =
    params=[size_param;continuation_param];
    output=nft_ownerships_enc;
    errors=[rarible_error_500];
-   name="ownershipss_all";
+   name="ownerships_all";
    section=ownerships_section}]
 
 (* nft-item-controller *)
