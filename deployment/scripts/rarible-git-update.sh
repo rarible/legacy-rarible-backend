@@ -4,7 +4,7 @@ LOG_PREFIX="Rarible Git Updater Script"
 GIT=git
 MAKE=make
 CMD=updater
-source rarible-env.sh
+source $HOME/rarible-env.sh
 
 rarible_update () {
     $ROTATE $LOGFILE
