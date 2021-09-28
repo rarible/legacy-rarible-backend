@@ -55,7 +55,9 @@ let end_date_param = EzAPI.Param.string "endDate"
 let source_param = EzAPI.Param.string "source"
 let status_param = EzAPI.Param.string "status"
 
-let arg_hash = EzAPI.Arg.string "hash"
+let hash_arg = EzAPI.Arg.string "hash"
+let item_id_arg = EzAPI.Arg.string "itemId"
+let collection_arg = EzAPI.Arg.string "collection"
 
 let mk_invalid_argument param msg =
   Error (invalid_argument (Printf.sprintf "%s %s" param.EzAPI.Param.param_id msg))
@@ -363,7 +365,7 @@ let get_nft_activities req input =
         let str = Crawlori.Rp.string_of_error db_err in
         return (Error (unexpected_api_error str))
       | Ok res -> return_ok res
-[@@get
+[@@post
   {path="/v0.1/nft/activities/search";
    params=[size_param;continuation_param];
    input=nft_activity_filter_enc;
@@ -446,7 +448,7 @@ let get_nft_item_meta_by_id (_req, item_id) () =
       return (Error (unexpected_api_error str))
     | Ok res -> return_ok res
 [@@get
-  {path="/v0.1/items/{itemId:string}/meta";
+  {path="/v0.1/items/{item_id_arg}/meta";
    output=nft_item_meta_enc;
    errors=[rarible_error_500];
    name="items_meta";
@@ -473,13 +475,12 @@ let get_nft_item_by_id (req, item_id) () =
         return (Error (unexpected_api_error str))
       | Ok res -> return_ok res
 [@@get
-  {path="/v0.1/items/byId/{itemId:string}";
+  {path="/v0.1/items/{item_id_arg}";
    params=[include_meta_param];
    output=nft_item_enc;
    errors=[rarible_error_500];
    name="items_by_id";
    section=items_section}]
-(* TODO path="/v0.1/items/{itemId:string}" *)
 
 let get_nft_items_by_owner req () =
   match get_required_owner_param req with
@@ -608,7 +609,7 @@ let generate_nft_token_id (_req, collection) () =
       return (Error (unexpected_api_error str))
     | Ok res -> return_ok res
 [@@get
-  {path="/v0.1/collections/{collection:string}/generate_token_id";
+  {path="/v0.1/collections/{collection_arg}/generate_token_id";
    output=nft_token_id_enc;
    errors=[rarible_error_500];
    name="collections_generate_id";
@@ -624,12 +625,11 @@ let get_nft_collection_by_id (_req, collection) () =
       return (Error (unexpected_api_error str))
     | Ok res -> return_ok res
 [@@get
-  {path="/v0.1/collections/byId/{collection:string}";
+  {path="/v0.1/collections/{collection_arg}";
    output=nft_collection_enc;
    errors=[rarible_error_500];
    name="collections_by_id";
    section=collections_section}]
-(* TODO : path="/v0.1/collections/{collection:string}" *)
 
 let search_nft_collections_by_owner req () =
   match get_required_owner_param req with
@@ -852,21 +852,20 @@ let get_order_by_hash (_req, hash) () =
     let str = Crawlori.Rp.string_of_error db_err in
     return (Error (unexpected_api_error str))
 [@@get
-  {path="/v0.1/orders/byHash/{arg_hash}";
+  {path="/v0.1/orders/{hash_arg}";
    output=order_enc;
    errors=[rarible_error_500];
    name="orders_by_hash";
    section=orders_section}]
-(* TODO : path="/v0.1/orders/{arg_hash}" *)
 
 (* let update_order_make_stock _req () =
  *   return (Error (unexpected_api_error ""))
  * [@@get
- *   {path="/v0.1/orders/{arg_hash}/updateMakeStock";
+ *   {path="/v0.1/orders/{hash_arg}/updateMakeStock";
  *    output=order_enc;
- *    errors=[rarible_error_500]}] *)
-
-(* let buyer_fee_signature req _input =
+ *    errors=[rarible_error_500]}]
+ * 
+ * let buyer_fee_signature req _input =
  *   let _fee = EzAPI.Req.find_param fee_param req in
  *   return (Error (unexpected_api_error ""))
  * [@@post

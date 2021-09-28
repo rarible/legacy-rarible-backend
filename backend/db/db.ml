@@ -539,7 +539,8 @@ let get_nft_item_creators_from_metadata metadata =
 let get_nft_item_owners ?dbh contract token_id =
   use dbh @@ fun dbh ->
   [%pgsql dbh
-      "select owner FROM tokens where contract = $contract and token_id = $token_id"]
+      "select owner FROM tokens where main and \
+       amount <> 0 and contract = $contract and token_id = $token_id"]
 
 (* let get_nft_item_royalties ?dbh id =
  *   use dbh @@ fun dbh ->
@@ -691,7 +692,7 @@ let get_nft_items_by_owner ?dbh ?include_meta ?continuation ?(size=50) owner =
       "select concat(contract, ':', token_id) as id, contract, token_id, \
        last, amount, supply, metadata \
        from tokens where \
-       main and owner = $owner and \
+       main and owner = $owner and amount <> 0 and \
        ($no_continuation or \
        (last = $ts and concat(contract, ':', token_id) > $id) or \
        (last < $ts)) \
@@ -730,7 +731,7 @@ let get_nft_items_by_creator ?dbh ?include_meta ?continuation ?(size=50) creator
        from tokens, \
        jsonb_to_recordset((metadata -> 'creators')) as creators(account varchar, value int) \
        where creators.account = $creator and \
-       main and \
+       main and amount <> 0 and \
        ($no_continuation or \
        (last = $ts and concat(contract, ':', token_id) > $id) or \
        (last < $ts)) \
@@ -785,7 +786,7 @@ let get_nft_items_by_collection ?dbh ?include_meta ?continuation ?(size=50) cont
       "select concat(contract, ':', token_id) as id, contract, token_id, \
        last, amount, supply, metadata \
        from tokens where \
-       main and contract = $contract and \
+       main and contract = $contract and amount <> 0 and \
        ($no_continuation or \
        (last = $ts and concat(contract, ':', token_id) > $id) or \
        (last < $ts)) \
@@ -847,7 +848,7 @@ let get_nft_all_items
        last, amount, supply, metadata \
        from tokens where \
        main and \
-       (supply > 0 or (not $no_show_deleted and $show_deleted_v)) and \
+       (supply > 0 and amount <> 0 or (not $no_show_deleted and $show_deleted_v)) and \
        ($no_last_updated_to or (last <= $last_updated_to_v)) and \
        ($no_last_updated_from or (last >= $last_updated_from_v)) and \
        ($no_continuation or \
@@ -907,9 +908,18 @@ let mk_nft_activity obj = match obj#activity_type with
   | _ as t -> Lwt.return_error (`hook_error ("unknown nft activity type " ^ t))
 
 let get_nft_activities_by_collection ?dbh ?continuation ?(size=50) filter =
+  Format.eprintf "get_nft_activities_by_collection %s [%s] %s %d@."
+    filter.nft_activity_by_collection_contract
+    (String.concat " " @@
+     List.map (EzEncoding.construct nft_activity_filter_all_type_enc)
+       filter.nft_activity_by_collection_types)
+    (match continuation with
+     | None -> "None"
+     | Some (ts, s) -> (Tzfunc.Proto.A.cal_to_str ts) ^ "_" ^ s)
+    size ;
   use dbh @@ fun dbh ->
   let contract = filter.nft_activity_by_collection_contract in
-  let types = filter_all_type_to_array filter.nft_activity_by_collection_types in
+  let types = filter_all_type_to_string filter.nft_activity_by_collection_types in
   let size64 = Int64.of_int size in
   let no_continuation, (ts, h) =
     continuation = None,
@@ -917,7 +927,8 @@ let get_nft_activities_by_collection ?dbh ?continuation ?(size=50) filter =
   let>? l = [%pgsql.object dbh
       "select activity_type, transaction, block, level, date, contract, \
        token_id, owner, amount, tr_from from nft_activities where \
-       main and contract = $contract and activity_type = any($types) and \
+       main and contract = $contract and \
+       position(activity_type in $types) > 0 and \
        ($no_continuation or \
        (date = $ts and transaction > $h) or (date < $ts)) \
        order by date desc, transaction asc limit $size64"] in
@@ -931,10 +942,20 @@ let get_nft_activities_by_collection ?dbh ?continuation ?(size=50) filter =
     { nft_activities_items = List.map fst activities ; nft_activities_continuation }
 
 let get_nft_activities_by_item ?dbh ?continuation ?(size=50) filter =
+  Format.eprintf "get_nft_activities_by_item %s %s [%s] %s %d@."
+    filter.nft_activity_by_item_contract
+    filter.nft_activity_by_item_token_id
+    (String.concat " " @@
+     List.map (EzEncoding.construct nft_activity_filter_all_type_enc)
+       filter.nft_activity_by_item_types)
+    (match continuation with
+     | None -> "None"
+     | Some (ts, s) -> (Tzfunc.Proto.A.cal_to_str ts) ^ "_" ^ s)
+    size ;
   use dbh @@ fun dbh ->
   let contract = filter.nft_activity_by_item_contract in
   let token_id = Int64.of_string filter.nft_activity_by_item_token_id in
-  let types = filter_all_type_to_array filter.nft_activity_by_item_types in
+  let types = filter_all_type_to_string filter.nft_activity_by_item_types in
   let size64 = Int64.of_int size in
   let no_continuation, (ts, h) =
     continuation = None,
@@ -943,7 +964,7 @@ let get_nft_activities_by_item ?dbh ?continuation ?(size=50) filter =
       "select activity_type, transaction, block, level, date, contract, \
        token_id, owner, amount, tr_from from nft_activities where \
        main and contract = $contract and token_id = $token_id and \
-       activity_type = any($types) and \
+       position(activity_type in $types) > 0 and \
        ($no_continuation or \
        (date = $ts and transaction > $h) or (date < $ts)) \
        order by date desc, transaction asc limit $size64"] in
@@ -957,9 +978,18 @@ let get_nft_activities_by_item ?dbh ?continuation ?(size=50) filter =
     { nft_activities_items = List.map fst activities ; nft_activities_continuation }
 
 let get_nft_activities_by_user ?dbh ?continuation ?(size=50) filter =
+  Format.eprintf "get_nft_activities_by_user [%s] [%s] %s %d@."
+    (String.concat ";" filter.nft_activity_by_user_users)
+    (String.concat " " @@
+     List.map (EzEncoding.construct nft_activity_filter_user_type_enc)
+       filter.nft_activity_by_user_types)
+    (match continuation with
+     | None -> "None"
+     | Some (ts, s) -> (Tzfunc.Proto.A.cal_to_str ts) ^ "_" ^ s)
+    size ;
   use dbh @@ fun dbh ->
-  let users = List.map Option.some filter.nft_activity_by_user_users in
-  let types = filter_user_type_to_array filter.nft_activity_by_user_types in
+  let users = String.concat ";" filter.nft_activity_by_user_users in
+  let types = filter_user_type_to_string filter.nft_activity_by_user_types in
   let size64 = Int64.of_int size in
   let no_continuation, (ts, h) =
     continuation = None,
@@ -967,8 +997,9 @@ let get_nft_activities_by_user ?dbh ?continuation ?(size=50) filter =
   let>? l = [%pgsql.object dbh
       "select activity_type, transaction, block, level, date, contract, \
        token_id, owner, amount, tr_from from nft_activities where \
-       main and owner = any($users) and \
-       activity_type = any($types) and \
+       main and \
+       (position(owner in $users) > 0 or position(tr_from in $users) > 0) and \
+       position(activity_type in $types) > 0 and \
        ($no_continuation or \
        (date = $ts and transaction > $h) or (date < $ts)) \
        order by date desc, transaction asc limit $size64"] in
@@ -982,16 +1013,22 @@ let get_nft_activities_by_user ?dbh ?continuation ?(size=50) filter =
     { nft_activities_items = List.map fst activities ; nft_activities_continuation }
 
 let get_nft_activities_all ?dbh ?continuation ?(size=50) types =
+  Format.eprintf "get_nft_activities_all [%s] %s %d@."
+    (String.concat " " @@ List.map (EzEncoding.construct nft_activity_filter_all_type_enc) types)
+    (match continuation with
+     | None -> "None"
+     | Some (ts, s) -> (Tzfunc.Proto.A.cal_to_str ts) ^ "_" ^ s)
+    size ;
   use dbh @@ fun dbh ->
-  let types = filter_all_type_to_array types in
+  let types = filter_all_type_to_string types in
   let size64 = Int64.of_int size in
   let no_continuation, (ts, h) =
     continuation = None,
     (match continuation with None -> CalendarLib.Calendar.now (), "" | Some (ts, h) -> (ts, h)) in
-  let>? l = [%pgsql.object dbh
+  let>? l = [%pgsql.object dbh "show"
       "select activity_type, transaction, block, level, date, contract, \
        token_id, owner, amount, tr_from from nft_activities where \
-       main and activity_type = any($types) and \
+       main and position(activity_type in $types) > 0 and \
        ($no_continuation or \
        (date = $ts and transaction > $h) or (date < $ts)) \
        order by date desc, transaction asc limit $size64"] in
@@ -1139,9 +1176,10 @@ let mk_nft_collection_name_symbol metadata =
     let name = List.assoc "name" l in
     let symbol = try Some (List.assoc "symbol" l) with Not_found -> None in
     Lwt.return_ok (name, symbol)
-  with Not_found -> Lwt.return_error (`hook_error "no name in contract metadata")
-     | EzEncoding.DestructError ->
-       Lwt.return_error (`hook_error ("metadata destruct error"))
+  with
+  | Not_found -> Lwt.return_ok ("NO NAME", None)
+  | EzEncoding.DestructError ->
+    Lwt.return_error (`hook_error ("metadata destruct error"))
 
 let mk_nft_collection obj =
   let|>? (name, symbol) = mk_nft_collection_name_symbol obj#metadata in
@@ -1177,7 +1215,7 @@ let search_nft_collections_by_owner ?dbh ?continuation ?(size=50) owner =
   let>? l = [%pgsql.object dbh
       "select address, owner, metadata \
        from contracts where \
-       main and owner = $owner and metadata <> '{}' and \
+       main and owner = $owner and \
        ($no_continuation or (address > $collection)) \
        order by address asc limit $size64"] in
   let>? nft_collections_total = [%pgsql dbh
@@ -1204,7 +1242,7 @@ let get_nft_all_collections ?dbh ?continuation ?(size=50) () =
     continuation = None, (match continuation with None -> "" | Some c -> c) in
   let>? l = [%pgsql.object dbh
       "select address, owner, metadata \
-       from contracts where main and metadata <> '{}' and \
+       from contracts where main and \
        ($no_continuation or (address > $collection)) \
        order by address asc limit $size64"] in
   let>? nft_collections_total = [%pgsql dbh

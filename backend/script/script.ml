@@ -79,7 +79,7 @@ let compile_contract filename =
 
 let deploy_aux
     ?(dry_run=false) ?(burn_cap=2.5) ?fee ?(verbose=0) ?endpoint
-    ~filename storage source contract =
+    ?(force=false) ~filename storage source contract =
     let dry_run = if dry_run then [ "--dry-run" ] else [] in
     let mich = match Filename.extension filename with
       | ".tz" -> filename
@@ -88,10 +88,11 @@ let deploy_aux
     let fee = match fee with None -> [] | Some f -> [ "--fee"; Format.sprintf "%F" f ] in
     let log = if verbose > 1 then ["-l"] else [] in
     let endpoint = match endpoint with None -> [] | Some e -> [ "-E"; e ] in
+    let force = if force then [ "--force" ] else [] in
     let s = Filename.quote_command !client ( endpoint @ [
         "originate"; "contract"; contract; "transferring"; "0";
         "from"; source; "running"; mich; "--init"; storage; "--burn-cap";
-        Format.sprintf "%F" burn_cap] @ fee @ log @ dry_run) in
+        Format.sprintf "%F" burn_cap] @ fee @ log @ dry_run @ force) in
     if verbose > 0 then Format.printf "Command:\n%s@." s;
     s
 
