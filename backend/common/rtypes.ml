@@ -359,18 +359,18 @@ type nft_activity_type =
   | NftActivityMint [@kind "mint"] [@kind_label "@type"]
   | NftActivityBurn [@kind "burn"] [@kind_label "@type"]
   | NftActivityTransfer of (A.address [@wrap "transfer"]) [@kind "mint"] [@kind_label "@type"]
-[@@deriving encoding {debug}]
+[@@deriving encoding]
 
 type nft_activity = {
   nft_activity_elt : nft_activity_elt ;
   nft_activity_type : nft_activity_type ;
 }
-[@@deriving encoding {debug}]
+[@@deriving encoding]
 
 type nft_activities = {
   nft_activities_continuation : string option ;
   nft_activities_items : nft_activity list
-} [@@deriving encoding {debug}]
+} [@@deriving encoding]
 
 type item_history_elt = {
   item_history_owner : A.address option;
