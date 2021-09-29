@@ -22,9 +22,11 @@ let ownerships_section = EzAPI.Doc.{section_name = "nft-ownership-controller"; s
 let items_section = EzAPI.Doc.{section_name = "nft-item-controller"; section_docs = []}
 let collections_section = EzAPI.Doc.{section_name = "nft-collection-controller"; section_docs = []}
 let orders_section = EzAPI.Doc.{section_name = "order-controller"; section_docs = []}
+let order_activities_section =
+  EzAPI.Doc.{section_name = "order-activity-controller"; section_docs = []}
 let sections = [
   nft_section; ownerships_section; items_section; collections_section;
-  orders_section ]
+  orders_section; order_activities_section ]
 
 let blockchain_param = EzAPI.Param.string "blockchain"
 let address_param = EzAPI.Param.string "address"
@@ -59,6 +61,7 @@ let hash_arg = EzAPI.Arg.string "hash"
 let item_id_arg = EzAPI.Arg.string "itemId"
 let collection_arg = EzAPI.Arg.string "collection"
 let ownership_id_arg = EzAPI.Arg.string "ownershipId"
+
 
 let mk_invalid_argument param msg =
   Error (invalid_argument (Printf.sprintf "%s %s" param.EzAPI.Param.param_id msg))
@@ -1091,15 +1094,27 @@ let get_order_bids_by_item req () =
  *    output=aggregation_datas_enc;
  *    errors=[rarible_error_500]}] *)
 
-(* (\* order-activity-controller *\)
- * let get_order_activities req _input =
- *   let _continuation = EzAPI.Req.find_param continuation_param req in
- *   let _size = EzAPI.Req.find_param size_param req in
- *   return (Error (unexpected_api_error ""))
- * [@@post
- *   {path="/v0.1/order/activities/search";
- *    input=order_activity_filter_enc;
- *    output=order_activities_enc;errors=[rarible_error_500]}] *)
+(* order-activity-controller *)
+let get_order_activities req input =
+  match get_size_param req with
+  | Error err -> return @@ Error err
+  | Ok size ->
+    match get_continuation_last_update_param req with
+    | Error err -> return @@ Error err
+    | Ok continuation ->
+      Db.get_order_activities ?continuation ?size input >>= function
+      | Error db_err ->
+        let str = Crawlori.Rp.string_of_error db_err in
+        return (Error (unexpected_api_error str))
+      | Ok res -> return_ok res
+[@@post
+  {path="/v0.1/order/activities/search";
+   params=[size_param;continuation_param];
+   name="get_order_activities";
+   input=order_activity_filter_enc;
+   output=order_activities_enc;
+   errors=[rarible_error_500];
+   section=order_activities_section}]
 
 (* (\* order-bid-controller *\)
  * let get_bids_by_item req () =
@@ -1170,10 +1185,8 @@ let get_order_bids_by_item req () =
 
 (* Order Activities *)
 (* Merge de history et Orderversion *)
-(* ExchangeHistoryRepo saves *)
-(* Log event of exchange contract*)
-(* -> ENTRYPOINT CANCEL MATCH_ORDERS *)
 
-(* Nft Activities *)
-(* Log Event on nft contract *)
-(* -> ENTRYPOINT MINT BURN TRANSFER *)
+(* ExchangeHistoryRepo saves *)
+(* Log event of exchange contract *)
+(* -> ENTRYPOINT CANCEL MATCH_ORDERS *)
+(* VOIR ExchangeOrderMatchDescriptor OnExchangeLogEventListener et OrderReduceService *)

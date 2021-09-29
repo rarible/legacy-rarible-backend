@@ -461,6 +461,12 @@ let filter_all_type_to_string l =
       String.lowercase_ascii @@
       EzEncoding.construct nft_activity_filter_all_type_enc t) l
 
+let filter_order_all_type_to_string l =
+  String.concat ";" @@
+  List.map (fun t ->
+      String.lowercase_ascii @@
+      EzEncoding.construct order_activity_filter_all_type_enc t) l
+
 let filter_user_type_to_pgarray = List.map (fun t ->
     Option.some @@
     String.lowercase_ascii @@
@@ -471,6 +477,12 @@ let filter_user_type_to_string l =
   List.map (fun t ->
       String.lowercase_ascii @@
       EzEncoding.construct nft_activity_filter_user_type_enc t) l
+
+let filter_order_user_type_to_string l =
+  String.concat ";" @@
+  List.map (fun t ->
+      String.lowercase_ascii @@
+      EzEncoding.construct order_activity_filter_user_type_enc t) l
 
 let sign ~edsk ~bytes =
   let open Tzfunc.Crypto in

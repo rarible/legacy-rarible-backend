@@ -245,6 +245,19 @@ let set_royalties dbh ~id op roy =
        ${op.bo_tsp}, $source, ${roy.roy_token_id}, ${roy.roy_contract}, $royalties) \
        on conflict do nothing"]
 
+let insert_order_activity
+    dbh match_left match_right hash transaction block level date order_activity_type =
+  [%pgsql dbh
+      "insert into order_activities(match_left, match_right, hash, transaction, \
+       block, level, date, order_activity_type) \
+       values ($?match_left, $?match_right, $?hash, $?transaction, \
+       $?block, $?level, $date, $order_activity_type) \
+       on conflict do nothing"]
+(* TODO : KAFKA *)
+
+let insert_order_activity_cancel dbh hash transaction block level date =
+  insert_order_activity dbh None None hash transaction block level date "cancel"
+
 let set_cancel dbh ~id op hash =
   let source = op.bo_op.source in
   [%pgsql dbh
@@ -252,6 +265,9 @@ let set_cancel dbh ~id op hash =
        values(${op.bo_hash}, $id, ${op.bo_block}, ${op.bo_level}, \
        ${op.bo_tsp}, $source, $hash) \
        on conflict do nothing"]
+
+let insert_order_activity_match dbh left right transaction block level date =
+  insert_order_activity dbh left right left transaction block level date "match"
 
 let set_do_transfers dbh ~id op ~left ~right =
   let source = op.bo_op.source in
@@ -261,6 +277,15 @@ let set_do_transfers dbh ~id op ~left ~right =
        values(${op.bo_hash}, $id, ${op.bo_block}, ${op.bo_level}, \
        ${op.bo_tsp}, $source, $left, $right) \
        on conflict do nothing"]
+
+let insert_order_activity_new dbh hash date make_class take_class =
+  match make_class, take_class with
+  | "FA2", _ ->
+    insert_order_activity dbh None None (Some hash) None None None date "list"
+  | _, "FA2" ->
+    insert_order_activity dbh None None (Some hash) None None None date "bid"
+  | _, _ ->
+    Lwt.return_ok ()
 
 let set_transaction config dbh ~id op tr =
   match tr.parameters with
@@ -515,6 +540,7 @@ let set_main _config dbh {Hooks.m_main; m_hash} =
   let>? () = [%pgsql dbh "update tokens set main = $m_main where block = $m_hash"] in
   let>? () = [%pgsql dbh "update accounts set main = $m_main where block = $m_hash"] in
   let>? () = [%pgsql dbh "update nft_activities set main = $m_main where block = $m_hash"] in
+  let>? () = [%pgsql dbh "update order_activities set main = $m_main where block = $m_hash"] in
   let>? t_updates = [%pgsql.object dbh "update token_updates set main = $m_main where block = $m_hash returning *"] in
   let>? c_updates = [%pgsql.object dbh "update contract_updates set main = $m_main where block = $m_hash returning *"] in
   let>? o_updates = [%pgsql.object dbh "update order_updates set main = $m_main where block = $m_hash returning *"] in
@@ -1914,6 +1940,8 @@ let upsert_order ?dbh order =
        on conflict (hash) do update set (\
        make_asset_value, take_asset_value, make_stock, signature, last_update_at) = \
        ($make_asset_value, $take_asset_value, $make_stock, $signature, $last_update_at)"] in
+  insert_order_activity_new
+    dbh hash_key created_at make_class take_class >>=? fun () ->
   begin match order_elt.order_elt_pending with
     | None -> Lwt.return_ok ()
     | Some pendings -> insert_pendings dbh pendings hash_key
@@ -1924,3 +1952,430 @@ let upsert_order ?dbh order =
     else Lwt.return_ok ()
   end >>=? fun () ->
   insert_payouts dbh payouts hash_key
+
+let mk_order_activity_continuation _obj =
+  Printf.sprintf "TODO"
+    (* (Int64.of_float @@ CalendarLib.Calendar.to_unixfloat obj#date)
+     * obj#transaction *)
+
+(* Normalize here in case of ERC20 like asset *)
+let price left right =
+  if Int64.of_string left.asset_value > 0L then
+    Lwt.return_ok @@
+    Int64.(to_string (div (of_string left.asset_value) (of_string right.asset_value)))
+  else Lwt.return_ok "0"
+
+let nft_price left right =
+  match left.asset_type with
+  | ATFA_2 _ -> price left right
+  | _ -> price right left
+
+let mk_order_activity_bid obj =
+  mk_asset
+    obj#make_asset_type_class
+    obj#make_asset_type_contract
+    obj#make_asset_type_token_id
+    obj#make_asset_value
+  >>=? fun make ->
+  mk_asset
+    obj#take_asset_type_class
+    obj#take_asset_type_contract
+    obj#take_asset_type_token_id
+    obj#take_asset_value
+  >>=? fun take ->
+  nft_price make take >>=? fun price ->
+  Lwt.return_ok
+    {
+      order_activity_bid_hash = obj#o_hash;
+      order_activity_bid_maker = obj#maker ;
+      order_activity_bid_make = make ;
+      order_activity_bid_take = take ;
+      order_activity_bid_price = price ;
+      order_activity_bid_price_usd = None ;
+    }
+
+let mk_side_type asset = match asset.asset_type with
+  | ATFA_2 _ -> STBID
+  | _ -> STSELL
+
+let mk_left_side obj =
+  mk_asset
+    obj#oleft_make_asset_type_class
+    obj#oleft_make_asset_type_contract
+    obj#oleft_make_asset_type_token_id
+    obj#oleft_make_asset_value
+  >|=? fun asset ->
+  {
+    order_activity_match_side_maker = obj#oleft_maker ;
+    order_activity_match_side_hash = obj#oleft_hash ;
+    order_activity_match_side_asset = asset ;
+    order_activity_match_side_type = mk_side_type asset ;
+  }
+
+let mk_right_side obj =
+  mk_asset
+    obj#oright_take_asset_type_class
+    obj#oright_take_asset_type_contract
+    obj#oright_take_asset_type_token_id
+    obj#oright_take_asset_value
+  >|=? fun asset ->
+  {
+    order_activity_match_side_maker = Option.get obj#oright_taker ;
+    order_activity_match_side_hash = obj#oright_hash ;
+    order_activity_match_side_asset = asset ;
+    order_activity_match_side_type = mk_side_type asset ;
+  }
+
+let mk_order_activity_match obj =
+  let>? left = mk_left_side obj in
+  let>? right = mk_right_side obj in
+  nft_price
+    left.order_activity_match_side_asset
+    right.order_activity_match_side_asset
+  >|=? fun price ->
+  {
+    order_activity_match_left = left ;
+    order_activity_match_right = right ;
+    order_activity_match_price = price ;
+    order_activity_match_price_usd = None ;
+    order_activity_match_transaction_hash = Option.get obj#transaction ;
+    order_activity_match_block_hash = Option.get obj#block ;
+    order_activity_match_block_number = Int64.of_int32 @@ Option.get obj#level ;
+    order_activity_match_log_index = 0 ;
+  }
+
+let mk_order_activity_cancel obj =
+  mk_asset
+    obj#make_asset_type_class
+    obj#make_asset_type_contract
+    obj#make_asset_type_token_id
+    obj#make_asset_value
+  >>=? fun make ->
+  mk_asset
+    obj#take_asset_type_class
+    obj#take_asset_type_contract
+    obj#take_asset_type_token_id
+    obj#take_asset_value
+  >>=? fun take ->
+  let bid = {
+    order_activity_cancel_bid_hash = obj#o_hash;
+    order_activity_cancel_bid_maker = obj#maker ;
+    order_activity_cancel_bid_make = make.asset_type ;
+    order_activity_cancel_bid_take = take.asset_type ;
+    order_activity_cancel_bid_transction_hash = Option.get obj#transaction ;
+    order_activity_cancel_bid_block_hash = Option.get obj#block ;
+    order_activity_cancel_bid_block_number = Int64.of_int32 @@ Option.get obj#level ;
+    order_activity_cancel_bid_log_index = 0
+  } in
+  Lwt.return_ok @@
+  match make.asset_type with
+  | ATFA_2 _ ->
+    OrderActivityCancelList bid
+  | _ ->
+    OrderActivityCancelBid bid
+
+let mk_order_activity obj = match obj#order_activity_type with
+  | "list" ->
+    let|>? listing = mk_order_activity_bid obj in
+    OrderActivityList listing
+  | "bid" ->
+    let|>? listing = mk_order_activity_bid obj in
+    OrderActivityBid listing
+  | "match" ->
+    let|>? matched = mk_order_activity_match obj in
+    OrderActivityMatch matched
+  | "cancel" ->
+    mk_order_activity_cancel obj
+  | _ as t -> Lwt.return_error (`hook_error ("unknown order activity type " ^ t))
+
+let get_order_activities_by_collection ?dbh ?continuation ?(size=50) filter =
+  Format.eprintf "get_order_activities_by_collection %s [%s] %s %d@."
+    filter.order_activity_by_collection_contract
+    (String.concat " " @@
+     List.map (EzEncoding.construct order_activity_filter_all_type_enc)
+       filter.order_activity_by_collection_types)
+    (match continuation with
+     | None -> "None"
+     | Some (ts, s) -> (Tzfunc.Proto.A.cal_to_str ts) ^ "_" ^ s)
+    size ;
+  use dbh @@ fun dbh ->
+  let contract = filter.order_activity_by_collection_contract in
+  let types = filter_order_all_type_to_string filter.order_activity_by_collection_types in
+  let size64 = Int64.of_int size in
+  let no_continuation, (ts, h) =
+    continuation = None,
+    (match continuation with None -> CalendarLib.Calendar.now (), "" | Some (ts, h) -> (ts, h)) in
+  let>? l = [%pgsql.object dbh
+      "select order_activity_type, \
+       o.make_asset_type_class, o.make_asset_type_contract, \
+       o.make_asset_type_token_id, o.make_asset_value, \
+       o.take_asset_type_class, o.take_asset_type_contract, \
+       o.take_asset_type_token_id, o.take_asset_value, \
+       o.maker, o.hash as o_hash, \
+       match_left, match_right, \
+       transaction, block, level, date, \
+
+       oleft.hash as oleft_hash, oleft.maker as oleft_maker, \
+       oleft.taker as oleft_taker, \
+       oleft.make_asset_type_class as oleft_make_asset_type_class, \
+       oleft.make_asset_type_contract as oleft_make_asset_type_contract, \
+       oleft.make_asset_type_token_id as oleft_make_asset_type_token_id, \
+       oleft.make_asset_value as oleft_make_asset_value, \
+       oleft.take_asset_type_class as oleft_take_asset_type_class, \
+       oleft.take_asset_type_contract as oleft_take_asset_type_contract, \
+       oleft.take_asset_type_token_id as oleft_take_asset_type_token_id, \
+       oleft.take_asset_value as oleft_take_asset_value, \
+
+       oright.hash as oright_hash, oright.maker as oright_maker, \
+       oright.taker as oright_taker, \
+       oright.make_asset_type_class as oright_make_asset_type_class, \
+       oright.make_asset_type_contract as oright_make_asset_type_contract, \
+       oright.make_asset_type_token_id as oright_make_asset_type_token_id, \
+       oright.make_asset_value as oright_make_asset_value, \
+       oright.take_asset_type_class as oright_take_asset_type_class, \
+       oright.take_asset_type_contract as oright_take_asset_type_contract, \
+       oright.take_asset_type_token_id as oright_take_asset_type_token_id, \
+       oright.take_asset_value as oright_take_asset_value \
+
+       from order_activities as a \
+       left join orders as o on o.hash = a.hash \
+       left join orders as oleft on oleft.hash = a.match_left \
+       left join orders as oright on oright.hash = a.match_right where \
+       main and position(order_activity_type in $types) > 0 and \
+       (o.make_asset_type_contract = $contract or \
+        o.take_asset_type_contract = $contract or \
+        oleft.make_asset_type_contract = $contract or \
+        oleft.take_asset_type_contract = $contract or \
+        oright.make_asset_type_contract = $contract or \
+        oright.take_asset_type_contract = $contract) and \
+       ($no_continuation or \
+       (date = $ts and transaction > $h) or (date < $ts)) \
+       order by date desc, transaction asc limit $size64"] in
+  map_rp (fun r -> let|>? a = mk_order_activity r in a, r) l >>=? fun activities ->
+  let len = List.length activities in
+  let order_activities_continuation =
+    if len <> size then None
+    else Some
+        (mk_order_activity_continuation @@ snd @@ List.hd (List.rev activities)) in
+  Lwt.return_ok
+    { order_activities_items = List.map fst activities ; order_activities_continuation }
+
+let get_order_activities_by_item ?dbh ?continuation ?(size=50) filter =
+  Format.eprintf "get_order_activities_by_item %s %s [%s] %s %d@."
+    filter.order_activity_by_item_contract
+    filter.order_activity_by_item_token_id
+    (String.concat " " @@
+     List.map (EzEncoding.construct order_activity_filter_all_type_enc)
+       filter.order_activity_by_item_types)
+    (match continuation with
+     | None -> "None"
+     | Some (ts, s) -> (Tzfunc.Proto.A.cal_to_str ts) ^ "_" ^ s)
+    size ;
+  use dbh @@ fun dbh ->
+  let contract = filter.order_activity_by_item_contract in
+  let token_id = filter.order_activity_by_item_token_id in
+  let types = filter_order_all_type_to_string filter.order_activity_by_item_types in
+  let size64 = Int64.of_int size in
+  let no_continuation, (ts, h) =
+    continuation = None,
+    (match continuation with None -> CalendarLib.Calendar.now (), "" | Some (ts, h) -> (ts, h)) in
+  let>? l = [%pgsql.object dbh
+      "select order_activity_type, \
+       o.make_asset_type_class, o.make_asset_type_contract, \
+       o.make_asset_type_token_id, o.make_asset_value, \
+       o.take_asset_type_class, o.take_asset_type_contract, \
+       o.take_asset_type_token_id, o.take_asset_value, \
+       o.maker, o.hash as o_hash, \
+       match_left, match_right, \
+       transaction, block, level, date, \
+
+       oleft.hash as oleft_hash, oleft.maker as oleft_maker, \
+       oleft.taker as oleft_taker, \
+       oleft.make_asset_type_class as oleft_make_asset_type_class, \
+       oleft.make_asset_type_contract as oleft_make_asset_type_contract, \
+       oleft.make_asset_type_token_id as oleft_make_asset_type_token_id, \
+       oleft.make_asset_value as oleft_make_asset_value, \
+       oleft.take_asset_type_class as oleft_take_asset_type_class, \
+       oleft.take_asset_type_contract as oleft_take_asset_type_contract, \
+       oleft.take_asset_type_token_id as oleft_take_asset_type_token_id, \
+       oleft.take_asset_value as oleft_take_asset_value, \
+
+       oright.hash as oright_hash, oright.maker as oright_maker, \
+       oright.taker as oright_taker, \
+       oright.make_asset_type_class as oright_make_asset_type_class, \
+       oright.make_asset_type_contract as oright_make_asset_type_contract, \
+       oright.make_asset_type_token_id as oright_make_asset_type_token_id, \
+       oright.make_asset_value as oright_make_asset_value, \
+       oright.take_asset_type_class as oright_take_asset_type_class, \
+       oright.take_asset_type_contract as oright_take_asset_type_contract, \
+       oright.take_asset_type_token_id as oright_take_asset_type_token_id, \
+       oright.take_asset_value as oright_take_asset_value \
+
+       from order_activities as a \
+       left join orders as o on o.hash = a.hash \
+       left join orders as oleft on oleft.hash = a.match_left \
+       left join orders as oright on oright.hash = a.match_right where \
+       main and position(order_activity_type in $types) > 0 and \
+       ((o.make_asset_type_contract = $contract and o.make_asset_type_token_id = $token_id) or \
+        (o.take_asset_type_contract = $contract and o.take_asset_type_token_id = $token_id) or \
+        (oleft.make_asset_type_contract = $contract and
+         oleft.make_asset_type_token_id = $token_id) or \
+        (oleft.take_asset_type_contract = $contract and
+         oleft.take_asset_type_token_id = $token_id) or \
+        (oright.make_asset_type_contract = $contract and
+         oright.make_asset_type_token_id = $token_id) or \
+        (oright.take_asset_type_contract = $contract and
+         oright.take_asset_type_token_id = $token_id)) and \
+       ($no_continuation or \
+       (date = $ts and transaction > $h) or (date < $ts)) \
+       order by date desc, transaction asc limit $size64"] in
+  map_rp (fun r -> let|>? a = mk_order_activity r in a, r) l >>=? fun activities ->
+  let len = List.length activities in
+  let order_activities_continuation =
+    if len <> size then None
+    else Some
+        (mk_order_activity_continuation @@ snd @@ List.hd (List.rev activities)) in
+  Lwt.return_ok
+    { order_activities_items = List.map fst activities ; order_activities_continuation }
+
+let get_order_activities_all ?dbh ?continuation ?(size=50) types =
+  Format.eprintf "get_order_activities_all [%s] %s %d@."
+    (String.concat " " @@
+     List.map (EzEncoding.construct order_activity_filter_all_type_enc) types)
+    (match continuation with
+     | None -> "None"
+     | Some (ts, s) -> (Tzfunc.Proto.A.cal_to_str ts) ^ "_" ^ s)
+    size ;
+  use dbh @@ fun dbh ->
+  let types = filter_order_all_type_to_string types in
+  let size64 = Int64.of_int size in
+  let no_continuation, (ts, h) =
+    continuation = None,
+    (match continuation with None -> CalendarLib.Calendar.now (), "" | Some (ts, h) -> (ts, h)) in
+  let>? l = [%pgsql.object dbh
+      "select order_activity_type, \
+       o.make_asset_type_class, o.make_asset_type_contract, \
+       o.make_asset_type_token_id, o.make_asset_value, \
+       o.take_asset_type_class, o.take_asset_type_contract, \
+       o.take_asset_type_token_id, o.take_asset_value, \
+       o.maker, o.hash as o_hash, \
+       match_left, match_right, \
+       transaction, block, level, date, \
+
+       oleft.hash as oleft_hash, oleft.maker as oleft_maker, \
+       oleft.taker as oleft_taker, \
+       oleft.make_asset_type_class as oleft_make_asset_type_class, \
+       oleft.make_asset_type_contract as oleft_make_asset_type_contract, \
+       oleft.make_asset_type_token_id as oleft_make_asset_type_token_id, \
+       oleft.make_asset_value as oleft_make_asset_value, \
+       oleft.take_asset_type_class as oleft_take_asset_type_class, \
+       oleft.take_asset_type_contract as oleft_take_asset_type_contract, \
+       oleft.take_asset_type_token_id as oleft_take_asset_type_token_id, \
+       oleft.take_asset_value as oleft_take_asset_value, \
+
+       oright.hash as oright_hash, oright.maker as oright_maker, \
+       oright.taker as oright_taker, \
+       oright.make_asset_type_class as oright_make_asset_type_class, \
+       oright.make_asset_type_contract as oright_make_asset_type_contract, \
+       oright.make_asset_type_token_id as oright_make_asset_type_token_id, \
+       oright.make_asset_value as oright_make_asset_value, \
+       oright.take_asset_type_class as oright_take_asset_type_class, \
+       oright.take_asset_type_contract as oright_take_asset_type_contract, \
+       oright.take_asset_type_token_id as oright_take_asset_type_token_id, \
+       oright.take_asset_value as oright_take_asset_value \
+
+       from order_activities as a \
+       left join orders as o on o.hash = a.hash \
+       left join orders as oleft on oleft.hash = a.match_left \
+       left join orders as oright on oright.hash = a.match_right where \
+       main and position(order_activity_type in $types) > 0 and \
+       ($no_continuation or \
+       (date = $ts and transaction > $h) or (date < $ts)) \
+       order by date desc, transaction asc limit $size64"] in
+  map_rp (fun r -> let|>? a = mk_order_activity r in a, r) l >>=? fun activities ->
+  let len = List.length activities in
+  let order_activities_continuation =
+    if len <> size then None
+    else Some
+        (mk_order_activity_continuation @@ snd @@ List.hd (List.rev activities)) in
+  Lwt.return_ok
+    { order_activities_items = List.map fst activities ; order_activities_continuation }
+
+let get_order_activities_by_user ?dbh ?continuation ?(size=50) filter =
+  Format.eprintf "get_order_activities_by_user [%s] [%s] %s %d@."
+    (String.concat " " filter.order_activity_by_user_users)
+    (String.concat " " @@
+     List.map (EzEncoding.construct order_activity_filter_user_type_enc)
+       filter.order_activity_by_user_types)
+    (match continuation with
+     | None -> "None"
+     | Some (ts, s) -> (Tzfunc.Proto.A.cal_to_str ts) ^ "_" ^ s)
+    size ;
+  use dbh @@ fun dbh ->
+  let users = String.concat ";" filter.order_activity_by_user_users in
+  let types = filter_order_user_type_to_string filter.order_activity_by_user_types in
+  let size64 = Int64.of_int size in
+  let no_continuation, (ts, h) =
+    continuation = None,
+    (match continuation with None -> CalendarLib.Calendar.now (), "" | Some (ts, h) -> (ts, h)) in
+  let>? l = [%pgsql.object dbh
+      "select order_activity_type, \
+       o.make_asset_type_class, o.make_asset_type_contract, \
+       o.make_asset_type_token_id, o.make_asset_value, \
+       o.take_asset_type_class, o.take_asset_type_contract, \
+       o.take_asset_type_token_id, o.take_asset_value, \
+       o.maker, o.hash as o_hash, \
+       match_left, match_right, \
+       transaction, block, level, date, \
+
+       oleft.hash as oleft_hash, oleft.maker as oleft_maker, \
+       oleft.taker as oleft_taker, \
+       oleft.make_asset_type_class as oleft_make_asset_type_class, \
+       oleft.make_asset_type_contract as oleft_make_asset_type_contract, \
+       oleft.make_asset_type_token_id as oleft_make_asset_type_token_id, \
+       oleft.make_asset_value as oleft_make_asset_value, \
+       oleft.take_asset_type_class as oleft_take_asset_type_class, \
+       oleft.take_asset_type_contract as oleft_take_asset_type_contract, \
+       oleft.take_asset_type_token_id as oleft_take_asset_type_token_id, \
+       oleft.take_asset_value as oleft_take_asset_value, \
+
+       oright.hash as oright_hash, oright.maker as oright_maker, \
+       oright.taker as oright_taker, \
+       oright.make_asset_type_class as oright_make_asset_type_class, \
+       oright.make_asset_type_contract as oright_make_asset_type_contract, \
+       oright.make_asset_type_token_id as oright_make_asset_type_token_id, \
+       oright.make_asset_value as oright_make_asset_value, \
+       oright.take_asset_type_class as oright_take_asset_type_class, \
+       oright.take_asset_type_contract as oright_take_asset_type_contract, \
+       oright.take_asset_type_token_id as oright_take_asset_type_token_id, \
+       oright.take_asset_value as oright_take_asset_value \
+
+       from order_activities as a \
+       left join orders as o on o.hash = a.hash \
+       left join orders as oleft on oleft.hash = a.match_left \
+       left join orders as oright on oright.hash = a.match_right where \
+       main and position(order_activity_type in $types) > 0 and \
+       ((position(o.maker in $users) > 0 or position(o.taker in $users) > 0) or \
+        (position(oleft.maker in $users) > 0 or position(oleft.taker in $users) > 0) or \
+        (position(oright.maker in $users) > 0 or position(oright.taker in $users) > 0)) and \
+       ($no_continuation or \
+       (date = $ts and transaction > $h) or (date < $ts)) \
+       order by date desc, transaction asc limit $size64"] in
+  map_rp (fun r -> let|>? a = mk_order_activity r in a, r) l >>=? fun activities ->
+  let len = List.length activities in
+  let order_activities_continuation =
+    if len <> size then None
+    else Some
+        (mk_order_activity_continuation @@ snd @@ List.hd (List.rev activities)) in
+  Lwt.return_ok
+    { order_activities_items = List.map fst activities ; order_activities_continuation }
+
+let get_order_activities ?dbh ?continuation ?size = function
+  | OrderActivityFilterByCollection filter ->
+    get_order_activities_by_collection ?dbh ?continuation ?size filter
+  | OrderActivityFilterByItem filter ->
+    get_order_activities_by_item ?dbh ?continuation ?size filter
+  | OrderActivityFilterByUser filter ->
+    get_order_activities_by_user ?dbh ?continuation ?size filter
+  | OrderActivityFilterAll types ->
+    get_order_activities_all ?dbh ?continuation ?size types
