@@ -6,5 +6,5 @@
     "outDir": "dist",
     "target": "es2020"
   },
-  "include": [ "main/*.ts", "providers/*/*.ts" ]
+  "include": [ "main/*.ts", "test/*.ts", "providers/*/*.ts" ]
 }

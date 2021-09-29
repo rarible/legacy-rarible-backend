@@ -1,4 +1,4 @@
-import { Provider, transfer } from "./rarible"
+import { Provider, transfer } from "../main"
 import { beacon_provider } from '../providers/beacon/beacon_provider'
 import { NetworkType } from "@airgap/beacon-sdk";
 

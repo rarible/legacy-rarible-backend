@@ -1,4 +1,5 @@
-import { Provider, send, send_batch, MichelsonData, TransactionArg, get_address } from "../common/base"
+import { MichelsonData } from "@taquito/michel-codec"
+import { Provider, send, send_batch, TransactionArg, get_address } from "../common/base"
 import { Part, OrderForm } from "./utils"
 import { invert_order } from "./invert-order"
 import { get_make_fee } from "./get-make-fee"

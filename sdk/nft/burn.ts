@@ -1,7 +1,7 @@
-import { Provider, MichelsonData, TransactionArg, send, get_address } from "../common/base"
+import { MichelsonData } from "@taquito/michel-codec"
+import { Provider, TransactionArg, send, get_address } from "../common/base"
 import { check_asset_type, ExtendedAssetType } from "../common/check-asset-type"
 
-// todo : choose type of burn parameter
 function burn_param(
   token_id: bigint,
   owner: string,

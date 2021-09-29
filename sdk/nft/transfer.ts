@@ -1,4 +1,5 @@
-import { Provider, MichelsonData, send, TransactionArg, get_address } from "../common/base"
+import { MichelsonData } from "@taquito/michel-codec"
+import { Provider, send, TransactionArg, get_address } from "../common/base"
 import { check_asset_type, ExtendedAssetType } from "../common/check-asset-type"
 
 function transfer_param(

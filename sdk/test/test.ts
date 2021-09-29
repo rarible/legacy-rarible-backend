@@ -1,4 +1,4 @@
-import { transfer } from "./rarible"
+import { transfer } from "../main"
 import { in_memory_provider } from '../providers/in_memory/in_memory_provider'
 
 async function main() {

@@ -6,3 +6,4 @@
 /sdk/dist
 *.tz
 /config
+/openapi.json

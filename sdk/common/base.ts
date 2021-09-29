@@ -1,9 +1,7 @@
 import { BigMapAbstraction, TransferParams, OriginateParams } from "@taquito/taquito"
 import { Config } from "../config/type"
-import { MichelsonData, MichelsonType, packDataBytes } from "@taquito/michel-codec"
+import { MichelsonData } from "@taquito/michel-codec"
 const bs58check = require("bs58check")
-
-// Storages
 
 export interface StorageFA2 {
   owner: string;
@@ -20,11 +18,7 @@ export interface StorageFA1_2 {
   allowance: BigMapAbstraction;
 }
 
-export type Storage = StorageFA2 | StorageFA1_2
-
-// Assets
-
-export interface XTZAssetType {
+export interface XTZAssetType  {
   asset_class: "XTZ";
 }
 
@@ -62,8 +56,6 @@ export interface Provider {
   api: string;
   config: Config;
 }
-
-// Operation Argument
 
 export interface TransactionArg {
   destination: string,
@@ -136,12 +128,6 @@ export async function send_batch(
   return provider.tezos.batch(params, wait)
 }
 
-export function pack(
-  data: MichelsonData,
-  type: MichelsonType) : string {
-  return packDataBytes(data, type).bytes
-}
-
 export async function get_transaction(
   provider: Provider,
   op_hash: string) {
@@ -149,5 +135,3 @@ export async function get_transaction(
   if (r.ok) { return r.json() }
   else throw new Error("/transaction/" + op_hash + " failed")
 }
-
-export { MichelsonData, MichelsonType } from "@taquito/michel-codec"
