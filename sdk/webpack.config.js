@@ -3,7 +3,7 @@ const NodePolyfillPlugin = require("node-polyfill-webpack-plugin");
 
 module.exports = [
   {
-    entry: path.resolve(__dirname, "./main/rarible.ts"),
+    entry: path.resolve(__dirname, "./main/index.ts"),
     module: {
       rules: [
         {
@@ -87,7 +87,7 @@ module.exports = [
   },
 
   {
-    entry: path.resolve(__dirname, "./main/test-web.ts"),
+    entry: path.resolve(__dirname, "./test/test-web.ts"),
     module: {
       rules: [
         {

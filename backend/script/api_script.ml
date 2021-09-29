@@ -82,12 +82,15 @@ let set_opt_int r = Arg.Int (fun i -> r := Some i)
 let arg_parse ~spec ~usage f =
   Arg.parse spec f usage
 
+let js = ref false
+
 let spec = [
   "--api", Arg.Set_string api, "api address (default: http://localhost:8080)";
   "--endpoint", Arg.Set_string endpoint, "node endpoint (default: http://granada.tz.functori.com)";
   "--client", Arg.Set_string Script.client, "tezos client" ;
   "--sdk", Arg.Set sdk, "use sdk to make tezos operations (default: false, uses tezos-client)";
   "--verbose", Arg.Set_int verbose, "verbosity";
+  "--js", Arg.Set js, "use js sdk";
 ]
 
 let ko_colored = Fmt.styled (`Fg (`Hi `Red)) Format.pp_print_string
@@ -108,7 +111,6 @@ let by_sk i =
   with Not_found ->
     Printf.eprintf "Not_found by_sk %s\n%!" i ;
     raise Not_found
-
 let by_alias i =
   try
     List.find (fun (alias, _, _) -> alias = i) accounts
@@ -775,55 +777,65 @@ let create_royalties () =
   alias_new, alias_admin
 
 let mint_tokens id owner amount royalties source contract =
-  let cmd = Script.mint_tokens_aux ~endpoint:!endpoint id owner amount royalties source contract in
-  let code, out, err = sys_command ~retry:1 cmd in
-  if code <> 0 then
-    Lwt.fail_with ("mint failure : log " ^ out ^ " & " ^ err)
-  else Lwt.return_ok ()
+  if !js then
+    Script_js.mint_tokens ~endpoint:!endpoint ~amount ~royalties ~contract ~source id
+  else
+    let cmd = Script.mint_tokens_aux ~endpoint:!endpoint id owner amount
+        royalties (fst source) contract in
+    let code, out, err = sys_command ~retry:1 cmd in
+    if code <> 0 then
+      Lwt.fail_with ("mint failure : log " ^ out ^ " & " ^ err)
+    else Lwt.return_ok ()
 
 let burn_tokens id amount source contract =
-  let cmd = Script.burn_tokens_aux ~endpoint:!endpoint id amount source contract in
-  let code, out, err = sys_command ~retry:1 cmd in
-  if code <> 0 then
-    Lwt.fail_with ("burn failure : log " ^ out ^ " & " ^ err)
-  else Lwt.return_ok ()
+  if !js then
+    Script_js.burn_tokens ~endpoint:!endpoint ~amount ~contract ~source id
+  else
+    let cmd = Script.burn_tokens_aux ~endpoint:!endpoint id amount (fst source) contract in
+    let code, out, err = sys_command ~retry:1 cmd in
+    if code <> 0 then
+      Lwt.fail_with ("burn failure : log " ^ out ^ " & " ^ err)
+    else Lwt.return_ok ()
 
 let transfer_tokens id amount source contract new_owner =
-  let param = [ source ; Printf.sprintf "%s*%s=%s" id amount new_owner ] in
-  let cmd = Script.transfer_aux ~endpoint:!endpoint param source contract in
-  let code, out, err = sys_command ~retry:1 cmd in
-  if code <> 0 then
-    Lwt.fail_with ("transfer failure : log " ^ out ^ " & " ^ err)
-  else Lwt.return_ok ()
+  if !js then
+    Script_js.transfer_tokens ~endpoint:!endpoint ~amount ~contract ~source ~token_id:id new_owner
+  else
+    let param = [ fst source ; Printf.sprintf "%s*%s=%s" id amount new_owner ] in
+    let cmd = Script.transfer_aux ~endpoint:!endpoint param (fst source) contract in
+    let code, out, err = sys_command ~retry:1 cmd in
+    if code <> 0 then
+      Lwt.fail_with ("transfer failure : log " ^ out ^ " & " ^ err)
+    else Lwt.return_ok ()
 
 let mint_with_random_token_id ~source ~contract =
   Printf.eprintf "mint_with_random_token_id for %s on %s\n%!" source contract ;
-  let _owner_alias, owner_pk, _owner_sk = generate_address () in
+  let _owner_alias, owner_pk, owner_sk = generate_address () in
   let owner =  Tzfunc.Crypto.pk_to_tz1 owner_pk in
   let tid = generate_token_id () in
   let amount = string_of_int @@ generate_amount ~max:10 () in
   let royalties = generate_royalties () in
   let metadata = [] in
-  mint_tokens tid owner amount royalties source contract >|=? fun () ->
-  (owner, amount, tid, royalties, metadata)
+  mint_tokens tid owner amount royalties (source, owner_sk) contract >|=? fun () ->
+  ((owner, owner_sk), amount, tid, royalties, metadata)
 
 let mint_with_token_id_from_api ~source ~contract =
   Printf.eprintf "mint_with_token_id_from_api for %s on %s\n%!" source contract ;
-  let _owner_alias, owner_pk, _owner_sk = generate_address () in
+  let _owner_alias, owner_pk, owner_sk = generate_address () in
   let owner =  Tzfunc.Crypto.pk_to_tz1 owner_pk in
   let amount = string_of_int @@ generate_amount ~max:10 () in
   let royalties = generate_royalties () in
   let metadata = [] in
   call_generate_token_id contract >>=? fun tid ->
-  mint_tokens tid.nft_token_id owner amount royalties source contract >|=? fun () ->
-  (owner, amount, tid.nft_token_id, royalties, metadata)
+  mint_tokens tid.nft_token_id owner amount royalties (owner_sk, source) contract >|=? fun () ->
+  ((owner, owner_sk), amount, tid.nft_token_id, royalties, metadata)
 
 let burn_with_token_id ~source ~contract tid amount =
-  Printf.eprintf "burn_with_token_id for %s on %s\n%!" source contract ;
+  Printf.eprintf "burn_with_token_id for %s on %s\n%!" (fst source) contract ;
   burn_tokens tid amount source contract
 
 let transfer_with_token_id ~source ~contract tid amount new_owner =
-  Printf.eprintf "transfer_with_token_id for %s on %s\n%!" source contract ;
+  Printf.eprintf "transfer_with_token_id for %s on %s\n%!" (fst source) contract ;
   transfer_tokens tid amount source contract new_owner
 
 let mint ~source ~contract =
@@ -841,12 +853,12 @@ let burn ~source ~contract tid max_amount =
 
 let transfer ~source ~contract tid max_amount =
   let full = Random.bool () in
-  let _alias, pk, _sk = generate_address ~diff:(Some source) () in
+  let _alias, pk, sk = generate_address ~diff:(Some (fst source)) () in
   let new_owner =  Tzfunc.Crypto.pk_to_tz1 pk in
   let new_owner_amount =
     if full then max_amount else generate_amount ~max:max_amount () + 1 in
   transfer_with_token_id ~source ~contract tid (string_of_int new_owner_amount) new_owner
-  >|=? fun () -> (new_owner_amount, new_owner)
+  >|=? fun () -> (new_owner_amount, (new_owner, sk))
 
 let random_mint collections =
   let _alias_collection, kt1, admin, _owner =
@@ -950,6 +962,7 @@ let check_nft_ownership ow kt1 owner amount tid _metadata =
    * check_creators ow.nft_ownership_creators metadata *)
 
 let check_item ?strict (kt1, (owner, amount, tid, royalties, metadata)) =
+  let owner = fst owner in
   let nft_item_exists ?verbose items =
     List.exists (fun i ->
         check_nft_item ?verbose ?strict i kt1 owner amount tid royalties metadata) items in
@@ -1049,6 +1062,7 @@ let check_nft_activity ?(from=false) activity kt1 owner amount tid =
     activity.nft_activity_token_id = tid
 
 let check_mint_activity (kt1, (owner, amount, tid, _royalties, _metadata)) =
+  let owner = fst owner in
   let mint_activity_exists activities =
     List.exists (fun act -> match act.nft_activity_type with
         | NftActivityMint -> check_nft_activity act.nft_activity_elt kt1 owner amount tid
@@ -1240,6 +1254,7 @@ let check_mint_activity (kt1, (owner, amount, tid, _royalties, _metadata)) =
   end
 
 let check_transfer_activity ?(from=false) (kt1, (owner, amount, tid, _royalties, _metadata)) =
+  let owner = fst owner in
   let transfer_activity_exists activities =
     List.exists (fun act -> match act.nft_activity_type with
         | NftActivityTransfer addr ->

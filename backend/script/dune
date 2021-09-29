@@ -4,8 +4,14 @@
  (name script)
  (libraries unix hex))
 
+(library
+ (name script_js)
+ (package rarible)
+ (modules script_js)
+ (libraries unix tzfunc))
+
 (executable
  (public_name rarible.api_script)
  (modules api_script)
  (name api_script)
- (libraries script fmt api unix hex let rtypes ez_api.icurl_lwt ez_api.icurl))
+ (libraries script fmt api script_js ez_api.icurl_lwt ez_api.icurl))
