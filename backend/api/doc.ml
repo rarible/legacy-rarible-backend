@@ -20,7 +20,7 @@ let docs = List.map (fun (n, t, d) -> (n, (t, d, None, None))) @@ [
     "collections_by_owner", "searchNftCollectionsByOwner", "collections_by_owner" ;
     "collections_all", "searchNftAllCollections", "collections_all" ;
 
-    (* Order dontroller *)
+    (* Order controller *)
     "orders_upsert", "upsertOrder", "Create or update an order" ;
     "orders_all", "getOrdersAll", "Get all orders" ;
     "orders_by_hash", "getOrderByHash", "Get order by hash" ;
@@ -30,4 +30,18 @@ let docs = List.map (fun (n, t, d) -> (n, (t, d, None, None))) @@ [
     "orders_sell", "getSellOrders", "Get sell orders" ;
     "orders_bids_by_maker", "getOrderBidsByMaker", "Get order bids by maker" ;
     "orders_bids_by_item", "getOrderBidsByItem", "Get order bids by item" ;
+
+    (* Order Activity controller *)
+    "get_order_activities", "getOrderActivities", "get Order activities with some filter" ;
+
+    (* Order Aggregation controller *)
+    "aggregate_nft_sell_by_maker", "aggregate_nft_sell_by_maker",
+    "Aggregate Nft Sell orders by maker" ;
+    "aggregate_nft_purchase_by_taker", "aggregate_nft_purchase_by_taker",
+    "Aggregate Nft Sell orders by taker" ;
+    "aggregate_nft_purchase_buy_collection", "aggregate_nft_purchase_buy_collection",
+    "Aggregate Nft Sell orders by collection" ;
+
+    (* Order Bid controller *)
+    "get_bids_by_item", "getBidsByItem", "get Bid by item" ;
   ]

@@ -22,9 +22,15 @@ let ownerships_section = EzAPI.Doc.{section_name = "nft-ownership-controller"; s
 let items_section = EzAPI.Doc.{section_name = "nft-item-controller"; section_docs = []}
 let collections_section = EzAPI.Doc.{section_name = "nft-collection-controller"; section_docs = []}
 let orders_section = EzAPI.Doc.{section_name = "order-controller"; section_docs = []}
+let order_activities_section =
+  EzAPI.Doc.{section_name = "order-activity-controller"; section_docs = []}
+let aggregation_section =
+  EzAPI.Doc.{section_name = "order-aggregation-controller"; section_docs = []}
+let order_bid_section =
+  EzAPI.Doc.{section_name = "order-bid-controller"; section_docs = []}
 let sections = [
   nft_section; ownerships_section; items_section; collections_section;
-  orders_section ]
+  orders_section; order_activities_section; aggregation_section; order_bid_section ]
 
 let blockchain_param = EzAPI.Param.string "blockchain"
 let address_param = EzAPI.Param.string "address"
@@ -47,9 +53,7 @@ let origin_param = EzAPI.Param.string "origin"
 let platform_param = EzAPI.Param.string "platform"
 let fee_param = EzAPI.Param.int "fee"
 let maker_param = EzAPI.Param.string "maker"
-(* TODO : date-time *)
 let start_date_param = EzAPI.Param.string "startDate"
-(* TODO : date-time*)
 let end_date_param = EzAPI.Param.string "endDate"
 (* TODO : ALL | RARIBLE | OPEN_SEA *)
 let source_param = EzAPI.Param.string "source"
@@ -59,6 +63,7 @@ let hash_arg = EzAPI.Arg.string "hash"
 let item_id_arg = EzAPI.Arg.string "itemId"
 let collection_arg = EzAPI.Arg.string "collection"
 let ownership_id_arg = EzAPI.Arg.string "ownershipId"
+
 
 let mk_invalid_argument param msg =
   Error (invalid_argument (Printf.sprintf "%s %s" param.EzAPI.Param.param_id msg))
@@ -294,8 +299,76 @@ let get_continuation_ownerships_param req =
         mk_invalid_argument
           continuation_param "must be in format TIMESTAMP_CONTRACT:TOKEN_ID:OWNER"
     with _ ->
-        mk_invalid_argument
-          continuation_param "must be in format TIMESTAMP_CONTRACT:TOKEN_ID:OWNER"
+      mk_invalid_argument
+        continuation_param "must be in format TIMESTAMP_CONTRACT:TOKEN_ID:OWNER"
+
+let get_required_start_date_param req =
+  match EzAPI.Req.find_param start_date_param req with
+  | None -> mk_invalid_argument start_date_param "param is required"
+  | Some ts ->
+    try
+      let ts = CalendarLib.Calendar.from_unixfloat (float_of_string ts) in
+      Ok ts
+    with _ ->
+      mk_invalid_argument owner_param "must be a date"
+
+let get_end_date_param req =
+  match EzAPI.Req.find_param end_date_param req with
+  | None -> Ok None
+  | Some ts ->
+    try
+      let ts = CalendarLib.Calendar.from_unixfloat (float_of_string ts) in
+      Ok (Some ts)
+    with _ ->
+      mk_invalid_argument owner_param "must be a date"
+
+let get_start_date_param req =
+  match EzAPI.Req.find_param start_date_param req with
+  | None -> Ok None
+  | Some ts ->
+    try
+      let ts = CalendarLib.Calendar.from_unixfloat (float_of_string ts) in
+      Ok (Some ts)
+    with _ ->
+      mk_invalid_argument owner_param "must be a date"
+
+let get_required_end_date_param req =
+  match EzAPI.Req.find_param end_date_param req with
+  | None -> mk_invalid_argument end_date_param "param is required"
+  | Some ts ->
+    try
+      let ts = CalendarLib.Calendar.from_unixfloat (float_of_string ts) in
+      Ok ts
+    with _ ->
+      mk_invalid_argument owner_param "must be a date"
+
+let get_required_status_param req =
+  match EzAPI.Req.find_param status_param req with
+  | None -> mk_invalid_argument status_param "param is required"
+  | Some o ->
+    try
+      match String.split_on_char ',' o with
+      | [] -> Ok [ EzEncoding.destruct order_bid_status_enc o ]
+      | l -> Ok (List.map (EzEncoding.destruct order_bid_status_enc) l)
+    with _ ->
+      mk_invalid_argument
+        status_param
+        "must be a ACTIVE FILLED HISTORICAL, INACTIVE OR CANCELLED separated with ','"
+
+let get_continuation_price_param req =
+  match EzAPI.Req.find_param continuation_param req with
+  | None -> Ok None
+  | Some s ->
+    try
+      let l = String.split_on_char '_' s in
+      match l with
+      | ts :: h :: [] ->
+        let f = (float_of_string ts) in
+        Ok (Some (f, h))
+      | _ ->
+        mk_invalid_argument continuation_param "must be in format PRICE_HASH"
+    with _ ->
+      mk_invalid_argument continuation_param "must be in format PRICE_HASH"
 
 (* (\* gateway-controller *\)
  * let create_gateway_pending_transactions _req _input =
@@ -342,15 +415,6 @@ let get_continuation_ownerships_param req =
  *   {path="/v0.1/nft/transactions";
  *    input=create_transaction_request_enc;
  *    output=log_events_enc;
- *    errors=[rarible_error_500]}] *)
-
-(* (\* nft-lazy-mint-controller *\)
- * let mint_nft_asset _req _input =
- *   return (Error (bad_request ""))
- * [@@post
- *   {path="/v0.1/mints";
- *    input=lazy_nft_enc;
- *    output=nft_item_enc;
  *    errors=[rarible_error_500]}] *)
 
 (* nft-activity-controller *)
@@ -455,13 +519,6 @@ let get_nft_item_meta_by_id (_req, item_id) () =
    name="items_meta";
    section=items_section
   }]
-
-(* let get_nft_lazy_item_by_id (_req, _item_id) () =
- *   return (Error (bad_request ""))
- * [@@get
- *   {path="/v0.1/items/{itemId:string}/lazy";
- *    output=lazy_nft_enc;
- *    errors=[rarible_error_500]}] *)
 
 let get_nft_item_by_id (req, item_id) () =
   match parse_item_id item_id with
@@ -926,10 +983,10 @@ let get_sell_orders_by_item req () =
             | Ok continuation ->
               Db.get_sell_orders_by_item
                 ?origin ?continuation ?size ?maker contract token_id >>= function
-                | Error db_err ->
-                  let str = Crawlori.Rp.string_of_error db_err in
-                  return (Error (unexpected_api_error str))
-                | Ok res -> return_ok res
+              | Error db_err ->
+                let str = Crawlori.Rp.string_of_error db_err in
+                return (Error (unexpected_api_error str))
+              | Ok res -> return_ok res
 [@@get
   {path="/v0.1/orders/sell/byItem";
    params=[contract_param;token_id_param;maker_param;origin_param;
@@ -1044,10 +1101,10 @@ let get_order_bids_by_item req () =
             | Ok continuation ->
               Db.get_bid_orders_by_item
                 ?origin ?continuation ?size ?maker contract token_id >>= function
-                | Error db_err ->
-                  let str = Crawlori.Rp.string_of_error db_err in
-                  return (Error (unexpected_api_error str))
-                | Ok res -> return_ok res
+              | Error db_err ->
+                let str = Crawlori.Rp.string_of_error db_err in
+                return (Error (unexpected_api_error str))
+              | Ok res -> return_ok res
 [@@get
   {path="/v0.1/orders/bids/byItem";
    params=[contract_param;token_id_param;maker_param;origin_param;
@@ -1057,90 +1114,148 @@ let get_order_bids_by_item req () =
    name="orders_bids_by_item";
    section=orders_section}]
 
-(* (\* order-aggregation-controller *\)
- * let aggregate_nft_sell_by_maker req () =
- *   let _start_date = EzAPI.Req.find_param start_date_param req in
- *   let _end_date = EzAPI.Req.find_param end_date_param req in
- *   let _size = EzAPI.Req.find_param size_param req in
- *   let _source = EzAPI.Req.find_param source_param req in
- *   return (Error (unexpected_api_error ""))
- * [@@get
- *   {path="/v0.1/aggregations/nftSellByMaker";
- *    output=aggregation_datas_enc;
- *    errors=[rarible_error_500]}]
- *
- * let aggregate_nft_purchase_by_taker req () =
- *   let _start_date = EzAPI.Req.find_param start_date_param req in
- *   let _end_date = EzAPI.Req.find_param end_date_param req in
- *   let _size = EzAPI.Req.find_param size_param req in
- *   let _source = EzAPI.Req.find_param source_param req in
- *   return (Error (unexpected_api_error ""))
- * [@@get
- *   {path="/v0.1/aggregations/nftPurchaseByTaker";
- *    output=aggregation_datas_enc;
- *    errors=[rarible_error_500]}]
- *
- * let aggregate_nft_purchase_buy_collection req () =
- *   let _start_date = EzAPI.Req.find_param start_date_param req in
- *   let _end_date = EzAPI.Req.find_param end_date_param req in
- *   let _size = EzAPI.Req.find_param size_param req in
- *   let _source = EzAPI.Req.find_param source_param req in
- *   return (Error (unexpected_api_error ""))
- * [@@get
- *   {path="/v0.1/aggregations/nftPurchaseByCollection";
- *    output=aggregation_datas_enc;
- *    errors=[rarible_error_500]}] *)
+(* order-aggregation-controller *)
+let aggregate_nft_sell_by_maker req () =
+  (* let _source = EzAPI.Req.find_param source_param req in *)
+  match get_required_start_date_param req with
+  | Error err -> return @@ Error err
+  | Ok start_date ->
+    match get_required_end_date_param req with
+    | Error err -> return @@ Error err
+    | Ok end_date ->
+      match get_size_param req with
+      | Error err -> return @@ Error err
+      | Ok size ->
+        if start_date >= end_date then
+          return (Error (invalid_argument "startDate must be greater the endDate"))
+        else
+          Db.aggregate_nft_sell_by_maker ?size start_date end_date >>= function
+          | Error db_err ->
+            let str = Crawlori.Rp.string_of_error db_err in
+            return (Error (unexpected_api_error str))
+          | Ok res -> return_ok res
+[@@get
+  {path="/v0.1/aggregations/nftSellByMaker";
+   params=[start_date_param;end_date_param;size_param];
+   output=aggregation_datas_enc;
+   errors=[rarible_error_500];
+   name="aggregate_nft_sell_by_maker";
+   section=aggregation_section}]
 
-(* (\* order-activity-controller *\)
- * let get_order_activities req _input =
- *   let _continuation = EzAPI.Req.find_param continuation_param req in
- *   let _size = EzAPI.Req.find_param size_param req in
- *   return (Error (unexpected_api_error ""))
- * [@@post
- *   {path="/v0.1/order/activities/search";
- *    input=order_activity_filter_enc;
- *    output=order_activities_enc;errors=[rarible_error_500]}] *)
+let aggregate_nft_purchase_by_taker req () =
+  (* let _source = EzAPI.Req.find_param source_param req in *)
+  match get_required_start_date_param req with
+  | Error err -> return @@ Error err
+  | Ok start_date ->
+    match get_required_end_date_param req with
+    | Error err -> return @@ Error err
+    | Ok end_date ->
+      match get_size_param req with
+      | Error err -> return @@ Error err
+      | Ok size ->
+        if start_date >= end_date then
+          return (Error (invalid_argument "startDate must be greater the endDate"))
+        else
+          Db.aggregate_nft_sell_by_taker ?size start_date end_date >>= function
+          | Error db_err ->
+            let str = Crawlori.Rp.string_of_error db_err in
+            return (Error (unexpected_api_error str))
+          | Ok res -> return_ok res
+[@@get
+  {path="/v0.1/aggregations/nftPurchaseByTaker";
+   output=aggregation_datas_enc;
+   params=[start_date_param;end_date_param;size_param];
+   errors=[rarible_error_500];
+   name="aggregate_nft_sell_by_taker";
+   section=aggregation_section}]
 
-(* (\* order-bid-controller *\)
- * let get_bids_by_item req () =
- *   let _contract = EzAPI.Req.find_param contract_param req in
- *   let _token_id = EzAPI.Req.find_param token_id_param req in
- *   let _maker = EzAPI.Req.find_param maker_param req in
- *   let _status =  EzAPI.Req.find_param status_param req in
- *   let _origin = EzAPI.Req.find_param origin_param req in
- *   let _platform = EzAPI.Req.find_param platform_param req in
- *   let _start_date = EzAPI.Req.find_param start_date_param req in
- *   let _end_date = EzAPI.Req.find_param end_date_param req in
- *   let _continuation = EzAPI.Req.find_param continuation_param req in
- *   let _size = EzAPI.Req.find_param size_param req in
- *   return (Error (unexpected_api_error ""))
- * [@@get
- *   {path="/v0.1/bids/byItem";
- *    output=order_bids_pagination_enc;
- *    errors=[rarible_error_500]}] *)
+let aggregate_nft_purchase_buy_collection req () =
+  (* let _source = EzAPI.Req.find_param source_param req in *)
+  match get_required_start_date_param req with
+  | Error err -> return @@ Error err
+  | Ok start_date ->
+    match get_required_end_date_param req with
+    | Error err -> return @@ Error err
+    | Ok end_date ->
+      match get_size_param req with
+      | Error err -> return @@ Error err
+      | Ok size ->
+        if start_date >= end_date then
+          return (Error (invalid_argument "startDate must be greater the endDate"))
+        else
+          Db.aggregate_nft_sell_by_collection ?size start_date end_date >>= function
+          | Error db_err ->
+            let str = Crawlori.Rp.string_of_error db_err in
+            return (Error (unexpected_api_error str))
+          | Ok res -> return_ok res
+[@@get
+  {path="/v0.1/aggregations/nftPurchaseByCollection";
+   params=[start_date_param;end_date_param;size_param];
+   output=aggregation_datas_enc;
+   errors=[rarible_error_500];
+   name="aggregate_nft_sell_by_collection";
+   section=aggregation_section}]
 
-(* (\* lock-controller *\)
- * let create_lock _req _input =
- *   return (Error (lock_exists ""))
- * [@@post
- *   {path="/v0.1/item/{itemId:string}/lock";
- *    input=lock_form_enc;output=lock_enc;
- *    errors=[rarible_error_400]}]
- *
- * let get_lock_content _req _input =
- *   return (Error (ownership_error ""))
- * [@@get
- *   {path="/v0.1/item/{itemId:string}/content";
- *    input=signature_form_enc;
- *    output=Json_encoding.string;
- *    errors=[rarible_error_400]}]
- *
- * let is_unlockable _req () =
- *   return (Error (unknown_error ""))
- * [@@get
- *   {path="/v0.1/item/{itemId:string}/isUnlockable";
- *    output=Json_encoding.bool;
- *    errors=[rarible_error_500]}] *)
+(* order-activity-controller *)
+let get_order_activities req input =
+  match get_size_param req with
+  | Error err -> return @@ Error err
+  | Ok size ->
+    match get_continuation_last_update_param req with
+    | Error err -> return @@ Error err
+    | Ok continuation ->
+      Db.get_order_activities ?continuation ?size input >>= function
+      | Error db_err ->
+        let str = Crawlori.Rp.string_of_error db_err in
+        return (Error (unexpected_api_error str))
+      | Ok res -> return_ok res
+[@@post
+  {path="/v0.1/order/activities/search";
+   params=[size_param;continuation_param];
+   name="get_order_activities";
+   input=order_activity_filter_enc;
+   output=order_activities_enc;
+   errors=[rarible_error_500];
+   section=order_activities_section}]
+
+(* order-bid-controller *)
+let get_bids_by_item req () =
+  (* let _platform = EzAPI.Req.find_param platform_param req in *)
+  match get_required_contract_param req with
+  | Error err -> return @@ Error err
+  | Ok contract ->
+    match get_required_token_id_param req with
+    | Error err -> return @@ Error err
+    | Ok token_id ->
+      match get_required_status_param req with
+      | Error err -> return @@ Error err
+      | Ok status ->
+        match get_start_date_param req with
+        | Error err -> return @@ Error err
+        | Ok start_date ->
+          match get_end_date_param req with
+          | Error err -> return @@ Error err
+          | Ok end_date ->
+            match get_size_param req with
+            | Error err -> return @@ Error err
+            | Ok size ->
+              match get_continuation_price_param req with
+              | Error err -> return @@ Error err
+              | Ok continuation ->
+                Db.get_bids_by_item
+                  ?start_date ?end_date ?continuation ?size contract token_id status >>= function
+                | Error db_err ->
+                  let str = Crawlori.Rp.string_of_error db_err in
+                  return (Error (unexpected_api_error str))
+                | Ok res -> return_ok res
+[@@get
+  {path="/v0.1/bids/byItem";
+   params=[contract_param;token_id_param;start_date_param;end_date_param;
+           status_param;continuation_param;size_param];
+   name="get_bids_by_item";
+   output=order_bids_pagination_enc;
+   errors=[rarible_error_500];
+   section=order_bid_section}]
 
 (* module V_0_1 = struct
  *
@@ -1170,10 +1285,8 @@ let get_order_bids_by_item req () =
 
 (* Order Activities *)
 (* Merge de history et Orderversion *)
-(* ExchangeHistoryRepo saves *)
-(* Log event of exchange contract*)
-(* -> ENTRYPOINT CANCEL MATCH_ORDERS *)
 
-(* Nft Activities *)
-(* Log Event on nft contract *)
-(* -> ENTRYPOINT MINT BURN TRANSFER *)
+(* ExchangeHistoryRepo saves *)
+(* Log event of exchange contract *)
+(* -> ENTRYPOINT CANCEL MATCH_ORDERS *)
+(* VOIR ExchangeOrderMatchDescriptor OnExchangeLogEventListener et OrderReduceService *)

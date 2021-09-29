@@ -179,7 +179,19 @@ let upgrade_1_to_2 dbh version =
       cancel varchar,
       hash_left varchar,
       hash_right varchar,
+      take_usd float,
       primary key (transaction, id))|};
+
+    {|create table order_activities(
+      match_left varchar,
+      match_right varchar,
+      hash varchar,
+      transaction varchar,
+      block varchar,
+      level int,
+      main boolean not null default false,
+      date timestamp not null,
+      order_activity_type varchar not null)|};
   ]
 
 let upgrades =
