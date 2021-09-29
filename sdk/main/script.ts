@@ -1,4 +1,4 @@
-import { transfer, mint, burn, deploy, set_token_metadata, set_metadata_uri } from "./rarible"
+import { transfer, mint, burn, deploy, set_token_metadata, set_metadata_uri } from "."
 import { in_memory_provider } from '../providers/in_memory/in_memory_provider'
 import yargs from 'yargs'
 

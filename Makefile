@@ -66,3 +66,6 @@ arl:
 
 openapi:
 	@cp -f _build/default/backend/api/openapi.json .
+
+typedoc:
+	@npx typedoc --tsconfig sdk/tsconfig.json --options sdk/typedoc.json

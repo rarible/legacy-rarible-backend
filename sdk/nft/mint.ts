@@ -1,4 +1,5 @@
-import { Provider, MichelsonData, send, send_batch, TransactionArg, get_address } from "../common/base"
+import { MichelsonData } from "@taquito/michel-codec"
+import { Provider, send, send_batch, TransactionArg, get_address } from "../common/base"
 
 function mint_param(
   token_id: bigint,

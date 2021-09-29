@@ -1,4 +1,5 @@
-import { Provider, send, StorageFA1_2, StorageFA2, Asset, TransactionArg, MichelsonData } from "../common/base"
+import { MichelsonData } from "@taquito/michel-codec"
+import { Provider, send, StorageFA1_2, StorageFA2, Asset, TransactionArg } from "../common/base"
 
 export async function approve_fa1_2_arg(
   provider: Provider,

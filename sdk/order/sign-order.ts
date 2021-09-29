@@ -1,9 +1,16 @@
-import { Provider, pack, sign, MichelsonType, MichelsonData, AssetType, Asset } from "../common/base"
+import { MichelsonData, MichelsonType, packDataBytes } from "@taquito/michel-codec"
+import { Provider, sign, AssetType, Asset } from "../common/base"
 import { OrderForm, OrderRaribleV2DataV1 } from "./utils"
 const keccak_base = require("keccak")
 
 export function keccak(s : string) : string {
   return keccak_base('keccak256').update(s, 'hex').digest('hex')
+}
+
+function pack(
+  data: MichelsonData,
+  type: MichelsonType) : string {
+  return packDataBytes(data, type).bytes
 }
 
 export const XTZ : MichelsonData = { prim: 'Left', args: [ { prim: 'Unit' } ] }
