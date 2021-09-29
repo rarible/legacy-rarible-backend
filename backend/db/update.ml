@@ -179,6 +179,7 @@ let upgrade_1_to_2 dbh version =
       cancel varchar,
       hash_left varchar,
       hash_right varchar,
+      take_usd float,
       primary key (transaction, id))|};
 
     {|create table order_activities(

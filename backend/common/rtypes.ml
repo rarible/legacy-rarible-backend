@@ -795,50 +795,19 @@ type order_bid_elt = {
   order_bid_elt_make_stock : A.big_integer ;
   order_bid_elt_cancelled : bool ;
   order_bid_elt_salt : A.big_integer ;
-  order_bid_elt_signature : A.binary option ;
+  order_bid_elt_signature : A.binary ;
   order_bid_elt_created_at : A.date;
 } [@@deriving encoding {camel}]
 
-type legacy_order_bid = {
-  legacy_order_bid_elt : order_bid_elt ; [@merge]
-  legacy_order_bid_data : order_data_legacy ;
+type order_bid = {
+  order_bid_elt : order_bid_elt ; [@merge]
+  order_bid_data : order_data ; [@merge]
 } [@@deriving encoding]
-
-type rarible_v2_order_bid = {
-  rarible_v2_order_bid_elt : order_bid_elt ; [@merge]
-  rarible_v2_order_bid_data : order_rarible_v2_data_v1 ;
-} [@@deriving encoding]
-
-type open_sea_v1_order_bid = {
-  open_sea_v1_order_bid_elt : order_bid_elt ; [@merge]
-  open_sea_v1_order_bid_data : order_rarible_v2_data_v1 ;
-} [@@deriving encoding]
-
-type order_bid =
-  | LegacyOrderBid of legacy_order_bid [@kind_label "RARIBLE_V1"] [@kind "type"]
-  | RaribleV2OrderBid of rarible_v2_order_bid [@kind_label "RARIBLE_V2"] [@kind "type"]
-  | OpenSeav1OrderBid of open_sea_v1_order_bid [@kind_label "OPEN_SEA_V1"] [@kind "type"]
-[@@deriving encoding]
 
 type order_bids_pagination = {
   order_bids_pagination_items : order_bid list ;
   order_bids_pagination_continuation : string option ;
 } [@@deriving encoding]
-
-type lock_form = {
-  lock_form_signature : A.binary option ;
-  lock_form_content : string ;
-} [@@deriving encoding]
-
-type lock = {
-  lock_id : string ;
-  lock_item_id : string ;
-  lock_content : string ;
-  lock_author : A.address ;
-  lock_signature : A.binary ;
-  lock_unlock_date : A.date ;
-  lock_version : int64 ;
-} [@@deriving encoding {camel}]
 
 type signature_form = {
   signature_form_signature : A.binary option ;

@@ -12,7 +12,7 @@ let use dbh f = match dbh with
   | None -> Pg.PG.Pool.use f
   | Some dbh -> f dbh
 
-let one ?(err="expected unique roaw not found") l = match l with
+let one ?(err="expected unique row not found") l = match l with
   | [ x ] -> Lwt.return_ok x
   | _ -> Lwt.return_error (`hook_error err)
 
@@ -2379,3 +2379,190 @@ let get_order_activities ?dbh ?continuation ?size = function
     get_order_activities_by_user ?dbh ?continuation ?size filter
   | OrderActivityFilterAll types ->
     get_order_activities_all ?dbh ?continuation ?size types
+
+let mk_taker_aggregation_data obj =
+  Lwt.return_ok {
+    aggregation_data_address = Option.get obj#taker ;
+    aggregation_data_sum = string_of_float @@ Option.get obj#sum ;
+    aggregation_data_count = Option.get obj#count
+  }
+
+let mk_maker_aggregation_data obj =
+  Lwt.return_ok {
+    aggregation_data_address = obj#maker ;
+    aggregation_data_sum = string_of_float @@ Option.get obj#sum ;
+    aggregation_data_count = Option.get obj#count
+  }
+
+let mk_collection_aggregation_data obj =
+  Lwt.return_ok {
+    aggregation_data_address = Option.get obj#collection ;
+    aggregation_data_sum = string_of_float @@ Option.get obj#sum ;
+    aggregation_data_count = Option.get obj#count
+  }
+
+let aggregate_nft_sell_by_maker ?dbh ?(size=50) start_date end_date =
+  Format.eprintf "aggregate_nft_sell_by_maker %s %s %d@."
+    (CalendarLib.Printer.Calendar.to_string start_date)
+    (CalendarLib.Printer.Calendar.to_string end_date)
+    size ;
+  use dbh @@ fun dbh ->
+  let size64 = Int64.of_int size in
+  let>? l = [%pgsql.object dbh
+      "select oleft.maker, \
+       count(*) as count, sum (take_usd) as sum \
+       from order_updates \
+       left join orders as oleft on oleft.hash = hash_left \
+       where main and \
+       (hash_left is not null and hash_right is not null) and \
+       (tsp >= $start_date and tsp <= $end_date) \
+       group by oleft.maker limit $size64"] in
+  map_rp mk_maker_aggregation_data l
+
+let aggregate_nft_sell_by_taker ?dbh ?(size=50) start_date end_date =
+  Format.eprintf "aggregate_nft_sell_by_taker %s %s %d@."
+    (CalendarLib.Printer.Calendar.to_string start_date)
+    (CalendarLib.Printer.Calendar.to_string end_date)
+    size ;
+  use dbh @@ fun dbh ->
+  let size64 = Int64.of_int size in
+  let>? l = [%pgsql.object dbh
+      "select oleft.taker, \
+       count(*) as count, sum (take_usd) as sum \
+       from order_updates \
+       left join orders as oleft on oleft.hash = hash_left \
+       where main and oleft.taker is not null and \
+       (hash_left is not null and hash_right is not null) and \
+       (tsp >= $start_date and tsp <= $end_date) \
+       group by oleft.taker limit $size64"] in
+  map_rp mk_taker_aggregation_data l
+
+let aggregate_nft_sell_by_collection ?dbh ?(size=50) start_date end_date =
+  Format.eprintf "aggregate_nft_sell_by_collection %s %s %d@."
+    (CalendarLib.Printer.Calendar.to_string start_date)
+    (CalendarLib.Printer.Calendar.to_string end_date)
+    size ;
+  use dbh @@ fun dbh ->
+  let size64 = Int64.of_int size in
+  let>? l = [%pgsql.object dbh
+      "select oleft.make_asset_type_contract as collection, \
+       count(*) as count, sum (take_usd) as sum \
+       from order_updates \
+       left join orders as oleft on oleft.hash = hash_left \
+       where main and oleft.make_asset_type_contract is not null and \
+       (hash_left is not null and hash_right is not null) and \
+       (tsp >= $start_date and tsp <= $end_date) \
+       group by oleft.make_asset_type_contract limit $size64"] in
+  map_rp mk_collection_aggregation_data l
+
+let mk_order_bids_pagination_continuation obj =
+  Printf.sprintf "%s_%s"
+    (string_of_float_opt obj#take_price_usd)
+    obj#hash
+
+let mk_order_status obj =
+  if obj#cancelled then BSCANCELLED
+  else
+  if obj#make_stock = 0L then BSINACTIVE
+  else
+  if obj#fill = obj#take_asset_value then BSFILLED
+  else BSACTIVE
+
+let mk_order_bid_elt obj =
+  let status = mk_order_status obj in
+  mk_asset
+    obj#make_asset_type_class
+    obj#make_asset_type_contract
+    obj#make_asset_type_token_id
+    obj#make_asset_value
+  >>=? fun make ->
+  mk_asset
+    obj#take_asset_type_class
+    obj#take_asset_type_contract
+    obj#take_asset_type_token_id
+    obj#take_asset_value
+  >|=? fun take ->
+  {
+    order_bid_elt_order_hash = obj#hash ;
+    order_bid_elt_status = status ;
+    order_bid_elt_maker = obj#maker ;
+    order_bid_elt_taker = obj#taker ;
+    order_bid_elt_make = make ;
+    order_bid_elt_take = take ;
+    order_bid_elt_make_balance = string_opt_of_int64_opt obj#make_balance ;
+    order_bid_elt_make_price_usd = string_opt_of_float_opt obj#make_price_usd ;
+    order_bid_elt_take_price_usd = string_opt_of_float_opt obj#take_price_usd ;
+    order_bid_elt_fill = Int64.to_string obj#fill ;
+    order_bid_elt_make_stock = Int64.to_string obj#make_stock ;
+    order_bid_elt_cancelled = obj#cancelled ;
+    order_bid_elt_salt = obj#salt ;
+    order_bid_elt_signature = obj#signature ;
+    order_bid_elt_created_at = obj#created_at ;
+  }
+
+let mk_order_bid ?dbh obj =
+  let>? order_bid_elt = mk_order_bid_elt obj in
+  get_order_origin_fees ?dbh obj#hash >>=? fun origin_fees ->
+  get_order_payouts ?dbh obj#hash >|=? fun payouts ->
+  let order_bid_data = RaribleV2Order {
+    order_rarible_v2_data_v1_data_type = "RARIBLE_V2_DATA_V1" ;
+    order_rarible_v2_data_v1_payouts = payouts ;
+    order_rarible_v2_data_v1_origin_fees = origin_fees ;
+  } in
+  { order_bid_elt ; order_bid_data }
+
+let get_bids_by_item ?dbh ?start_date ?end_date ?continuation ?(size=50) contract token_id status =
+  let statuses = order_bid_status_to_string status in
+  Printf.eprintf "get_bids_by_item %s %s %s %d %s %s [%s]\n%!"
+    (match start_date with None -> "None" | Some d -> CalendarLib.Printer.Calendar.to_string d)
+    (match end_date with None -> "None" | Some d -> CalendarLib.Printer.Calendar.to_string d)
+    (match continuation with
+     | None -> "None"
+     | Some (f, s) -> (string_of_float f) ^ "_" ^ s)
+    size
+    contract
+    token_id
+    statuses ;
+  let no_continuation, (price, h) =
+    continuation = None,
+    (match continuation with None -> 0., "" | Some (f, h) -> (f, h)) in
+  let no_start_date, sd =
+    start_date = None,
+    (match start_date with None -> CalendarLib.Calendar.now () | Some d -> d) in
+  let no_end_date, ed =
+    start_date = None,
+    (match end_date with None -> CalendarLib.Calendar.now () | Some d -> d) in
+  use dbh @@ fun dbh ->
+  let size64 = Int64.of_int size in
+  let>? l = [%pgsql.object dbh
+      "select maker, taker, \
+       make_asset_type_class, make_asset_type_contract, make_asset_type_token_id, \
+       make_asset_value, \
+       take_asset_type_class, take_asset_type_contract, take_asset_type_token_id, \
+       take_asset_value, \
+       fill, start_date, end_date, make_stock, cancelled, salt, \
+       signature, created_at, last_update_at, hash, \
+       make_balance, make_price_usd, take_price_usd \
+       from orders where \
+       take_asset_type_contract = $contract and \
+       take_asset_type_token_id = $token_id and \
+       ((fill = take_asset_value and position('FILLED' in $statuses) > 0) or \
+        (fill <> take_asset_value and position('ACTIVE' in $statuses) > 0) or \
+        (cancelled and position('CANCELLED' in $statuses) > 0) or \
+        (make_stock = 0 and position('INACTIVE' in $statuses) > 0)) and \
+       ($no_continuation or (take_price_usd = $price and hash < $h) or \
+       (take_price_usd < $price)) and \
+       ($no_start_date or created_at >= $sd) and \
+       ($no_end_date or created_at <= $ed) \
+       order by take_price_usd desc, hash desc limit $size64"] in
+  map_rp (fun r -> let|>? a = mk_order_bid r in a, r) l >>=? fun items ->
+  let len = List.length items in
+  let order_bids_pagination_continuation =
+    if len <> size then None
+    else Some
+        (mk_order_bids_pagination_continuation @@ snd @@ List.hd (List.rev items)) in
+  Lwt.return_ok
+    { order_bids_pagination_items = List.map fst items ; order_bids_pagination_continuation }
+
+
+  (* ORDER UPDATE field = fill, make_stock, cancelled, last_update, make_balance, make_price_usd, take_price_usd, assets values ?? *)

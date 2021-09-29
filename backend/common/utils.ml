@@ -419,6 +419,10 @@ let string_opt_of_float_opt = function
   | None -> None
   | Some f -> Some (string_of_float f)
 
+let string_of_float_opt = function
+  | None -> "0"
+  | Some f -> string_of_float f
+
 let float_opt_of_string_opt = function
   | None -> None
   | Some f -> Some (float_of_string f)
@@ -483,6 +487,11 @@ let filter_order_user_type_to_string l =
   List.map (fun t ->
       String.lowercase_ascii @@
       EzEncoding.construct order_activity_filter_user_type_enc t) l
+
+let order_bid_status_to_string l =
+  String.concat ";" @@
+  List.map (fun t ->
+      EzEncoding.construct order_bid_status_enc t) l
 
 let sign ~edsk ~bytes =
   let open Tzfunc.Crypto in

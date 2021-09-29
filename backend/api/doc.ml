@@ -33,4 +33,15 @@ let docs = List.map (fun (n, t, d) -> (n, (t, d, None, None))) @@ [
 
     (* Order Activity controller *)
     "get_order_activities", "getOrderActivities", "get Order activities with some filter" ;
+
+    (* Order Aggregation controller *)
+    "aggregate_nft_sell_by_maker", "aggregate_nft_sell_by_maker",
+    "Aggregate Nft Sell orders by maker" ;
+    "aggregate_nft_purchase_by_taker", "aggregate_nft_purchase_by_taker",
+    "Aggregate Nft Sell orders by taker" ;
+    "aggregate_nft_purchase_buy_collection", "aggregate_nft_purchase_buy_collection",
+    "Aggregate Nft Sell orders by collection" ;
+
+    (* Order Bid controller *)
+    "get_bids_by_item", "getBidsByItem", "get Bid by item" ;
   ]
