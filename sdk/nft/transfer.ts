@@ -1,5 +1,5 @@
 import { MichelsonData } from "@taquito/michel-codec"
-import { Provider, send, TransactionArg, get_address } from "../common/base"
+import { Provider, send, TransactionArg, get_address, OperationResult } from "../common/base"
 import { check_asset_type, ExtendedAssetType } from "../common/check-asset-type"
 
 function transfer_param(
@@ -40,10 +40,9 @@ export async function transfer_nft(
   contract: string,
   from: string,
   to: string,
-  token_id: bigint,
-  wait?: boolean) : Promise<string> {
+  token_id: bigint) : Promise<OperationResult> {
   const arg = transfer_nft_arg(contract, from, to, token_id)
-  return send(provider, arg, wait)
+  return send(provider, arg)
 }
 
 export function transfer_mt_arg(
@@ -66,10 +65,9 @@ export async function transfer_mt(
   to: string,
   token_id: bigint | bigint[],
   token_amount: bigint | bigint[],
-  wait?: boolean
-) : Promise<string> {
+) : Promise<OperationResult> {
   const arg = transfer_mt_arg(contract, from, to, token_id, token_amount)
-  return send(provider, arg, wait)
+  return send(provider, arg)
 }
 
 export async function transfer_arg(
@@ -94,8 +92,7 @@ export async function transfer(
   provider: Provider,
   asset_type: ExtendedAssetType,
   to: string,
-  amount?: bigint,
-  wait?: boolean) : Promise<string> {
+  amount?: bigint) : Promise<OperationResult> {
   const arg = await transfer_arg(provider, asset_type, to, amount)
-  return send(provider, arg, wait)
+  return send(provider, arg)
 }

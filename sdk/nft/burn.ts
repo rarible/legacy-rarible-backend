@@ -1,5 +1,5 @@
 import { MichelsonData } from "@taquito/michel-codec"
-import { Provider, TransactionArg, send, get_address } from "../common/base"
+import { Provider, TransactionArg, send, get_address, OperationResult } from "../common/base"
 import { check_asset_type, ExtendedAssetType } from "../common/check-asset-type"
 
 function burn_param(
@@ -34,8 +34,7 @@ export async function burn(
   provider: Provider,
   asset_type: ExtendedAssetType,
   amount?: bigint,
-  owner?: string,
-  wait?: boolean) : Promise<string> {
+  owner?: string) : Promise<OperationResult> {
   const arg = await burn_arg(provider, asset_type, amount, owner)
-  return send(provider, arg, wait)
+  return send(provider, arg)
 }

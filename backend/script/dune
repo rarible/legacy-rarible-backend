@@ -8,7 +8,7 @@
  (name script_js)
  (package rarible)
  (modules script_js)
- (libraries unix tzfunc))
+ (libraries script tzfunc))
 
 (executable
  (public_name rarible.api_script)
