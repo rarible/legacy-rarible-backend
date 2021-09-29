@@ -1,5 +1,5 @@
 import { MichelsonData } from "@taquito/michel-codec"
-import { Provider, send, StorageFA1_2, StorageFA2, Asset, TransactionArg } from "../common/base"
+import { Provider, send, StorageFA1_2, StorageFA2, Asset, TransactionArg, OperationResult } from "../common/base"
 
 export async function approve_fa1_2_arg(
   provider: Provider,
@@ -25,10 +25,9 @@ export async function approve_fa1_2(
   contract: string,
   value: bigint,
   infinite: boolean = true,
-  wait?: boolean
-) : Promise<string | undefined> {
+) : Promise<OperationResult | undefined> {
   const arg = await approve_fa1_2_arg(provider, owner, contract, value, infinite)
-  if (arg) return send(provider, arg, wait)
+  if (arg) return send(provider, arg)
   else return undefined
 }
 
@@ -70,10 +69,9 @@ export async function approve_fa2(
   provider: Provider,
   owner: string,
   contract: string,
-  token_id?: bigint,
-  wait?: boolean) : Promise<string | undefined> {
+  token_id?: bigint) : Promise<OperationResult | undefined> {
   const arg = await approve_fa2_arg(provider, owner, contract, token_id)
-  if (arg) return send(provider, arg, wait)
+  if (arg) return send(provider, arg)
   else return undefined
 }
 
@@ -96,12 +94,11 @@ export async function approve(
   owner: string,
   asset: Asset,
   infinite?: boolean,
-  wait?: boolean
-): Promise<string | undefined> {
+): Promise<OperationResult | undefined> {
   if (asset.asset_type.asset_class == "FA_1_2") {
-    return approve_fa1_2(provider, owner, asset.asset_type.contract, asset.value, infinite, wait)
+    return approve_fa1_2(provider, owner, asset.asset_type.contract, asset.value, infinite)
   } else if (asset.asset_type.asset_class == "FA_2") {
-    return approve_fa2(provider, owner, asset.asset_type.contract, undefined, wait)
+    return approve_fa2(provider, owner, asset.asset_type.contract, undefined)
   } else
     throw new Error("Asset class " + asset.asset_type.asset_class + " not handled for approve")
 }
@@ -125,12 +122,11 @@ export async function approve_token(
   owner: string,
   asset: Asset,
   infinite?: boolean,
-  wait?: boolean
-): Promise<string | undefined> {
+): Promise<OperationResult | undefined> {
   if (asset.asset_type.asset_class == "FA_1_2") {
-    return approve_fa1_2(provider, owner, asset.asset_type.contract, asset.value, infinite, wait)
+    return approve_fa1_2(provider, owner, asset.asset_type.contract, asset.value, infinite)
   } else if (asset.asset_type.asset_class == "FA_2") {
-    return approve_fa2(provider, owner, asset.asset_type.contract, asset.asset_type.token_id, wait)
+    return approve_fa2(provider, owner, asset.asset_type.contract, asset.asset_type.token_id)
   } else
     throw new Error("Asset class " + asset.asset_type.asset_class + " not handled for approve")
 }

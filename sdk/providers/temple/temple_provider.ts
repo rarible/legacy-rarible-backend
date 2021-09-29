@@ -8,22 +8,19 @@ export async function temple_provider(endpoint: string, network: TempleDAppNetwo
   const tk = new TezosToolkit(endpoint)
   tk.setProvider({ wallet })
 
-  const transfer = async(arg: TransferParams, wait?: boolean) => {
+  const transfer = async(arg: TransferParams) => {
     const op = await tk.wallet.transfer(arg).send()
-    if (wait) { await op.confirmation() }
-    return op.opHash
+    return { hash: op.opHash, confirmation: async() => { await op.confirmation() } }
   }
-  const originate = async(arg: OriginateParams, wait?: boolean) => {
+  const originate = async(arg: OriginateParams) => {
     const op = await tk.wallet.originate(arg).send()
-    if (wait) { await op.confirmation() }
-    return op.opHash
+    return { hash: op.opHash, confirmation: async() => { await op.confirmation() } }
   }
-  const batch = async(args: TransferParams[], wait?: boolean) => {
+  const batch = async(args: TransferParams[]) => {
     const args2 = args.map(function(a) {
       return {...a, kind: <OpKind.TRANSACTION>OpKind.TRANSACTION} })
     const op = await tk.wallet.batch(args2).send()
-    if (wait) { await op.confirmation() }
-    return op.opHash
+    return { hash: op.opHash, confirmation: async() => { await op.confirmation() } }
   }
   const sign = async(bytes: string) => {
     const sig = await wallet.sign(bytes)

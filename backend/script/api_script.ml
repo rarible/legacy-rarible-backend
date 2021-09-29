@@ -7,7 +7,6 @@ let exe = Sys.argv.(0)
 
 let api = ref "http://localhost:8080"
 let sdk = ref false
-let verbose = ref 0
 let endpoint = ref "http://granada.tz.functori.com"
 
 let validator = "KT1Vx7UddodXEVAjvgC2et267JqKSYX7WAr7"
@@ -89,7 +88,7 @@ let spec = [
   "--endpoint", Arg.Set_string endpoint, "node endpoint (default: http://granada.tz.functori.com)";
   "--client", Arg.Set_string Script.client, "tezos client" ;
   "--sdk", Arg.Set sdk, "use sdk to make tezos operations (default: false, uses tezos-client)";
-  "--verbose", Arg.Set_int verbose, "verbosity";
+  "--verbose", Arg.Set_int Script.verbose, "verbosity";
   "--js", Arg.Set js, "use js sdk";
 ]
 
@@ -693,48 +692,51 @@ let show_address alias =
       end
   | Unix.WSIGNALED _ | Unix.WSTOPPED _ -> failwith "show address failure"
 
-let find_kt1 contract_alias  =
-  let prog = !Script.client in
-  let args =
-    Array.of_list
-      [ prog ; "-E"; !endpoint; "list" ; "known" ; "contracts" ] in
-  let stdout, out_temp_fn = create_descr "tezos-client" "list_known_contracts" in
-  let stderr, _err_temp_fn = create_descr "tezos-client" "list_known_contracts" in
-  let pid = create_process ~stdout ~stderr prog args in
-  let _, status = Unix.waitpid [] pid in
-  Unix.close stdout ;
-  Unix.close stderr ;
-  match status with
-  | Unix.WEXITED code ->
-    begin if code <> 0 then failwith "list_known_contracts failure"
-    else
-      let contract = ref None in
-      let ch = open_in out_temp_fn in
-      begin try
-          while true; do
-            let line = input_line ch in
-            match String.split_on_char ':' line with
-            | alias :: kt1 :: [] ->
-              if alias = contract_alias then
-                begin
-                  contract := Some (String.sub kt1 1 36) ;
-                  raise End_of_file
-                end
-            | _ -> ()
-          done
-        with End_of_file -> ()
-      end ;
-      close_in ch ;
-      match !contract with
-      | None -> failwith "can't find kt1"
-      | Some kt1 -> kt1
-  end
-  | Unix.WSIGNALED _ | Unix.WSTOPPED _ -> failwith "list_known_address failure"
+let find_kt1 contract_alias =
+  if !js then contract_alias
+  else
+    let prog = !Script.client in
+    let args =
+      Array.of_list
+        [ prog ; "-E"; !endpoint; "list" ; "known" ; "contracts" ] in
+    let stdout, out_temp_fn = create_descr "tezos-client" "list_known_contracts" in
+    let stderr, _err_temp_fn = create_descr "tezos-client" "list_known_contracts" in
+    let pid = create_process ~stdout ~stderr prog args in
+    let _, status = Unix.waitpid [] pid in
+    Unix.close stdout ;
+    Unix.close stderr ;
+    match status with
+    | Unix.WEXITED code ->
+      begin if code <> 0 then failwith "list_known_contracts failure"
+        else
+          let contract = ref None in
+          let ch = open_in out_temp_fn in
+          begin try
+              while true; do
+                let line = input_line ch in
+                match String.split_on_char ':' line with
+                | alias :: kt1 :: [] ->
+                  if alias = contract_alias then
+                    begin
+                      contract := Some (String.sub kt1 1 36) ;
+                      raise End_of_file
+                    end
+                | _ -> ()
+              done
+            with End_of_file -> ()
+          end ;
+          close_in ch ;
+          match !contract with
+          | None -> failwith "can't find kt1"
+          | Some kt1 -> kt1
+      end
+    | Unix.WSIGNALED _ | Unix.WSTOPPED _ -> failwith "list_known_address failure"
 
-let deploy ?(verbose=0) filename storage source alias =
+let deploy ?verbose filename storage source alias =
+  ignore verbose;
   let cmd =
-    Script.deploy_aux ~verbose ~endpoint:!endpoint ~force:true ~filename storage source alias in
-  let code, out, err = sys_command ~retry:1 cmd in
+    Script.deploy_aux ~verbose:!Script.verbose ~endpoint:!endpoint ~force:true ~filename storage source alias in
+  let code, out, err = sys_command ~verbose:!Script.verbose ~retry:1 cmd in
   if code <> 0 then
     failwith (Printf.sprintf "deploy failure : out %S err %S" out err)
 
@@ -745,7 +747,7 @@ let create_collection ?(royalties=pick_royalties ()) () =
   let alias_source, _pk_source, sk_source = generate_address () in
   let admin = Tzfunc.Crypto.pk_to_tz1 pk_admin in
   may_import_key alias_source sk_source ;
-  admin, alias_source, alias_new, royalties
+  (admin, sk_admin), alias_source, alias_new, royalties
 
 let create_collections ?royalties nb =
   let rec aux acc cpt =
@@ -755,26 +757,33 @@ let create_collections ?royalties nb =
 
 let deploy_collection admin alias_source alias_new royalties =
   Printf.eprintf "Deploying new collection\n%!" ;
-  let filename = "contracts/arl/fa2.arl" in
-  let storage = Script.storage_fa2 ~admin:admin ~royalties in
-  deploy filename storage alias_source alias_new ;
-  Printf.eprintf "  deployed collection %s\n%!" alias_new ;
-  let kt1 = find_kt1 alias_new in
-  Printf.eprintf "  --> %s:%s\n%!" alias_new kt1 ;
-  alias_new, kt1, admin, royalties
+  if !js then
+    Script_js.deploy_collection ~endpoint:!endpoint
+      ~source:admin ~royalties_contract:royalties ()
+  else
+    let filename = "contracts/arl/fa2.arl" in
+    let storage = Script.storage_fa2 ~admin:(fst admin) ~royalties in
+    deploy filename storage alias_source alias_new ;
+    Printf.eprintf "  deployed collection %s\n%!" alias_new ;
+    let kt1 = find_kt1 alias_new in
+    Printf.eprintf "  --> %s:%s\n%!" alias_new kt1 ;
+    alias_new, kt1, admin, royalties
 
 let create_royalties () =
   Printf.eprintf "Creating new royalties\n%!" ;
-  let alias_new = generate_alias "royalties" in
   let alias_admin, pk_admin, sk_admin = generate_address () in
-  may_import_key alias_admin sk_admin ;
-  let alias_source, _pk_source, sk_source = generate_address () in
   let admin = Tzfunc.Crypto.pk_to_tz1 pk_admin in
-  may_import_key alias_source sk_source ;
-  let filename = "contracts/arl/royalties.arl" in
-  let storage = Script.storage_royalties ~admin:admin in
-  deploy filename storage alias_source alias_new ;
-  alias_new, alias_admin
+  if !js then
+    Script_js.deploy_royalties ~endpoint:!endpoint (admin, sk_admin)
+  else
+    let alias_new = generate_alias "royalties" in
+    may_import_key alias_admin sk_admin ;
+    let alias_source, _pk_source, sk_source = generate_address () in
+    may_import_key alias_source sk_source ;
+    let filename = "contracts/arl/royalties.arl" in
+    let storage = Script.storage_royalties ~admin:admin in
+    deploy filename storage alias_source alias_new ;
+    alias_new, alias_admin
 
 let mint_tokens id owner amount royalties source contract =
   if !js then
@@ -809,25 +818,25 @@ let transfer_tokens id amount source contract new_owner =
     else Lwt.return_ok ()
 
 let mint_with_random_token_id ~source ~contract =
-  Printf.eprintf "mint_with_random_token_id for %s on %s\n%!" source contract ;
+  Printf.eprintf "mint_with_random_token_id for %s on %s\n%!" (fst source) contract ;
   let _owner_alias, owner_pk, owner_sk = generate_address () in
   let owner =  Tzfunc.Crypto.pk_to_tz1 owner_pk in
   let tid = generate_token_id () in
   let amount = string_of_int @@ generate_amount ~max:10 () in
   let royalties = generate_royalties () in
   let metadata = [] in
-  mint_tokens tid owner amount royalties (source, owner_sk) contract >|=? fun () ->
+  mint_tokens tid owner amount royalties source contract >|=? fun () ->
   ((owner, owner_sk), amount, tid, royalties, metadata)
 
 let mint_with_token_id_from_api ~source ~contract =
-  Printf.eprintf "mint_with_token_id_from_api for %s on %s\n%!" source contract ;
+  Printf.eprintf "mint_with_token_id_from_api for %s on %s\n%!" (fst source) contract ;
   let _owner_alias, owner_pk, owner_sk = generate_address () in
   let owner =  Tzfunc.Crypto.pk_to_tz1 owner_pk in
   let amount = string_of_int @@ generate_amount ~max:10 () in
   let royalties = generate_royalties () in
   let metadata = [] in
   call_generate_token_id contract >>=? fun tid ->
-  mint_tokens tid.nft_token_id owner amount royalties (owner_sk, source) contract >|=? fun () ->
+  mint_tokens tid.nft_token_id owner amount royalties source contract >|=? fun () ->
   ((owner, owner_sk), amount, tid.nft_token_id, royalties, metadata)
 
 let burn_with_token_id ~source ~contract tid amount =
@@ -1511,6 +1520,7 @@ let transfers_check_random ?(max=30) items =
   aux [] nb
 
 let check_collection alias kt1 owner =
+  let owner = fst owner in
   Printf.eprintf "Checking new collection %s of %s\n%!" alias owner ;
   let collection_exists collections =
     List.find_all (fun c ->
@@ -1559,7 +1569,7 @@ let deploy_check_random_collections ?royalties ?(max=10) () =
           (admin, [ collection ]) ::  acc)
       [] collections in
   Lwt_list.map_p (fun (admin, collections) ->
-      Printf.eprintf "  deploying %d collection for %s\n%!" (List.length collections) admin ;
+      Printf.eprintf "  deploying %d collection for %s\n%!" (List.length collections) (fst admin) ;
       Lwt_list.map_s (fun (admin, alias_source, alias_new, royalties) ->
           Lwt.return @@
           deploy_collection admin alias_source alias_new royalties) collections)

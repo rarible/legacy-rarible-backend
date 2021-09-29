@@ -1,5 +1,5 @@
 import { MichelsonData } from "@taquito/michel-codec"
-import { Provider, send, send_batch, TransactionArg, get_address } from "../common/base"
+import { Provider, send, send_batch, TransactionArg, get_address, OperationResult } from "../common/base"
 import { Part, OrderForm } from "./utils"
 import { invert_order } from "./invert-order"
 import { get_make_fee } from "./get-make-fee"
@@ -78,10 +78,9 @@ export async function fill_order_arg(
 export async function fill_order(
   provider: Provider,
   left: OrderForm,
-  request: FillOrderRequest,
-  wait?: boolean
-): Promise<string> {
+  request: FillOrderRequest
+): Promise<OperationResult> {
   const args = await fill_order_arg(provider, left, request)
-  if (args.length == 1) return send(provider, args[0], wait)
-  else return send_batch(provider, args, wait)
+  if (args.length == 1) return send(provider, args[0])
+  else return send_batch(provider, args)
 }

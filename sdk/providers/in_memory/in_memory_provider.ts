@@ -8,22 +8,19 @@ export function in_memory_provider(edsk: string, endpoint: string) : TezosProvid
     signer: new InMemorySigner(edsk),
   })
 
-  const transfer = async(arg: TransferParams, wait?: boolean) => {
+  const transfer = async(arg: TransferParams) => {
     const op = await tk.contract.transfer(arg)
-    if (wait) { await op.confirmation() }
-    return op.hash
+    return { hash: op.hash, confirmation: async() => { await op.confirmation() } }
   }
-  const originate = async(arg: OriginateParams, wait?: boolean) => {
+  const originate = async(arg: OriginateParams) => {
     const op = await tk.contract.originate(arg)
-    if (wait) { await op.confirmation() }
-    return op.hash
+    return { hash: op.hash, confirmation: async() => { await op.confirmation() } }
   }
-  const batch = async(args: TransferParams[], wait?: boolean) => {
+  const batch = async(args: TransferParams[]) => {
     const args2 = args.map(function(a) {
       return {...a, kind: <OpKind.TRANSACTION>OpKind.TRANSACTION} })
     const op = await tk.contract.batch(args2).send()
-    if (wait) { await op.confirmation() }
-    return op.hash
+    return { hash: op.hash, confirmation: async() => { await op.confirmation() } }
   }
   const sign = async(bytes: string) => {
     const sig = await tk.signer.sign(bytes)

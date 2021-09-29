@@ -1,4 +1,4 @@
-export const code : any =
+export const fa2_code : any =
   [  {  "prim": "storage",
         "args": [
           {  "prim": "pair",
@@ -3007,7 +3007,7 @@ export const code : any =
      ]
   }  ]
 
-export function make_storage(owner: string, royalties_contract: string) : any {
+export function fa2_storage(owner: string, royalties_contract: string) : any {
   return {  "prim": "Pair",
             "args": [
               {  "string": owner  },

@@ -41,11 +41,17 @@ export interface Asset {
   value: bigint;
 }
 
+export interface OperationResult {
+  hash: string;
+  confirmation: () => Promise<void>;
+  token_id?: bigint
+}
+
 export interface TezosProvider {
   kind: 'in_memory' | "temple" | "beacon";
-  transfer: (arg: TransferParams, wait?: boolean) => Promise<string>;
-  originate: (arg: OriginateParams, wait?: boolean) => Promise<string>;
-  batch: (args: TransferParams[], wait?: boolean) => Promise<string>;
+  transfer: (arg: TransferParams) => Promise<OperationResult>;
+  originate: (arg: OriginateParams) => Promise<OperationResult>;
+  batch: (args: TransferParams[]) => Promise<OperationResult>;
   sign: (bytes: string) => Promise<string>;
   address: () => Promise<string>;
   storage: (contract: string) => Promise<any>;
@@ -90,27 +96,25 @@ export async function sign(p : Provider, bytes: string) : Promise<string> {
 export async function send(
   provider : Provider,
   arg: TransactionArg,
-  wait?: boolean
-) : Promise<string> {
+) : Promise<OperationResult> {
   if (arg.entrypoint && arg.parameter) {
     return provider.tezos.transfer({
       amount: (arg.amount) ? Number(arg.amount) : 0,
       to: arg.destination,
       parameter: { entrypoint: arg.entrypoint, value: arg.parameter }
-    }, wait)
+    })
   } else {
     return provider.tezos.transfer({
       amount: (arg.amount) ? Number(arg.amount) : 0,
       to: arg.destination
-    }, wait)
+    })
   }
 }
 
 export async function send_batch(
   provider: Provider,
   args: TransactionArg[],
-  wait?: boolean
-) : Promise<string> {
+) : Promise<OperationResult> {
   const params = args.map(function(p) {
     if (p.entrypoint && p.parameter) {
       return {
@@ -125,7 +129,7 @@ export async function send_batch(
       }
     }
   })
-  return provider.tezos.batch(params, wait)
+  return provider.tezos.batch(params)
 }
 
 export async function get_transaction(
