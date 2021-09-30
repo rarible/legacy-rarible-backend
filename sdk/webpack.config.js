@@ -3,96 +3,23 @@ const NodePolyfillPlugin = require("node-polyfill-webpack-plugin");
 
 module.exports = [
   {
-    entry: path.resolve(__dirname, "./main/index.ts"),
-    module: {
-      rules: [
-        {
-          test: /\.tsx?$/,
-          use: path.resolve(__dirname, "node_modules/ts-loader"),
-          exclude: /node_modules/,
-        },
-      ],
-    },
-    resolve: {
-      extensions: ['.tsx', '.ts', '.js'],
-    },
-    mode: 'production',
-    output: {
-      filename: 'rarible-web.js',
-      library: { name : 'rarible', type: 'var' },
-      path: path.resolve(__dirname, 'dist'),
-    },
-    plugins: [
-      new NodePolyfillPlugin()
-    ],
-    performance: {
-      hints: false,
-    },
-  },
-
-  {
-    entry: path.resolve(__dirname, "./providers/temple/temple_provider.ts"),
-    module: {
-      rules: [
-        {
-          test: /\.tsx?$/,
-          use: path.resolve(__dirname, "node_modules/ts-loader"),
-          exclude: /node_modules/,
-        },
-      ],
-    },
-    resolve: {
-      extensions: ['.tsx', '.ts', '.js'],
-    },
-    mode: 'production',
-    output: {
-      filename: 'rarible-temple.js',
-      library: { name : 'rarible_temple', type: 'var' },
-      path: path.resolve(__dirname, 'dist'),
-    },
-    plugins: [
-      new NodePolyfillPlugin()
-    ],
-    performance: {
-      hints: false,
-    },
-  },
-
-  {
-    entry: path.resolve(__dirname, "./providers/beacon/beacon_provider.ts"),
-    module: {
-      rules: [
-        {
-          test: /\.tsx?$/,
-          use: path.resolve(__dirname, "node_modules/ts-loader"),
-          exclude: /node_modules/,
-        },
-      ],
-    },
-    resolve: {
-      extensions: ['.tsx', '.ts', '.js'],
-    },
-    mode: 'production',
-    output: {
-      filename: 'rarible-beacon.js',
-      library: { name : 'rarible_beacon', type: 'var' },
-      path: path.resolve(__dirname, 'dist'),
-    },
-    plugins: [
-      new NodePolyfillPlugin()
-    ],
-    performance: {
-      hints: false,
-    },
-  },
-
-  {
     entry: path.resolve(__dirname, "./test/test-web.ts"),
     module: {
       rules: [
         {
           test: /\.tsx?$/,
-          use: path.resolve(__dirname, "./node_modules/ts-loader"),
+          use: {
+            loader: path.resolve(__dirname, "./node_modules/ts-loader"),
+            options: {
+              transpileOnly: true,
+              compilerOptions: {
+                strict: true,
+                module: "es2020",
+                moduleResolution: "node",
+                target: "es2020"
+              }
+            }
+          },
           exclude: /node_modules/,
         },
       ],
@@ -102,9 +29,8 @@ module.exports = [
     },
     mode: 'production',
     output: {
-      filename: 'test-web.js',
-      library: { name : 'rarible_test', type: 'var' },
-      path: path.resolve(__dirname, 'dist'),
+      filename: 'test.js',
+      path: path.resolve(__dirname, 'www'),
     },
     plugins: [
       new NodePolyfillPlugin()
@@ -112,6 +38,8 @@ module.exports = [
     performance: {
       hints: false,
     },
+    externals: {
+      vue: "Vue",
+    }
   }
-
 ]

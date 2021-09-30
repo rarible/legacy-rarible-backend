@@ -99,13 +99,13 @@ export async function send(
 ) : Promise<OperationResult> {
   if (arg.entrypoint && arg.parameter) {
     return provider.tezos.transfer({
-      amount: (arg.amount) ? Number(arg.amount) : 0,
+      amount: (arg.amount!=undefined) ? Number(arg.amount) : 0,
       to: arg.destination,
       parameter: { entrypoint: arg.entrypoint, value: arg.parameter }
     })
   } else {
     return provider.tezos.transfer({
-      amount: (arg.amount) ? Number(arg.amount) : 0,
+      amount: (arg.amount!=undefined) ? Number(arg.amount) : 0,
       to: arg.destination
     })
   }
@@ -118,13 +118,13 @@ export async function send_batch(
   const params = args.map(function(p) {
     if (p.entrypoint && p.parameter) {
       return {
-        amount: (p.amount) ? Number(p.amount) : 0,
+        amount: (p.amount!=undefined) ? Number(p.amount) : 0,
         to: p.destination,
         parameter: { entrypoint: p.entrypoint, value: p.parameter }
       }
     } else {
       return {
-        amount: (p.amount) ? Number(p.amount) : 0,
+        amount: (p.amount!=undefined) ? Number(p.amount) : 0,
         to: p.destination,
       }
     }

@@ -3,10 +3,16 @@ import { NetworkType } from "@airgap/beacon-sdk"
 import { TezosToolkit, TransferParams, OriginateParams, OpKind } from "@taquito/taquito"
 import { TezosProvider, b58enc } from "../../common/base"
 
-export async function beacon_provider(endpoint: string, network: NetworkType, name = "rarible") : Promise<TezosProvider> {
+interface Network {
+  node: string;
+  network?: NetworkType;
+}
+
+export async function beacon_provider(network: Network, name = "rarible") : Promise<TezosProvider> {
   const wallet = new BeaconWallet({ name })
-  await wallet.requestPermissions({ network: {type: network, rpcUrl: endpoint} })
-  const tk = new TezosToolkit(endpoint)
+  const type = (!network.network) ? NetworkType.CUSTOM : network.network
+  await wallet.requestPermissions({ network: {type, rpcUrl: network.node} })
+  const tk = new TezosToolkit(network.node)
   tk.setProvider({ wallet })
 
   const transfer = async(arg: TransferParams) => {

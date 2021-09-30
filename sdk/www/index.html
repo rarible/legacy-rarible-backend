@@ -1,0 +1,151 @@
+<html>
+  <head>
+    <title>Rarible Tezos Example</title>
+    <meta charset="utf-8">
+    <link rel="icon" href="/rarible-logo.png" />
+    <link type="text/css" rel="stylesheet" href="https://unpkg.com/bootstrap/dist/css/bootstrap.min.css" />
+    <link type="text/css" rel="stylesheet" href="https://unpkg.com/bootstrap-vue@latest/dist/bootstrap-vue.min.css" />
+    <script src="https://unpkg.com/vue@latest/dist/vue.min.js"></script>
+    <script src="https://unpkg.com/bootstrap-vue@latest/dist/bootstrap-vue.min.js"></script>
+    <script src="https://unpkg.com/bootstrap-vue@latest/dist/bootstrap-vue-icons.min.js"></script>
+    <script src="/test.js" defer></script>
+  </head>
+  <body>
+    <div id="app">
+      <b-navbar sticky toggleable="sm" type="dark" variant="dark">
+        <b-navbar-brand @click="path='home'" class="px-2">
+          <img src="/rarible-logo.png" alt="Rarible" width="30"/>
+        </b-navbar-brand>
+        <b-navbar-toggle target="nav-collapse"></b-navbar-toggle>
+        <b-collapse id="nav-collapse" is-nav>
+          <b-navbar-nav>
+            <b-nav-item :active="path=='deploy'" @click="path='deploy'">Deploy</b-nav-item>
+            <b-nav-item :active="path=='mint'" @click="path='mint'">Mint</b-nav-item>
+            <b-nav-item :active="path=='burn'" @click="path='burn'">Burn</b-nav-item>
+            <b-nav-item :active="path=='transfer'" @click="path='transfer'">Transfer</b-nav-item>
+            <b-nav-item :active="path=='api'" @click="path='api'">API</b-nav-item>
+          </b-navbar-nav>
+          <b-navbar-nav class="ms-auto">
+              <b-input-group prepend="Node" class="mx-2">
+                <b-form-input size="sm" v-model="node"></b-form-input>
+              </b-input-group>
+              <b-input-group prepend="API" class="mx-2">
+                <b-form-input size="sm" v-model="api_url"></b-form-input>
+              </b-input-group>
+          </b-navbar-nav>
+        </b-collapse>
+      </b-navbar>
+
+      <b-container v-if="path=='home'" class="mt-4">
+        <h3 class="text-center mt-5 pt-5">
+          Rarible SDK Example
+        </h3>
+      </b-container>
+
+      <b-container v-if="path=='transfer'" class="mt-4">
+        <b-form-group label="Contract *" class="mb-2">
+          <b-form-input v-model="transfer.contract"></b-form-input>
+        </b-form-group>
+        <b-form-group label="Token ID *" class="mb-2">
+          <b-form-input v-model="transfer.token_id"></b-form-input>
+        </b-form-group>
+        <b-form-group label="Destination *" class="mb-2">
+          <b-form-input v-model="transfer.destination"></b-form-input>
+        </b-form-group>
+        <b-form-group label="Amount" class="mb-2">
+          <b-form-input v-model="transfer.amount" type="number"></b-form-input>
+        </b-form-group>
+        <div class="text-center" class="mb-2">
+          <b-button class="m-2" @click="ftransfer()">
+            Transfer
+          </b-button>
+        </div>
+        <div :class="'text-center text-'+transfer.status">{{ transfer.result }}</div>
+      </b-container>
+
+      <b-container v-if="path=='mint'" class="mt-4">
+        <b-form-group label="Contract *" class="mb-2">
+          <b-form-input v-model="mint.contract"></b-form-input>
+        </b-form-group>
+        <b-form-group label="Token ID" class="mb-2">
+          <b-form-input v-model="mint.token_id"></b-form-input>
+        </b-form-group>
+        <b-form-group label="Amount" class="mb-2">
+          <b-form-input v-model="mint.amount" type="number"></b-form-input>
+        </b-form-group>
+        <b-form-group label="Royalties" description="{ &quot;tz1...&quot;: 10, ... }" class="mb-2">
+          <b-form-input v-model="mint.royalties"></b-form-input>
+        </b-form-group>
+        <div class="text-center" class="mb-2">
+          <b-button class="m-2" @click="fmint()">
+            Mint
+          </b-button>
+        </div>
+        <div :class="'text-center text-'+mint.status">{{ mint.result }}</div>
+      </b-container>
+
+      <b-container v-if="path=='burn'" class="mt-4">
+        <b-form-group label="Contract *" class="mb-2">
+          <b-form-input v-model="burn.contract"></b-form-input>
+        </b-form-group>
+        <b-form-group label="Token ID *" class="mb-2">
+          <b-form-input v-model="burn.token_id"></b-form-input>
+        </b-form-group>
+        <b-form-group label="Amount" class="mb-2">
+          <b-form-input v-model="burn.amount" type="number"></b-form-input>
+        </b-form-group>
+        <div class="text-center" class="mb-2">
+          <b-button class="m-2" @click="fburn()">
+            Burn
+          </b-button>
+        </div>
+        <div :class="'text-center text-'+burn.status">{{ burn.result }}</div>
+      </b-container>
+
+      <b-container v-if="path=='deploy'" class="mt-4">
+        <div>
+          <b-form-group label="Owner *" class="mb-2">
+            <b-form-input v-model="deploy.fa2_owner"></b-form-input>
+          </b-form-group>
+          <b-form-group label="Royalties Contract *" class="mb-2">
+            <b-form-input v-model="deploy.royalties_contract"></b-form-input>
+          </b-form-group>
+          <div class="text-center" class="mb-2">
+            <b-button class="m-2" @click="deploy_fa2()">
+              Deploy FA2
+            </b-button>
+          </div>
+          <div :class="'text-center text-'+deploy.fa2_status">{{ deploy.fa2_result }}</div>
+        </div>
+        <div class="mt-4">
+          <b-form-group label="Owner *" class="mb-2">
+            <b-form-input v-model="deploy.royalties_owner"></b-form-input>
+          </b-form-group>
+          <div class="text-center" class="mb-2">
+            <b-button class="m-2" @click="deploy_royalties()">
+              Deploy Royalties
+            </b-button>
+          </div>
+          <div :class="'text-center text-'+deploy.royalties_status">{{ deploy.royalties_result }}</div>
+        </div>
+      </b-container>
+
+      <b-container v-if="path=='api'" class="mt-4">
+        <b-form-group label="Path *" class="mb-2">
+          <b-form-input v-model="api.path"></b-form-input>
+        </b-form-group>
+        <b-form-group label="Data" class="mb-2">
+          <b-form-textarea v-model="api.data"></b-form-textarea>
+        </b-form-group>
+        <div class="text-center" class="mb-2">
+          <b-button class="m-2" @click="api_request()">
+            Request
+          </b-button>
+        </div>
+        <div :class="'text-center text-'+api.status">{{ api.result }}</div>
+      </b-container>
+
+    </div>
+
+  </body>
+</html>

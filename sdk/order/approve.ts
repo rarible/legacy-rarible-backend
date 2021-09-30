@@ -38,7 +38,7 @@ export async function approve_fa2_arg(
   token_id?: bigint) : Promise<TransactionArg | undefined> {
   const operator = provider.config.proxies.fa_1_2
   const st : StorageFA2 = await provider.tezos.storage(contract)
-  if (token_id) {
+  if (token_id!=undefined) {
     let r = await st.operator.get({ 0 : operator, 1 : token_id, 2: owner })
     if (r===false) {
       let parameter : MichelsonData = [

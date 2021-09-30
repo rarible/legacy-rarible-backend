@@ -54,7 +54,6 @@ export function transfer_mt_arg(
   const ids = (Array.isArray(token_id)) ? token_id : [ token_id ]
   const amounts = (Array.isArray(token_amount)) ? token_amount : [ token_amount ]
   const parameter = transfer_param(from, to, ids, amounts)
-  console.log({ destination: contract , entrypoint: 'transfer', parameter })
   return { destination: contract , entrypoint: 'transfer', parameter }
 }
 
