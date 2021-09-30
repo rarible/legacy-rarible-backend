@@ -41,8 +41,8 @@ let () =
   EzLwtSys.run @@ fun () ->
   Lwt.map (fun _ -> ()) @@
   let>? config = Unix_sys.get_config Rtypes.config_enc in
-  Hooks.set_operation Db.set_operation;
-  Hooks.set_block Db.set_block;
+  Hooks.set_operation Db.insert_operation;
+  Hooks.set_block Db.insert_block;
   Hooks.set_main Db.set_main;
 
   let>? () = fill_config config in
