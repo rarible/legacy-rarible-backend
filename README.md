@@ -13,7 +13,7 @@ This project contains:
   to interact "programmatically" with the smart contract and the API
   server.
 
-API and SDK documentation can be found [here](https://functori.gitlab.io/rarible/index.html)
+API and SDK documentation can be found [here](https://tezos-paris-hub.gitlab.io/rarible/index.html).
 
 ## Repository Structure
 
