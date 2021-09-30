@@ -2,7 +2,7 @@
   "entryPoints": [
     "./main/index.ts"
   ],
-  "out": "./docs",
+  "out": "../public/sdk",
   "readme": "none",
   "name": "Rarible Tezos SDK"
 }
