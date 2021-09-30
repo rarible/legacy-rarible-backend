@@ -63,7 +63,7 @@ export async function mint_nft_arg(
   owner?: string,
 ) : Promise<[bigint, TransactionArg[]]> {
   const owner2 = (owner) ? owner : await get_address(provider)
-  const next_id = (token_id) ? token_id : await get_next_token_id(provider, contract)
+  const next_id = (token_id!=undefined) ? token_id : await get_next_token_id(provider, contract)
   const parameter = mint_param(next_id, owner2, royalties)
   const arg : TransactionArg[] = [ { destination: contract, entrypoint: 'mint', parameter } ]
   if (metadata) { return [ next_id, arg.concat([metadata_arg(contract, next_id, metadata)]) ] }
@@ -94,10 +94,10 @@ export async function mint_mt_arg(
   owner?: string,
 ) : Promise<[bigint, TransactionArg[]]> {
   const owner2 = (owner) ? owner : await get_address(provider)
-  const next_id = (token_id) ? token_id : await get_next_token_id(provider, contract)
+  const next_id = (token_id!=undefined) ? token_id : await get_next_token_id(provider, contract)
   const parameter = mint_param(next_id, owner2, royalties, supply)
   const arg : TransactionArg[] = [ { destination: contract, entrypoint: 'mint', parameter } ]
-  const arg_meta = (metadata)
+  const arg_meta = (metadata!=undefined)
     ? [ metadata_arg(contract, next_id, metadata) ]
     : []
   return [ next_id, arg.concat(arg_meta) ]
@@ -127,7 +127,7 @@ export async function mint_arg(
   metadata?: { [key: string]: string },
   owner?: string,
 ) : Promise<[bigint, TransactionArg[]]> {
-    if (supply) { return mint_mt_arg(provider, contract, royalties, supply, token_id, metadata, owner) }
+    if (supply!=undefined) { return mint_mt_arg(provider, contract, royalties, supply, token_id, metadata, owner) }
   else { return mint_nft_arg(provider, contract, royalties, token_id, metadata, owner) }
 }
 
@@ -140,6 +140,6 @@ export async function mint(
   metadata?: { [key: string]: string },
   owner?: string,
 ) : Promise<OperationResult> {
-  if (supply) { return mint_mt(provider, contract, royalties, supply, token_id, metadata, owner) }
+  if (supply!=undefined) { return mint_mt(provider, contract, royalties, supply, token_id, metadata, owner) }
   else { return mint_nft(provider, contract, royalties, token_id, metadata, owner) }
 }
