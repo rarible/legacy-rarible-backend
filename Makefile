@@ -65,7 +65,7 @@ arl:
 	@dune build contracts/arl
 
 openapi:
-	@cp -f _build/default/backend/api/openapi.json .
+	@cp -f _build/default/backend/api/openapi.json public/api
 
 typedoc:
 	@npx typedoc --tsconfig sdk/tsconfig.json --options sdk/typedoc.json
