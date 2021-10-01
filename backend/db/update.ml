@@ -73,7 +73,7 @@ let upgrade_1_to_2 dbh version =
 
     {|create table contract_updates(
       transaction varchar not null,
-      id varchar not null,
+      index int not null,
       block varchar not null,
       level int not null,
       main boolean not null default false,
@@ -82,11 +82,11 @@ let upgrade_1_to_2 dbh version =
       mint jsonb,
       burn jsonb,
       uri varchar,
-      primary key (transaction, id))|};
+      primary key (block, index))|};
 
     {|create table token_updates(
       transaction varchar not null,
-      id varchar not null,
+      index int not null,
       block varchar not null,
       level int not null,
       main boolean not null default false,
@@ -100,7 +100,7 @@ let upgrade_1_to_2 dbh version =
       amount bigint,
       metadata jsonb,
       royalties jsonb,
-      primary key (transaction, id))|};
+      primary key (block, index))|};
 
     {|create table orders(
       maker varchar not null,
@@ -183,7 +183,7 @@ let upgrade_1_to_2 dbh version =
 
     {|create table order_updates(
       transaction varchar not null,
-      id varchar not null,
+      index int not null,
       block varchar not null,
       level int not null,
       main boolean not null default false,
@@ -193,7 +193,7 @@ let upgrade_1_to_2 dbh version =
       hash_left varchar,
       hash_right varchar,
       take_usd float,
-      primary key (transaction, id))|};
+      primary key (block, index))|};
 
     {|create table order_activities(
       match_left varchar,
