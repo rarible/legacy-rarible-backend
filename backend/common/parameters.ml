@@ -115,37 +115,37 @@ let parse_token_metadata = function
     Ok (Token_metadata (Z.to_int64 id, l))
   | _ -> unexpected_michelson
 
-let rec parse_nft e p =
+let rec parse_fa2 e p =
   let p = flatten p in
   match e, p with
   | EPdefault, Mprim { prim = `Left; args = [ m ]; _ } ->
-    parse_nft (EPnamed "left") m
+    parse_fa2 (EPnamed "left") m
   | EPdefault, Mprim { prim = `Right; args = [ m ]; _ } ->
-    parse_nft (EPnamed "right") m
+    parse_fa2 (EPnamed "right") m
   | EPnamed "left", Mprim { prim = `Left; args = [ m ]; _ } ->
-    parse_nft (EPnamed "left_left") m
+    parse_fa2 (EPnamed "left_left") m
   | EPnamed "left", Mprim { prim = `Right; args = [ m ]; _ } ->
-    parse_nft (EPnamed "left_right") m
+    parse_fa2 (EPnamed "left_right") m
   | EPnamed "right", Mprim { prim = `Left; args = [ m ]; _ } ->
-    parse_nft (EPnamed "right_left") m
+    parse_fa2 (EPnamed "right_left") m
   | EPnamed "right", Mprim { prim = `Right; args = [ m ]; _ } ->
-    parse_nft (EPnamed "right_right") m
+    parse_fa2 (EPnamed "right_right") m
   | EPnamed "left_left", Mprim { prim = `Left; args = [ m ]; _ } ->
-    parse_nft (EPnamed "balance_of") m
+    parse_fa2 (EPnamed "balance_of") m
   | EPnamed "left_left", Mprim { prim = `Right; args = [ m ]; _ } ->
-    parse_nft (EPnamed "update_operators") m
+    parse_fa2 (EPnamed "update_operators") m
   | EPnamed "left_right", Mprim { prim = `Left; args = [ m ]; _ } ->
-    parse_nft (EPnamed "update_operators_for_all") m
+    parse_fa2 (EPnamed "update_operators_for_all") m
   | EPnamed "left_right", Mprim { prim = `Right; args = [ m ]; _ } ->
-    parse_nft (EPnamed "transfer") m
+    parse_fa2 (EPnamed "transfer") m
   | EPnamed "right_left", Mprim { prim = `Left; args = [ m ]; _ } ->
-    parse_nft (EPnamed "mint") m
+    parse_fa2 (EPnamed "mint") m
   | EPnamed "right_left", Mprim { prim = `Right; args = [ m ]; _ } ->
-    parse_nft (EPnamed "burn") m
+    parse_fa2 (EPnamed "burn") m
   | EPnamed "right_right", Mprim { prim = `Left; args = [ m ]; _ } ->
-    parse_nft (EPnamed "setMetadaraUri") m
+    parse_fa2 (EPnamed "setMetadaraUri") m
   | EPnamed "right_right", Mprim { prim = `Right; args = [ m ]; _ } ->
-    parse_nft (EPnamed "setTokenMetadata") m
+    parse_fa2 (EPnamed "setTokenMetadata") m
 
   | EPnamed "update_operators", m -> parse_update_operators m
   | EPnamed "update_operators_for_all", m -> parse_update_operators_all m
@@ -330,4 +330,12 @@ let rec parse_exchange e p =
 
   | EPnamed "cancel", m -> parse_cancel m
   | EPnamed "doTransfers", m -> parse_do_transfers m
+  | _ -> unexpected_michelson
+
+
+let parse_fa1 e p =
+  let p = flatten p in
+  match e, p with
+  | EPnamed "transfer", Mprim { prim = `Pair; args = [ Mstring from; Mstring dst; Mint am ]; _} ->
+    Ok (from, dst, Z.to_int64 am)
   | _ -> unexpected_michelson
