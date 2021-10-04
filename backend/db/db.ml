@@ -26,28 +26,36 @@ let get_extra_config ?dbh () =
   use dbh @@ fun dbh ->
   let>? r = [%pgsql.object dbh
       "select admin_wallet, exchange_v2_contract, royalties_contract, \
-       validator_contract from state"] in
+       validator_contract, ft_fa2, ft_fa1 from state"] in
   match r with
   | [ r ] ->  Lwt.return_ok (Some {
       admin_wallet = r#admin_wallet;
       exchange_v2 = r#exchange_v2_contract;
       royalties = r#royalties_contract;
-      validator = r#validator_contract})
+      validator = r#validator_contract;
+      ft_fa2 = List.filter_map (fun x -> x) r#ft_fa2;
+      ft_fa1 = List.filter_map (fun x -> x) r#ft_fa1;
+    })
   | [] -> Lwt.return_ok None
   | _ -> Lwt.return_error (`hook_error "wrong_state")
 
 let update_extra_config ?dbh e =
   use dbh @@ fun dbh ->
   let>? r = [%pgsql.object dbh "select * from state"] in
+  let ft_fa1 = List.map Option.some e.ft_fa1 in
+  let ft_fa2 = List.map Option.some e.ft_fa2 in
   match r with
   | [] ->
     [%pgsql dbh
-        "insert into state(exchange_v2_contract, royalties_contract, validator_contract) \
-         values (${e.exchange_v2}, ${e.royalties}, ${e.validator})"]
+        "insert into state(exchange_v2_contract, royalties_contract, \
+         validator_contract, ft_fa2, ft_fa1) \
+         values (${e.exchange_v2}, ${e.royalties}, ${e.validator}, \
+         $ft_fa2, $ft_fa1)"]
   | _ ->
     [%pgsql dbh
         "update state set exchange_v2_contract = ${e.exchange_v2}, \
-         royalties_contract = ${e.royalties}, validator_contract = ${e.validator}"]
+         royalties_contract = ${e.royalties}, validator_contract = ${e.validator}, \
+         ft_fa1 = $ft_fa1, ft_fa2 = $ft_fa2"]
 
 let insert_fake ?dbh address =
   use dbh @@ fun dbh ->
@@ -290,6 +298,26 @@ let insert_order_activity_new dbh hash date make_class take_class =
   | _, _ ->
     Lwt.return_ok ()
 
+let insert_ft_fa2 dbh op tr txs =
+  iter_rp (fun tx ->
+      iter_rp (fun txd ->
+          [%pgsql dbh
+              "insert into ft_token_updates(transaction, index, block, \
+               level, tsp, source, destination, contract, amount) \
+               values(${op.bo_hash}, ${op.bo_index}, ${op.bo_block}, ${op.bo_level}, \
+               ${op.bo_tsp}, ${tx.tr_source}, ${txd.tr_destination}, \
+               ${tr.destination}, ${txd.tr_amount}) \
+               on conflict do nothing"]) tx.tr_txs) txs
+
+let insert_ft_fa1 dbh op tr (from, dst, amount) =
+  [%pgsql dbh
+      "insert into ft_token_updates(transaction, index, block, \
+       level, tsp, source, destination, contract, amount) \
+       values(${op.bo_hash}, ${op.bo_index}, ${op.bo_block}, ${op.bo_level}, \
+       ${op.bo_tsp}, $from, $dst, \
+       ${tr.destination}, $amount) \
+       on conflict do nothing"]
+
 let insert_transaction config dbh op tr =
   match tr.parameters with
   | None | Some { value = Other _; _ } | Some { value = Bytes _; _ } -> Lwt.return_ok ()
@@ -312,8 +340,25 @@ let insert_transaction config dbh op tr =
           (* todo : match order *)
           Lwt.return_ok ()
       end
+    else if List.mem tr.destination config.Crawlori.Config.extra.ft_fa2 then
+      begin match Parameters.parse_fa2 entrypoint m with
+        | Ok (Transfers t) ->
+          Format.printf "\027[0;35mFT transfer %s %ld %s\027[0m@."
+            (short op.bo_hash) op.bo_index (short tr.destination);
+          insert_ft_fa2 dbh op tr t
+        | _ -> Lwt.return_ok ()
+      end
+    else if List.mem tr.destination config.Crawlori.Config.extra.ft_fa1 then
+      begin match Parameters.parse_fa1 entrypoint m with
+        | Ok t ->
+          Format.printf "\027[0;35mFT transfer %s %ld %s\027[0m@."
+            (short op.bo_hash) op.bo_index (short tr.destination);
+          insert_ft_fa1 dbh op tr t
+        | _ -> Lwt.return_ok ()
+      end
+
     else (* nft *)
-      begin match Parameters.parse_nft entrypoint m with
+      begin match Parameters.parse_fa2 entrypoint m with
         | Ok (Mint_tokens m) ->
           Format.printf "\027[0;35mmint %s %ld %s\027[0m@."
             (short op.bo_hash) op.bo_index (short tr.destination);
@@ -581,6 +626,16 @@ let token_updates dbh main l =
         else Lwt.return_ok ()
       | _ -> Lwt.return_error (`hook_error "invalid token_update")) l
 
+let ft_token_updates dbh main l =
+  iter_rp (fun r ->
+      let amount = if main then r#amount else Int64.neg r#amount in
+      let>? () = [%pgsql dbh
+          "update ft_tokens set balance = balance + $amount \
+           where contract = ${r#contract} and account = ${r#destination}"] in
+      [%pgsql dbh
+          "update ft_tokens set balance = balance - $amount \
+           where contract = ${r#contract} and account = ${r#source}"]) l
+
 let order_updates dbh main l =
   iter_rp (fun r -> match r#cancel, r#hash_left, r#hash_right with
       | Some hash, _, _ ->
@@ -603,8 +658,10 @@ let set_main _config dbh {Hooks.m_main; m_hash} =
   let>? t_updates = [%pgsql.object dbh "update token_updates set main = $m_main where block = $m_hash returning *"] in
   let>? c_updates = [%pgsql.object dbh "update contract_updates set main = $m_main where block = $m_hash returning *"] in
   let>? o_updates = [%pgsql.object dbh "update order_updates set main = $m_main where block = $m_hash returning *"] in
+  let>? ft_updates = [%pgsql.object dbh "update ft_token_updates set main = $m_main where block = $m_hash returning *"] in
   let>? () = contract_updates dbh m_main @@ sort c_updates in
   let>? () = token_updates dbh m_main @@ sort t_updates in
+  let>? () = ft_token_updates dbh m_main @@ sort ft_updates in
   let>? () = order_updates dbh m_main @@ sort o_updates in
   Lwt.return_ok ()
 

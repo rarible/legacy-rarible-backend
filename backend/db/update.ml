@@ -18,6 +18,8 @@ let upgrade_1_to_2 dbh version =
       exchange_v2_contract varchar not null default '',
       validator_contract varchar not null default '',
       fees_receiver jsonb[] not null default '{}',
+      ft_fa2 varchar[] not null default '{}',
+      ft_fa1 varchar[] not null default '{}',
       protocol_fee bigint)|};
 
     {|create table contracts(
@@ -205,6 +207,26 @@ let upgrade_1_to_2 dbh version =
       main boolean not null default false,
       date timestamp not null,
       order_activity_type varchar not null)|};
+
+    {|create table ft_tokens(
+      contract varchar not null,
+      account varchar not null,
+      balance bigint not null,
+      primary key (contract, account))|};
+
+    {|create table ft_token_updates(
+      transaction varchar not null,
+      index int not null,
+      block varchar not null,
+      level int not null,
+      main boolean not null default false,
+      tsp timestamp not null,
+      source varchar not null,
+      destination varchar not null,
+      contract varchar not null,
+      amount bigint not null,
+      primary key (block, index))|};
+
   ]
 
 let upgrades =
