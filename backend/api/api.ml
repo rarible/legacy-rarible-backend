@@ -852,8 +852,15 @@ let upsert_order _req input =
             let str = Crawlori.Rp.string_of_error db_err in
             return (Error (unexpected_api_error str))
           | Ok () ->
-            (* kafkta.push order *)
-            return_ok order
+            Db.get_order order.order_elt.order_elt_hash >>= function
+            | Error db_err ->
+              let str = Crawlori.Rp.string_of_error db_err in
+              return (Error (unexpected_api_error str))
+            | Ok None ->
+              return (Error (unexpected_api_error "order not registered"))
+            | Ok Some (order) ->
+              return_ok order
+(* kafkta.push order *)
 [@@post
   {path="/v0.1/orders";
    input=order_form_enc;
@@ -861,21 +868,6 @@ let upsert_order _req input =
    errors=[rarible_error_500];
    name="orders_upsert";
    section=orders_section}]
-
-(* let prepare_order_transaction _req _input =
- *   return (Error (unexpected_api_error ""))
- * [@@post
- *   {path="/v0.1/orders/{arg_hash}/prepareTx";
- *    input=prepare_order_tx_form_enc;
- *    output=prepare_order_tx_response_enc;
- *    errors=[rarible_error_500]}]
- *
- * let prepare_order_cancel_transaction _req () =
- *   return (Error (unexpected_api_error ""))
- * [@@post
- *   {path="/v0.1/orders/{arg_hash}/prepareCancelTx";
- *    output=prepared_order_tx_enc;
- *    errors=[rarible_error_500]}] *)
 
 let get_orders_all req () =
   (* let _platform = EzAPI.Req.find_param platform_param req in *)

@@ -257,7 +257,8 @@ let order_type =
     ]
   ]
 
-let hash_order_form maker make taker take salt start_date end_date data_type payouts origin_fees =
+let mich_order_form
+    ~maker ~make ~taker ~take ~salt ~start_date ~end_date ~data_type ~payouts ~origin_fees =
   let open Tzfunc.Forge in
   let$ data_type = pack (prim `string) (Mstring data_type) in
   let$ data = pack order_data_type
@@ -271,32 +272,39 @@ let hash_order_form maker make taker take salt start_date end_date data_type pay
         ]) in
   let$ asset_make = asset_mich make in
   let$ asset_take = asset_mich take in
-  pack order_type @@
-  prim `Pair ~args:[
-    option_mich (fun s -> Mstring s) (Some maker);
-    prim `Pair ~args:[
-      asset_make;
+  Ok (prim `Pair ~args:[
+      option_mich (fun s -> Mstring s) (Some maker);
       prim `Pair ~args:[
-        option_mich (fun s -> Mstring s) taker;
+        asset_make;
         prim `Pair ~args:[
-          asset_take;
+          option_mich (fun s -> Mstring s) taker;
           prim `Pair ~args:[
-            Mint (Z.of_string salt);
+            asset_take;
             prim `Pair ~args:[
-              option_mich (fun c -> Mstring (Proto.A.cal_to_str c)) start_date;
+              Mint (Z.of_string salt);
               prim `Pair ~args:[
-                option_mich (fun c -> Mstring (Proto.A.cal_to_str c)) end_date;
+                option_mich (fun c -> Mstring (Proto.A.cal_to_str c)) start_date;
                 prim `Pair ~args:[
-                  Mbytes (Hex.of_string @@ keccak data_type);
-                  Mbytes (Hex.of_string data);
+                  option_mich (fun c -> Mstring (Proto.A.cal_to_str c)) end_date;
+                  prim `Pair ~args:[
+                    Mbytes (Hex.of_string @@ keccak data_type);
+                    Mbytes (Hex.of_string data);
+                  ]
                 ]
               ]
             ]
           ]
         ]
       ]
-    ]
-  ]
+    ])
+
+let hash_order_form maker make taker take salt start_date end_date data_type payouts origin_fees =
+  let open Tzfunc.Forge in
+  let$ x =
+    mich_order_form
+      ~maker ~make ~taker ~take ~salt ~start_date ~end_date ~data_type ~payouts ~origin_fees in
+  let$ res = pack order_type x in
+  Ok res
 
 (* // who fills asset collection `fill` ?
  * function hashKeyOrder(iorder : order) : bytes {
@@ -308,30 +316,30 @@ let hash_order_form maker make taker take salt start_date end_date data_type pay
  * } *)
 
 let calculate_remaining make_value take_value fill cancelled =
-  if cancelled then 0, 0
+  if cancelled then 0L, 0L
   else
-    let take = take_value - fill in
-    let make = take * make_value / take_value in
+    let take = Int64.sub take_value fill in
+    let make = Int64.(div (mul take make_value) take_value) in
     make, take
 
 let calculate_fee data protocol_commission = match data with
   | RaribleV2Order { order_rarible_v2_data_v1_origin_fees ; _ } ->
-    List.fold_left (fun acc p -> acc + p.part_value)
+    List.fold_left (fun acc p -> Int64.(add acc (of_int p.part_value)))
       protocol_commission
       order_rarible_v2_data_v1_origin_fees
   | _ -> assert false
 
 let calculate_rounded_make_balance make_value take_value make_balance =
-  let max_take = make_balance * take_value / make_value in
-  make_value * max_take / take_value
+  let max_take = Int64.(div (mul make_balance take_value) make_value) in
+  Int64.(div (mul make_value max_take) take_value)
 
 let calculate_make_stock
     make_value take_value fill data make_balance protocol_commission fee_side cancelled =
   let make, _take = calculate_remaining make_value take_value fill cancelled in
   let fee = match fee_side with
-    | None | Some FeeSideTake -> 0
+    | None | Some FeeSideTake -> 0L
     | Some FeeSideMake -> calculate_fee data protocol_commission in
-  let make_balance = (make_balance * 10000) / (fee + 10000) in
+  let make_balance = Int64.(div (mul make_balance 10000L) (add fee 10000L)) in
   let rounded_make_balance = calculate_rounded_make_balance make_value take_value make_balance in
   min make rounded_make_balance
 
@@ -345,7 +353,7 @@ let get_fee_side make_asset take_asset =
    * | _, ATERC1155 _ -> Some FeeSideTake *)
   | _, _ -> None
 
-let order_elt_from_order_form_elt elt data =
+let order_elt_from_order_form_elt elt =
   let make_asset = elt.order_form_elt_make in
   let take_asset = elt.order_form_elt_take in
   (* TODO *)
@@ -355,23 +363,6 @@ let order_elt_from_order_form_elt elt data =
       make_asset.asset_type
       take_asset.asset_type
       elt.order_form_elt_salt in
-  (* TODO : QUERY BALANCE FOR MAKER ON MAKE ASSET *)
-  let make_balance = None in
-  (* TODO *)
-  (* TODO : QUERY PROTOCOL COMMISSION *)
-  let protocol_commission = 0 in
-  let fee_side = get_fee_side make_asset take_asset in
-  let make_stock =
-    calculate_make_stock
-      (int_of_string make_asset.asset_value)
-      (int_of_string take_asset.asset_value)
-      0
-      data
-      (match make_balance with None -> 0 | Some b -> b)
-      protocol_commission
-      fee_side
-      false
-  in
   let now = CalendarLib.Calendar.now () in
   Ok {
     order_elt_maker = elt.order_form_elt_maker ;
@@ -381,7 +372,7 @@ let order_elt_from_order_form_elt elt data =
     order_elt_fill = "0";
     order_elt_start = elt.order_form_elt_start;
     order_elt_end = elt.order_form_elt_end;
-    order_elt_make_stock = string_of_int make_stock;
+    order_elt_make_stock = "0";
     order_elt_cancelled = false;
     order_elt_salt = elt.order_form_elt_salt;
     order_elt_signature = elt.order_form_elt_signature;
@@ -389,14 +380,14 @@ let order_elt_from_order_form_elt elt data =
     order_elt_last_update_at = now;
     order_elt_pending = Some [];
     order_elt_hash = hash;
-    order_elt_make_balance = make_balance;
+    order_elt_make_balance = None;
     order_elt_make_price_usd = None;
     order_elt_take_price_usd = None;
     order_elt_price_history = [];
   }
 
 let order_from_order_form form =
-  let$ order_elt = order_elt_from_order_form_elt form.order_form_elt form.order_form_data in
+  let$ order_elt = order_elt_from_order_form_elt form.order_form_elt in
   Ok { order_elt; order_data = form.order_form_data }
 
 let order_form_elt_from_order_elt order_elt = {
@@ -453,6 +444,7 @@ let string_opt_of_int64_opt = function
 let int64_opt_of_string_opt = function
   | None -> None
   | Some i -> Some (Int64.of_string i)
+
 
 let filter_all_type_to_pgarray = List.map (fun t ->
     Option.some @@

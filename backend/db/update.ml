@@ -115,20 +115,15 @@ let upgrade_1_to_2 dbh version =
       take_asset_type_contract varchar,
       take_asset_type_token_id varchar,
       take_asset_value bigint not null,
-      fill bigint not null,
       start_date timestamp,
       end_date timestamp,
-      make_stock bigint not null,
-      cancelled boolean not null default false,
-      applied boolean not null default false,
       salt varchar not null,
       signature varchar not null,
       created_at timestamp not null,
       last_update_at timestamp not null,
-      hash varchar primary key,
-      make_balance bigint,
       make_price_usd float,
-      take_price_usd float)|};
+      take_price_usd float,
+      hash varchar primary key)|};
 
     {|create table origin_fees(
       account varchar not null,
@@ -139,28 +134,6 @@ let upgrade_1_to_2 dbh version =
     {|create table payouts(
       account varchar not null,
       value int not null,
-      hash varchar not null references orders(hash) on delete cascade)|};
-
-    {|create table order_pending(
-      type varchar not null,
-      make_asset_type_class varchar,
-      make_asset_type_contract varchar,
-      make_asset_type_token_id varchar,
-      make_asset_value bigint,
-      take_asset_type_class varchar,
-      take_asset_type_contract varchar,
-      take_asset_type_token_id varchar,
-      take_asset_value bigint,
-      date timestamp not null,
-      maker varchar,
-      side varchar,
-      fill bigint,
-      taker varchar,
-      counter_hash varchar,
-      make_usd float,
-      take_usd float,
-      make_price_usd float,
-      take_price_usd float,
       hash varchar not null references orders(hash) on delete cascade)|};
 
     {|create table order_price_history(
@@ -183,7 +156,21 @@ let upgrade_1_to_2 dbh version =
       tr_from varchar,
       primary key (transaction, block))|};
 
-    {|create table order_updates(
+    {|create table order_match(
+      transaction varchar not null,
+      index int not null,
+      block varchar not null,
+      level int not null,
+      main boolean not null default false,
+      tsp timestamp not null,
+      source varchar not null,
+      hash_left varchar not null,
+      hash_right varchar not null,
+      fill_make_value bigint not null,
+      fill_take_value bigint not null,
+      primary key (block, index))|};
+
+    {|create table order_cancel(
       transaction varchar not null,
       index int not null,
       block varchar not null,
@@ -192,9 +179,6 @@ let upgrade_1_to_2 dbh version =
       tsp timestamp not null,
       source varchar not null,
       cancel varchar,
-      hash_left varchar,
-      hash_right varchar,
-      take_usd float,
       primary key (block, index))|};
 
     {|create table order_activities(

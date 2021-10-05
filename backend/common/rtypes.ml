@@ -820,4 +820,4 @@ type fee_side = FeeSideMake | FeeSideTake
 
 type exchange_param =
   | Cancel of string
-  | DoTransfers of {left: string; right: string}
+  | DoTransfers of {left: string; right: string ; fill_make_value: int64; fill_take_value: int64}
