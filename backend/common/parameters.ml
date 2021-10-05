@@ -253,7 +253,7 @@ let parse_cancel = function
 let parse_do_transfers = function
   | Mprim { prim = `Pair; args = [
       _m_asset_class; _m_asset_data; _t_asset_class; _t_asset_data;
-      _fill_m_value; _fill_t_value;
+      Mint fill_m_value; Mint fill_t_value;
       left_maker; left_m_asset_class; left_m_asset_data; _left_m_asset_value;
       _left_taker; left_t_asset_class;  left_t_asset_data; _left_t_asset_value;
       Mint left_salt; _left_start; _left_end; _left_data_type; _left_data;
@@ -272,7 +272,9 @@ let parse_do_transfers = function
     let$ right_tat = parse_asset_type right_t_asset_class right_t_asset_data in
     let right_salt = Z.to_string right_salt in
     let$ right = Utils.hash_key right_maker right_mat right_tat right_salt in
-    Ok (DoTransfers {left; right})
+    let fill_make_value = Z.to_int64 fill_m_value in
+    let fill_take_value = Z.to_int64 fill_t_value in
+    Ok (DoTransfers {left; right; fill_make_value; fill_take_value})
 
   | _ -> unexpected_michelson
 

@@ -218,7 +218,7 @@ let update_operators_for_all l =
         (if add then "Left" else "Right") operator) l
 
 let set_token_metadata id l =
-  Format.sprintf "Pair %Ld %s" id @@ String.concat "; " @@
+  Format.sprintf "Pair %Ld {%s}" id @@ String.concat "; " @@
   List.map (fun (k, v) -> Format.sprintf "Elt %S %S" k v) l
 
 let hex s =
@@ -234,6 +234,9 @@ let set_metadata_uri s =
   Format.sprintf "0x%s" (hex s)
 
 (** entrypoints *)
+
+let match_orders_aux ?endpoint source contract param =
+  call_aux ?endpoint ~entrypoint:"matchOrders" ~param source contract
 
 let mint_tokens_aux ?endpoint id owner amount royalties source contract =
   let param =
@@ -295,11 +298,26 @@ let update_operators l =
       id, String.sub s 0 i, String.sub s (i+1) (String.length s - i - 1), add) l in
   call ~entrypoint:"update_operators" @@ update_operators l
 
+let update_operators_for_all_aux ?endpoint l source contract =
+  let l = List.map (fun s ->
+      let add = String.get s 0 = '+' in
+      String.sub s 1 (String.length s - 1), add) l in
+  let param = update_operators_for_all l in
+  call_aux ?endpoint ~entrypoint:"update_operators_for_all" ~param source contract
+
 let update_operators_for_all l =
   let l = List.map (fun s ->
       let add = String.get s 0 = '+' in
       String.sub s 1 (String.length s - 1), add) l in
   call ~entrypoint:"update_operators_for_all" @@ update_operators_for_all l
+
+let set_token_metadata_aux ?endpoint id l source contract =
+  let l = List.filter_map (fun s ->
+      match String.index_opt s '=' with
+      | None -> None
+      | Some i -> Some (String.sub s 0 i, String.sub s (i+1) (String.length s - i - 1))) l in
+  let param = set_token_metadata (Int64.of_string id) l in
+  call_aux ?endpoint ~entrypoint:"setTokenMetadata" ~param source contract
 
 let set_token_metadata id l =
   let l = List.filter_map (fun s ->
@@ -308,8 +326,16 @@ let set_token_metadata id l =
       | Some i -> Some (String.sub s 0 i, String.sub s (i+1) (String.length s - i - 1))) l in
   call ~entrypoint:"setTokenMetadata" @@ set_token_metadata (Int64.of_string id) l
 
+let set_metadata_uri_aux ?endpoint s source contract =
+  let param = set_metadata_uri s in
+  call_aux ?endpoint ~entrypoint:"setMetadataUri" ~param source contract
+
 let set_metadata_uri s =
   call ~entrypoint:"setMetadataUri" @@ set_metadata_uri s
+
+let set_validator_aux ?endpoint kt1 source contract =
+  let param = Printf.sprintf "%S" kt1  in
+  call_aux ?endpoint  ~entrypoint:"setValidator" ~param source contract
 
 (** main *)
 

@@ -214,10 +214,10 @@ let generate_royalties () =
   let rec aux royalties =
     let total =
       List.fold_left (fun acc (_addr, v) -> acc + v) 0 royalties in
-    if total = 10000 then royalties
+    if total = 5000 then royalties
     else
       let _, addr_pk, _ = generate_address () in
-      let v = (Random.int 9999) + 1 in
+      let v = (Random.int 4999) + 1 in
       try
         let old = List.assoc addr_pk royalties in
         aux ((addr_pk, v + old) :: (List.remove_assoc addr_pk royalties))
@@ -254,7 +254,7 @@ let generate_order () =
   let salt = generate_salt () in
   let start_date = None in
   let end_date = None in
-  let data_type = "RARIBLE_V2_DATA_V1" in
+  let data_type = "V1" in
   let payouts = [] in
   let origin_fees = generate_parts () in
   let$ to_sign =
@@ -266,18 +266,39 @@ let generate_order () =
       maker_pk taker make take salt start_date end_date signature data_type payouts origin_fees in
   Ok order_form
 
+let maker_from_item ((_owner, owner_sk), _am, _token_id, _royalties, _metadata) =
+  by_sk owner_sk
+
+let asset_from_item collection ((_owner, _owner_sk), am, token_id, _royalties, _metadata) =
+  let asset_type = ATFA_2 { asset_fa2_contract = collection ; asset_fa2_token_id = token_id } in
+  { asset_type ; asset_value = string_of_int am }
+
+let order_form_from_items ?(salt=0) collection item1 item2 =
+  let _maker, maker_pk, maker_sk = maker_from_item item1 in
+  let taker = None in
+  let make = asset_from_item collection item1 in
+  let take = asset_from_item collection item2 in
+  let salt = string_of_int salt in
+  let start_date = None in
+  let end_date = None in
+  let data_type = "V1" in
+  let payouts = [ { part_account = Tzfunc.Crypto.pk_to_tz1 maker_pk; part_value = 10000 } ] in
+  let origin_fees = [] in
+  let$ to_sign =
+    hash_order_form
+      maker_pk make taker take salt start_date end_date data_type payouts origin_fees in
+  let signature = sign ~edsk:maker_sk ~bytes:to_sign in
+  let order_form =
+    mk_order_form
+      maker_pk taker make take salt start_date end_date signature data_type payouts origin_fees in
+  Ok order_form
+
 let call_upsert_order order_form =
-    Format.eprintf "%s\n%!" (EzEncoding.construct order_form_enc order_form) ;
-    let url = EzAPI.BASE !api in
-    EzReq.post0
-      ~input:order_form
-      url
-      ~error:(fun code msg ->
-          Format.eprintf "ERROR %d %s\n%!" code (match msg with None -> "None" | Some s -> s))
-      Api.upsert_order_s
-      (function
-        | Ok order -> Format.eprintf "RES %s\n%!" order.order_elt.order_elt_hash
-        | Error _err -> Format.eprintf "ERROR" )
+  let url = EzAPI.BASE !api in
+  EzReq_lwt.post0
+    ~input:order_form
+    url
+    Api.upsert_order_s
 
 let call_generate_token_id collection =
   let url = EzAPI.BASE !api in
@@ -538,122 +559,118 @@ let call_get_nft_activities_by_collection_transfer collection =
 
 let upsert_order () =
   match generate_order () with
-  | Ok order_form -> call_upsert_order order_form
+  | Ok order_form ->
+    call_upsert_order order_form
   | Error err ->
-    Format.eprintf "Error %s\n%!" @@ Let.string_of_error err
+    Lwt.fail_with (Printf.sprintf "error : %s" @@ Let.string_of_error err)
 
-let get_order hash =
+let call_get_order hash =
   let url = EzAPI.BASE !api in
-  EzReq.get1
+  EzReq_lwt.get1
     url
-    ~error:(fun code msg ->
-        Format.eprintf "ERROR %d %s\n%!" code (match msg with None -> "None" | Some s -> s))
     Api.get_order_by_hash_s
     hash
-    (function
-      | Ok order -> Format.eprintf "RES %s\n%!" order.order_elt.order_elt_hash
-      | Error _err -> Format.eprintf "ERROR" )
 
-let update_order_make_value hash make_value =
-  Db.get_order hash >|= function
-  | Error err -> Format.eprintf "ERROR %s\n%!" @@ Crp.string_of_error err ;
-  | Ok None -> Format.eprintf "get_order None"
-  | Ok (Some order) ->
-    let order_form = order_form_from_order order in
-    let maker = order_form.order_form_elt.order_form_elt_maker in
-    let _, _, maker_sk = by_pk maker in
-    let taker = order_form.order_form_elt.order_form_elt_taker in
-    let make = order_form.order_form_elt.order_form_elt_make in
-    let make = { make with asset_value = make_value } in
-    let take = order_form.order_form_elt.order_form_elt_take in
-    let salt = order_form.order_form_elt.order_form_elt_salt in
-    let start_date = order_form.order_form_elt.order_form_elt_start in
-    let end_date = order_form.order_form_elt.order_form_elt_end in
-    match order_form.order_form_data with
-    | RaribleV2Order data ->
-      let data_type = data.order_rarible_v2_data_v1_data_type in
-      let payouts = data.order_rarible_v2_data_v1_payouts in
-      let origin_fees = data.order_rarible_v2_data_v1_origin_fees in
-      begin match
-          hash_order_form
-            maker make taker take salt start_date end_date data_type payouts origin_fees with
-      | Ok to_sign ->
-        let signature = sign ~edsk:maker_sk ~bytes:to_sign in
-        let order_form =
-          mk_order_form
-            maker taker make take salt start_date end_date signature data_type payouts origin_fees in
-        call_upsert_order order_form
-      | Error err -> Format.eprintf "Error %s\n%!" @@ string_of_error err
-      end
-    | _ ->
-      Format.eprintf "Wrong order type \n%!"
+(* let update_order_make_value hash make_value =
+ *   Db.get_order hash >|= function
+ *   | Error err -> Format.eprintf "ERROR %s\n%!" @@ Crp.string_of_error err ;
+ *   | Ok None -> Format.eprintf "get_order None"
+ *   | Ok (Some order) ->
+ *     let order_form = order_form_from_order order in
+ *     let maker = order_form.order_form_elt.order_form_elt_maker in
+ *     let _, _, maker_sk = by_pk maker in
+ *     let taker = order_form.order_form_elt.order_form_elt_taker in
+ *     let make = order_form.order_form_elt.order_form_elt_make in
+ *     let make = { make with asset_value = make_value } in
+ *     let take = order_form.order_form_elt.order_form_elt_take in
+ *     let salt = order_form.order_form_elt.order_form_elt_salt in
+ *     let start_date = order_form.order_form_elt.order_form_elt_start in
+ *     let end_date = order_form.order_form_elt.order_form_elt_end in
+ *     match order_form.order_form_data with
+ *     | RaribleV2Order data ->
+ *       let data_type = data.order_rarible_v2_data_v1_data_type in
+ *       let payouts = data.order_rarible_v2_data_v1_payouts in
+ *       let origin_fees = data.order_rarible_v2_data_v1_origin_fees in
+ *       begin match
+ *           hash_order_form
+ *             maker make taker take salt start_date end_date data_type payouts origin_fees with
+ *       | Ok to_sign ->
+ *         let signature = sign ~edsk:maker_sk ~bytes:to_sign in
+ *         let order_form =
+ *           mk_order_form
+ *             maker taker make take salt start_date end_date signature data_type payouts origin_fees in
+ *         call_upsert_order order_form
+ *       | Error err -> Lwt.return_error err
+ *       end
+ *     | _ ->
+ *       Format.eprintf "Wrong order type \n%!" *)
 
-let update_order_take_value hash take_value =
-  Db.get_order hash >|= function
-  | Error err -> Format.eprintf "ERROR %s\n%!" @@ Crp.string_of_error err ;
-  | Ok None -> Format.eprintf "get_order None"
-  | Ok (Some order) ->
-    let order_form = order_form_from_order order in
-    let maker = order_form.order_form_elt.order_form_elt_maker in
-    let _, _, maker_sk = by_pk maker in
-    let taker = order_form.order_form_elt.order_form_elt_taker in
-    let make = order_form.order_form_elt.order_form_elt_make in
-    let take = order_form.order_form_elt.order_form_elt_take in
-    let take = { take with asset_value = take_value } in
-    let salt = order_form.order_form_elt.order_form_elt_salt in
-    let start_date = order_form.order_form_elt.order_form_elt_start in
-    let end_date = order_form.order_form_elt.order_form_elt_end in
-    match order_form.order_form_data with
-    | RaribleV2Order data ->
-      let data_type = data.order_rarible_v2_data_v1_data_type in
-      let payouts = data.order_rarible_v2_data_v1_payouts in
-      let origin_fees = data.order_rarible_v2_data_v1_origin_fees in
-      begin match
-          hash_order_form
-            maker make taker take salt start_date end_date data_type payouts origin_fees with
-      | Ok to_sign ->
-        let signature = sign ~edsk:maker_sk ~bytes:to_sign in
-        let order_form =
-          mk_order_form
-            maker taker make take salt start_date end_date signature data_type payouts origin_fees in
-        call_upsert_order order_form
-      | Error err -> Format.eprintf "Error %s\n%!" @@ string_of_error err
-      end
-    | _ ->
-      Format.eprintf "Wrong order type \n%!"
+(* let update_order_take_value hash take_value =
+ *   Db.get_order hash >|= function
+ *   | Error err -> Format.eprintf "ERROR %s\n%!" @@ Crp.string_of_error err ;
+ *   | Ok None -> Format.eprintf "get_order None"
+ *   | Ok (Some order) ->
+ *     let order_form = order_form_from_order order in
+ *     let maker = order_form.order_form_elt.order_form_elt_maker in
+ *     let _, _, maker_sk = by_pk maker in
+ *     let taker = order_form.order_form_elt.order_form_elt_taker in
+ *     let make = order_form.order_form_elt.order_form_elt_make in
+ *     let take = order_form.order_form_elt.order_form_elt_take in
+ *     let take = { take with asset_value = take_value } in
+ *     let salt = order_form.order_form_elt.order_form_elt_salt in
+ *     let start_date = order_form.order_form_elt.order_form_elt_start in
+ *     let end_date = order_form.order_form_elt.order_form_elt_end in
+ *     match order_form.order_form_data with
+ *     | RaribleV2Order data ->
+ *       let data_type = data.order_rarible_v2_data_v1_data_type in
+ *       let payouts = data.order_rarible_v2_data_v1_payouts in
+ *       let origin_fees = data.order_rarible_v2_data_v1_origin_fees in
+ *       begin match
+ *           hash_order_form
+ *             maker make taker take salt start_date end_date data_type payouts origin_fees with
+ *       | Ok to_sign ->
+ *         let signature = sign ~edsk:maker_sk ~bytes:to_sign in
+ *         let order_form =
+ *           mk_order_form
+ *             maker taker make take salt start_date end_date signature data_type payouts origin_fees in
+ *         call_upsert_order order_form
+ *       | Error err -> Format.eprintf "Error %s\n%!" @@ string_of_error err
+ *       end
+ *     | _ ->
+ *       Format.eprintf "Wrong order type \n%!" *)
 
-let update_order_taker hash taker =
-  Db.get_order hash >|= function
-  | Error err -> Format.eprintf "ERROR %s\n%!" @@ Crp.string_of_error err ;
-  | Ok None -> Format.eprintf "get_order None"
-  | Ok (Some order) ->
-    let order_form = order_form_from_order order in
-    let maker = order_form.order_form_elt.order_form_elt_maker in
-    let _, _, maker_sk = by_pk maker in
-    let taker = taker in
-    let make = order_form.order_form_elt.order_form_elt_make in
-    let take = order_form.order_form_elt.order_form_elt_take in
-    let salt = order_form.order_form_elt.order_form_elt_salt in
-    let start_date = order_form.order_form_elt.order_form_elt_start in
-    let end_date = order_form.order_form_elt.order_form_elt_end in
-    match order_form.order_form_data with
-    | RaribleV2Order data ->
-      let data_type = data.order_rarible_v2_data_v1_data_type in
-      let payouts = data.order_rarible_v2_data_v1_payouts in
-      let origin_fees = data.order_rarible_v2_data_v1_origin_fees in
-      begin match
-          hash_order_form
-            maker make taker take salt start_date end_date data_type payouts origin_fees with
-      | Ok to_sign ->
-        let signature = sign ~edsk:maker_sk ~bytes:to_sign in
-        let order_form =
-          mk_order_form
-            maker taker make take salt start_date end_date signature data_type payouts origin_fees in
-        call_upsert_order order_form
-      | Error err -> Format.eprintf "Error %s\n%!" @@ string_of_error err
-      end
-    | _ ->
-      Format.eprintf "Wrong order type \n%!"
+(* let update_order_taker hash taker =
+ *   Db.get_order hash >|= function
+ *   | Error err -> Format.eprintf "ERROR %s\n%!" @@ Crp.string_of_error err ;
+ *   | Ok None -> Format.eprintf "get_order None"
+ *   | Ok (Some order) ->
+ *     let order_form = order_form_from_order order in
+ *     let maker = order_form.order_form_elt.order_form_elt_maker in
+ *     let _, _, maker_sk = by_pk maker in
+ *     let taker = taker in
+ *     let make = order_form.order_form_elt.order_form_elt_make in
+ *     let take = order_form.order_form_elt.order_form_elt_take in
+ *     let salt = order_form.order_form_elt.order_form_elt_salt in
+ *     let start_date = order_form.order_form_elt.order_form_elt_start in
+ *     let end_date = order_form.order_form_elt.order_form_elt_end in
+ *     match order_form.order_form_data with
+ *     | RaribleV2Order data ->
+ *       let data_type = data.order_rarible_v2_data_v1_data_type in
+ *       let payouts = data.order_rarible_v2_data_v1_payouts in
+ *       let origin_fees = data.order_rarible_v2_data_v1_origin_fees in
+ *       begin match
+ *           hash_order_form
+ *             maker make taker take salt start_date end_date data_type payouts origin_fees with
+ *       | Ok to_sign ->
+ *         let signature = sign ~edsk:maker_sk ~bytes:to_sign in
+ *         let order_form =
+ *           mk_order_form
+ *             maker taker make take salt start_date end_date signature data_type payouts origin_fees in
+ *         call_upsert_order order_form
+ *       | Error err -> Format.eprintf "Error %s\n%!" @@ string_of_error err
+ *       end
+ *     | _ ->
+ *       Format.eprintf "Wrong order type \n%!" *)
 
 let may_import_key ?(verbose=0) alias sk =
   let cmd = Script.import_key ~verbose alias sk in
@@ -734,10 +751,18 @@ let find_kt1 contract_alias =
       end
     | Unix.WSIGNALED _ | Unix.WSTOPPED _ -> failwith "list_known_address failure"
 
-let deploy ?verbose filename storage source alias =
+let deploy ?verbose ?burn_cap filename storage source alias =
   ignore verbose;
   let cmd =
-    Script.deploy_aux ~verbose:!Script.verbose ~endpoint:!endpoint ~force:true ~filename storage source alias in
+    Script.deploy_aux
+      ~verbose:!Script.verbose
+      ~endpoint:!endpoint
+      ~force:true
+      ?burn_cap
+      ~filename
+      storage
+      source
+      alias in
   let code, out, err = sys_command ~verbose:!Script.verbose ~retry:1 cmd in
   if code <> 0 then
     failwith (Printf.sprintf "deploy failure : out %S err %S" out err)
@@ -749,7 +774,16 @@ let create_collection ?(royalties=pick_royalties ()) () =
   let alias_source, _pk_source, sk_source = generate_address () in
   let admin = Tzfunc.Crypto.pk_to_tz1 pk_admin in
   may_import_key alias_source sk_source ;
-  (admin, sk_admin), alias_source, alias_new, royalties
+  let name = Filename.basename @@ Filename.temp_file "collection" "name" in
+  let symbol =
+    if Random.bool () then None
+    else
+      Some (String.init 3 (fun _ -> Char.chr @@ Random.int 26 + 97)) in
+  let uri =
+    EzEncoding.construct
+      Json_encoding.(obj2 (req "name" string) (opt "symbol" string))
+      (name, symbol) in
+  (admin, sk_admin), alias_source, alias_new, royalties, uri
 
 let create_collections ?royalties nb =
   let rec aux acc cpt =
@@ -757,7 +791,27 @@ let create_collections ?royalties nb =
     else aux ((create_collection ?royalties ()) :: acc) (cpt - 1) in
   aux [] nb
 
-let deploy_collection admin alias_source alias_new royalties =
+let set_metadata_uri uri source contract =
+  if !js then
+    failwith "TODO : script js set_validator"
+  else
+    let cmd = Script.set_metadata_uri_aux ~endpoint:!endpoint uri source contract in
+    let code, out, err = sys_command cmd in
+    if code <> 0 then
+      Printf.eprintf "set_metadata_uri failure (log %s err %s)\n%!" out err
+    else ()
+
+let set_token_metadata id uri source contract =
+  if !js then
+    failwith "TODO : script js set_validator"
+  else
+    let cmd = Script.set_token_metadata_aux ~endpoint:!endpoint id uri (fst source) contract in
+    let code, out, err = sys_command cmd in
+    if code <> 0 then
+      Printf.eprintf "set_metadata_uri failure (log %s err %s)\n%!" out err
+    else ()
+
+let deploy_collection admin alias_source alias_new royalties uri =
   Printf.eprintf "Deploying new collection\n%!" ;
   if !js then
     Script_js.deploy_collection ~endpoint:!endpoint
@@ -768,6 +822,7 @@ let deploy_collection admin alias_source alias_new royalties =
     deploy filename storage alias_source alias_new ;
     Printf.eprintf "  deployed collection %s\n%!" alias_new ;
     let kt1 = find_kt1 alias_new in
+    set_metadata_uri uri (fst admin) kt1 ;
     Printf.eprintf "  --> %s:%s\n%!" alias_new kt1 ;
     alias_new, kt1, admin, royalties
 
@@ -787,15 +842,72 @@ let create_royalties () =
     deploy filename storage alias_source alias_new ;
     alias_new, alias_admin
 
+let create_validator ~exchange ~royalties =
+  Printf.eprintf "Creating new validator\n%!" ;
+  if !js then
+    failwith "TODO : js.deploy_exchange"
+  else
+    let alias_new = generate_alias "validator" in
+    let alias_source, _pk_source, sk_source = generate_address () in
+    may_import_key alias_source sk_source ;
+    let filename = "contracts/arl/validator.arl" in
+    let storage = Script.storage_validator ~exchange ~royalties in
+    deploy ~burn_cap:4.67575 filename storage alias_source alias_new ;
+    alias_new, alias_source
+
+let create_exchange () =
+  Printf.eprintf "Creating new exchange\n%!" ;
+  let alias_admin, pk_admin, sk_admin = generate_address () in
+  let admin = Tzfunc.Crypto.pk_to_tz1 pk_admin in
+  if !js then
+    failwith "TODO : js.deploy_exchange"
+  else
+    let alias_new = generate_alias "exchange" in
+    may_import_key alias_admin sk_admin ;
+    let alias_source, _pk_source, sk_source = generate_address () in
+    may_import_key alias_source sk_source ;
+    let alias_receiver, pk_receiver, sk_receiver = generate_address () in
+    may_import_key alias_receiver sk_receiver ;
+    let receiver = Tzfunc.Crypto.pk_to_tz1 pk_receiver in
+    let filename = "contracts/arl/exchangeV2.arl" in
+    let storage = Script.storage_exchange ~admin:admin ~receiver ~fee:300L in
+    deploy ~burn_cap:4.67575 filename storage alias_source alias_new ;
+    alias_new, alias_admin, alias_receiver
+
+let set_validator validator source contract =
+  if !js then
+    failwith "TODO : script js set_validator"
+  else
+    let cmd = Script.set_validator_aux ~endpoint:!endpoint validator source contract in
+    let code, out, err = sys_command cmd in
+    if code <> 0 then
+      Lwt.return_ok @@
+      Printf.eprintf "set_validator failure (log %s err %s)\n%!" out err
+    else Lwt.return_ok ()
+
+let update_operators_for_all operator source contract =
+  let operator = "+" ^ operator in
+  if !js then
+    failwith "TODO : script js update_operators_for_all"
+  else
+    let cmd =
+      Script.update_operators_for_all_aux ~endpoint:!endpoint [ operator ] (fst source) contract in
+    let code, out, err = sys_command cmd in
+    if code <> 0 then
+      Lwt.return_ok @@
+      Printf.eprintf "update_operator_for_all failure (log %s err %s)\n%!" out err
+    else Lwt.return_ok ()
+
 let mint_tokens id owner amount royalties source contract =
   if !js then
     Script_js.mint_tokens ~endpoint:!endpoint ~amount ~royalties ~contract ~source id
   else
     let cmd = Script.mint_tokens_aux ~endpoint:!endpoint id owner amount
         royalties (fst source) contract in
-    let code, out, err = sys_command ~retry:1 cmd in
+    let code, out, err = sys_command cmd in
     if code <> 0 then
-      Lwt.fail_with ("mint failure : log " ^ out ^ " & " ^ err)
+      Lwt.return_ok @@
+      Printf.eprintf "mint failure (log %s err %s)\n%!" out err
     else Lwt.return_ok ()
 
 let burn_tokens id amount source contract =
@@ -829,6 +941,19 @@ let mint_with_random_token_id ~source ~contract =
   let metadata = [] in
   mint_tokens tid owner amount royalties source contract >|=? fun () ->
   ((owner, owner_sk), amount, tid, royalties, metadata)
+
+let mint_one_with_token_id_from_api ?diff ~source ~contract () =
+  Printf.eprintf "mint_one_with_token_id_from_api for %s on %s\n%!" (fst source) contract ;
+  let _owner_alias, owner_pk, owner_sk = generate_address ?diff () in
+  let owner =  Tzfunc.Crypto.pk_to_tz1 owner_pk in
+  let amount = string_of_int 1 in
+  let royalties = generate_royalties () in
+  let name = Filename.basename @@ Filename.temp_file "item" "name" in
+  let metadata = [ Printf.sprintf "name=%s" name ] in
+  call_generate_token_id contract >>=? fun tid ->
+  mint_tokens tid.nft_token_id owner amount royalties source contract >|=? fun () ->
+  set_token_metadata tid.nft_token_id metadata source contract ;
+  ((owner, owner_sk), 1, tid.nft_token_id, royalties, metadata)
 
 let mint_with_token_id_from_api ~source ~contract =
   Printf.eprintf "mint_with_token_id_from_api for %s on %s\n%!" (fst source) contract ;
@@ -870,6 +995,108 @@ let transfer ~source ~contract tid max_amount =
     if full then max_amount else generate_amount ~max:max_amount () + 1 in
   transfer_with_token_id ~source ~contract tid (string_of_int new_owner_amount) new_owner
   >|=? fun () -> (new_owner_amount, (new_owner, sk))
+
+let make_tr ?entrypoint ?(fee= -1L) ?(gas_limit=Z.minus_one)
+    ?(storage_limit=Z.minus_one) ?(counter=Z.zero) ?(amount=0L) ~source ~contract p =
+  let open Tzfunc.Proto in
+  let entrypoint = EPnamed (Option.get entrypoint) in
+  let parameters = Some {entrypoint; value = Micheline p} in
+  {
+    man_info = {source; kind = Transaction {amount; destination=contract; parameters}};
+    man_numbers = {fee; gas_limit; storage_limit; counter};
+    man_metadata = None
+  }
+
+let forge_tr ?entrypoint ?fee ?gas_limit ?storage_limit ?counter
+    ?amount ?remove_failed ?local_forge ~base ~get_pk ~source ~contract p =
+  let op = make_tr ?entrypoint ?fee ?gas_limit ?storage_limit
+      ?counter ?amount ~source ~contract p in
+  Tzfunc.Node.forge_manager_operations ?remove_failed ?local_forge ~base
+    ~get_pk ~src:source [ op ]
+
+let sign ~edsk ~bytes =
+  let open Tzfunc.Crypto in
+  let sk =
+    Hacl.Sign.unsafe_sk_of_bytes
+      (Bigstring.of_string @@ Base58.decode Prefix.ed25519_seed edsk) in
+  let msg = Bigstring.of_string @@ Crypto.Blake2b_32.hash ["\003";bytes] in
+  let signature = Bigstring.create 64 in
+  Hacl.Sign.sign ~sk ~msg ~signature;
+  Bigstring.to_string @@ signature
+
+let call ?entrypoint ?fee ?gas_limit ?storage_limit ?counter
+    ?amount ?remove_failed ?local_forge ~base ~get_pk ~source ~contract ~sign p =
+  Lwt.bind (forge_tr ?entrypoint ?fee ?gas_limit ?storage_limit
+              ?counter ?amount ?remove_failed ?local_forge ~base ~get_pk ~source ~contract p) @@ function
+  | Error e ->
+    Printf.eprintf "forge_tr error %s" @@ Tzfunc.Rp.string_of_error e ;
+    Lwt.return_error e
+  | Ok (bytes, protocol, branch, ops) ->
+    Tzfunc.Node.inject ~base ~sign ~bytes ~branch ~protocol ops
+
+let mich_order order =
+  let maker = order.order_elt.order_elt_maker in
+  let make = order.order_elt.order_elt_make in
+  let taker = order.order_elt.order_elt_taker in
+  let take = order.order_elt.order_elt_take in
+  let salt = order.order_elt.order_elt_salt in
+  let start_date = order.order_elt.order_elt_start in
+  let end_date = order.order_elt.order_elt_end in
+  match order.order_data with
+  | RaribleV2Order data ->
+    mich_order_form
+      ~maker ~make ~taker ~take ~salt ~start_date ~end_date
+      ~data_type:"V1"
+      ~payouts:data.order_rarible_v2_data_v1_payouts
+      ~origin_fees:data.order_rarible_v2_data_v1_origin_fees
+  | _ ->
+    mich_order_form
+      ~maker ~make ~taker ~take ~salt ~start_date ~end_date
+      ~data_type:"V0"
+      ~payouts:[]
+      ~origin_fees:[]
+
+let payouts order = match order.order_data with
+  | RaribleV2Order data ->
+    let payouts = match data.order_rarible_v2_data_v1_payouts with
+      | [] ->
+        let tz1 = Tzfunc.Crypto.pk_to_tz1 order.order_elt.order_elt_maker in
+        let part = { part_account = tz1 ; part_value = 10000 } in
+        [ part ]
+      | payouts -> payouts in
+    let data = RaribleV2Order { data with order_rarible_v2_data_v1_payouts = payouts } in
+    { order with order_data = data }
+  | _ -> order
+
+let match_orders ~source ~contract order_left order_right =
+  let open Tzfunc.Crypto in
+  let pk =
+    Sk.to_public_key @@
+    (Base58.decode Prefix.ed25519_seed @@ snd source) in
+  (* TODO : remove this, it should be on chain ? *)
+  let order_left = payouts order_left in
+  let order_right = payouts order_right in
+  match mich_order order_left with
+  | Error err -> Lwt.fail_with @@ Printf.sprintf "mich order %s" @@ string_of_error err
+  | Ok m_left ->
+    match mich_order order_right with
+    | Error err -> Lwt.fail_with @@ Printf.sprintf "mich order %s" @@ string_of_error err
+    | Ok m_right ->
+      let signature_left =
+        prim `Some ~args:[Proto.Mstring order_left.order_elt.order_elt_signature] in
+      let signature_right =
+        prim `Some ~args:[Proto.Mstring order_right.order_elt.order_elt_signature] in
+      let mich = prim `Pair ~args:[m_left; signature_left; m_right; signature_right] in
+      call
+        (* ~gas_limit:(Z.of_int (1040000 - 1))
+         * ~local_forge:false *)
+        ~entrypoint:"matchOrders"
+        ~base:(EzAPI.BASE !endpoint)
+        ~get_pk:(fun () -> Lwt.return_ok pk)
+        ~source:(fst source)
+        ~contract
+        ~sign:(fun bytes -> Lwt.return_ok (sign ~edsk:(snd source) ~bytes))
+        mich
 
 let random_mint collections =
   let _alias_collection, kt1, admin, _owner =
@@ -982,7 +1209,7 @@ let check_item ?strict (kt1, (owner, amount, tid, royalties, metadata)) =
         check_nft_ownership o kt1 owner amount tid metadata) ownerships in
   call_get_nft_item_by_id kt1 tid >|= begin function
   | Ok nft_item ->
-    if check_nft_item ~verbose:1 nft_item kt1 owner amount tid royalties metadata then
+    if check_nft_item nft_item kt1 owner amount tid royalties metadata then
       Printf.eprintf "[OK] API: get_nft_item_by_id\n%!"
     else
       Printf.eprintf "[KO] API: get_nft_item_by_id (no matching nft_item)\n%!"
@@ -1555,15 +1782,12 @@ let check_collection alias kt1 owner =
       "[KO] API: search_nft_all_collection %s (more than 1 matching collection)\n%!" alias
   end
 
-let set_metadata _source _kt1 =
-  Lwt.return_unit
-
 let deploy_check_random_collections ?royalties ?(max=10) () =
   let nb = Random.int max + 1 in
   Printf.eprintf "Deploying and checking %d collection(s)\n%!" nb ;
   let collections = create_collections ?royalties nb in
   let agg =
-    List.fold_left (fun acc ((admin, _alias_source, _alias_new, _royalties) as collection) ->
+    List.fold_left (fun acc ((admin, _alias_source, _alias_new, _royalties, _uri) as collection) ->
         try
           let old = List.assoc admin acc in
           (admin, (collection :: old)) :: (List.remove_assoc admin acc)
@@ -1572,9 +1796,9 @@ let deploy_check_random_collections ?royalties ?(max=10) () =
       [] collections in
   Lwt_list.map_p (fun (admin, collections) ->
       Printf.eprintf "  deploying %d collection for %s\n%!" (List.length collections) (fst admin) ;
-      Lwt_list.map_s (fun (admin, alias_source, alias_new, royalties) ->
+      Lwt_list.map_s (fun (admin, alias_source, alias_new, royalties, uri) ->
           Lwt.return @@
-          deploy_collection admin alias_source alias_new royalties) collections)
+          deploy_collection admin alias_source alias_new royalties uri) collections)
     agg >>= fun new_collections ->
   let new_collections = List.flatten new_collections in
   Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
@@ -1696,6 +1920,95 @@ let random_test () =
   begin match !crawler_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
   Lwt.return_unit
 
+let sell_nft_for_nft ?salt collection item1 item2 =
+  match order_form_from_items ?salt collection item1 item2 with
+  | Error _err -> Lwt.fail_with "order_from"
+  | Ok form -> call_upsert_order form
+
+let get_source_from_item ((owner, owner_sk), _amount, _token_id, _royalties, _metadata) =
+  (owner, owner_sk)
+
+let get_token_id_from_item (_owner, _amount, token_id, _royalties, _metadata) =
+  token_id
+
+let wait_next_block () =
+  let rec aux level0 =
+    Db.get_level () >>= function
+    | Ok level ->
+      Printf.eprintf "wait_next_block level0 %d level %d\n%!" level0 level ;
+      if level <> level0 then Lwt.return_unit
+      else
+        Lwt_unix.sleep 20. >>= fun () ->
+        aux level0
+    | Error err ->
+      Lwt.return @@ Format.eprintf "ERROR %s\n%!" @@ Crp.string_of_error err
+  in
+  Db.get_level () >>= function
+  | Error err ->
+    Lwt.return @@ Format.eprintf "wait_next_block error %s\n%!" @@ Crp.string_of_error err
+  | Ok level ->
+    aux level
+
+let test_1 () =
+  reset_db () ;
+  let r_alias, _r_source = create_royalties () in
+  let r_kt1 = find_kt1 r_alias in
+  Printf.eprintf "New royalties %s\n%!" r_kt1 ;
+  let ex_alias, ex_admin, _ex_receiver = create_exchange () in
+  let ex_kt1 = find_kt1 ex_alias in
+  Printf.eprintf "New exchange %s\n%!" ex_kt1 ;
+  let v_alias, _v_source = create_validator ~exchange:ex_kt1 ~royalties:r_kt1 in
+  let v_kt1 = find_kt1 v_alias in
+  Printf.eprintf "New validator %s\n%!" v_kt1 ;
+  api_pid := Some (start_api ()) ;
+  start_crawler "" v_kt1 ex_kt1 r_kt1 [] [] >>= fun cpid ->
+  crawler_pid := Some cpid ;
+  set_validator v_kt1 ex_admin ex_kt1 >>=? fun () ->
+  Printf.eprintf "Waiting 6sec to let crawler catch up...\n%!" ;
+  Lwt_unix.sleep 6. >>= fun () ->
+  let (admin, source, contract, royalties, uri) = create_collection ~royalties:r_kt1 () in
+  let (admin, contract, source, _royalties) =
+    deploy_collection admin source contract royalties uri in
+  let>? () = check_collection admin contract source in
+  Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
+  Lwt_unix.sleep 6. >>= fun () ->
+  let>? item1 = mint_one_with_token_id_from_api ~source ~contract () in
+  Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
+  Lwt_unix.sleep 6. >>= fun () ->
+  let (source1, amount1, token_id1, royalties1, metadata1) = item1 in
+  check_item (contract, (source1, string_of_int amount1, token_id1, royalties1, metadata1))
+  >>= fun () ->
+  let>? () = update_operators_for_all ex_kt1 source1 contract in
+  let>? item2 = mint_one_with_token_id_from_api ~diff:(Some (fst source1)) ~source ~contract () in
+  Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
+  Lwt_unix.sleep 6. >>= fun () ->
+  let (source2, amount2, token_id2, royalties2, metadata2) = item2 in
+  check_item (contract, (source2, string_of_int amount2, token_id2, royalties2, metadata2))
+  >>= fun () ->
+  let>? () = update_operators_for_all ex_kt1 source2 contract in
+  (* let tid = get_token_id_from_item item1 in *)
+  let>? order1 = sell_nft_for_nft contract item1 item2 in
+  (* TODO : check order *)
+  let>? order2 = sell_nft_for_nft ~salt:1 contract item2 item1 in
+  (* TODO : check order *)
+  begin match_orders ~source:source1 ~contract:ex_kt1 order1 order2 >>= function
+    | Error err ->
+      Printf.eprintf "match_orders error %s" @@ Tzfunc.Rp.string_of_error err ;
+      Lwt.return_unit
+  | Ok op_hash ->
+      Printf.eprintf "HASH = %s\n%!" op_hash ;
+      Printf.eprintf "Waiting next block...\n%!" ;
+      wait_next_block () >>= fun () ->
+      Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
+      Lwt_unix.sleep 6. >>= fun () ->
+      check_item (contract, (source1, string_of_int amount2, token_id2, royalties2, metadata2))
+      >>= fun () ->
+      check_item (contract, (source2, string_of_int amount1, token_id1, royalties1, metadata1))
+      (* check_orders *)
+  end >>= fun () ->
+  begin match !api_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
+  begin match !crawler_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
+  Lwt.return_ok ()
 
 (** main *)
 
@@ -1711,6 +2024,7 @@ let actions = [
   ["transfer_nft <contract_alias> <token_id> <dest>"], "transfer a nft" ;
   ["transfer_multi <contract_alias> <token_id> <dest> <amount>"], "transfer amount nft" ;
   ["run_test"], "will run some test (orig, mint, burn and trasnfer (will erase rarible db)";
+  ["test_1"], "create sell order then transfer the nft (will erase rarible db)" ;
 ]
 
 let usage =
@@ -1723,29 +2037,46 @@ let main () =
   let action = ref [] in
   Arg.parse spec (fun s -> action := s :: !action) usage;
   match List.rev !action with
-    | [ "call_upsert_order" ] -> upsert_order ()
-    | "update_order_make_value" :: hash :: make_value :: [] ->
-      Lwt_main.run (update_order_make_value hash make_value)
-    | "update_order_take_value" :: hash :: take_value :: [] ->
-      Lwt_main.run (update_order_take_value hash take_value)
+  (* | [ "call_upsert_order" ] ->
+   *   Lwt_main.run (upsert_order () >>= function
+   *     | Ok _ -> Lwt.return_unit
+   *     | Error err -> Lwt.fail_with @@ string_of_error err) *)
+    (* | "update_order_make_value" :: hash :: make_value :: [] ->
+     *   Lwt_main.run (update_order_make_value hash make_value)
+     * | "update_order_take_value" :: hash :: take_value :: [] ->
+     *   Lwt_main.run (update_order_take_value hash take_value) *)
     (* | "update_order_date" :: hash :: start_date :: end_date :: [] ->
      *   update_order_date hash start_date end_date *)
-    | "update_order_taker" :: hash :: taker :: [] ->
-      Lwt_main.run (update_order_taker hash (Some taker))
-    | [ "create_collection" ] -> ignore @@ create_collection ()
-    | "create_collection" :: royalties :: [] -> ignore @@ create_collection ~royalties ()
+    (* | "update_order_taker" :: hash :: taker :: [] ->
+     *   Lwt_main.run (update_order_taker hash (Some taker))
+     * | [ "create_collection" ] -> ignore @@ create_collection ()
+     * | "create_collection" :: royalties :: [] -> ignore @@ create_collection ~royalties () *)
     (* | "mint_token_id" :: contract :: token_id :: [] -> mint contract token_id
      * | "mint" :: contract :: [] -> mint_with_random_token_id contract *)
     (* | "transfer_nft" :: contract :: token_id :: dest :: [] ->
      *   transfer_nft contract token_id dest
      * | "transfer_multi" :: contract :: token_id :: dest :: amount :: [] ->
      *   transfer_multi contract token_id dest amount *)
-    | [ "run_test" ] -> Lwt_main.run (
+    | [ "run_nft_test" ] -> Lwt_main.run (
         Lwt.catch random_test (fun exn ->
             Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
             begin match !api_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
             begin match !crawler_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
             Lwt.return_unit))
+    | [ "test_1" ] ->
+      Lwt_main.run (
+        Lwt.catch (fun () ->
+            test_1 () >>= function
+            | Ok _ -> Lwt.return_unit
+            | Error err ->
+              Lwt.fail_with @@
+              EzReq_lwt.string_of_error
+                (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err)
+          (fun exn ->
+             Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
+             begin match !api_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
+             begin match !crawler_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
+             Lwt.return_unit))
     | _ -> Arg.usage spec usage
 
 let _ = main ()
