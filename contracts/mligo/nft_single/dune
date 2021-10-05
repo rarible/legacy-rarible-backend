@@ -45,7 +45,7 @@
 (rule
  (alias runtest)
  (deps nft.mligo)
- (action (with-stdout-to nft.tz (run ligo compile-contract nft.mligo main))))
+ (action (with-stdout-to nft.tz (run ligo compile contract nft.mligo -e main))))
 
 (rule
  (deps
