@@ -423,24 +423,35 @@ let insert_origination config dbh op ori =
 
 let insert_operation config dbh op =
   let open Hooks in
-  match op.bo_op.kind with
-  | Transaction tr -> insert_transaction config dbh op tr
-  (* | Origination ori -> set_origination config dbh op ori *)
+  match op.bo_meta with
+  | Some meta ->
+    if meta.op_status = `applied then
+      match op.bo_op.kind with
+      | Transaction tr -> insert_transaction config dbh op tr
+      (* | Origination ori -> set_origination config dbh op ori *)
+      | _ -> Lwt.return_ok ()
+    else Lwt.return_ok ()
   | _ -> Lwt.return_ok ()
 
 let insert_block config dbh b =
   iter_rp (fun op ->
-      iter_rp (fun c -> match c.man_info.kind with
-          | Origination ori ->
-            let op = {
-              Hooks.bo_block = b.hash; bo_level = b.header.shell.level;
-              bo_tsp = b.header.shell.timestamp; bo_hash = op.op_hash;
-              bo_op = c.man_info; bo_index = 0l;
-              bo_meta = Option.map (fun m -> m.man_operation_result) c.man_metadata;
-              bo_numbers = Some c.man_numbers; bo_nonce = None;
-              bo_counter = c.man_numbers.counter } in
-            insert_origination config dbh op ori
-          | _ -> Lwt.return_ok ()
+      iter_rp (fun c ->
+          match c.man_metadata with
+          | None -> Lwt.return_ok ()
+          | Some meta ->
+            if meta.man_operation_result.op_status = `applied then
+              match c.man_info.kind with
+              | Origination ori ->
+                let op = {
+                  Hooks.bo_block = b.hash; bo_level = b.header.shell.level;
+                  bo_tsp = b.header.shell.timestamp; bo_hash = op.op_hash;
+                  bo_op = c.man_info; bo_index = 0l;
+                  bo_meta = Option.map (fun m -> m.man_operation_result) c.man_metadata;
+                  bo_numbers = Some c.man_numbers; bo_nonce = None;
+                  bo_counter = c.man_numbers.counter } in
+                insert_origination config dbh op ori
+              | _ -> Lwt.return_ok ()
+            else Lwt.return_ok ()
         ) op.op_contents
     ) b.operations
 
