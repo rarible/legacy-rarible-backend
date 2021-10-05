@@ -15,10 +15,10 @@ export async function upsert_order(
     await approve(provider, order.maker, order.make, infinite)
   }
   const signature = sign_order(provider, order)
-  const r = await fetch(provider.api + '/upsert_order', {
+  const r = await fetch(provider.api + '/orders', {
     method: 'POST', headers: [[ 'content-type', 'application/json' ]],
     body: JSON.stringify({...order, signature})
   })
   if (r.ok) { return r.json() }
-  else throw new Error("/upsert_order failed")
+  else throw new Error("/orders failed")
 }
