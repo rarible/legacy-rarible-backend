@@ -37,7 +37,7 @@ export interface Part {
 }
 
 export interface OrderRaribleV2DataV1 {
-  data_type: "RARIBLE_V2_DATA_V1";
+  data_type: "V1";
   payouts: Array<Part>;
   origin_fees: Array<Part>;
 }

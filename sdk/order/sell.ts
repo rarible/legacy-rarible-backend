@@ -5,12 +5,12 @@ import { upsert_order } from "./upsert-order"
 
 export interface SellRequest {
   maker: string
-  makeAssetType: ExtendedAssetType
+  make_asset_type: ExtendedAssetType
   amount: bigint
-  takeAssetType: XTZAssetType | FA12AssetType
+  take_asset_type: XTZAssetType | FA12AssetType
   price: bigint
   payouts: Array<Part>
-  originFees: Array<Part>
+  origin_fees: Array<Part>
 }
 
 export async function sell(
@@ -20,18 +20,18 @@ export async function sell(
   const order: OrderForm = {
     maker: request.maker,
     make: {
-      asset_type: await check_asset_type(provider, request.makeAssetType),
+      asset_type: await check_asset_type(provider, request.make_asset_type),
       value: request.amount,
     },
     take: {
-      asset_type: request.takeAssetType,
+      asset_type: request.take_asset_type,
       value: request.price * request.amount,
     },
     type: "RARIBLE_V2",
     data: {
-      data_type: "RARIBLE_V2_DATA_V1",
+      data_type: "V1",
       payouts: request.payouts,
-      origin_fees: request.originFees,
+      origin_fees: request.origin_fees,
     },
     salt: salt()
   }
