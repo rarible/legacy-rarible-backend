@@ -8,6 +8,7 @@
     "@types/elliptic": "^6.4.13",
     "@types/keccak": "^3.0.1",
     "bs58check": "^2.1.2",
+    "json-formatter-js": "^2.3.4",
     "keccak": "^3.0.2",
     "node-polyfill-webpack-plugin": "^1.1.4",
     "ts-loader": "^9.2.6",
