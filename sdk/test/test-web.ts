@@ -1,5 +1,6 @@
 import { Provider, transfer, mint, burn, deploy_fa2, deploy_royalties, upsert_order, bid, sell, Part, AssetType, salt, OrderForm, SellRequest, BidRequest, ExtendedAssetType, XTZAssetType, FA12AssetType, TokenAssetType, approve, fill_order } from "../main"
 import { beacon_provider } from '../providers/beacon/beacon_provider'
+import JSONFormatter from "json-formatter-js"
 import Vue from "vue"
 
 
@@ -55,7 +56,7 @@ async function provider(node: string, api:string) : Promise<Provider> {
 export default new Vue({
   el: "#app",
   data: {
-    api_url: "http://localhost:8080/v0.1/",
+    api_url: "https://rarible-api.functori.com/v0.1/",
     node: 'https://granada.tz.functori.com',
     provider: undefined as Provider | undefined,
     path: "home",
@@ -326,13 +327,18 @@ export default new Vue({
 
     async api_request() {
       this.api.status = undefined
-      this.api.result = ''
+      const elt = document.getElementById("api-request-result")
+      if (!elt) throw new Error('element "api-request-result" not found')
+      elt.innerHTML = ''
       const options = (this.api.data)
         ? { method: "POST", headers : { "Content-Type": "application/json" }, body: JSON.stringify(this.api.data) }
         : undefined
       try {
         const r = await fetch(this.api_url + this.api.path, options)
-        if (r.ok) this.api.result = await r.text()
+        if (r.ok) {
+          const formatter = new JSONFormatter(await r.json(), 3)
+          elt.appendChild(formatter.render())
+        }
         else {
           this.api.status = 'danger'
           this.api.result = r.statusText
@@ -346,6 +352,9 @@ export default new Vue({
     async fupsert_order() {
       this.upsert.status = 'info'
       this.upsert.result = ''
+      const elt = document.getElementById("upsert-result")
+      if (!elt) throw new Error('element "upsert-result" not found')
+      elt.innerHTML = ''
       if (!this.upsert.maker) {
         this.upsert.status = 'danger'
         this.upsert.result = "no maker given"
@@ -379,7 +388,8 @@ export default new Vue({
         try {
           const r = await upsert_order(p, order)
           this.upsert.status = 'success'
-          this.upsert.result = JSON.stringify(r)
+          const formatter = new JSONFormatter(r, 3)
+          elt.appendChild(formatter.render())
         } catch(e : any) {
           this.upsert.status = 'danger'
           this.upsert.result = e.toString()
@@ -390,6 +400,9 @@ export default new Vue({
     async sell_order() {
       this.sell.status = 'info'
       this.sell.result = ''
+      const elt = document.getElementById("sell-result")
+      if (!elt) throw new Error('element "sell-result" not found')
+      elt.innerHTML = ''
       if (!this.sell.maker) {
         this.sell.status = 'danger'
         this.sell.result = "no maker given"
@@ -420,7 +433,8 @@ export default new Vue({
         try {
           const r = await sell(p, request)
           this.upsert.status = 'success'
-          this.upsert.result = JSON.stringify(r)
+          const formatter = new JSONFormatter(r, 3)
+          elt.appendChild(formatter.render())
         } catch(e : any) {
           this.upsert.status = 'danger'
           this.upsert.result = e.toString()
@@ -431,6 +445,9 @@ export default new Vue({
     async bid_order() {
       this.sell.status = 'info'
       this.sell.result = ''
+      const elt = document.getElementById("bid-result")
+      if (!elt) throw new Error('element "bid-result" not found')
+      elt.innerHTML = ''
       if (!this.sell.maker) {
         this.sell.status = 'danger'
         this.sell.result = "no maker given"
@@ -461,7 +478,8 @@ export default new Vue({
         try {
           const r = await bid(p, request)
           this.upsert.status = 'success'
-          this.upsert.result = JSON.stringify(r)
+          const formatter = new JSONFormatter(r, 3)
+          elt.appendChild(formatter.render())
         } catch(e) {
           this.upsert.status = 'danger'
           this.upsert.result = JSON.stringify(e)

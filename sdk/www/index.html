@@ -5,6 +5,8 @@
     <link rel="icon" href="/favicon.png" />
     <link type="text/css" rel="stylesheet" href="https://unpkg.com/bootstrap/dist/css/bootstrap.min.css" />
     <link type="text/css" rel="stylesheet" href="https://unpkg.com/bootstrap-vue@latest/dist/bootstrap-vue.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/json-formatter-js@2.3.4/dist/json-formatter.css"/>
+
     <script src="https://unpkg.com/vue@latest/dist/vue.min.js"></script>
     <script src="https://unpkg.com/bootstrap-vue@latest/dist/bootstrap-vue.min.js"></script>
     <script src="https://unpkg.com/bootstrap-vue@latest/dist/bootstrap-vue-icons.min.js"></script>
@@ -204,7 +206,8 @@
                 Upsert
               </b-button>
             </div>
-            <div :class="'text-center text-'+upsert.status">{{ upsert.result }}</div>
+            <div v-if="upsert.result" :class="'text-center text-'+upsert.status">{{ upsert.result }}</div>
+            <div id="upsert-result" :class="'text-'+upsert.status"></div>
           </b-tab>
 
           <b-tab title="Sell" class="mt-4">
@@ -247,7 +250,8 @@
                 Sell
               </b-button>
             </div>
-            <div :class="'text-center text-'+sell.status">{{ sell.result }}</div>
+            <div v-if="sell.result" :class="'text-center text-'+sell.status">{{ sell.result }}</div>
+            <div id="sell-result" :class="'text-'+sell.status"></div>
           </b-tab>
 
           <b-tab title="Bid" class="mt-4">
@@ -289,7 +293,8 @@
                 Bid
               </b-button>
             </div>
-            <div :class="'text-center text-'+bid.status">{{ bid.result }}</div>
+            <div v-if="bid.result" :class="'text-center text-'+bid.status">{{ bid.result }}</div>
+            <div id="bid-result" :class="'text-'+bid.status"></div>
           </b-tab>
 
           <b-tab title="Fill" @click="get_orders()">
@@ -347,7 +352,8 @@
             Request
           </b-button>
         </div>
-        <div :class="'text-center text-'+api.status">{{ api.result }}</div>
+        <div v-if="api.result" :class="'text-center text-'+api.status">{{ api.result }}</div>
+        <div id="api-request-result"></div>
       </b-container>
 
     </div>
