@@ -293,6 +293,43 @@ let order_form_from_items ?(salt=0) collection item1 item2 =
       maker_pk taker make take salt start_date end_date signature data_type payouts origin_fees in
   Ok order_form
 
+let sell_order_form_from_item ?(salt=0) collection item1 take =
+  let _maker, maker_pk, maker_sk = maker_from_item item1 in
+  let taker = None in
+  let make = asset_from_item collection item1 in
+  let salt = string_of_int salt in
+  let start_date = None in
+  let end_date = None in
+  let data_type = "V1" in
+  let payouts = [ { part_account = Tzfunc.Crypto.pk_to_tz1 maker_pk; part_value = 10000 } ] in
+  let origin_fees = [] in
+  let$ to_sign =
+    hash_order_form
+      maker_pk make taker take salt start_date end_date data_type payouts origin_fees in
+  let signature = sign ~edsk:maker_sk ~bytes:to_sign in
+  let order_form =
+    mk_order_form
+      maker_pk taker make take salt start_date end_date signature data_type payouts origin_fees in
+  Ok order_form
+
+let buy_order_form_from_item ?(salt=0) collection item1 (maker_pk, maker_sk) make =
+  let taker = None in
+  let take = asset_from_item collection item1 in
+  let salt = string_of_int salt in
+  let start_date = None in
+  let end_date = None in
+  let data_type = "V1" in
+  let payouts = [ { part_account = Tzfunc.Crypto.pk_to_tz1 maker_pk; part_value = 10000 } ] in
+  let origin_fees = [] in
+  let$ to_sign =
+    hash_order_form
+      maker_pk make taker take salt start_date end_date data_type payouts origin_fees in
+  let signature = sign ~edsk:maker_sk ~bytes:to_sign in
+  let order_form =
+    mk_order_form
+      maker_pk taker make take salt start_date end_date signature data_type payouts origin_fees in
+  Ok order_form
+
 let call_upsert_order order_form =
   let url = EzAPI.BASE !api in
   EzReq_lwt.post0
@@ -1011,6 +1048,7 @@ let forge_tr ?entrypoint ?fee ?gas_limit ?storage_limit ?counter
     ?amount ?remove_failed ?local_forge ~base ~get_pk ~source ~contract p =
   let op = make_tr ?entrypoint ?fee ?gas_limit ?storage_limit
       ?counter ?amount ~source ~contract p in
+  (* Printf.eprintf "OP %s\n%!" @@ EzEncoding.construct Tzfunc.Proto.manager_operation_enc.json op ; *)
   Tzfunc.Node.forge_manager_operations ?remove_failed ?local_forge ~base
     ~get_pk ~src:source [ op ]
 
@@ -1068,7 +1106,7 @@ let payouts order = match order.order_data with
     { order with order_data = data }
   | _ -> order
 
-let match_orders ~source ~contract order_left order_right =
+let match_orders ?amount ~source ~contract order_left order_right =
   let open Tzfunc.Crypto in
   let pk =
     Sk.to_public_key @@
@@ -1088,6 +1126,7 @@ let match_orders ~source ~contract order_left order_right =
         prim `Some ~args:[Proto.Mstring order_right.order_elt.order_elt_signature] in
       let mich = prim `Pair ~args:[m_left; signature_left; m_right; signature_right] in
       call
+        ?amount
         (* ~gas_limit:(Z.of_int (1040000 - 1))
          * ~local_forge:false *)
         ~entrypoint:"matchOrders"
@@ -1925,6 +1964,18 @@ let sell_nft_for_nft ?salt collection item1 item2 =
   | Error _err -> Lwt.fail_with "order_from"
   | Ok form -> call_upsert_order form
 
+let sell_nft_for_one_tezos ?(salt=0) collection item1 =
+  let take = { asset_type = ATXTZ ; asset_value = string_of_int 1 } in
+  match sell_order_form_from_item ~salt collection item1 take with
+  | Error _err -> Lwt.fail_with "order_from"
+  | Ok form -> call_upsert_order form
+
+let buy_nft_for_one_tezos ?(salt=0) collection maker item1 =
+  let make = { asset_type = ATXTZ ; asset_value = string_of_int 1 } in
+  match buy_order_form_from_item ~salt collection item1 maker make with
+  | Error _err -> Lwt.fail_with "order_from"
+  | Ok form -> call_upsert_order form
+
 let get_source_from_item ((owner, owner_sk), _amount, _token_id, _royalties, _metadata) =
   (owner, owner_sk)
 
@@ -2010,6 +2061,60 @@ let test_1 () =
   begin match !crawler_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
   Lwt.return_ok ()
 
+let test_2 () =
+  reset_db () ;
+  let r_alias, _r_source = create_royalties () in
+  let r_kt1 = find_kt1 r_alias in
+  Printf.eprintf "New royalties %s\n%!" r_kt1 ;
+  let ex_alias, ex_admin, _ex_receiver = create_exchange () in
+  let ex_kt1 = find_kt1 ex_alias in
+  Printf.eprintf "New exchange %s\n%!" ex_kt1 ;
+  let v_alias, _v_source = create_validator ~exchange:ex_kt1 ~royalties:r_kt1 in
+  let v_kt1 = find_kt1 v_alias in
+  Printf.eprintf "New validator %s\n%!" v_kt1 ;
+  api_pid := Some (start_api ()) ;
+  start_crawler "" v_kt1 ex_kt1 r_kt1 [] [] >>= fun cpid ->
+  crawler_pid := Some cpid ;
+  set_validator v_kt1 ex_admin ex_kt1 >>=? fun () ->
+  Printf.eprintf "Waiting 6sec to let crawler catch up...\n%!" ;
+  Lwt_unix.sleep 6. >>= fun () ->
+  let (admin, source, contract, royalties, uri) = create_collection ~royalties:r_kt1 () in
+  let (admin, contract, source, _royalties) =
+    deploy_collection admin source contract royalties uri in
+  let>? () = check_collection admin contract source in
+  Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
+  Lwt_unix.sleep 6. >>= fun () ->
+  let>? item1 = mint_one_with_token_id_from_api ~source ~contract () in
+  Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
+  Lwt_unix.sleep 6. >>= fun () ->
+  let (source1, amount1, token_id1, royalties1, metadata1) = item1 in
+  check_item (contract, (source1, string_of_int amount1, token_id1, royalties1, metadata1))
+  >>= fun () ->
+  let>? () = update_operators_for_all ex_kt1 source1 contract in
+  let>? order1 = sell_nft_for_one_tezos ~salt:1 contract item1 in
+  (* TODO : check order *)
+  let _source2_alias, source2_pk, source2_sk = generate_address ~diff:(Some (fst source1)) () in
+  let source2 = Tzfunc.Crypto.pk_to_tz1 source2_pk, source2_sk in
+  let>? order2 = buy_nft_for_one_tezos contract (source2_pk, source2_sk) item1 in
+  (* TODO : check order *)
+  begin match_orders ~amount:1L ~source:source2 ~contract:ex_kt1 order2 order1 >>= function
+    | Error err ->
+      Printf.eprintf "match_orders error %s" @@ Tzfunc.Rp.string_of_error err ;
+      Lwt.return_unit
+  | Ok op_hash ->
+      Printf.eprintf "HASH = %s\n%!" op_hash ;
+      Printf.eprintf "Waiting next block...\n%!" ;
+      wait_next_block () >>= fun () ->
+      Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
+      Lwt_unix.sleep 6. >>= fun () ->
+      (* TODO : check_item not *)
+      check_item (contract, (source2, string_of_int amount1, token_id1, royalties1, metadata1))
+      (* check_orders *)
+  end >>= fun () ->
+  begin match !api_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
+  begin match !crawler_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
+  Lwt.return_ok ()
+
 (** main *)
 
 let actions = [
@@ -2024,7 +2129,8 @@ let actions = [
   ["transfer_nft <contract_alias> <token_id> <dest>"], "transfer a nft" ;
   ["transfer_multi <contract_alias> <token_id> <dest> <amount>"], "transfer amount nft" ;
   ["run_test"], "will run some test (orig, mint, burn and trasnfer (will erase rarible db)";
-  ["test_1"], "create sell order then transfer the nft (will erase rarible db)" ;
+  ["test_1"], "create sell orders then exchange the nfts (will erase rarible db)" ;
+  ["test_2"], "create sell orders then buy the nft (will erase rarible db)" ;
 ]
 
 let usage =
@@ -2067,6 +2173,20 @@ let main () =
       Lwt_main.run (
         Lwt.catch (fun () ->
             test_1 () >>= function
+            | Ok _ -> Lwt.return_unit
+            | Error err ->
+              Lwt.fail_with @@
+              EzReq_lwt.string_of_error
+                (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err)
+          (fun exn ->
+             Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
+             begin match !api_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
+             begin match !crawler_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
+             Lwt.return_unit))
+    | [ "test_2" ] ->
+      Lwt_main.run (
+        Lwt.catch (fun () ->
+            test_2 () >>= function
             | Ok _ -> Lwt.return_unit
             | Error err ->
               Lwt.fail_with @@

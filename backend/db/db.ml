@@ -1540,6 +1540,7 @@ let get_cancelled hash l =
   List.exists (fun r -> r#cancel = Some hash) l
 
 let get_make_balance ?dbh make owner = match make.asset_type with
+  | ATXTZ -> Lwt.return_ok 0L
   | ATFA_1_2 _addr ->
     Printf.eprintf "TODO : get_make_balance FA1.2\n%!" ;
     Lwt.return_ok 0L
