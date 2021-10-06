@@ -29,6 +29,9 @@ export function in_memory_provider(edsk: string, endpoint: string) : TezosProvid
   const address = async() => {
     return tk.signer.publicKeyHash()
   }
+  const public_key = async() => {
+    return tk.signer.publicKey()
+  }
   const storage = async(contract: string) => {
     const c = await tk.contract.at(contract)
     return c.storage()
@@ -41,6 +44,7 @@ export function in_memory_provider(edsk: string, endpoint: string) : TezosProvid
     batch,
     sign,
     address,
+    public_key,
     storage
   }
 }

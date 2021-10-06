@@ -5,6 +5,7 @@
     "@taquito/signer": "^10.1.2",
     "@temple-wallet/dapp": "^5.0.2",
     "@types/bs58check": "^2.1.0",
+    "@types/elliptic": "^6.4.13",
     "@types/keccak": "^3.0.1",
     "bs58check": "^2.1.2",
     "keccak": "^3.0.2",
