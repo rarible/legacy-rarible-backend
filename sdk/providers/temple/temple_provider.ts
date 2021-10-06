@@ -29,6 +29,11 @@ export async function temple_provider(endpoint: string, network: TempleDAppNetwo
   const address = async() => {
     return wallet.getPKH()
   }
+  const public_key = async() => {
+    const perm = await TempleWallet.getCurrentPermission()
+    if (perm) return perm.publicKey
+    else undefined
+  }
   const storage = async(contract: string) => {
     const c = await tk.wallet.at(contract)
     return c.storage()
@@ -40,6 +45,7 @@ export async function temple_provider(endpoint: string, network: TempleDAppNetwo
     batch,
     sign,
     address,
+    public_key,
     storage
   }
 }

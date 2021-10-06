@@ -36,6 +36,11 @@ export async function beacon_provider(network: Network, name = "rarible") : Prom
   const address = async() => {
     return wallet.getPKH()
   }
+  const public_key = async() => {
+    const account = await wallet.client.getActiveAccount()
+    if (account) return account.publicKey
+    else return undefined
+  }
   const storage = async(contract: string) => {
     const c = await tk.wallet.at(contract)
     return c.storage()
@@ -47,6 +52,7 @@ export async function beacon_provider(network: Network, name = "rarible") : Prom
     batch,
     sign,
     address,
+    public_key,
     storage
   }
 }

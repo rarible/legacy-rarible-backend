@@ -54,6 +54,7 @@ export interface TezosProvider {
   batch: (args: TransferParams[]) => Promise<OperationResult>;
   sign: (bytes: string) => Promise<string>;
   address: () => Promise<string>;
+  public_key: () => Promise<string | undefined>;
   storage: (contract: string) => Promise<any>;
 }
 
@@ -72,6 +73,10 @@ export interface TransactionArg {
 
 export function get_address(p: Provider) : Promise<string> {
   return p.tezos.address()
+}
+
+export function get_public_key(p: Provider) : Promise<string | undefined> {
+  return p.tezos.public_key()
 }
 
 export async function storage<T>(p : Provider, contract: string) : Promise<T> {
