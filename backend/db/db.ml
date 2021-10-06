@@ -549,12 +549,23 @@ let transfer_updates dbh main ~contract ~block ~level ~tsp ~token_id ~source amo
        last_block = case when $main then $block else last_block end, \
        last_level = case when $main then $level else last_level end, \
        last = case when $main then $tsp else last end where token_id = $token_id and \
-       owner = $source and contract = $contract returning amount, metadata, supply, transaction, tsp"] in
-  let>? new_src_amount, meta, supply, transaction, tsp = one ~err:"source token not found for transfer update" info in
+       owner = $source and contract = $contract \
+       returning amount, metadata, supply, transaction, tsp, name, royalties, \
+       creators, description, attributes, image, animation"] in
+  let>? new_src_amount, meta, supply, transaction, tsp, name, royalties,
+        creators, description, attributes, image, animation =
+    one ~err:"source token not found for transfer update" info in
   let>? l_new_dst_amount =
     [%pgsql dbh
         "update tokens set amount = amount + $amount, \
          metadata = case when amount = 0 then $meta else metadata end, \
+         name = case when amount = 0 then $?name else name end, \
+         royalties = case when amount = 0 then $royalties else royalties end, \
+         creators = case when amount = 0 then $creators else creators end, \
+         description = case when amount = 0 then $?description else description end, \
+         attributes = case when amount = 0 then $?attributes else attributes end, \
+         image = case when amount = 0 then $?image else image end, \
+         animation = case when amount = 0 then $?animation else image end, \
          supply = case when amount = 0 then $supply else supply end, \
          transaction = case when amount = 0 then $transaction else transaction end, \
          last_block = case when $main then $block else block end, \
@@ -1529,6 +1540,7 @@ let get_cancelled hash l =
   List.exists (fun r -> r#cancel = Some hash) l
 
 let get_make_balance ?dbh make owner = match make.asset_type with
+  | ATXTZ -> Lwt.return_ok 0L
   | ATFA_1_2 _addr ->
     Printf.eprintf "TODO : get_make_balance FA1.2\n%!" ;
     Lwt.return_ok 0L
