@@ -2116,49 +2116,65 @@ let test_2 () =
   begin match !crawler_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
   Lwt.return_ok ()
 
-let rarible_demo collection exchange =
-  let _source1_alias, source1_pk, source1_sk = generate_address () in
-  let source1 = (source1_pk, source1_sk) in
-  let _source2_alias, source2_pk, source2_sk = generate_address ~diff:(Some source1_pk) () in
-  let source2 = (source2_pk, source2_sk) in
-  let>? item1 = mint_one_with_token_id_from_api ~source:source1 ~contract:collection () in
+let fill_orders () =
+  reset_db () ;
+  let r_alias, _r_source = create_royalties () in
+  let r_kt1 = find_kt1 r_alias in
+  Printf.eprintf "New royalties %s\n%!" r_kt1 ;
+  let ex_alias, ex_admin, _ex_receiver = create_exchange () in
+  let ex_kt1 = find_kt1 ex_alias in
+  Printf.eprintf "New exchange %s\n%!" ex_kt1 ;
+  let v_alias, _v_source = create_validator ~exchange:ex_kt1 ~royalties:r_kt1 in
+  let v_kt1 = find_kt1 v_alias in
+  Printf.eprintf "New validator %s\n%!" v_kt1 ;
+  api_pid := Some (start_api ()) ;
+  start_crawler "" v_kt1 ex_kt1 r_kt1 [] [] >>= fun cpid ->
+  crawler_pid := Some cpid ;
+  set_validator v_kt1 ex_admin ex_kt1 >>=? fun () ->
+  Printf.eprintf "Waiting 6sec to let crawler catch up...\n%!" ;
+  Lwt_unix.sleep 6. >>= fun () ->
+  let (admin, source, contract, royalties, uri) = create_collection ~royalties:r_kt1 () in
+  let (admin, contract, source, _royalties) =
+    deploy_collection admin source contract royalties uri in
+  let>? () = check_collection admin contract source in
   Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
   Lwt_unix.sleep 6. >>= fun () ->
-  let>? () = update_operators_for_all exchange source1 collection in
-  let>? order1 = sell_nft_for_one_tezos ~salt:1 collection item1 in
-  let>? order2 = buy_nft_for_one_tezos collection source2 item1 in
-  (* TODO : check orders *)
-  begin match_orders ~amount:1L ~source:source2 ~contract:exchange order2 order1 >>= function
-    | Error err ->
-      Printf.eprintf "match_orders error %s" @@ Tzfunc.Rp.string_of_error err ;
-      Lwt.return_unit
-  | Ok op_hash ->
-      Printf.eprintf "HASH = %s\n%!" op_hash ;
-      Printf.eprintf "Waiting next block...\n%!" ;
-      wait_next_block () >>= fun () ->
-      Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
-      Lwt_unix.sleep 6.
-      (* TODO : check_item not *)
-      (* check_orders *)
-  end >>= fun () ->
+  let>? item1 = mint_one_with_token_id_from_api ~source ~contract () in
+  let (source1, amount1, token_id1, royalties1, metadata1) = item1 in
+  let>? item2 = mint_one_with_token_id_from_api ~source ~contract () in
+  let (source2, amount2, token_id2, royalties2, metadata2) = item2 in
+  let>? item3 = mint_one_with_token_id_from_api ~source ~contract () in
+  let (source3, amount3, token_id3, royalties3, metadata3) = item3 in
+  let>? item4 = mint_one_with_token_id_from_api ~source ~contract () in
+  let (source4, amount4, token_id4, royalties4, metadata4) = item4 in
+  let>? item5 = mint_one_with_token_id_from_api ~source ~contract () in
+  let (source5, amount5, token_id5, royalties5, metadata5) = item5 in
+  Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
+  Lwt_unix.sleep 6. >>= fun () ->
+  check_item (contract, (source1, string_of_int amount1, token_id1, royalties1, metadata1))
+  >>= fun () ->
+  check_item (contract, (source2, string_of_int amount2, token_id2, royalties2, metadata2))
+  >>= fun () ->
+  check_item (contract, (source3, string_of_int amount3, token_id3, royalties3, metadata3))
+  >>= fun () ->
+  check_item (contract, (source4, string_of_int amount4, token_id4, royalties4, metadata4))
+  >>= fun () ->
+  check_item (contract, (source5, string_of_int amount5, token_id5, royalties5, metadata5))
+  >>= fun () ->
+  let>? () = update_operators_for_all ex_kt1 source1 contract in
+  let>? _order1 = sell_nft_for_one_tezos ~salt:1 contract item1 in
+  Lwt_unix.sleep 1. >>= fun () ->
+  let>? _order2 = sell_nft_for_one_tezos ~salt:1 contract item2 in
+  Lwt_unix.sleep 1. >>= fun () ->
+  let>? _order3 = sell_nft_for_one_tezos ~salt:1 contract item3 in
+  Lwt_unix.sleep 1. >>= fun () ->
+  let>? _order4 = sell_nft_for_one_tezos ~salt:1 contract item4 in
+  Lwt_unix.sleep 1. >>= fun () ->
+  let>? _order5 = sell_nft_for_one_tezos ~salt:1 contract item5 in
+  (* TODO : check order *)
+  begin match !api_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
+  begin match !crawler_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
   Lwt.return_ok ()
-
-(* let rarible_demo_buy hash exchange =
- *   let _source2_alias, source2_pk, source2_sk = generate_address () in
- *   let source2 = (source2_pk, source2_sk) in
- *   Db.get_order hash >>= fun order ->
- *   let contract = match order.make_asset with
- *     |  FA_2 { asset_fa2_contract ; asset_fa2_token_id } in
- *   let>? order2 = buy_nft_for_one_tezos order.make_asset (source2_pk, source2_sk) item1 in
- * 
- *   let>? item1 = mint_one_with_token_id_from_api ~source ~contract:collection () in
- *   Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
- *   Lwt_unix.sleep 6. >>= fun () ->
- *   let>? () = update_operators_for_all exchange source collection in
- *   let>? order1 = sell_nft_for_one_tezos ~salt:1 collection item1 in
- *   (\* TODO : check orders *\)
- *   Printf.eprintf "%s\n%!" @@ EzEncoding.construct order_enc order1 ;
- *   Lwt.return_ok () *)
 
 (** main *)
 
@@ -2244,24 +2260,10 @@ let main () =
              begin match !api_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
              begin match !crawler_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
              Lwt.return_unit))
-    (* | [ "fill_orders_db" ] ->
-     *   Lwt_main.run (
-     *     Lwt.catch (fun () ->
-     *         fill_orders () >>= function
-     *         | Ok _ -> Lwt.return_unit
-     *         | Error err ->
-     *           Lwt.fail_with @@
-     *           EzReq_lwt.string_of_error
-     *             (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err)
-     *       (fun exn ->
-     *          Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
-     *          begin match !api_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
-     *          begin match !crawler_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
-     *          Lwt.return_unit)) *)
-    | "rarible_demo" :: collection :: exchange :: [] ->
+    | [ "fill_orders_db" ] ->
       Lwt_main.run (
         Lwt.catch (fun () ->
-            rarible_demo collection exchange >>= function
+            fill_orders () >>= function
             | Ok _ -> Lwt.return_unit
             | Error err ->
               Lwt.fail_with @@
