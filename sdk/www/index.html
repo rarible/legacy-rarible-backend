@@ -51,7 +51,8 @@
                 <b-form-input v-model="deploy.fa2_owner"></b-form-input>
               </b-form-group>
               <b-form-group label="Royalties Contract *" class="mb-2">
-                <b-form-input v-model="deploy.royalties_contract"></b-form-input>
+                <b-form-select v-model="deploy.royalties_contract" :options="royalties_contracts_options"></b-form-select>
+                <b-form-input v-if="deploy.royalties_contract=='custom'" v-model="deploy.royalties_contract_custom" class="mt-2"></b-form-input>
               </b-form-group>
               <div class="text-center" class="mb-2">
                 <b-button class="m-2" @click="deploy_fa2()">
@@ -75,7 +76,8 @@
 
           <b-tab title="Mint" class="mt-4">
             <b-form-group label="Contract *" class="mb-2">
-              <b-form-input v-model="mint.contract"></b-form-input>
+              <b-form-select v-model="mint.contract" :options="fa2_contracts_options"></b-form-select>
+              <b-form-input v-if="mint.contract=='custom'" v-model="mint.contract_custom" class="mt-2"></b-form-input>
             </b-form-group>
             <b-form-group label="Token ID" class="mb-2">
               <b-form-input v-model="mint.token_id"></b-form-input>
@@ -96,7 +98,8 @@
 
           <b-tab title="Burn" class="mt-4">
             <b-form-group label="Contract *" class="mb-2">
-              <b-form-input v-model="burn.contract"></b-form-input>
+              <b-form-select v-model="burn.contract" :options="fa2_contracts_options"></b-form-select>
+              <b-form-input v-if="burn.contract=='custom'" v-model="burn.contract_custom" class="mt-2"></b-form-input>
             </b-form-group>
             <b-form-group label="Token ID *" class="mb-2">
               <b-form-input v-model="burn.token_id"></b-form-input>
@@ -114,7 +117,8 @@
 
           <b-tab title="Transfer" class="mt-4">
             <b-form-group label="Contract *" class="mb-2">
-              <b-form-input v-model="transfer.contract"></b-form-input>
+              <b-form-select v-model="transfer.contract" :options="fa2_contracts_options"></b-form-select>
+              <b-form-input v-if="transfer.contract=='custom'" v-model="transfer.contract_custom" class="mt-2"></b-form-input>
             </b-form-group>
             <b-form-group label="Token ID *" class="mb-2">
               <b-form-input v-model="transfer.token_id"></b-form-input>
@@ -138,7 +142,8 @@
               <b-form-select v-model="approve.asset_type.asset_class" :options="['FA_1_2', 'FA_2']"></b-form-select>
             </b-form-group>
             <b-form-group label="Contract *" class="mb-2">
-              <b-form-input v-model="approve.asset_type.contract"></b-form-input>
+              <b-form-select v-model="approve.asset_type.contract" :options="fa2_contracts_options" :disabled="approve.asset_type.asset_class=='XTZ'"></b-form-select>
+              <b-form-input v-if="approve.asset_type.contract=='custom'" v-model="approve.asset_type.contract_custom" class="mt-2"></b-form-input>
             </b-form-group>
             <b-form-group label="Token ID" class="mb-2">
               <b-form-input v-model="approve.asset_type.token_id" :disabled="approve.asset_type.asset_class!='FA_2'">
@@ -175,7 +180,8 @@
                 <b-input-group-text>Class</b-input-group-text>
                 <b-form-select v-model="upsert.make.asset_type.asset_class" :options="['XTZ', 'FA_1_2', 'FA_2']"></b-form-select>
                 <b-input-group-text>Contract</b-input-group-text>
-                <b-form-input v-model="upsert.make.asset_type.contract" :disabled="upsert.make.asset_type.asset_class=='XTZ'"></b-form-input>
+                <b-form-select v-model="upsert.make.asset_type.contract" :options="fa2_contracts_options" :disabled="upsert.make.asset_type.asset_class=='XTZ'"></b-form-select>
+                <b-form-input v-if="upsert.make.asset_type.contract=='custom'" v-model="upsert.make.asset_type.contract_custom" :disabled="upsert.make.asset_type.asset_class=='XTZ'"></b-form-input>
                 <b-input-group-text>Token ID</b-input-group-text>
                 <b-form-input v-model="upsert.make.asset_type.token_id" :disabled="upsert.make.asset_type.asset_class!='FA_2'" type="number"></b-form-input>
                 <b-input-group-text>Value</b-input-group-text>
@@ -187,7 +193,8 @@
                 <b-input-group-text>Class</b-input-group-text>
                 <b-form-select v-model="upsert.take.asset_type.asset_class" :options="['XTZ', 'FA_1_2', 'FA_2']"></b-form-select>
                 <b-input-group-text>Contract</b-input-group-text>
-                <b-form-input v-model="upsert.take.asset_type.contract" :disabled="upsert.take.asset_type.asset_class=='XTZ'"></b-form-input>
+                <b-form-select v-model="upsert.take.asset_type.contract" :options="fa2_contracts_options" :disabled="upsert.take.asset_type.asset_class=='XTZ'"></b-form-select>
+                <b-form-input v-if="upsert.take.asset_type.contract=='custom'" v-model="upsert.take.asset_type.contract_custom" :disabled="upsert.take.asset_type.asset_class=='XTZ'"></b-form-input>
                 <b-input-group-text>Token ID</b-input-group-text>
                 <b-form-input v-model="upsert.take.asset_type.token_id" :disabled="upsert.take.asset_type.asset_class!='FA_2'" type="number"></b-form-input>
                 <b-input-group-text>Value</b-input-group-text>
@@ -211,7 +218,7 @@
           </b-tab>
 
           <b-tab title="Sell" class="mt-4">
-            <b-form-group label="Maker *" class="mb-2">
+            <b-form-group label="Maker" class="mb-2">
               <b-form-input v-model="sell.maker"></b-form-input>
             </b-form-group>
             <b-form-group label="Make Asset Type *" class="mb-2">
@@ -219,7 +226,8 @@
                 <b-input-group-text>Class</b-input-group-text>
                 <b-form-select v-model="sell.make_asset_type.asset_class" :options="['XTZ', 'FA_1_2', 'FA_2', 'Unknown']"></b-form-select>
                 <b-input-group-text>Contract</b-input-group-text>
-                <b-form-input v-model="sell.make_asset_type.contract" :disabled="sell.make_asset_type.asset_class=='XTZ'"></b-form-input>
+                <b-form-select v-model="sell.make_asset_type.contract" :options="fa2_contracts_options" :disabled="sell.make_asset_type.asset_class=='XTZ'"></b-form-select>
+                <b-form-input v-if="sell.make_asset_type.contract=='custom'" v-model="sell.make_asset_type.contract_custom" :disabled="sell.make_asset_type.asset_class=='XTZ'"></b-form-input>
                 <b-input-group-text>Token ID</b-input-group-text>
                 <b-form-input v-model="sell.make_asset_type.token_id" :disabled="sell.make_asset_type.asset_class in ['XTZ', 'FA_1_2']" type="number"></b-form-input>
               </b-input-group>
@@ -229,7 +237,8 @@
                 <b-input-group-text>Class</b-input-group-text>
                 <b-form-select v-model="sell.take_asset_type.asset_class" :options="['XTZ', 'FA_1_2']"></b-form-select>
                 <b-input-group-text>Contract</b-input-group-text>
-                <b-form-input v-model="sell.take_asset_type.contract" :disabled="sell.take_asset_type.asset_class=='XTZ'"></b-form-input>
+                <b-form-select v-model="sell.take_asset_type.contract" :options="fa2_contracts_options" :disabled="sell.make_asset_type.asset_class=='XTZ'"></b-form-select>
+                <b-form-input v-if="sell.take_asset_type.contract=='custom'" v-model="sell.take_asset_type.contract_custom" :disabled="sell.take_asset_type.asset_class=='XTZ'"></b-form-input>
               </b-input-group>
             </b-form-group>
             <b-form-group label="Amount *" class="mb-2">
@@ -263,7 +272,8 @@
                 <b-input-group-text>Class</b-input-group-text>
                 <b-form-select v-model="bid.make_asset_type.asset_class" :options="['XTZ', 'FA_1_2']"></b-form-select>
                 <b-input-group-text>Contract</b-input-group-text>
-                <b-form-input v-model="bid.make_asset_type.contract" :disabled="bid.make_asset_type.asset_class=='XTZ'"></b-form-input>
+                <b-form-select v-model="bid.make_asset_type.contract" :options="fa2_contracts_options" :disabled="bid.make_asset_type.asset_class=='XTZ'"></b-form-select>
+                <b-form-input v-if="bid.make_asset_type.contract=='custom'" v-model="bid.make_asset_type.contract_custom" :disabled="bid.make_asset_type.asset_class=='XTZ'"></b-form-input>
               </b-input-group>
             </b-form-group>
             <b-form-group label="Take Asset Type *" class="mb-2">
@@ -271,7 +281,8 @@
                 <b-input-group-text>Class</b-input-group-text>
                 <b-form-select v-model="bid.take_asset_type.asset_class" :options="['XTZ', 'FA_1_2', 'FA_2', 'Unknown']"></b-form-select>
                 <b-input-group-text>Contract</b-input-group-text>
-                <b-form-input v-model="bid.take_asset_type.contract" :disabled="bid.take_asset_type.asset_class=='XTZ'"></b-form-input>
+                <b-form-select v-model="bid.take_asset_type.contract" :options="fa2_contracts_options" :disabled="bid.take_asset_type.asset_class=='XTZ'"></b-form-select>
+                <b-form-input v-if="bid.take_asset_type.contract=='custom'" v-model="bid.take_asset_type.contract_custom" :disabled="bid.take_asset_type.asset_class=='XTZ'"></b-form-input>
                 <b-input-group-text>Token ID</b-input-group-text>
                 <b-form-input v-model="bid.take_asset_type.token_id" :disabled="bid.take_asset_type.asset_class in ['XTZ', 'FA_1_2']" type="number"></b-form-input>
               </b-input-group>

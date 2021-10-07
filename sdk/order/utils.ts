@@ -1,35 +1,4 @@
-import { Asset } from "../common/base"
-
-// export interface OrderCancel {
-//   type: "CANCEL";
-//   hash: string;
-//   make?: Asset;
-//   take?: Asset;
-//   date: string;
-//   maker?: string;
-//   owner?: string;
-// }
-
-// export type OrderSide = "LEFT" | "RIGHT"
-
-// export interface OrderSideMatch {
-//   type: "ORDER_SIDE_MATCH";
-//   hash: string;
-//   make?: Asset;
-//   take?: Asset;
-//   date: string;
-//   maker?: string;
-//   side?: OrderSide;
-//   fill: bigint;
-//   taker?: string;
-//   counterHash?: string;
-//   makeUsd?: bigint;
-//   takeUsd?: bigint;
-//   makePriceUsd?: bigint;
-//   takePriceUsd?: bigint;
-// }
-
-// export type OrderExchangeHistory = OrderCancel | OrderSideMatch
+import { Asset, asset_to_json } from "../common/base"
 
 export interface Part {
   account: string;
@@ -55,18 +24,31 @@ export declare type OrderForm = {
   data: OrderRaribleV2DataV1;
 }
 
-// export type Order = OrderForm & {
-//   fill: bigint;
-//   makeStock: bigint;
-//   cancelled: boolean;
-//   createdAt: string;
-//   lastUpdateAt: string;
-//   pending?: Array<OrderExchangeHistory>;
-//   hash: string;
-//   makeBalance?: bigint;
-//   makePriceUsd?: bigint;
-//   takePriceUsd?: bigint;
-// }
+function part_to_json(p: Part) {
+  return { account: p.account, value: p.value.toString() }
+}
+
+function data_to_json(d: OrderRaribleV2DataV1) {
+  let payouts = []
+  let originFees = []
+  for (let p of d.payouts) { payouts.push(part_to_json(p)) }
+  for (let o of d.origin_fees) { originFees.push(part_to_json(o)) }
+  return {
+    dataType: d.data_type,
+    payouts, originFees
+  }
+}
+
+
+export function order_to_json(order : OrderForm) : any {
+  const { salt, make, take, data, ...rest } = order
+  return {
+    salt: salt.toString(),
+    make: asset_to_json(order.make),
+    take: asset_to_json(order.take),
+    data: data_to_json(data),
+    ...rest }
+}
 
 export function salt() : bigint {
   let a = new Uint8Array(32)

@@ -1,7 +1,8 @@
-import { Provider, transfer, mint, burn, deploy_fa2, deploy_royalties, upsert_order, bid, sell, Part, AssetType, salt, OrderForm, SellRequest, BidRequest, ExtendedAssetType, XTZAssetType, FA12AssetType, TokenAssetType, approve, fill_order } from "../main"
-import { beacon_provider } from '../providers/beacon/beacon_provider'
+import { Provider, transfer, mint, burn, deploy_fa2, deploy_royalties, upsert_order, bid, sell, Part, AssetType, salt, OrderForm, SellRequest, BidRequest, ExtendedAssetType, XTZAssetType, FA12AssetType, TokenAssetType, approve, fill_order, get_public_key } from "../main"
+import { temple_provider } from '../providers/temple/temple_provider'
 import JSONFormatter from "json-formatter-js"
 import Vue from "vue"
+import { TempleDAppNetwork } from '@temple-wallet/dapp'
 
 
 function parse_parts(s : string) : Array<Part> {
@@ -18,36 +19,42 @@ function parse_parts(s : string) : Array<Part> {
 interface RawAssetType {
   asset_class: string;
   contract: string;
+  contract_custom: string;
   token_id: number;
+}
+
+interface StorageContract {
+  contract: string,
+  owner: string,
 }
 
 function parse_asset_type(r : RawAssetType) : AssetType | ExtendedAssetType | undefined {
   if (r.asset_class == 'XTZ') {
     return { asset_class: 'XTZ' }
-  } else if (r.asset_class == 'FA_1_2' && r.contract) {
+  } else if (r.asset_class == 'FA_1_2' && (r.contract || (r.contract == 'custom' && r.contract_custom))) {
     return {
       asset_class: 'FA_1_2',
-      contract: r.contract
+      contract: (r.contract=='custom') ? r.contract_custom : r.contract
     }
-  } else if (r.asset_class == 'FA_2' && r.contract) {
+  } else if (r.asset_class == 'FA_2' && (r.contract || (r.contract == 'custom' && r.contract_custom))) {
     return {
       asset_class: 'FA_2',
-      contract: r.contract,
+      contract: (r.contract=='custom') ? r.contract_custom : r.contract,
       token_id: BigInt(r.token_id)
     }
-  } else if (r.asset_class == 'Unknown' && r.contract) {
+  } else if (r.asset_class == 'Unknown' && (r.contract || (r.contract == 'custom' && r.contract_custom))) {
     return {
-      contract: r.contract,
+      contract: (r.contract=='custom') ? r.contract_custom : r.contract,
       token_id: BigInt(r.token_id)
     }
   } else return undefined
 }
 
 async function provider(node: string, api:string) : Promise<Provider> {
-  const tezos = await beacon_provider({node})
+  const tezos = await temple_provider(node, "granadanet" )
   const config = {
-    exchange: "KT1C5kWbfzASApxCMHXFLbHuPtnRaJXE4WMu",
-    proxies: { fa_1_2: "", nft: "" },
+    exchange: "KT1XgQ52NeNdjo3jLpbsPBRfg8YhWoQ5LB7g",
+    proxies: { fa_1_2: "KT1XgQ52NeNdjo3jLpbsPBRfg8YhWoQ5LB7g", nft: "KT1XgQ52NeNdjo3jLpbsPBRfg8YhWoQ5LB7g" },
     fees: 0n
   }
   return { tezos, api, config }
@@ -70,6 +77,7 @@ export default new Vue({
     },
     mint: {
       contract: '',
+      contract_custom: '',
       royalties: '',
       amount: 1,
       token_id: '' as string | undefined,
@@ -78,6 +86,7 @@ export default new Vue({
     },
     burn: {
       contract: '',
+      contract_custom: '',
       amount: 1,
       token_id: '',
       result: '',
@@ -86,6 +95,7 @@ export default new Vue({
     deploy: {
       fa2_owner: '',
       royalties_contract: '',
+      royalties_contract_custom: '',
       fa2_result: '',
       fa2_status: 'info',
       royalties_owner: '',
@@ -96,6 +106,7 @@ export default new Vue({
       asset_type: {
         asset_class: 'FA_2',
         contract: '',
+        contract_custom: '',
         token_id: 0,
       },
       value: 1,
@@ -115,6 +126,7 @@ export default new Vue({
         asset_type: {
           asset_class: 'FA_2',
           contract: '',
+          contract_custom: '',
           token_id: 0,
         },
         value: 1
@@ -123,6 +135,7 @@ export default new Vue({
         asset_type: {
           asset_class: 'FA_2',
           contract: '',
+          contract_custom: '',
           token_id: 0,
         },
         value: 1
@@ -137,11 +150,13 @@ export default new Vue({
       make_asset_type: {
         asset_class: 'FA_2',
         contract: '',
+        contract_custom: '',
         token_id: 0,
       },
       take_asset_type: {
         asset_class: 'XTZ',
         contract: '',
+        contract_custom: '',
         token_id: 0,
       },
       payouts: '',
@@ -156,11 +171,13 @@ export default new Vue({
       make_asset_type: {
         asset_class: 'XTZ',
         contract: '',
+        contract_custom: '',
         token_id: 0,
       },
       take_asset_type: {
         asset_class: 'FA_2',
         contract: '',
+        contract_custom: '',
         token_id: 0,
       },
       payouts: '',
@@ -179,6 +196,34 @@ export default new Vue({
       result: '',
       get_result: '',
       fields: [ 'make_class', 'make_contract', 'make_token_id', 'make_value', 'take_class', 'take_contract', 'take_token_id', 'take_value' ]
+    },
+    royalties_contracts: [] as StorageContract[],
+    fa2_contracts: [] as StorageContract[]
+  },
+
+  created() {
+    const royalties_contracts = window.localStorage.getItem('royalties_contracts')
+    if (royalties_contracts) this.royalties_contracts = JSON.parse(royalties_contracts)
+    const fa2_contracts = window.localStorage.getItem('fa2_contracts')
+    if (fa2_contracts) this.fa2_contracts = JSON.parse(fa2_contracts)
+  },
+
+  computed: {
+    royalties_contracts_options() {
+      let options = []
+      for (let c of this.royalties_contracts) {
+        options.push({ text: c.contract.substr(0,10) + ' - ' + c.owner.substr(0,10), value: c.contract })
+      }
+      options.push({text:'Custom', value:'custom'})
+      return options
+    },
+    fa2_contracts_options() {
+      let options = []
+      for (let c of this.fa2_contracts) {
+        options.push({ text: c.contract.substr(0,10) + ' - ' + c.owner.substr(0,10), value: c.contract })
+      }
+      options.push({text:'Custom', value:'custom'})
+      return options
     }
   },
 
@@ -274,12 +319,19 @@ export default new Vue({
       } else {
         const p = (this.provider) ? this.provider : await provider(this.node, this.api_url)
         this.provider = p
+        const contract = (this.deploy.royalties_contract=='custom') ? this.deploy.royalties_contract_custom : this.deploy.royalties_contract
         const op = await deploy_fa2(
-          p, this.deploy.fa2_owner, this.deploy.royalties_contract)
+          p, this.deploy.fa2_owner, contract)
         this.deploy.fa2_result = `operation ${op.hash} injected`
         await op.confirmation()
         this.deploy.fa2_status = 'success'
-        this.deploy.fa2_result = `operation ${op.hash} confirmed`
+        if (op.contract) {
+          this.deploy.fa2_result = `operation ${op.hash} confirmed -> new contract: ${op.contract}`
+          this.fa2_contracts.push({contract: op.contract, owner: this.deploy.fa2_owner })
+          window.localStorage.setItem('fa2_contracts', JSON.stringify(this.fa2_contracts))
+        } else {
+          this.deploy.fa2_result = `operation ${op.hash} confirmed`
+        }
       }
     },
 
@@ -297,7 +349,13 @@ export default new Vue({
         this.deploy.royalties_result = `operation ${op.hash} injected`
         await op.confirmation()
         this.deploy.royalties_status = 'success'
-        this.deploy.royalties_result = `operation ${op.hash} confirmed`
+        if (op.contract) {
+          this.deploy.royalties_result = `operation ${op.hash} confirmed -> new contract: ${op.contract}`
+          this.royalties_contracts.push({contract: op.contract, owner: this.deploy.royalties_owner })
+          window.localStorage.setItem('royalties_contracts', JSON.stringify(this.royalties_contracts))
+        } else {
+          this.deploy.royalties_result = `operation ${op.hash} confirmed`
+        }
       }
     },
 
@@ -355,44 +413,46 @@ export default new Vue({
       const elt = document.getElementById("upsert-result")
       if (!elt) throw new Error('element "upsert-result" not found')
       elt.innerHTML = ''
-      if (!this.upsert.maker) {
+      const p = (this.provider) ? this.provider : await provider(this.node, this.api_url)
+      this.provider = p
+      const maker = this.upsert.maker || await get_public_key(p)
+      if (!maker) {
         this.upsert.status = 'danger'
         this.upsert.result = "no maker given"
-      }
-      const make_asset_type = parse_asset_type(this.upsert.make.asset_type) as AssetType
-      const take_asset_type = parse_asset_type(this.upsert.take.asset_type) as AssetType
-      const make_value = BigInt(this.upsert.make.value)
-      const take_value = BigInt(this.upsert.take.value)
-      const payouts = parse_parts(this.upsert.payouts)
-      const origin_fees = parse_parts(this.upsert.origin_fees)
-      if (!make_asset_type) {
-        this.upsert.status = 'danger'
-        this.upsert.result = "invalid make asset"
-      } else if (!take_asset_type) {
-        this.upsert.status = 'danger'
-        this.upsert.result = "invalid take asset"
       } else {
-        const p = (this.provider) ? this.provider : await provider(this.node, this.api_url)
-        this.provider = p
-        const order : OrderForm = {
-          type: "RARIBLE_V2",
-          maker: this.upsert.maker,
-          taker: (this.upsert.maker) ? this.upsert.maker : undefined,
-          make: { asset_type: make_asset_type, value: make_value },
-          take: { asset_type: take_asset_type, value: take_value },
-          salt: salt(),
-          start: undefined,
-          end: undefined,
-          signature: undefined,
-          data: { data_type: "V1", payouts, origin_fees } }
-        try {
-          const r = await upsert_order(p, order)
-          this.upsert.status = 'success'
-          const formatter = new JSONFormatter(r, 3)
-          elt.appendChild(formatter.render())
-        } catch(e : any) {
+        const make_asset_type = parse_asset_type(this.upsert.make.asset_type) as AssetType
+        const take_asset_type = parse_asset_type(this.upsert.take.asset_type) as AssetType
+        const make_value = BigInt(this.upsert.make.value)
+        const take_value = BigInt(this.upsert.take.value)
+        const payouts = parse_parts(this.upsert.payouts)
+        const origin_fees = parse_parts(this.upsert.origin_fees)
+        if (!make_asset_type) {
           this.upsert.status = 'danger'
-          this.upsert.result = e.toString()
+          this.upsert.result = "invalid make asset"
+        } else if (!take_asset_type) {
+          this.upsert.status = 'danger'
+          this.upsert.result = "invalid take asset"
+        } else {
+          const order : OrderForm = {
+            type: "RARIBLE_V2",
+            maker,
+            taker: (this.upsert.maker) ? this.upsert.maker : undefined,
+            make: { asset_type: make_asset_type, value: make_value },
+            take: { asset_type: take_asset_type, value: take_value },
+            salt: 0n,
+            start: undefined,
+            end: undefined,
+            signature: undefined,
+            data: { data_type: "V1", payouts, origin_fees } }
+          try {
+            const r = await upsert_order(p, order)
+            this.upsert.status = 'success'
+            const formatter = new JSONFormatter(r, 3)
+            elt.appendChild(formatter.render())
+          } catch(e : any) {
+            this.upsert.status = 'danger'
+            this.upsert.result = e.toString()
+          }
         }
       }
     },

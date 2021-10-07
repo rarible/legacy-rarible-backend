@@ -22,10 +22,6 @@ export const FA_2 : MichelsonData = {
   prim: 'Right', args: [
     { prim: 'Right', args: [ { prim: 'Left', args: [ { prim: 'Unit' } ] } ] } ] }
 
-export const FEE_SIDE_NONE = 0
-export const FEE_SIDE_MAKE = 1
-export const FEE_SIDE_TAKE = 2
-
 export function some_struct(v : MichelsonData ) : MichelsonData {
   return {
     prim: 'Some',
@@ -75,7 +71,7 @@ export function asset_type_to_struct(a : AssetType) : MichelsonData {
       return { prim: 'Pair', args: [ FA_1_2,  {
         bytes: pack({ string: a.contract }, fa_1_2_type) } ] }
     case "FA_2":
-      return { prim: 'Pair', args: [ FA_1_2,  {
+      return { prim: 'Pair', args: [ FA_2,  {
         bytes: pack({ prim: "Pair", args: [
           { string: a.contract }, { int: a.token_id.toString() } ] }, fa_2_type) } ] }
   }
@@ -122,7 +118,8 @@ export async function sign_order(
   provider: Provider,
   order: OrderForm) : Promise<string> {
   let h = pack(order_to_struct(order), order_type)
-  return sign(provider, h)
+  const signature = sign(provider, h)
+  return signature
 }
 
 export async function order_key(

@@ -1,5 +1,5 @@
 import { Provider } from "../common/base"
-import { OrderForm } from "./utils"
+import { OrderForm, order_to_json } from "./utils"
 import { get_make_fee } from "./get-make-fee"
 import { add_fee } from "./add-fee"
 import { approve } from "./approve"
@@ -14,10 +14,10 @@ export async function upsert_order(
   if (make.asset_type.asset_class != "XTZ" ) {
     await approve(provider, order.maker, order.make, infinite)
   }
-  const signature = sign_order(provider, order)
+  const signature = await sign_order(provider, order)
   const r = await fetch(provider.api + '/orders', {
     method: 'POST', headers: [[ 'content-type', 'application/json' ]],
-    body: JSON.stringify({...order, signature})
+    body: JSON.stringify(order_to_json({...order, signature}))
   })
   if (r.ok) { return r.json() }
   else throw new Error("/orders failed")
