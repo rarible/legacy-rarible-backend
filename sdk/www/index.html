@@ -169,7 +169,7 @@
         <b-tabs justified>
 
           <b-tab title="Upsert" class="mt-4">
-            <b-form-group label="Maker *" class="mb-2">
+            <b-form-group label="Maker" class="mb-2">
               <b-form-input v-model="upsert.maker"></b-form-input>
             </b-form-group>
             <b-form-group label="Taker" class="mb-2">
@@ -237,7 +237,7 @@
                 <b-input-group-text>Class</b-input-group-text>
                 <b-form-select v-model="sell.take_asset_type.asset_class" :options="['XTZ', 'FA_1_2']"></b-form-select>
                 <b-input-group-text>Contract</b-input-group-text>
-                <b-form-select v-model="sell.take_asset_type.contract" :options="fa2_contracts_options" :disabled="sell.make_asset_type.asset_class=='XTZ'"></b-form-select>
+                <b-form-select v-model="sell.take_asset_type.contract" :options="fa2_contracts_options" :disabled="sell.take_asset_type.asset_class=='XTZ'"></b-form-select>
                 <b-form-input v-if="sell.take_asset_type.contract=='custom'" v-model="sell.take_asset_type.contract_custom" :disabled="sell.take_asset_type.asset_class=='XTZ'"></b-form-input>
               </b-input-group>
             </b-form-group>
@@ -264,7 +264,7 @@
           </b-tab>
 
           <b-tab title="Bid" class="mt-4">
-            <b-form-group label="Maker *" class="mb-2">
+            <b-form-group label="Maker" class="mb-2">
               <b-form-input v-model="bid.maker"></b-form-input>
             </b-form-group>
             <b-form-group label="Make Asset Type *" class="mb-2">
@@ -309,7 +309,7 @@
           </b-tab>
 
           <b-tab title="Fill" @click="get_orders()">
-            <b-table selectable :fields="fill.fields" :items="fill.orders" select-mode="single" class="mt-4" @row-selected="onselected()" ref="orders_table">
+            <b-table selectable :fields="fill.fields" :items="fill.orders" select-mode="single" class="mt-4" @row-selected="onselected" ref="orders_table">
               <template #cell(make_class)="data">
                 {{ data.item.make.asset_type.asset_class }}
               </template>
@@ -317,7 +317,7 @@
                 {{ data.item.make.asset_type.contract || '--'  }}
               </template>
               <template #cell(make_token_id)="data">
-                {{ data.item.make.asset_type.token_id || '--'  }}
+                {{ (data.item.make.asset_type.token_id==undefined) ? '--' : data.item.make.asset_type.token_id }}
               </template>
               <template #cell(make_value)="data">
                 {{ data.item.make.value  }}
@@ -329,7 +329,7 @@
                 {{ data.item.take.asset_type.contract || '--'  }}
               </template>
               <template #cell(take_token_id)="data">
-                {{ data.item.take.asset_type.token_id || '--'  }}
+                {{ (data.item.take.asset_type.token_id==undefined) ? '--' : data.item.take.asset_type.token_id }}
               </template>
               <template #cell(take_value)="data">
                 {{ data.item.take.value  }}
@@ -339,6 +339,13 @@
             <b-form-group label="Amount" class="mb-2">
               <b-form-input v-model="fill.amount" type="number"></b-form-input>
             </b-form-group>
+            <b-form-group label="Payouts" class="mb-2" description="{ &quot;tz1...&quot;: 42, ... }">
+              <b-form-input v-model="fill.payouts"></b-form-input>
+            </b-form-group>
+            <b-form-group label="Origin Fees" class="mb-2" description="{ &quot;tz1...&quot;: 42, ... }">
+              <b-form-input v-model="fill.origin_fees"></b-form-input>
+            </b-form-group>
+
             <div class="text-center" class="mb-2">
               <b-button class="m-2" @click="ffill_order()">
                 Fill

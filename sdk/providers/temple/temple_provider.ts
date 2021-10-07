@@ -14,12 +14,15 @@ export async function temple_provider(endpoint: string, network: TempleDAppNetwo
   }
   const originate = async(arg: OriginateParams) => {
     const op = await tk.wallet.originate(arg).send()
-    const op2 = await op.originationOperation();
-    const contract = (op2!.metadata.operation_result.originated_contracts || [])[0];
     return {
       hash: op.opHash,
-      confirmation: async() => { await op.confirmation() },
-      contract
+      confirmation: async function() {
+        await op.confirmation()
+        const op2 = await op.originationOperation()
+        const contract = (op2!.metadata.operation_result.originated_contracts || [])[0]
+        this.contract = contract
+      },
+      contract: undefined as string | undefined
     }
   }
   const batch = async(args: TransferParams[]) => {

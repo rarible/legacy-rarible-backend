@@ -33,7 +33,7 @@ export async function sell(
       payouts: request.payouts,
       origin_fees: request.origin_fees,
     },
-    salt: 0n
+    salt: salt()
   }
   return upsert_order(provider, order, false)
 }
