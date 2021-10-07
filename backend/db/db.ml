@@ -1666,9 +1666,7 @@ let mk_order_continuation order =
     order.order_elt.order_elt_hash
 
 let filter_orders ?origin orders =
-  Printf.eprintf "filter_orders %d\n%!" @@ List.length orders;
   List.filter (fun order ->
-      Printf.eprintf "filter_order %s\n%!" order.order_elt.order_elt_hash;
       (int_of_string order.order_elt.order_elt_make_stock) > 0 &&
       match origin with
       | Some orig ->
@@ -1695,11 +1693,12 @@ let rec get_orders_all_aux ?dbh ?origin ?continuation ~size acc =
     use dbh @@ fun dbh ->
     let>? l =
       [%pgsql dbh "select hash from orders \
-                   where ($no_continuation or \
-                   (last_update_at = $ts and hash < $h) or (last_update_at < $ts)) \
+                   where \
+                   ($no_continuation or \
+                   (last_update_at < $ts) or \
+                   (last_update_at = $ts and hash < $h)) \
                    order by last_update_at desc, hash desc limit $size"] in
     map_rp (fun h -> get_order ~dbh h) l >>=? fun orders ->
-    Printf.eprintf "orders %d\n%!" @@ List.length orders;
     match orders with
     | [] -> Lwt.return_ok acc
     | _ ->
@@ -1710,13 +1709,7 @@ let rec get_orders_all_aux ?dbh ?origin ?continuation ~size acc =
           Some (hd.order_elt.order_elt_last_update_at,
                 hd.order_elt.order_elt_hash) in
       let orders = filter_orders ?origin orders in
-      Printf.eprintf "orders %d\n%!" @@ List.length orders;
-      match orders with
-      | [] -> get_orders_all_aux ~dbh ?origin ?continuation ~size acc
-      | _ ->
-        Printf.eprintf "orders %d\n%!" @@ List.length orders;
-        let orders = acc @ orders in
-        get_orders_all_aux ~dbh ?origin ?continuation ~size orders
+      get_orders_all_aux ~dbh ?origin ?continuation ~size (acc @ orders)
   else
   if len = size then Lwt.return_ok acc
   else
@@ -1737,7 +1730,7 @@ let get_orders_all ?dbh ?origin ?continuation ?(size=50) () =
   let orders_pagination_contination =
     if len = 0L || len < size then None
     else Some
-        (mk_order_continuation @@ List.hd orders) in
+        (mk_order_continuation @@ List.hd @@ List.rev orders) in
   Lwt.return_ok
     { orders_pagination_orders = orders ; orders_pagination_contination }
 
