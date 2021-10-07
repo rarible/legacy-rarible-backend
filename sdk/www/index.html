@@ -88,6 +88,9 @@
             <b-form-group label="Royalties" description="{ &quot;tz1...&quot;: 42, ... }" class="mb-2">
               <b-form-input v-model="mint.royalties"></b-form-input>
             </b-form-group>
+            <b-form-group label="Metadata" class="mb-2">
+              <b-form-input v-model="mint.metadata"></b-form-input>
+            </b-form-group>
             <div class="text-center" class="mb-2">
               <b-button class="m-2" @click="fmint()">
                 Mint

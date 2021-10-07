@@ -79,6 +79,7 @@ export default new Vue({
       royalties: '',
       amount: 1,
       token_id: '' as string | undefined,
+      metadata: '',
       result: '',
       status: 'info'
     },
@@ -287,9 +288,9 @@ export default new Vue({
           function(k : string) : void {
             royalties[k] = BigInt(royalties0[k])
           })
+        const metadata = (this.mint.metadata) ? JSON.parse(this.mint.metadata) : undefined
         const token_id = (this.mint.token_id!=undefined) ? BigInt(this.mint.token_id) : undefined
-        const op = await mint(
-          p, contract, royalties, BigInt(this.mint.amount), token_id)
+        const op = await mint(p, contract, royalties, BigInt(this.mint.amount), token_id, metadata)
         this.mint.result = `operation ${op.hash} injected`
         await op.confirmation()
         this.mint.status = 'success'
