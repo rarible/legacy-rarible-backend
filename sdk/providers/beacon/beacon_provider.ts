@@ -1,7 +1,7 @@
 import { BeaconWallet } from '@taquito/beacon-wallet'
-import { NetworkType } from "@airgap/beacon-sdk"
+import { NetworkType, SigningType } from "@airgap/beacon-sdk"
 import { TezosToolkit, TransferParams, OriginateParams, OpKind } from "@taquito/taquito"
-import { TezosProvider, b58enc } from "../../common/base"
+import { TezosProvider } from "../../common/base"
 
 interface Network {
   node: string;
@@ -21,12 +21,15 @@ export async function beacon_provider(network: Network, name = "rarible") : Prom
   }
   const originate = async(arg: OriginateParams) => {
     const op = await tk.wallet.originate(arg).send()
-    const op2 = await op.originationOperation();
-    const contract = (op2!.metadata.operation_result.originated_contracts || [])[0];
     return {
       hash: op.opHash,
-      confirmation: async() => { await op.confirmation() },
-      contract
+      confirmation: async function() {
+        await op.confirmation()
+        const op2 = await op.originationOperation()
+        const contract = (op2!.metadata.operation_result.originated_contracts || [])[0]
+        this.contract = contract
+      },
+      contract: undefined as string | undefined
     }
   }
   const batch = async(args: TransferParams[]) => {
@@ -36,7 +39,10 @@ export async function beacon_provider(network: Network, name = "rarible") : Prom
     return { hash: op.opHash, confirmation: async() => { await op.confirmation() } }
   }
   const sign = async(bytes: string) => {
-    const { signature } = await wallet.client.requestSignPayload({payload: bytes})
+    const { signature } = await wallet.client.requestSignPayload({
+      signingType: SigningType.MICHELINE,
+      payload: bytes
+    })
     return signature
   }
   const address = async() => {

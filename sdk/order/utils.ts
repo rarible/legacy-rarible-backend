@@ -1,4 +1,4 @@
-import { Asset, asset_to_json } from "../common/base"
+import { Asset, asset_to_json, asset_of_json } from "../common/base"
 
 export interface Part {
   account: string;
@@ -25,7 +25,11 @@ export declare type OrderForm = {
 }
 
 function part_to_json(p: Part) {
-  return { account: p.account, value: p.value.toString() }
+  return { account: p.account, value: Number(p.value) }
+}
+
+function part_of_json(p: any) : Part {
+  return { account: p.account, value: BigInt(p.value) }
 }
 
 function data_to_json(d: OrderRaribleV2DataV1) {
@@ -34,19 +38,37 @@ function data_to_json(d: OrderRaribleV2DataV1) {
   for (let p of d.payouts) { payouts.push(part_to_json(p)) }
   for (let o of d.origin_fees) { originFees.push(part_to_json(o)) }
   return {
-    dataType: d.data_type,
-    payouts, originFees
+    dataType: "V1",
+    payouts: d.payouts.map(part_to_json),
+    originFees: d.origin_fees.map(part_to_json)
   }
 }
 
+function data_of_json(d: any) : OrderRaribleV2DataV1 {
+  return {
+    data_type: "V1",
+    payouts: d.payouts.map(part_of_json),
+    origin_fees: d.originFees.map(part_of_json)
+  }
+}
 
-export function order_to_json(order : OrderForm) : any {
+export function order_to_json(order: OrderForm) : any {
   const { salt, make, take, data, ...rest } = order
   return {
     salt: salt.toString(),
     make: asset_to_json(order.make),
     take: asset_to_json(order.take),
     data: data_to_json(data),
+    ...rest }
+}
+
+export function order_of_json(order: any ) : OrderForm {
+  const { salt, make, take, data, ...rest } = order
+  return {
+    salt: BigInt(salt),
+    make: asset_of_json(order.make),
+    take: asset_of_json(order.take),
+    data: data_of_json(data),
     ...rest }
 }
 

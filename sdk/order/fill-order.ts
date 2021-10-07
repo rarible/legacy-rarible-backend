@@ -1,5 +1,5 @@
 import { MichelsonData } from "@taquito/michel-codec"
-import { Provider, send, send_batch, TransactionArg, get_address, OperationResult } from "../common/base"
+import { Provider, send, send_batch, TransactionArg, get_public_key, OperationResult } from "../common/base"
 import { Part, OrderForm } from "./utils"
 import { invert_order } from "./invert-order"
 import { get_make_fee } from "./get-make-fee"
@@ -55,9 +55,10 @@ export async function fill_order_arg(
     ? await approve_arg(provider, left.maker, left.make, request.infinite)
     : undefined
   const args = (arg_approve) ? [ arg_approve ] : []
-  const address = await get_address(provider)
+  const pk = await get_public_key(provider)
+  if (!pk) throw new Error("cannot get public key")
   const right = {
-    ...invert_order(left, request.amount, address),
+    ...invert_order(left, request.amount, pk),
     data: {
       ...left.data,
       payouts: request.payouts || [],

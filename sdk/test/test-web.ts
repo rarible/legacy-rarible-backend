@@ -1,9 +1,7 @@
-import { Provider, transfer, mint, burn, deploy_fa2, deploy_royalties, upsert_order, bid, sell, Part, AssetType, salt, OrderForm, SellRequest, BidRequest, ExtendedAssetType, XTZAssetType, FA12AssetType, TokenAssetType, approve, fill_order, get_public_key } from "../main"
-import { temple_provider } from '../providers/temple/temple_provider'
+import { Provider, transfer, mint, burn, deploy_fa2, deploy_royalties, upsert_order, bid, sell, Part, AssetType, OrderForm, SellRequest, BidRequest, ExtendedAssetType, XTZAssetType, FA12AssetType, TokenAssetType, approve, fill_order, get_public_key, order_of_json, order_to_json, salt } from "../main"
+import { beacon_provider } from '../providers/beacon/beacon_provider'
 import JSONFormatter from "json-formatter-js"
 import Vue from "vue"
-import { TempleDAppNetwork } from '@temple-wallet/dapp'
-
 
 function parse_parts(s : string) : Array<Part> {
   if (s == '') s = '{}'
@@ -51,7 +49,7 @@ function parse_asset_type(r : RawAssetType) : AssetType | ExtendedAssetType | un
 }
 
 async function provider(node: string, api:string) : Promise<Provider> {
-  const tezos = await temple_provider(node, "granadanet" )
+  const tezos = await beacon_provider({node})
   const config = {
     exchange: "KT1XgQ52NeNdjo3jLpbsPBRfg8YhWoQ5LB7g",
     proxies: { fa_1_2: "KT1XgQ52NeNdjo3jLpbsPBRfg8YhWoQ5LB7g", nft: "KT1XgQ52NeNdjo3jLpbsPBRfg8YhWoQ5LB7g" },
@@ -63,7 +61,7 @@ async function provider(node: string, api:string) : Promise<Provider> {
 export default new Vue({
   el: "#app",
   data: {
-    api_url: "https://rarible-api.functori.com/v0.1/",
+    api_url: "http://localhost:8080/v0.1/",
     node: 'https://granada.tz.functori.com',
     provider: undefined as Provider | undefined,
     path: "home",
@@ -190,29 +188,44 @@ export default new Vue({
     fill : {
       continuation: undefined,
       orders: [],
-      selected: undefined as OrderForm | undefined,
+      selected: undefined as any | undefined,
       amount: 1,
       status: 'info',
       result: '',
       get_result: '',
-      fields: [ 'make_class', 'make_contract', 'make_token_id', 'make_value', 'take_class', 'take_contract', 'take_token_id', 'take_value' ]
+      fields: [ 'make_class', 'make_contract', 'make_token_id', 'make_value', 'take_class', 'take_contract', 'take_token_id', 'take_value' ],
+      payouts: '',
+      origin_fees: ''
     },
-    royalties_contracts: [] as StorageContract[],
-    fa2_contracts: [] as StorageContract[]
+    royalties_contracts: new Set<string>(),
+    fa2_contracts: new Set<StorageContract>()
   },
 
-  created() {
-    const royalties_contracts = window.localStorage.getItem('royalties_contracts')
-    if (royalties_contracts) this.royalties_contracts = JSON.parse(royalties_contracts)
-    const fa2_contracts = window.localStorage.getItem('fa2_contracts')
-    if (fa2_contracts) this.fa2_contracts = JSON.parse(fa2_contracts)
+  async created() {
+    const r = await fetch("/config.json")
+    if (r.ok) {
+      const r2 = await r.json()
+      if (r2.royalties_contracts) r2.royalties_contracts.forEach((c : string) => this.royalties_contracts.add(c))
+      if (r2.fa2_contracts) r2.fa2_contracts.forEach((c : StorageContract) => this.fa2_contracts.add(c))
+      if (r2.api_url) { this.api_url = r2.api_url }
+      if (r2.node) { this.node = r2.node }
+    }
+    const royalties_contracts_s = localStorage.getItem('royalties_contracts')
+    if (royalties_contracts_s && Array.isArray(royalties_contracts_s))
+      JSON.parse(royalties_contracts_s).forEach((c : string) => this.royalties_contracts.add(c))
+    const fa2_contracts_s = localStorage.getItem('fa2_contracts')
+    if (fa2_contracts_s && Array.isArray(fa2_contracts_s))
+      JSON.parse(fa2_contracts_s).forEach((c : StorageContract) => this.fa2_contracts.add(c))
+    localStorage.setItem('royalties_contracts', JSON.stringify(Array.from(this.royalties_contracts)))
+    localStorage.setItem('fa2_contracts', JSON.stringify(Array.from(this.fa2_contracts)))
+
   },
 
   computed: {
     royalties_contracts_options() {
       let options = []
       for (let c of this.royalties_contracts) {
-        options.push({ text: c.contract.substr(0,10) + ' - ' + c.owner.substr(0,10), value: c.contract })
+        options.push({ text: c.substr(0,10), value: c })
       }
       options.push({text:'Custom', value:'custom'})
       return options
@@ -269,13 +282,14 @@ export default new Vue({
         this.provider = p
         const royalties0 = JSON.parse(this.mint.royalties) as { [key:string] : number }
         const royalties : { [key:string] : bigint } = {}
+        const contract = (this.mint.contract=="custom") ? this.mint.contract_custom : this.mint.contract
         Object.keys(royalties0).forEach(
           function(k : string) : void {
             royalties[k] = BigInt(royalties0[k])
           })
         const token_id = (this.mint.token_id!=undefined) ? BigInt(this.mint.token_id) : undefined
         const op = await mint(
-          p, this.mint.contract, royalties, BigInt(this.mint.amount), token_id)
+          p, contract, royalties, BigInt(this.mint.amount), token_id)
         this.mint.result = `operation ${op.hash} injected`
         await op.confirmation()
         this.mint.status = 'success'
@@ -294,11 +308,12 @@ export default new Vue({
         this.burn.result = "no token id given"
       } else {
         if (!this.burn.amount) this.burn.amount = 1
+        const contract = (this.burn.contract=="custom") ? this.burn.contract_custom : this.burn.contract
         const p = (this.provider) ? this.provider : await provider(this.node, this.api_url)
         this.provider = p
         const op = await burn(
           p, { asset_class: "FA_2",
-               contract: this.burn.contract,
+               contract: contract,
                token_id: BigInt(this.burn.token_id) }, BigInt(this.transfer.amount))
         this.burn.result = `operation ${op.hash} injected`
         await op.confirmation()
@@ -327,8 +342,8 @@ export default new Vue({
         this.deploy.fa2_status = 'success'
         if (op.contract) {
           this.deploy.fa2_result = `operation ${op.hash} confirmed -> new contract: ${op.contract}`
-          this.fa2_contracts.push({contract: op.contract, owner: this.deploy.fa2_owner })
-          window.localStorage.setItem('fa2_contracts', JSON.stringify(this.fa2_contracts))
+          this.fa2_contracts.add({contract: op.contract, owner: this.deploy.fa2_owner })
+          localStorage.setItem('fa2_contracts', JSON.stringify(this.fa2_contracts))
         } else {
           this.deploy.fa2_result = `operation ${op.hash} confirmed`
         }
@@ -351,8 +366,8 @@ export default new Vue({
         this.deploy.royalties_status = 'success'
         if (op.contract) {
           this.deploy.royalties_result = `operation ${op.hash} confirmed -> new contract: ${op.contract}`
-          this.royalties_contracts.push({contract: op.contract, owner: this.deploy.royalties_owner })
-          window.localStorage.setItem('royalties_contracts', JSON.stringify(this.royalties_contracts))
+          this.royalties_contracts.add(op.contract)
+          localStorage.setItem('royalties_contracts', JSON.stringify(this.royalties_contracts))
         } else {
           this.deploy.royalties_result = `operation ${op.hash} confirmed`
         }
@@ -439,7 +454,7 @@ export default new Vue({
             taker: (this.upsert.maker) ? this.upsert.maker : undefined,
             make: { asset_type: make_asset_type, value: make_value },
             take: { asset_type: take_asset_type, value: take_value },
-            salt: 0n,
+            salt: salt(),
             start: undefined,
             end: undefined,
             signature: undefined,
@@ -463,86 +478,94 @@ export default new Vue({
       const elt = document.getElementById("sell-result")
       if (!elt) throw new Error('element "sell-result" not found')
       elt.innerHTML = ''
-      if (!this.sell.maker) {
+      const p = (this.provider) ? this.provider : await provider(this.node, this.api_url)
+      this.provider = p
+      const maker = this.upsert.maker || await get_public_key(p)
+      if (!maker) {
         this.sell.status = 'danger'
         this.sell.result = "no maker given"
-      }
-      const make_asset_type = parse_asset_type(this.sell.make_asset_type) as ExtendedAssetType
-      const take_asset_type = parse_asset_type(this.sell.take_asset_type) as XTZAssetType | FA12AssetType
-      const amount = BigInt(this.sell.amount)
-      const price = BigInt(this.sell.price)
-      const payouts = parse_parts(this.sell.payouts)
-      const origin_fees = parse_parts(this.sell.origin_fees)
-      if (!make_asset_type) {
-        this.sell.status = 'danger'
-        this.sell.result = "invalid make asset"
-      } else if (!take_asset_type) {
-        this.sell.status = 'danger'
-        this.sell.result = "invalid take asset"
       } else {
-        const p = (this.provider) ? this.provider : await provider(this.node, this.api_url)
-        this.provider = p
-        const request : SellRequest = {
-          maker: this.sell.maker,
-          make_asset_type,
-          take_asset_type,
-          amount,
-          price,
-          payouts,
-          origin_fees }
-        try {
-          const r = await sell(p, request)
-          this.upsert.status = 'success'
-          const formatter = new JSONFormatter(r, 3)
-          elt.appendChild(formatter.render())
-        } catch(e : any) {
-          this.upsert.status = 'danger'
-          this.upsert.result = e.toString()
+        const make_asset_type = parse_asset_type(this.sell.make_asset_type) as ExtendedAssetType
+        const take_asset_type = parse_asset_type(this.sell.take_asset_type) as XTZAssetType | FA12AssetType
+        const amount = BigInt(this.sell.amount)
+        const price = BigInt(this.sell.price)
+        const payouts = parse_parts(this.sell.payouts)
+        const origin_fees = parse_parts(this.sell.origin_fees)
+        if (!make_asset_type) {
+          this.sell.status = 'danger'
+          this.sell.result = "invalid make asset"
+        } else if (!take_asset_type) {
+          this.sell.status = 'danger'
+          this.sell.result = "invalid take asset"
+        } else {
+          const p = (this.provider) ? this.provider : await provider(this.node, this.api_url)
+          this.provider = p
+          const request : SellRequest = {
+            maker,
+            make_asset_type,
+            take_asset_type,
+            amount,
+            price,
+            payouts,
+            origin_fees }
+          try {
+            const r = await sell(p, request)
+            this.sell.status = 'success'
+            const formatter = new JSONFormatter(r, 3)
+            elt.appendChild(formatter.render())
+          } catch(e : any) {
+            this.sell.status = 'danger'
+            this.sell.result = e.toString()
+          }
         }
       }
     },
 
     async bid_order() {
-      this.sell.status = 'info'
-      this.sell.result = ''
+      this.bid.status = 'info'
+      this.bid.result = ''
       const elt = document.getElementById("bid-result")
       if (!elt) throw new Error('element "bid-result" not found')
       elt.innerHTML = ''
-      if (!this.sell.maker) {
-        this.sell.status = 'danger'
-        this.sell.result = "no maker given"
-      }
-      const make_asset_type = parse_asset_type(this.sell.make_asset_type) as XTZAssetType | FA12AssetType
-      const take_asset_type = parse_asset_type(this.sell.take_asset_type) as ExtendedAssetType
-      const amount = BigInt(this.sell.amount)
-      const price = BigInt(this.sell.price)
-      const payouts = parse_parts(this.sell.payouts)
-      const origin_fees = parse_parts(this.sell.origin_fees)
-      if (!make_asset_type) {
-        this.sell.status = 'danger'
-        this.sell.result = "invalid make asset"
-      } else if (!take_asset_type) {
-        this.sell.status = 'danger'
-        this.sell.result = "invalid take asset"
+      const p = (this.provider) ? this.provider : await provider(this.node, this.api_url)
+      this.provider = p
+      const maker = this.bid.maker || await get_public_key(p)
+      if (!maker) {
+        this.bid.status = 'danger'
+        this.bid.result = "no maker given"
       } else {
-        const p = (this.provider) ? this.provider : await provider(this.node, this.api_url)
-        this.provider = p
-        const request : BidRequest = {
-          maker: this.sell.maker,
-          make_asset_type,
-          take_asset_type,
-          amount,
-          price,
-          payouts,
-          origin_fees }
-        try {
-          const r = await bid(p, request)
-          this.upsert.status = 'success'
-          const formatter = new JSONFormatter(r, 3)
-          elt.appendChild(formatter.render())
-        } catch(e) {
-          this.upsert.status = 'danger'
-          this.upsert.result = JSON.stringify(e)
+        const make_asset_type = parse_asset_type(this.bid.make_asset_type) as XTZAssetType | FA12AssetType
+        const take_asset_type = parse_asset_type(this.bid.take_asset_type) as ExtendedAssetType
+        const amount = BigInt(this.bid.amount)
+        const price = BigInt(this.bid.price)
+        const payouts = parse_parts(this.bid.payouts)
+        const origin_fees = parse_parts(this.bid.origin_fees)
+        if (!make_asset_type) {
+          this.bid.status = 'danger'
+          this.bid.result = "invalid make asset"
+        } else if (!take_asset_type) {
+          this.bid.status = 'danger'
+          this.bid.result = "invalid take asset"
+        } else {
+          const p = (this.provider) ? this.provider : await provider(this.node, this.api_url)
+          this.provider = p
+          const request : BidRequest = {
+            maker,
+            make_asset_type,
+            take_asset_type,
+            amount,
+            price,
+            payouts,
+            origin_fees }
+          try {
+            const r = await bid(p, request)
+            this.bid.status = 'success'
+            const formatter = new JSONFormatter(r, 3)
+            elt.appendChild(formatter.render())
+          } catch(e : any) {
+            this.bid.status = 'danger'
+            this.bid.result = e.toString()
+          }
         }
       }
     },
@@ -550,13 +573,13 @@ export default new Vue({
     async get_orders() {
       const continuation = (this.fill.continuation) ? '?' + this.fill.continuation : ''
       try {
-        const r = await fetch(this.api_url + "orders/all" + continuation)
+        const r = await fetch(this.api_url + "/orders/all" + continuation)
         if (!r.ok) {
           this.fill.status = 'danger'
           this.fill.get_result = r.statusText
         } else {
-          const res = JSON.parse(await r.json())
-          this.fill.orders = res.orders
+          const res = await r.json()
+          this.fill.orders = res.orders.map(order_of_json)
           this.fill.continuation = res.continuation
         }
       } catch(error : any) {
@@ -565,8 +588,8 @@ export default new Vue({
       }
     },
 
-    onselected(item : OrderForm) {
-      this.fill.selected = item
+    onselected(items : any) {
+      this.fill.selected = items[0]
     },
 
     async ffill_order() {
@@ -578,7 +601,12 @@ export default new Vue({
       } else {
         const p = (this.provider) ? this.provider : await provider(this.node, this.api_url)
         this.provider = p
-        const op = await fill_order(p, this.fill.selected, { amount: BigInt(this.fill.amount) })
+        const payouts = parse_parts(this.upsert.payouts)
+        const origin_fees = parse_parts(this.upsert.origin_fees)
+        const op = await fill_order(p, this.fill.selected, {
+          amount: BigInt(this.fill.amount),
+          payouts, origin_fees
+        })
         this.fill.result = `operation ${op.hash} injected`
         await op.confirmation()
         this.fill.status = 'success'

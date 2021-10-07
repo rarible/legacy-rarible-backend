@@ -87,10 +87,33 @@ export function asset_type_to_json(a: AssetType) : any {
   }
 }
 
+export function asset_type_of_json(a: any) : AssetType {
+  switch (a.assetClass) {
+    case "FA_2":
+      return {
+        asset_class: a.assetClass,
+        contract: a.contract,
+        token_id: BigInt(a.tokenId)
+      }
+    case "XTZ":
+      return { asset_class: a.assetClass }
+    case "FA_1_2":
+      return { asset_class: a.assetClass, contract: a.contract }
+    default: throw new Error("Unknown Asset Class")
+  }
+}
+
 export function asset_to_json(a: Asset) : any {
   return {
     assetType : asset_type_to_json(a.asset_type),
     value: a.value.toString()
+  }
+}
+
+export function asset_of_json(a: any) : Asset {
+  return {
+    asset_type : asset_type_of_json(a.assetType),
+    value: BigInt(a.value)
   }
 }
 

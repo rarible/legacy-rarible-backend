@@ -1,4 +1,4 @@
-import { transfer } from "../main"
+import { storage, StorageFA2 } from "../main"
 import { in_memory_provider } from '../providers/in_memory/in_memory_provider'
 
 async function main() {
@@ -21,7 +21,11 @@ async function main() {
 
   // mint(provider, "KT1VYBd25dw5GjYqPM8T8My6b4g5c4cd4hwu", { tz1ibJRnL6hHjAfmEzM7QtGyTsS6ZtHdgE2S: 10000n }, 100n, 1n)
 
-  transfer(provider, { asset_class: "FA_2", contract: "KT1MWv7oH8JJhxJJs8co21XiByBEAYx2QDjY", token_id: 1n }, "tz1iQ3DU476h5EUULD1e5yfuiYyk1JNR6HbY", 50n).then(console.log).catch(console.log)
+  const st : StorageFA2 = await storage(provider, "KT1WUJBk5T53bfNLncG2csWo4y8pFSteBvQL")
+  const r = await st.operator_for_all.get({0: "KT1XgQ52NeNdjo3jLpbsPBRfg8YhWoQ5LB7g", 1: "tz1ibJRnL6hHjAfmEzM7QtGyTsS6ZtHdgE2S"})
+  console.log(r)
+
+  // transfer(provider, { asset_class: "FA_2", contract: "KT1WUJBk5T53bfNLncG2csWo4y8pFSteBvQL", token_id: 1n }, "tz1iQ3DU476h5EUULD1e5yfuiYyk1JNR6HbY", 50n).then(console.log).catch(console.log)
 
   // burn(provider, { asset_class: "FA_2", contract: "KT1MWv7oH8JJhxJJs8co21XiByBEAYx2QDjY", token_id: 1n }, 1n)
 

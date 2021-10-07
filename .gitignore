@@ -5,5 +5,6 @@
 /sdk/package-lock.json
 /sdk/dist
 *.tz
-/config
-/sdk/www/*.js*
+/config/crawler_config.json
+/sdk/www/*.js
+/sdk/www/*.js.*
