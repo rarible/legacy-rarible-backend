@@ -2115,6 +2115,80 @@ let test_2 () =
   begin match !crawler_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
   Lwt.return_ok ()
 
+let fill_orders () =
+  reset_db () ;
+  let r_alias, _r_source = create_royalties () in
+  let r_kt1 = find_kt1 r_alias in
+  Printf.eprintf "New royalties %s\n%!" r_kt1 ;
+  let ex_alias, ex_admin, _ex_receiver = create_exchange () in
+  let ex_kt1 = find_kt1 ex_alias in
+  Printf.eprintf "New exchange %s\n%!" ex_kt1 ;
+  let v_alias, _v_source = create_validator ~exchange:ex_kt1 ~royalties:r_kt1 in
+  let v_kt1 = find_kt1 v_alias in
+  Printf.eprintf "New validator %s\n%!" v_kt1 ;
+  api_pid := Some (start_api ()) ;
+  start_crawler "" v_kt1 ex_kt1 r_kt1 [] [] >>= fun cpid ->
+  crawler_pid := Some cpid ;
+  set_validator v_kt1 ex_admin ex_kt1 >>=? fun () ->
+  Printf.eprintf "Waiting 6sec to let crawler catch up...\n%!" ;
+  Lwt_unix.sleep 6. >>= fun () ->
+  let (admin, source, contract, royalties, uri) = create_collection ~royalties:r_kt1 () in
+  let (admin, contract, source, _royalties) =
+    deploy_collection admin source contract royalties uri in
+  let>? () = check_collection admin contract source in
+  Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
+  Lwt_unix.sleep 6. >>= fun () ->
+  let>? item1 = mint_one_with_token_id_from_api ~source ~contract () in
+  Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
+  Lwt_unix.sleep 6. >>= fun () ->
+  let (source1, amount1, token_id1, royalties1, metadata1) = item1 in
+  check_item (contract, (source1, string_of_int amount1, token_id1, royalties1, metadata1))
+  >>= fun () ->
+  let>? item2 = mint_one_with_token_id_from_api ~source ~contract () in
+  Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
+  Lwt_unix.sleep 6. >>= fun () ->
+  let (source2, amount2, token_id2, royalties2, metadata2) = item2 in
+  check_item (contract, (source2, string_of_int amount2, token_id2, royalties2, metadata2))
+  >>= fun () ->
+  let>? item3 = mint_one_with_token_id_from_api ~source ~contract () in
+  Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
+  Lwt_unix.sleep 6. >>= fun () ->
+  let (source3, amount3, token_id3, royalties3, metadata3) = item3 in
+  check_item (contract, (source3, string_of_int amount3, token_id3, royalties3, metadata3))
+  >>= fun () ->
+  let>? item4 = mint_one_with_token_id_from_api ~source ~contract () in
+  Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
+  Lwt_unix.sleep 6. >>= fun () ->
+  let (source4, amount4, token_id4, royalties4, metadata4) = item4 in
+  check_item (contract, (source4, string_of_int amount4, token_id4, royalties4, metadata4))
+  >>= fun () ->
+  let>? item5 = mint_one_with_token_id_from_api ~source ~contract () in
+  Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
+  Lwt_unix.sleep 6. >>= fun () ->
+  let (source5, amount5, token_id5, royalties5, metadata5) = item5 in
+  check_item (contract, (source5, string_of_int amount5, token_id5, royalties5, metadata5))
+  >>= fun () ->
+  let>? () = update_operators_for_all ex_kt1 source1 contract in
+
+  let>? _order1 = sell_nft_for_one_tezos ~salt:1 contract item1 in
+  let>? _order2 = sell_nft_for_one_tezos ~salt:1 contract item2 in
+  let>? _order3 = sell_nft_for_one_tezos ~salt:1 contract item3 in
+  let>? _order4 = sell_nft_for_one_tezos ~salt:1 contract item4 in
+  let>? _order5 = sell_nft_for_one_tezos ~salt:1 contract item5 in
+  (* TODO : check orders *)
+
+  let _source2_alias, source2_pk, source2_sk = generate_address ~diff:(Some (fst source1)) () in
+  let>? _order6 = buy_nft_for_one_tezos contract (source2_pk, source2_sk) item1 in
+  let>? _order7 = buy_nft_for_one_tezos contract (source2_pk, source2_sk) item2 in
+  let>? _order8 = buy_nft_for_one_tezos contract (source2_pk, source2_sk) item3 in
+  let>? _order9 = buy_nft_for_one_tezos contract (source2_pk, source2_sk) item4 in
+  let>? _order10 = buy_nft_for_one_tezos contract (source2_pk, source2_sk) item5 in
+  (* TODO : check orders *)
+
+  begin match !api_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
+  begin match !crawler_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
+  Lwt.return_ok ()
+
 (** main *)
 
 let actions = [
@@ -2143,10 +2217,12 @@ let main () =
   let action = ref [] in
   Arg.parse spec (fun s -> action := s :: !action) usage;
   match List.rev !action with
-  (* | [ "call_upsert_order" ] ->
-   *   Lwt_main.run (upsert_order () >>= function
-   *     | Ok _ -> Lwt.return_unit
-   *     | Error err -> Lwt.fail_with @@ string_of_error err) *)
+  | [ "call_upsert_order" ] ->
+    Lwt_main.run (upsert_order () >>= function
+      | Ok _ -> Lwt.return_unit
+      | Error err -> Lwt.fail_with @@
+        EzReq_lwt.string_of_error
+          (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err)
     (* | "update_order_make_value" :: hash :: make_value :: [] ->
      *   Lwt_main.run (update_order_make_value hash make_value)
      * | "update_order_take_value" :: hash :: take_value :: [] ->
@@ -2187,6 +2263,20 @@ let main () =
       Lwt_main.run (
         Lwt.catch (fun () ->
             test_2 () >>= function
+            | Ok _ -> Lwt.return_unit
+            | Error err ->
+              Lwt.fail_with @@
+              EzReq_lwt.string_of_error
+                (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err)
+          (fun exn ->
+             Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
+             begin match !api_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
+             begin match !crawler_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
+             Lwt.return_unit))
+    | [ "fill_orders_db" ] ->
+      Lwt_main.run (
+        Lwt.catch (fun () ->
+            fill_orders () >>= function
             | Ok _ -> Lwt.return_unit
             | Error err ->
               Lwt.fail_with @@

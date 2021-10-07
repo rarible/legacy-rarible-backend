@@ -1642,6 +1642,7 @@ let mk_order ?dbh order_obj =
   Lwt.return_ok rarible_v2_order
 
 let get_order ?dbh hash_key =
+  Printf.eprintf "get_order %s\n%!" hash_key ;
   use dbh @@ fun dbh ->
   let>? l = [%pgsql.object dbh
       "select maker, taker, \
@@ -1664,31 +1665,28 @@ let mk_order_continuation order =
     (Int64.of_float @@ CalendarLib.Calendar.to_unixfloat order.order_elt.order_elt_last_update_at)
     order.order_elt.order_elt_hash
 
-let filter_orders ?origin ?continuation orders =
+let filter_orders ?origin orders =
+  Printf.eprintf "filter_orders %d\n%!" @@ List.length orders;
   List.filter (fun order ->
+      Printf.eprintf "filter_order %s\n%!" order.order_elt.order_elt_hash;
       (int_of_string order.order_elt.order_elt_make_stock) > 0 &&
-      match origin, continuation with
-      | Some orig, Some (ts, h) ->
-        let lu = order.order_elt.order_elt_last_update_at in
-        let hash = order.order_elt.order_elt_hash in
-        let origin_fees = match order.order_data with
-          | RaribleV2Order data -> data.order_rarible_v2_data_v1_origin_fees
-          | _ -> [] in
-        ((lu = ts && hash > h) || lu < ts) &&
-        (List.exists (fun p -> p.part_account = orig) origin_fees)
-      | Some orig, None ->
+      match origin with
+      | Some orig ->
         let origin_fees = match order.order_data with
           | RaribleV2Order data -> data.order_rarible_v2_data_v1_origin_fees
           | _ -> [] in
         List.exists (fun p -> p.part_account = orig) origin_fees
-      | None, Some (ts, h) ->
-        let lu = order.order_elt.order_elt_last_update_at in
-        let hash = order.order_elt.order_elt_hash in
-        ((lu = ts && hash > h) || lu < ts)
-      | None, None -> true)
+      | None -> true)
     orders
 
 let rec get_orders_all_aux ?dbh ?origin ?continuation ~size acc =
+  Format.eprintf "get_orders_all_aux %s %s %Ld %d@."
+    (match origin with None -> "None" | Some s -> s)
+    (match continuation with
+     | None -> "None"
+     | Some (ts, s) -> (Tzfunc.Proto.A.cal_to_str ts) ^ "_" ^ s)
+    size
+    (List.length acc) ;
   let no_continuation, (ts, h) =
     continuation = None,
     (match continuation with None -> CalendarLib.Calendar.now (), "" | Some (ts, h) -> (ts, h)) in
@@ -1698,22 +1696,29 @@ let rec get_orders_all_aux ?dbh ?origin ?continuation ~size acc =
     let>? l =
       [%pgsql dbh "select hash from orders \
                    where ($no_continuation or \
-                   (last_update_at = $ts and hash > $h) or (last_update_at < $ts)) \
-                   order by last_update_at desc limit $size"] in
-    match l with
+                   (last_update_at = $ts and hash < $h) or (last_update_at < $ts)) \
+                   order by last_update_at desc, hash desc limit $size"] in
+    map_rp (fun h -> get_order ~dbh h) l >>=? fun orders ->
+    Printf.eprintf "orders %d\n%!" @@ List.length orders;
+    match orders with
     | [] -> Lwt.return_ok acc
     | _ ->
-      map_rp (fun h -> get_order ~dbh h) l >>=? fun orders ->
       let orders = List.filter_map (fun x -> x) orders in
-      let orders = filter_orders ?origin ?continuation orders in
-      let last_order = List.hd (List.rev orders) in
-      let continuation =
-        last_order.order_elt.order_elt_last_update_at,
-        last_order.order_elt.order_elt_hash in
-      let orders = orders @ acc in
-      get_orders_all_aux ~dbh ?origin ~continuation ~size orders
+      let continuation = match List.rev orders with
+        | [] -> None
+        | hd :: _ ->
+          Some (hd.order_elt.order_elt_last_update_at,
+                hd.order_elt.order_elt_hash) in
+      let orders = filter_orders ?origin orders in
+      Printf.eprintf "orders %d\n%!" @@ List.length orders;
+      match orders with
+      | [] -> get_orders_all_aux ~dbh ?origin ?continuation ~size acc
+      | _ ->
+        Printf.eprintf "orders %d\n%!" @@ List.length orders;
+        let orders = acc @ orders in
+        get_orders_all_aux ~dbh ?origin ?continuation ~size orders
   else
-  if len = size  then Lwt.return_ok acc
+  if len = size then Lwt.return_ok acc
   else
     Lwt.return_ok @@
     List.filter_map (fun x -> x) @@
@@ -1730,9 +1735,9 @@ let get_orders_all ?dbh ?origin ?continuation ?(size=50) () =
   let>? orders = get_orders_all_aux ?dbh ?origin ?continuation ~size [] in
   let len = Int64.of_int @@ List.length orders in
   let orders_pagination_contination =
-    if len <> size then None
+    if len = 0L || len < size then None
     else Some
-        (mk_order_continuation @@ List.hd (List.rev orders)) in
+        (mk_order_continuation @@ List.hd orders) in
   Lwt.return_ok
     { orders_pagination_orders = orders ; orders_pagination_contination }
 
@@ -1755,7 +1760,7 @@ let rec get_sell_orders_by_maker_aux ?dbh ?origin ?continuation ~size ~maker acc
     | _ ->
       map_rp (fun h -> get_order ~dbh h) l >>=? fun orders ->
       let orders = List.filter_map (fun x -> x) orders in
-      let orders = filter_orders ?origin ?continuation orders in
+      let orders = filter_orders ?origin orders in
       let last_order = List.hd (List.rev orders) in
       let continuation =
         last_order.order_elt.order_elt_last_update_at,
@@ -1810,7 +1815,7 @@ let rec get_sell_orders_by_item_aux ?dbh ?origin ?continuation ?maker ~size cont
     | _ ->
       map_rp (fun h -> get_order ~dbh h) l >>=? fun orders ->
       let orders = List.filter_map (fun x -> x) orders in
-      let orders = filter_orders ?origin ?continuation orders in
+      let orders = filter_orders ?origin orders in
       let last_order = List.hd (List.rev orders) in
       let continuation =
         last_order.order_elt.order_elt_last_update_at,
@@ -1864,7 +1869,7 @@ let rec get_sell_orders_by_collection_aux ?dbh ?origin ?continuation ~size colle
     | _ ->
       map_rp (fun h -> get_order ~dbh h) l >>=? fun orders ->
       let orders = List.filter_map (fun x -> x) orders in
-      let orders = filter_orders ?origin ?continuation orders in
+      let orders = filter_orders ?origin orders in
       let last_order = List.hd (List.rev orders) in
       let continuation =
         last_order.order_elt.order_elt_last_update_at,
@@ -1915,7 +1920,7 @@ let rec get_sell_orders_aux ?dbh ?origin ?continuation ~size acc =
     | _ ->
       map_rp (fun h -> get_order ~dbh h) l >>=? fun orders ->
       let orders = List.filter_map (fun x -> x) orders in
-      let orders = filter_orders ?origin ?continuation orders in
+      let orders = filter_orders ?origin orders in
       let last_order = List.hd (List.rev orders) in
       let continuation =
         last_order.order_elt.order_elt_last_update_at,
@@ -1966,7 +1971,7 @@ let rec get_bid_orders_by_maker_aux ?dbh ?origin ?continuation ~size ~maker acc 
     | _ ->
       map_rp (fun h -> get_order ~dbh h) l >>=? fun orders ->
       let orders = List.filter_map (fun x -> x) orders in
-      let orders = filter_orders ?origin ?continuation orders in
+      let orders = filter_orders ?origin orders in
       let last_order = List.hd (List.rev orders) in
       let continuation =
         last_order.order_elt.order_elt_last_update_at,
@@ -2023,7 +2028,7 @@ let rec get_bid_orders_by_item_aux ?dbh ?origin ?continuation ?maker ~size contr
     | _ ->
       map_rp (fun h -> get_order ~dbh h) l >>=? fun orders ->
       let orders = List.filter_map (fun x -> x) orders in
-      let orders = filter_orders ?origin ?continuation orders in
+      let orders = filter_orders ?origin orders in
       let last_order = List.hd (List.rev orders) in
       let continuation =
         last_order.order_elt.order_elt_last_update_at,
