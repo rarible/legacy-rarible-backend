@@ -44,7 +44,8 @@ export interface Asset {
 export interface OperationResult {
   hash: string;
   confirmation: () => Promise<void>;
-  token_id?: bigint
+  token_id?: bigint;
+  contract?: string;
 }
 
 export interface TezosProvider {
@@ -69,6 +70,28 @@ export interface TransactionArg {
   amount?: bigint,
   entrypoint?: string,
   parameter?: MichelsonData
+}
+
+export function asset_type_to_json(a: AssetType) : any {
+  switch (a.asset_class) {
+    case "FA_2":
+      return {
+        assetClass: a.asset_class,
+        contract: a.contract,
+        tokenId: a.token_id.toString()
+      }
+    case "XTZ":
+      return { assetClass: a.asset_class }
+    case "FA_1_2":
+      return { assetClass: a.asset_class, contract: a.contract }
+  }
+}
+
+export function asset_to_json(a: Asset) : any {
+  return {
+    assetType : asset_type_to_json(a.asset_type),
+    value: a.value.toString()
+  }
 }
 
 export function get_address(p: Provider) : Promise<string> {

@@ -21,7 +21,13 @@ export async function beacon_provider(network: Network, name = "rarible") : Prom
   }
   const originate = async(arg: OriginateParams) => {
     const op = await tk.wallet.originate(arg).send()
-    return { hash: op.opHash, confirmation: async() => { await op.confirmation() } }
+    const op2 = await op.originationOperation();
+    const contract = (op2!.metadata.operation_result.originated_contracts || [])[0];
+    return {
+      hash: op.opHash,
+      confirmation: async() => { await op.confirmation() },
+      contract
+    }
   }
   const batch = async(args: TransferParams[]) => {
     const args2 = args.map(function(a) {
@@ -31,7 +37,7 @@ export async function beacon_provider(network: Network, name = "rarible") : Prom
   }
   const sign = async(bytes: string) => {
     const { signature } = await wallet.client.requestSignPayload({payload: bytes})
-    return b58enc(signature, new Uint8Array([9, 245, 205, 134, 18]))
+    return signature
   }
   const address = async() => {
     return wallet.getPKH()

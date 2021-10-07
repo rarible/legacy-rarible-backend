@@ -14,7 +14,11 @@ export function in_memory_provider(edsk: string, endpoint: string) : TezosProvid
   }
   const originate = async(arg: OriginateParams) => {
     const op = await tk.contract.originate(arg)
-    return { hash: op.hash, confirmation: async() => { await op.confirmation() } }
+    return {
+      hash: op.hash,
+      confirmation: async() => { await op.confirmation() },
+      contract: op.contractAddress
+    }
   }
   const batch = async(args: TransferParams[]) => {
     const args2 = args.map(function(a) {

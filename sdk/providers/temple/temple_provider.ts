@@ -1,6 +1,6 @@
 import { TempleWallet, TempleDAppNetwork } from '@temple-wallet/dapp'
 import { TezosToolkit, TransferParams, OriginateParams, OpKind } from "@taquito/taquito"
-import { TezosProvider, b58enc } from "../../common/base"
+import { TezosProvider } from "../../common/base"
 
 export async function temple_provider(endpoint: string, network: TempleDAppNetwork, name = "rarible") : Promise<TezosProvider> {
   const wallet = new TempleWallet(name)
@@ -14,7 +14,13 @@ export async function temple_provider(endpoint: string, network: TempleDAppNetwo
   }
   const originate = async(arg: OriginateParams) => {
     const op = await tk.wallet.originate(arg).send()
-    return { hash: op.opHash, confirmation: async() => { await op.confirmation() } }
+    const op2 = await op.originationOperation();
+    const contract = (op2!.metadata.operation_result.originated_contracts || [])[0];
+    return {
+      hash: op.opHash,
+      confirmation: async() => { await op.confirmation() },
+      contract
+    }
   }
   const batch = async(args: TransferParams[]) => {
     const args2 = args.map(function(a) {
@@ -24,7 +30,7 @@ export async function temple_provider(endpoint: string, network: TempleDAppNetwo
   }
   const sign = async(bytes: string) => {
     const sig = await wallet.sign(bytes)
-    return b58enc(sig, new Uint8Array([9, 245, 205, 134, 18]))
+    return sig
   }
   const address = async() => {
     return wallet.getPKH()
