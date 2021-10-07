@@ -121,8 +121,8 @@ let upgrade_1_to_2 dbh version =
       signature varchar not null,
       created_at timestamp not null,
       last_update_at timestamp not null,
-      make_price_usd float,
-      take_price_usd float,
+      make_price_usd float not null,
+      take_price_usd float not null,
       hash varchar primary key)|};
 
     {|create table origin_fees(

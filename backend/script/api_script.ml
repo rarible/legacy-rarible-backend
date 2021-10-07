@@ -1965,14 +1965,14 @@ let sell_nft_for_nft ?salt collection item1 item2 =
   | Error _err -> Lwt.fail_with "order_from"
   | Ok form -> call_upsert_order form
 
-let sell_nft_for_one_tezos ?(salt=0) collection item1 =
-  let take = { asset_type = ATXTZ ; asset_value = string_of_int 1 } in
+let sell_nft_for_tezos ?(salt=0) collection item1 amount =
+  let take = { asset_type = ATXTZ ; asset_value = string_of_int amount } in
   match sell_order_form_from_item ~salt collection item1 take with
   | Error _err -> Lwt.fail_with "order_from"
   | Ok form -> call_upsert_order form
 
-let buy_nft_for_one_tezos ?(salt=0) collection maker item1 =
-  let make = { asset_type = ATXTZ ; asset_value = string_of_int 1 } in
+let buy_nft_for_tezos ?(salt=0) collection maker item1 amount =
+  let make = { asset_type = ATXTZ ; asset_value = string_of_int amount } in
   match buy_order_form_from_item ~salt collection item1 maker make with
   | Error _err -> Lwt.fail_with "order_from"
   | Ok form -> call_upsert_order form
@@ -2092,11 +2092,11 @@ let test_2 () =
   check_item (contract, (source1, string_of_int amount1, token_id1, royalties1, metadata1))
   >>= fun () ->
   let>? () = update_operators_for_all ex_kt1 source1 contract in
-  let>? order1 = sell_nft_for_one_tezos ~salt:1 contract item1 in
+  let>? order1 = sell_nft_for_tezos ~salt:1 contract item1 1 in
   (* TODO : check order *)
   let _source2_alias, source2_pk, source2_sk = generate_address ~diff:(Some (fst source1)) () in
   let source2 = Tzfunc.Crypto.pk_to_tz1 source2_pk, source2_sk in
-  let>? order2 = buy_nft_for_one_tezos contract (source2_pk, source2_sk) item1 in
+  let>? order2 = buy_nft_for_tezos contract (source2_pk, source2_sk) item1 1 in
   (* TODO : check order *)
   begin match_orders ~amount:1L ~source:source2 ~contract:ex_kt1 order2 order1 >>= function
     | Error err ->
@@ -2162,16 +2162,29 @@ let fill_orders () =
   check_item (contract, (source5, string_of_int amount5, token_id5, royalties5, metadata5))
   >>= fun () ->
   let>? () = update_operators_for_all ex_kt1 source1 contract in
-  let>? _order1 = sell_nft_for_one_tezos ~salt:1 contract item1 in
+  (* SELL ORDERS *)
+  let>? _sell1_1 = sell_nft_for_tezos ~salt:1 contract item1 5 in
   Lwt_unix.sleep 1. >>= fun () ->
-  let>? _order2 = sell_nft_for_one_tezos ~salt:1 contract item2 in
+  let>? _sell2 = sell_nft_for_tezos ~salt:1 contract item2 1 in
   Lwt_unix.sleep 1. >>= fun () ->
-  let>? _order3 = sell_nft_for_one_tezos ~salt:1 contract item3 in
+  let>? _sell3 = sell_nft_for_tezos ~salt:1 contract item3 1 in
   Lwt_unix.sleep 1. >>= fun () ->
-  let>? _order4 = sell_nft_for_one_tezos ~salt:1 contract item4 in
+  let>? _sell4 = sell_nft_for_tezos ~salt:1 contract item4 1 in
   Lwt_unix.sleep 1. >>= fun () ->
-  let>? _order5 = sell_nft_for_one_tezos ~salt:1 contract item5 in
+  let>? _sell5 = sell_nft_for_tezos ~salt:1 contract item5 1 in
+  (* BIDS ORDERS *)
+  let _source2_alias, source2_pk, source2_sk = generate_address ~diff:(Some (fst source1)) () in
+  let>? _buy1_1 = buy_nft_for_tezos contract (source2_pk, source2_sk) item1 1 in
+  Lwt_unix.sleep 1. >>= fun () ->
+  let _source3_alias, source3_pk, source3_sk =
+    generate_address ~diff:(Some (Tzfunc.Crypto.pk_to_tz1 source2_pk)) () in
+  let>? _buy1_2 = buy_nft_for_tezos contract (source3_pk, source3_sk) item1 1 in
+  Lwt_unix.sleep 1. >>= fun () ->
+  let>? _buy4 = buy_nft_for_tezos contract (source2_pk, source2_sk) item4 1 in
+  Lwt_unix.sleep 1. >>= fun () ->
+
   (* TODO : check order *)
+
   begin match !api_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
   begin match !crawler_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
   Lwt.return_ok ()

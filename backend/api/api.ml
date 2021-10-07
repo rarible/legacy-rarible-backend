@@ -970,7 +970,7 @@ let get_sell_orders_by_item req () =
           match get_size_param req with
           | Error err -> return @@ Error err
           | Ok size ->
-            match get_continuation_last_update_param req with
+            match get_continuation_price_param req with
             | Error err -> return @@ Error err
             | Ok continuation ->
               Db.get_sell_orders_by_item
@@ -1088,7 +1088,7 @@ let get_order_bids_by_item req () =
           match get_size_param req with
           | Error err -> return @@ Error err
           | Ok size ->
-            match get_continuation_last_update_param req with
+            match get_continuation_price_param req with
             | Error err -> return @@ Error err
             | Ok continuation ->
               Db.get_bid_orders_by_item

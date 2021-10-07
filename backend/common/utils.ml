@@ -381,8 +381,8 @@ let order_elt_from_order_form_elt elt =
     order_elt_pending = Some [];
     order_elt_hash = hash;
     order_elt_make_balance = None;
-    order_elt_make_price_usd = None;
-    order_elt_take_price_usd = None;
+    order_elt_make_price_usd = "0";
+    order_elt_take_price_usd = "0";
     order_elt_price_history = [];
   }
 
