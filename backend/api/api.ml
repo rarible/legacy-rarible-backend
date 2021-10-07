@@ -1210,45 +1210,6 @@ let get_order_activities req input =
    errors=[rarible_error_500];
    section=order_activities_section}]
 
-(* order-bid-controller *)
-let get_bids_by_item req () =
-  (* let _platform = EzAPI.Req.find_param platform_param req in *)
-  match get_required_contract_param req with
-  | Error err -> return @@ Error err
-  | Ok contract ->
-    match get_required_token_id_param req with
-    | Error err -> return @@ Error err
-    | Ok token_id ->
-      match get_required_status_param req with
-      | Error err -> return @@ Error err
-      | Ok status ->
-        match get_start_date_param req with
-        | Error err -> return @@ Error err
-        | Ok start_date ->
-          match get_end_date_param req with
-          | Error err -> return @@ Error err
-          | Ok end_date ->
-            match get_size_param req with
-            | Error err -> return @@ Error err
-            | Ok size ->
-              match get_continuation_price_param req with
-              | Error err -> return @@ Error err
-              | Ok continuation ->
-                Db.get_bids_by_item
-                  ?start_date ?end_date ?continuation ?size contract token_id status >>= function
-                | Error db_err ->
-                  let str = Crawlori.Rp.string_of_error db_err in
-                  return (Error (unexpected_api_error str))
-                | Ok res -> return_ok res
-[@@get
-  {path="/v0.1/bids/byItem";
-   params=[contract_param;token_id_param;start_date_param;end_date_param;
-           status_param;continuation_param;size_param];
-   name="get_bids_by_item";
-   output=order_bids_pagination_enc;
-   errors=[rarible_error_500];
-   section=order_bid_section}]
-
 (* module V_0_1 = struct
  *
  *   module Acontroller = struct
