@@ -502,3 +502,16 @@ let check ~edpk ~signature ~bytes =
 
 let short ?(len=8) h =
   if String.length h > len then String.sub h 0 len else h
+
+let to_parts l =
+  List.map (fun (part_account, v) -> {
+        part_account ;
+        part_value = Int32.to_int v
+      }) l
+
+let mk_order_event event_id order_id order = {
+  order_event_event_id = event_id ;
+  order_event_order_id = order_id ;
+  order_event_order = order ;
+  order_event_type = "UPDATE" ;
+}

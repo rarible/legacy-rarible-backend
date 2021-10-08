@@ -9,6 +9,9 @@ type config = {
   royalties: string; [@dft ""]
   ft_fa2: string list; [@dft []]
   ft_fa1: string list; [@dft []]
+  kafka_broker : string; [@dft "localhost:9092"]
+  kafka_username : string; [@dft ""]
+  kafka_password : string; [@dft ""]
 } [@@deriving encoding]
 
 (** Api *)
@@ -821,3 +824,10 @@ type fee_side = FeeSideMake | FeeSideTake
 type exchange_param =
   | Cancel of string
   | DoTransfers of {left: string; right: string ; fill_make_value: int64; fill_take_value: int64}
+
+type order_event = {
+  order_event_event_id : string ;
+  order_event_order_id : string ;
+  order_event_order : order ;
+  order_event_type : string ;
+} [@@deriving encoding {camel} ]

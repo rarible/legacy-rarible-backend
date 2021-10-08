@@ -19,7 +19,7 @@ let no_update = true")))
 
 (library
  (name db)
- (modules db)
+ (modules db rarible_kafka)
  (preprocessor_deps (env_var "PGDATABASE") .rarible_witness)
  (preprocess (pps pgocaml_ppx))
- (libraries db_env_rarible crawlori.pg let))
+ (libraries db_env_rarible crawlori.pg let lwt kafka kafka_lwt))

@@ -6,7 +6,8 @@ open Config
 
 let dummy_extra = {
   admin_wallet = ""; exchange_v2 = ""; royalties = ""; validator = "";
-  ft_fa2 = []; ft_fa1 = []
+  ft_fa2 = []; ft_fa1 = [];
+  kafka_broker = "localhost:9092"; kafka_username = "" ; kafka_password = "" ;
 }
 
 let rarible_contracts ?(db=dummy_extra) config =
@@ -21,6 +22,9 @@ let rarible_contracts ?(db=dummy_extra) config =
     let extra = if extra.validator = "" then { extra with validator = db.validator } else extra in
     let extra = if extra.ft_fa2 = [] then { extra with ft_fa2 = db.ft_fa2 } else extra in
     let extra = if extra.ft_fa1 = [] then { extra with ft_fa1 = db.ft_fa1 } else extra in
+    let extra = if extra.kafka_broker = "" then { extra with kafka_broker = db.kafka_broker } else extra in
+    let extra = if extra.kafka_username = "" then { extra with kafka_username = db.kafka_username } else extra in
+    let extra = if extra.kafka_password = "" then { extra with kafka_password = db.kafka_password } else extra in
     let s = match config.accounts with
       | None -> SSet.empty
       | Some s -> s in

@@ -19,6 +19,9 @@ let config = {
   royalties = "" ;
   ft_fa2 = [];
   ft_fa1 = [];
+  kafka_broker = "localhost:9092";
+  kafka_username = "";
+  kafka_password = "";
 }
 
 let api_pid = ref None
@@ -1877,7 +1880,8 @@ let get_head () =
   EzReq_lwt.get
     (EzAPI.URL "https://api.granadanet.tzkt.io/v1/blocks/count")
 
-let make_config admin_wallet validator exchange_v2 royalties ft_fa1 ft_fa2 =
+let make_config admin_wallet validator exchange_v2 royalties ft_fa1 ft_fa2
+  kafka_broker kafka_username kafka_password =
   let open Crawlori.Config in
   get_head () >>= function
   | Error (code, str) ->
@@ -1895,7 +1899,10 @@ let make_config admin_wallet validator exchange_v2 royalties ft_fa1 ft_fa2 =
       verbose = 0 ;
       register_kinds = None ;
       allow_no_metadata = false ;
-      extra = { admin_wallet ; validator ; exchange_v2 ; royalties; ft_fa1; ft_fa2 } ;
+      extra = {
+        admin_wallet ; validator ; exchange_v2 ; royalties; ft_fa1; ft_fa2;
+        kafka_broker; kafka_username; kafka_password;
+      } ;
     } in
     let temp_fn = Filename.temp_file "config" "" in
     let json = EzEncoding.construct (Cconfig.enc Rtypes.config_enc) config in
@@ -1905,8 +1912,11 @@ let make_config admin_wallet validator exchange_v2 royalties ft_fa1 ft_fa2 =
     close_out c ;
     Lwt.return temp_fn
 
-let start_crawler admin_wallet validator exchange_v2 royalties ft_fa1 ft_fa2 =
-  make_config admin_wallet validator exchange_v2 royalties ft_fa1 ft_fa2 >>= fun config ->
+let start_crawler admin_wallet validator exchange_v2 royalties ft_fa1 ft_fa2
+    kafka_broker kafka_username kafka_password =
+  make_config
+    admin_wallet validator exchange_v2 royalties ft_fa1 ft_fa2
+    kafka_broker kafka_username kafka_password  >>= fun config ->
   let prog = "./_bin/crawler" in
   let args = [| prog ; config |] in
   let stdout, fn_out = create_descr "crawler" "out" in
@@ -1922,7 +1932,7 @@ let random_test () =
   let r_kt1 = find_kt1 r_alias in
   Printf.eprintf "New royalties %s\n%!" r_kt1 ;
   api_pid := Some (start_api ()) ;
-  start_crawler "" validator exchange_v2 r_kt1 [] [] >>= fun cpid ->
+  start_crawler "" validator exchange_v2 r_kt1 [] [] "" "" "" >>= fun cpid ->
   crawler_pid := Some cpid ;
   Printf.eprintf "Waiting 6sec to let crawler catch up...\n%!" ;
   Lwt_unix.sleep 6. >>= fun () ->
@@ -2013,7 +2023,7 @@ let test_1 () =
   let v_kt1 = find_kt1 v_alias in
   Printf.eprintf "New validator %s\n%!" v_kt1 ;
   api_pid := Some (start_api ()) ;
-  start_crawler "" v_kt1 ex_kt1 r_kt1 [] [] >>= fun cpid ->
+  start_crawler "" v_kt1 ex_kt1 r_kt1 [] [] "" "" "" >>= fun cpid ->
   crawler_pid := Some cpid ;
   set_validator v_kt1 ex_admin ex_kt1 >>=? fun () ->
   Printf.eprintf "Waiting 6sec to let crawler catch up...\n%!" ;
@@ -2074,7 +2084,7 @@ let test_2 () =
   let v_kt1 = find_kt1 v_alias in
   Printf.eprintf "New validator %s\n%!" v_kt1 ;
   api_pid := Some (start_api ()) ;
-  start_crawler "" v_kt1 ex_kt1 r_kt1 [] [] >>= fun cpid ->
+  start_crawler "" v_kt1 ex_kt1 r_kt1 [] [] "" "" "" >>= fun cpid ->
   crawler_pid := Some cpid ;
   set_validator v_kt1 ex_admin ex_kt1 >>=? fun () ->
   Printf.eprintf "Waiting 6sec to let crawler catch up...\n%!" ;
@@ -2128,7 +2138,7 @@ let fill_orders () =
   let v_kt1 = find_kt1 v_alias in
   Printf.eprintf "New validator %s\n%!" v_kt1 ;
   api_pid := Some (start_api ()) ;
-  start_crawler "" v_kt1 ex_kt1 r_kt1 [] [] >>= fun cpid ->
+  start_crawler "" v_kt1 ex_kt1 r_kt1 [] [] "" "" "" >>= fun cpid ->
   crawler_pid := Some cpid ;
   set_validator v_kt1 ex_admin ex_kt1 >>=? fun () ->
   Printf.eprintf "Waiting 6sec to let crawler catch up...\n%!" ;
