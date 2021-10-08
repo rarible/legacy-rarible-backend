@@ -5,7 +5,7 @@ let topic_item_name = "tezos-item"
 let topic_order_name = "tezos-order"
 let topic_activity_name = "tezos-activity"
 let topic_ownership_name = "tezos-ownership"
-let topic_test = "rarible-tezos-topic"
+let topic_test_name = "rarible-tezos-topic"
 
 (** Configuration *)
 let get_config () = [
@@ -22,27 +22,43 @@ let create topic =
   let topic = Kafka.new_topic producer topic [] in
   Lwt.return topic
 
+let topic_item =
+  create topic_item_name
+
+let topic_order =
+  create topic_order_name
+
+let topic_activity =
+  create topic_activity_name
+
+let topic_ownership =
+  create topic_ownership_name
+
+let topic_test =
+  create topic_test_name
+
 let kafka_produce ?(partition=0) topic message =
   Kafka_lwt.produce topic partition message
 
-let kafka_produce topic ev =
-  create topic >>= fun topic ->
-  kafka_produce topic ev
-
 (** Producer *)
 let produce_item_event msg =
-  kafka_produce topic_item_name msg
+  topic_item >>= fun topic ->
+  kafka_produce topic msg
 
 let produce_ownership_event msg  =
-  kafka_produce topic_ownership_name msg
+  topic_ownership >>= fun topic ->
+  kafka_produce topic msg
 
 let produce_order_event order_event =
+  topic_order >>= fun topic ->
   EzEncoding.construct Rtypes.order_event_enc order_event
-  |> kafka_produce topic_order_name
+  |> kafka_produce topic
 
 let produce_activity activity =
+  topic_activity >>= fun topic ->
   EzEncoding.construct Rtypes.nft_activity_enc activity
-  |> kafka_produce topic_activity_name
+  |> kafka_produce topic
 
 let produce_test msg =
-  kafka_produce topic_test msg
+  topic_test >>= fun topic ->
+  kafka_produce topic msg
