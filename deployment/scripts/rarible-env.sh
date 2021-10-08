@@ -8,7 +8,7 @@ LOGDIR=$HOME/rarible-logs
 TEZOS_SRC=$HOME/tezos
 RPC_ADDR=127.0.0.1
 ROTATE=$HOME/rotate/bin/rotate
-CRAWLER_CONFIG_FILE=$WORKING_DIRECTORY/config/crawler_config.json
+CRAWLER_CONFIG_FILE=$WORKING_DIRECTORY/deployment/crawler_config.json
 
 # Environment variable
 NAME=rarible-$CMD-$NETWORK
