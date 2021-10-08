@@ -261,7 +261,18 @@ let parse_do_transfers = function
       _right_taker; right_t_asset_class;  right_t_asset_data; _right_t_asset_value;
       Mint right_salt; _right_start; _right_end; _right_data_type; _right_data;
       _fee_side; _royalties
-    ]; _ } ->
+    ]; _ }
+  | Mseq [
+      Mprim { prim = `Pair; args = [ _m_asset_class; _m_asset_data ]; _ };
+      Mprim { prim = `Pair; args = [ _t_asset_class; _t_asset_data ]; _ };
+      Mprim { prim = `Pair; args = [ Mint fill_m_value; Mint fill_t_value ]; _ };
+      Mseq [ left_maker; left_m_asset_class; left_m_asset_data; _left_m_asset_value;
+             _left_taker; left_t_asset_class;  left_t_asset_data; _left_t_asset_value;
+             Mint left_salt; _left_start; _left_end; _left_data_type; _left_data ];
+      Mseq [ right_maker; right_m_asset_class; right_m_asset_data; _right_m_asset_value;
+             _right_taker; right_t_asset_class;  right_t_asset_data; _right_t_asset_value;
+             Mint right_salt; _right_start; _right_end; _right_data_type; _right_data ];
+      _fee_side; _royalties ] ->
     let$ left_maker = parse_option_key left_maker in
     let$ left_mat = parse_asset_type left_m_asset_class left_m_asset_data in
     let$ left_tat = parse_asset_type left_t_asset_class left_t_asset_data in
