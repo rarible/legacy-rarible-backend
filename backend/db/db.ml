@@ -1271,7 +1271,7 @@ let get_nft_ownerships_by_item ?dbh ?continuation ?(size=50) contract token_id =
        (last < $ts)) \
        order by last desc, id asc limit $size64"] in
   let>? nft_ownerships_total = [%pgsql dbh
-      "select count(owner) from tokens where main"] in
+      "select count(owner) from tokens where main and contract = $contract and token_id = $id64"] in
   let>? nft_ownerships_total = match nft_ownerships_total with
     | [ None ] -> Lwt.return_ok 0L
     | [ Some i64 ] -> Lwt.return_ok i64
@@ -1376,7 +1376,7 @@ let search_nft_collections_by_owner ?dbh ?continuation ?(size=50) owner =
        ($no_continuation or (address > $collection)) \
        order by address asc limit $size64"] in
   let>? nft_collections_total = [%pgsql dbh
-      "select count(address) from contracts where main and owner = $owner "] in
+      "select count(distinct address) from contracts where main and owner = $owner "] in
   let>? nft_collections_total = match nft_collections_total with
     | [ None ] -> Lwt.return_ok 0L
     | [ Some i64 ] -> Lwt.return_ok i64
@@ -1403,7 +1403,7 @@ let get_nft_all_collections ?dbh ?continuation ?(size=50) () =
        ($no_continuation or (address > $collection)) \
        order by address asc limit $size64"] in
   let>? nft_collections_total = [%pgsql dbh
-      "select count(address) from contracts where main "] in
+      "select count(distinct address) from contracts where main "] in
   let>? nft_collections_total = match nft_collections_total with
     | [ None ] -> Lwt.return_ok 0L
     | [ Some i64 ] -> Lwt.return_ok i64
