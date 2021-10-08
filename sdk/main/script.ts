@@ -1,22 +1,25 @@
-import { transfer, mint, burn, deploy_fa2, deploy_royalties, set_token_metadata, set_metadata_uri } from "."
+import { transfer, mint, burn, deploy_fa2, deploy_royalties, set_token_metadata, set_metadata_uri, deploy_exchange, deploy_validator, send, TransactionArg} from "."
 import { in_memory_provider } from '../providers/in_memory/in_memory_provider'
 import yargs from 'yargs'
-
 
 async function main() {
   const argv = yargs(process.argv.slice(2)).options({
     edsk: {type: 'string', default: 'edsk4RqeRTrhdKfJKBTndA9x1RLp4A3wtNL1iMFRXDvfs5ANeZAncZ'},
     endpoint: {type: 'string', default: 'https://granada.tz.functori.com'},
-    exchange: {type: 'string', default: 'KT1C5kWbfzASApxCMHXFLbHuPtnRaJXE4WMu'},
+    exchange: {type: 'string', default: 'KT1XgQ52NeNdjo3jLpbsPBRfg8YhWoQ5LB7g'},
     contract: {type: 'string', default: 'KT1MWv7oH8JJhxJJs8co21XiByBEAYx2QDjY'},
-    royalties_contract: {type: 'string', default: 'KT1BkQiZcEL8kvx66WZCnFBCCjhJHsQsScw7'},
+    royalties_contract: {type: 'string', default: 'KT1KrzCSQs6XMMRsQ7dqCVcYQeGs7d512zzb'},
     token_id: {type : 'number'},
     royalties: {type: 'string', default: '{}'},
     amount: {type: 'number'},
     metadata: {type: 'string', default: '{}'},
     metadata_uri: {type: 'string', default: ''},
     to: {type: 'string'},
-    owner: {type: 'string'}
+    owner: {type: 'string'},
+    receiver: {type: 'string'},
+    fee: {type: 'number', default: 0},
+    validator: {type: 'string', default: 'KT1RtsevY6b6izV12QMxvVZviSTy4Mcu2apg'},
+    operator: {type: 'string', default: 'KT1XgQ52NeNdjo3jLpbsPBRfg8YhWoQ5LB7g'},
   }).argv
 
   const token_id_opt = (argv.token_id) ? BigInt(argv.token_id) : undefined
@@ -49,6 +52,7 @@ async function main() {
   }
   const to = (argv.to) ? argv.to : await provider.tezos.address()
   const owner = (argv.owner) ? argv.owner : await provider.tezos.address()
+  const receiver = (argv.receiver) ? argv.receiver : await provider.tezos.address()
 
   switch(argv._[0]) {
     case 'transfer' :
@@ -76,30 +80,67 @@ async function main() {
       console.log("deploy fa2")
       const op_deploy_fa2 = await deploy_fa2(provider, owner, argv.royalties_contract)
       await op_deploy_fa2.confirmation()
-      console.log(op_deploy_fa2.hash)
+      console.log(op_deploy_fa2.contract)
       break
 
     case 'deploy_royalties':
       console.log("deploy royalties")
       const op_deploy_royalties = await deploy_royalties(provider, owner)
       await op_deploy_royalties.confirmation()
-      console.log(op_deploy_royalties.hash)
+      console.log(op_deploy_royalties.contract)
       break
 
     case 'set_token_metadata':
-      console.log("set_token_metadata")
+      console.log("set token metadata")
       const op_token_metadata = await set_token_metadata(provider, argv.contract, token_id, metadata)
       await op_token_metadata.confirmation()
       console.log(op_token_metadata.hash)
       break
 
     case 'set_metadata_uri':
-      console.log("set_metadata_uri")
+      console.log("set metadata uri")
       const op_metadata_uri = await set_metadata_uri(provider, argv.contract, argv.metadata_uri)
       await op_metadata_uri.confirmation()
       console.log(op_metadata_uri.hash)
       break
 
+    case 'deploy_validator':
+      console.log("deploy validator")
+      const op_deploy_validator = await deploy_validator(provider, argv.exchange, argv.royalties_contract)
+      await op_deploy_validator.confirmation()
+      console.log(op_deploy_validator.contract)
+      break
+
+    case 'deploy_exchange':
+      console.log("deploy exchange")
+      const op_deploy_exchange = await deploy_exchange(provider, owner, receiver, BigInt(argv.fee))
+      await op_deploy_exchange.confirmation()
+      console.log(op_deploy_exchange.contract)
+      break
+
+    case 'set_validator':
+      console.log("set validator")
+      const arg : TransactionArg = {
+        destination: argv.contract,
+        entrypoint: "setValidator",
+        parameter: { string: argv.validator }
+      }
+      const op_set_validator = await send(provider, arg)
+      await op_set_validator.confirmation()
+      console.log(op_set_validator.hash)
+      break
+
+    case 'update_operators_for_all':
+      console.log('update operators for all')
+      const arg_update : TransactionArg = {
+        destination: argv.contract,
+        entrypoint: "update_operators_for_all",
+        parameter: [ { prim: 'Left', args : [ { string: argv.operator } ] } ]
+      }
+      const op_update = await send(provider, arg_update)
+      await op_update.confirmation()
+      console.log(op_update.hash)
+      break
 
   }
 }
