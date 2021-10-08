@@ -2144,23 +2144,7 @@ let test_2 () =
   begin match !crawler_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
   Lwt.return_ok ()
 
-let fill_orders () =
-  reset_db () ;
-  let r_alias, _r_source = create_royalties () in
-  let r_kt1 = find_kt1 r_alias in
-  Printf.eprintf "New royalties %s\n%!" r_kt1 ;
-  let ex_alias, ex_admin, _ex_receiver = create_exchange () in
-  let ex_kt1 = find_kt1 ex_alias in
-  Printf.eprintf "New exchange %s\n%!" ex_kt1 ;
-  let v_alias, _v_source = create_validator ~exchange:ex_kt1 ~royalties:r_kt1 in
-  let v_kt1 = find_kt1 v_alias in
-  Printf.eprintf "New validator %s\n%!" v_kt1 ;
-  api_pid := Some (start_api ()) ;
-  start_crawler "" v_kt1 ex_kt1 r_kt1 [] [] "" "" "" >>= fun cpid ->
-  crawler_pid := Some cpid ;
-  set_validator v_kt1 ex_admin ex_kt1 >>= fun () ->
-  Printf.eprintf "Waiting 6sec to let crawler catch up...\n%!" ;
-  Lwt_unix.sleep 6. >>= fun () ->
+let fill_orders_db r_kt1 ex_kt1 =
   let (admin, source, contract, royalties, uri) = create_collection ~royalties:r_kt1 () in
   let> (admin, contract, source, _royalties) =
     deploy_collection admin source contract royalties uri in
@@ -2210,7 +2194,28 @@ let fill_orders () =
   Lwt_unix.sleep 1. >>= fun () ->
   let>? _buy4 = buy_nft_for_tezos contract (source2_pk, source2_sk) item4 1 in
   Lwt_unix.sleep 1. >>= fun () ->
+  Lwt.return_ok ()
 
+let fill_orders () =
+  reset_db () ;
+  let r_alias, _r_source = create_royalties () in
+  let r_kt1 = find_kt1 r_alias in
+  Printf.eprintf "New royalties %s\n%!" r_kt1 ;
+  let ex_alias, ex_admin, _ex_receiver = create_exchange () in
+  let ex_kt1 = find_kt1 ex_alias in
+  Printf.eprintf "New exchange %s\n%!" ex_kt1 ;
+  let v_alias, _v_source = create_validator ~exchange:ex_kt1 ~royalties:r_kt1 in
+  let v_kt1 = find_kt1 v_alias in
+  Printf.eprintf "New validator %s\n%!" v_kt1 ;
+  api_pid := Some (start_api ()) ;
+  start_crawler "" v_kt1 ex_kt1 r_kt1 [] [] "" "" "" >>= fun cpid ->
+  crawler_pid := Some cpid ;
+  set_validator v_kt1 ex_admin ex_kt1 >>= fun () ->
+  Printf.eprintf "Waiting 6sec to let crawler catch up...\n%!" ;
+  Lwt_unix.sleep 6. >>= fun () ->
+  fill_orders_db r_kt1 ex_kt1 >>=? fun () ->
+  fill_orders_db r_kt1 ex_kt1 >>=? fun () ->
+  fill_orders_db r_kt1 ex_kt1 >>=? fun () ->
   (* TODO : check order *)
 
   begin match !api_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
