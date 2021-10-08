@@ -35,6 +35,9 @@ let get_extra_config ?dbh () =
       validator = r#validator_contract;
       ft_fa2 = List.filter_map (fun x -> x) r#ft_fa2;
       ft_fa1 = List.filter_map (fun x -> x) r#ft_fa1;
+      kafka_broker = "";
+      kafka_username = "";
+      kafka_password = "";
     })
   | [] -> Lwt.return_ok None
   | _ -> Lwt.return_error (`hook_error "wrong_state")
@@ -56,6 +59,391 @@ let update_extra_config ?dbh e =
         "update state set exchange_v2_contract = ${e.exchange_v2}, \
          royalties_contract = ${e.royalties}, validator_contract = ${e.validator}, \
          ft_fa1 = $ft_fa1, ft_fa2 = $ft_fa2"]
+
+let mk_asset asset_class contract token_id asset_value =
+  let asset_value = Int64.to_string asset_value in
+  match asset_class with
+  (* For testing purposes*)
+  | "ERC721" ->
+    begin
+      match contract, token_id with
+      | Some c, Some id ->
+        let asset_type =
+          ATERC721
+            { asset_type_nft_contract = c ; asset_type_nft_token_id = id } in
+        Lwt.return_ok { asset_type; asset_value }
+      | _, _ ->
+        Lwt.return_error (`hook_error ("no contract addr or tokenId for ERC721 asset"))
+    end
+  | "ETH" ->
+    begin
+      match contract, token_id with
+      | None, None ->
+        Lwt.return_ok { asset_type = ATETH ; asset_value }
+      | _, _ ->
+        Lwt.return_error (`hook_error ("contract addr or tokenId for ETH asset"))
+    end
+    (* Tezos assets*)
+  | "XTZ" ->
+    begin
+      match contract, token_id with
+      | None, None ->
+        Lwt.return_ok { asset_type = ATXTZ ; asset_value }
+      | _, _ ->
+        Lwt.return_error (`hook_error ("contract addr or tokenId for XTZ asset"))
+    end
+  | "FA_1_2" ->
+    begin
+      match contract, token_id with
+      | Some c, None ->
+        let asset_type = ATFA_1_2 c in
+        Lwt.return_ok { asset_type; asset_value }
+      | _, _ ->
+        Lwt.return_error (`hook_error ("need contract and no tokenId for FA1.2 asset"))
+    end
+  | "FA_2" ->
+    begin
+      match contract, token_id with
+      | Some c, Some id ->
+        let asset_type =
+          ATFA_2
+            { asset_fa2_contract = c ; asset_fa2_token_id = id } in
+        Lwt.return_ok { asset_type; asset_value }
+      | _, _ ->
+        Lwt.return_error (`hook_error ("no contract addr for FA2 asset"))
+    end
+  | _ ->
+    Lwt.return_error (`hook_error ("invalid asset class " ^ asset_class))
+
+let db_from_asset asset =
+  let asset_value = Int64.of_string asset.asset_value in
+  match asset.asset_type with
+  (* For testing purposes*)
+  | ATERC721 data ->
+    Lwt.return_ok
+      (string_of_asset_type asset.asset_type,
+       Some data.asset_type_nft_contract,
+       Some data.asset_type_nft_token_id,
+       asset_value)
+  | ATETH ->
+    Lwt.return_ok
+      (string_of_asset_type asset.asset_type, None, None, asset_value)
+  (* Tezos assets*)
+  | ATXTZ ->
+    Lwt.return_ok
+      (string_of_asset_type asset.asset_type, None, None, asset_value)
+  | ATFA_1_2 c ->
+    Lwt.return_ok
+      (string_of_asset_type asset.asset_type,
+       Some c,
+       None,
+       asset_value)
+  | ATFA_2 fa2 ->
+    Lwt.return_ok
+      (string_of_asset_type asset.asset_type,
+       Some fa2.asset_fa2_contract,
+       Some fa2.asset_fa2_token_id,
+       asset_value)
+
+(* Normalize here in case of ERC20 like asset *)
+let price left right =
+  if Int64.of_string left.asset_value > 0L then
+    Lwt.return_ok @@
+    Int64.(to_string (div (of_string left.asset_value) (of_string right.asset_value)))
+  else Lwt.return_ok "0"
+
+let nft_price left right =
+  match left.asset_type with
+  | ATFA_2 _ -> price left right
+  | _ -> price right left
+
+let mk_order_activity_bid obj =
+  mk_asset
+    obj#make_asset_type_class
+    obj#make_asset_type_contract
+    obj#make_asset_type_token_id
+    obj#make_asset_value
+  >>=? fun make ->
+  mk_asset
+    obj#take_asset_type_class
+    obj#take_asset_type_contract
+    obj#take_asset_type_token_id
+    obj#take_asset_value
+  >>=? fun take ->
+  nft_price make take >>=? fun price ->
+  Lwt.return_ok
+    {
+      order_activity_bid_hash = obj#o_hash;
+      order_activity_bid_maker = obj#maker ;
+      order_activity_bid_make = make ;
+      order_activity_bid_take = take ;
+      order_activity_bid_price = price ;
+      order_activity_bid_price_usd = None ;
+    }
+
+let mk_side_type asset = match asset.asset_type with
+  | ATFA_2 _ -> STBID
+  | _ -> STSELL
+
+let mk_left_side obj =
+  mk_asset
+    obj#oleft_make_asset_type_class
+    obj#oleft_make_asset_type_contract
+    obj#oleft_make_asset_type_token_id
+    obj#oleft_make_asset_value
+  >|=? fun asset ->
+  {
+    order_activity_match_side_maker = obj#oleft_maker ;
+    order_activity_match_side_hash = obj#oleft_hash ;
+    order_activity_match_side_asset = asset ;
+    order_activity_match_side_type = mk_side_type asset ;
+  }
+
+let mk_right_side obj =
+  mk_asset
+    obj#oright_take_asset_type_class
+    obj#oright_take_asset_type_contract
+    obj#oright_take_asset_type_token_id
+    obj#oright_take_asset_value
+  >|=? fun asset ->
+  {
+    order_activity_match_side_maker = Option.get obj#oright_taker ;
+    order_activity_match_side_hash = obj#oright_hash ;
+    order_activity_match_side_asset = asset ;
+    order_activity_match_side_type = mk_side_type asset ;
+  }
+
+let mk_order_activity_match obj =
+  let>? left = mk_left_side obj in
+  let>? right = mk_right_side obj in
+  nft_price
+    left.order_activity_match_side_asset
+    right.order_activity_match_side_asset
+  >|=? fun price ->
+  {
+    order_activity_match_left = left ;
+    order_activity_match_right = right ;
+    order_activity_match_price = price ;
+    order_activity_match_price_usd = None ;
+    order_activity_match_transaction_hash = Option.get obj#transaction ;
+    order_activity_match_block_hash = Option.get obj#block ;
+    order_activity_match_block_number = Int64.of_int32 @@ Option.get obj#level ;
+    order_activity_match_log_index = 0 ;
+  }
+
+let mk_order_activity_cancel obj =
+  mk_asset
+    obj#make_asset_type_class
+    obj#make_asset_type_contract
+    obj#make_asset_type_token_id
+    obj#make_asset_value
+  >>=? fun make ->
+  mk_asset
+    obj#take_asset_type_class
+    obj#take_asset_type_contract
+    obj#take_asset_type_token_id
+    obj#take_asset_value
+  >>=? fun take ->
+  let bid = {
+    order_activity_cancel_bid_hash = obj#o_hash;
+    order_activity_cancel_bid_maker = obj#maker ;
+    order_activity_cancel_bid_make = make.asset_type ;
+    order_activity_cancel_bid_take = take.asset_type ;
+    order_activity_cancel_bid_transction_hash = Option.get obj#transaction ;
+    order_activity_cancel_bid_block_hash = Option.get obj#block ;
+    order_activity_cancel_bid_block_number = Int64.of_int32 @@ Option.get obj#level ;
+    order_activity_cancel_bid_log_index = 0
+  } in
+  Lwt.return_ok @@
+  match make.asset_type with
+  | ATFA_2 _ ->
+    OrderActivityCancelList bid
+  | _ ->
+    OrderActivityCancelBid bid
+
+let mk_order_activity obj = match obj#order_activity_type with
+  | "list" ->
+    let|>? listing = mk_order_activity_bid obj in
+    OrderActivityList listing
+  | "bid" ->
+    let|>? listing = mk_order_activity_bid obj in
+    OrderActivityBid listing
+  | "match" ->
+    let|>? matched = mk_order_activity_match obj in
+    OrderActivityMatch matched
+  | "cancel" ->
+    mk_order_activity_cancel obj
+  | _ as t -> Lwt.return_error (`hook_error ("unknown order activity type " ^ t))
+
+let get_order_price_history ?dbh hash_key =
+  use dbh @@ fun dbh ->
+  let|>? l = [%pgsql dbh
+      "select date, make_value, take_value \
+       from order_price_history where hash = $hash_key \
+       order by date desc"] in
+  List.map
+    (fun (date, make_value, take_value) -> {
+         order_price_history_record_date = date ;
+         order_price_history_record_make_value = Int64.to_string make_value ;
+         order_price_history_record_take_value = Int64.to_string take_value ;
+       }) l
+
+let get_order_origin_fees ?dbh hash_key =
+  use dbh @@ fun dbh ->
+  let|>? l = [%pgsql dbh
+      "select account, value from origin_fees where hash = $hash_key"] in
+  to_parts l
+
+let get_order_payouts ?dbh hash_key =
+  use dbh @@ fun dbh ->
+  let|>? l = [%pgsql dbh
+      "select account, value from payouts where hash = $hash_key"] in
+  to_parts l
+
+let get_fill hash rows =
+  List.fold_left (fun acc_fill r ->
+      let fill =
+        match r#hash_left, r#hash_right with
+        | hl, _hr when hl = hash -> r#fill_make_value
+        | _hl, hr when hr = hash -> r#fill_take_value
+        | _ -> 0L in
+      Int64.add acc_fill fill)
+    0L rows
+
+let get_cancelled hash l =
+  List.exists (fun r -> r#cancel = Some hash) l
+
+let get_make_balance ?dbh make owner = match make.asset_type with
+  | ATXTZ -> Lwt.return_ok 0L
+  | ATFA_1_2 _addr ->
+    Printf.eprintf "TODO : get_make_balance FA1.2\n%!" ;
+    Lwt.return_ok 0L
+  | ATFA_2 { asset_fa2_contract ; asset_fa2_token_id }->
+    let contract = asset_fa2_contract in
+    let token_id = Int64.of_string asset_fa2_token_id in
+    use dbh @@ fun dbh ->
+    let|>? l = [%pgsql.object dbh
+        "select amount from tokens where \
+         main and \
+         contract = $contract and token_id = $token_id and \
+         owner = $owner"] in
+    begin match l with
+      | [ r ] -> r#amount
+      | _ -> 0L
+    end
+  | _ -> Lwt.return_ok 0L
+
+let calculate_make_stock make take data fill make_balance cancelled =
+  (* TODO : protocol commission *)
+  let make_value = Int64.of_string make.asset_value in
+  let take_value = Int64.of_string take.asset_value in
+  let protocol_commission = 0L in
+  let fee_side = get_fee_side make take in
+  calculate_make_stock
+    make_value take_value fill data make_balance
+    protocol_commission fee_side cancelled
+
+let get_order_updates ?dbh obj make maker take data =
+  let hash = obj#hash in
+  use dbh @@ fun dbh ->
+  let>? cancel = [%pgsql.object dbh
+      "select * from order_cancel \
+       where main and (cancel = $hash) order by tsp"] in
+  match cancel with
+  | [ cancel ] ->
+    Lwt.return_ok (0L, 0L, true, cancel#tsp, 0L)
+  | _ ->
+    let>? matches = [%pgsql.object dbh
+        "select * from order_match \
+         where main and \
+         (hash_left = $hash or hash_right = $hash) order by tsp"] in
+    let fill = get_fill hash matches in
+    let owner = Tzfunc.Crypto.pk_to_tz1 maker in
+    let|>? make_balance = get_make_balance make owner in
+    let cancelled = false in
+    let make_stock = calculate_make_stock make take data fill make_balance cancelled in
+    let last_update_at = match matches with hd :: _ -> hd#tsp | [] -> obj#created_at in
+    fill, make_stock, cancelled, last_update_at, make_balance
+
+let mk_order ?dbh order_obj =
+  mk_asset
+    order_obj#make_asset_type_class
+    order_obj#make_asset_type_contract
+    order_obj#make_asset_type_token_id
+    order_obj#make_asset_value
+  >>=? fun order_elt_make ->
+  mk_asset
+    order_obj#take_asset_type_class
+    order_obj#take_asset_type_contract
+    order_obj#take_asset_type_token_id
+    order_obj#take_asset_value
+  >>=? fun order_elt_take ->
+  get_order_price_history ?dbh order_obj#hash >>=? fun price_history ->
+  get_order_origin_fees ?dbh order_obj#hash >>=? fun origin_fees ->
+  get_order_payouts ?dbh order_obj#hash >>=? fun payouts ->
+  let data = RaribleV2Order {
+    order_rarible_v2_data_v1_data_type = "RARIBLE_V2_DATA_V1" ;
+    order_rarible_v2_data_v1_payouts = payouts ;
+    order_rarible_v2_data_v1_origin_fees = origin_fees ;
+  } in
+  let>? (fill, make_stock, cancelled, last_update_at, make_balance) =
+    get_order_updates ?dbh order_obj order_elt_make order_obj#maker order_elt_take data in
+  let order_elt = {
+    order_elt_maker = order_obj#maker ;
+    order_elt_taker = order_obj#taker ;
+    order_elt_make ;
+    order_elt_take ;
+    order_elt_fill = Int64.to_string fill ;
+    order_elt_start = order_obj#start_date ;
+    order_elt_end = order_obj#end_date ;
+    order_elt_make_stock = Int64.to_string make_stock ;
+    order_elt_cancelled = cancelled ;
+    order_elt_salt = order_obj#salt ;
+    order_elt_signature = order_obj#signature ;
+    order_elt_created_at = order_obj#created_at ;
+    order_elt_last_update_at = last_update_at ;
+    order_elt_pending = None ;
+    order_elt_hash = order_obj#hash ;
+    order_elt_make_balance = Option.some @@ Int64.to_string make_balance ;
+    order_elt_make_price_usd = string_of_float order_obj#make_price_usd ;
+    order_elt_take_price_usd = string_of_float order_obj#take_price_usd ;
+    order_elt_price_history = price_history ;
+  } in
+  let rarible_v2_order = {
+    order_elt = order_elt ;
+    order_data = data ;
+  } in
+  Lwt.return_ok rarible_v2_order
+
+let get_order ?dbh hash_key =
+  Printf.eprintf "get_order %s\n%!" hash_key ;
+  use dbh @@ fun dbh ->
+  let>? l = [%pgsql.object dbh
+      "select maker, taker, \
+       make_asset_type_class, make_asset_type_contract, make_asset_type_token_id, \
+       make_asset_value, \
+       take_asset_type_class, take_asset_type_contract, take_asset_type_token_id, \
+       take_asset_value, \
+       start_date, end_date, salt, signature, created_at, hash, \
+       make_price_usd, take_price_usd \
+       from orders where hash = $hash_key"] in
+  match l with
+  | [] -> Lwt.return_ok None
+  | _ ->
+    one l >>=? fun r ->
+    mk_order r >>=? fun order ->
+    Lwt.return_ok @@ Some order
+
+let produce_order_event dbh hash =
+  let>? order = get_order ~dbh hash in
+  begin
+    match order with
+    | Some order ->
+      Rarible_kafka.produce_order_event
+        (mk_order_event "TODO-EVENTID" "TODO-ORDERID" order)
+    | None -> Lwt.return ()
+  end >>= fun () ->
+  Lwt.return_ok ()
 
 let insert_fake ?dbh address =
   use dbh @@ fun dbh ->
@@ -102,7 +490,9 @@ let insert_nft_activity dbh timestamp nft_activity =
        ${nft_activity.nft_activity_elt.nft_activity_contract}, \
        $token_id, \
        ${nft_activity.nft_activity_elt.nft_activity_owner}, $value, $?act_from) \
-       on conflict do nothing"]
+       on conflict do nothing"] >>=? fun () ->
+  Rarible_kafka.produce_activity nft_activity >>= fun () ->
+  Lwt.return_ok ()
 
 let create_nft_activity_elt op contract mi_op = {
   nft_activity_owner = mi_op.tk_owner ;
@@ -121,7 +511,6 @@ let insert_nft_activity_mint dbh op kt1 mi_op =
     nft_activity_elt ;
   } in
   insert_nft_activity dbh op.bo_tsp nft_activity
-  (* TODO : KAFKA *)
 
 let insert_nft_activity_burn dbh op kt1 mi_op =
   let nft_activity_elt = create_nft_activity_elt op kt1 mi_op in
@@ -130,7 +519,7 @@ let insert_nft_activity_burn dbh op kt1 mi_op =
     nft_activity_elt ;
   } in
   insert_nft_activity dbh op.bo_tsp nft_activity
-  (* TODO : KAFKA *)
+
 
 let insert_nft_activity_transfer dbh op kt1 source owner token_id amount =
   let nft_activity_elt = {
@@ -147,7 +536,6 @@ let insert_nft_activity_transfer dbh op kt1 source owner token_id amount =
     nft_activity_elt ;
   } in
   insert_nft_activity dbh op.bo_tsp nft_activity
-(* TODO : KAFKA *)
 
 let insert_mint dbh op kt1 m =
   let meta = EzEncoding.construct token_metadata_enc m.mi_meta in
@@ -275,7 +663,8 @@ let insert_cancel dbh op hash =
       "insert into order_cancel(transaction, index, block, level, tsp, source, cancel) \
        values(${op.bo_hash}, ${op.bo_index}, ${op.bo_block}, ${op.bo_level}, \
        ${op.bo_tsp}, $source, $hash) \
-       on conflict do nothing"]
+       on conflict do nothing"] >>=? fun () ->
+  produce_order_event dbh hash
 
 let insert_order_activity_match dbh left right transaction block level date =
   insert_order_activity dbh left right left transaction block level date "match"
@@ -288,7 +677,9 @@ let insert_do_transfers dbh op ~left ~right ~fill_make_value ~fill_take_value =
        values(${op.bo_hash}, ${op.bo_index}, ${op.bo_block}, ${op.bo_level}, \
        ${op.bo_tsp}, $source, $left, $right, \
        $fill_make_value, $fill_take_value) \
-       on conflict do nothing"]
+       on conflict do nothing"] >>=? fun () ->
+  produce_order_event dbh left >>=? fun () ->
+  produce_order_event dbh right
 
 let insert_order_activity_new dbh hash date make_class take_class =
   match make_class, take_class with
@@ -436,6 +827,8 @@ let insert_operation config dbh op =
   | _ -> Lwt.return_ok ()
 
 let insert_block config dbh b =
+  EzEncoding.construct Tzfunc.Proto.full_block_enc.Encoding.json b
+  |> Rarible_kafka.produce_test >>= fun () ->
   iter_rp (fun op ->
       iter_rp (fun c ->
           match c.man_metadata with
@@ -689,12 +1082,6 @@ let get_level ?dbh () =
   match res with
   | Some level -> Lwt.return_ok @@ Int32.to_int level
   | None -> Lwt.return_error (`hook_error "no level")
-
-let to_parts l =
-  List.map (fun (part_account, v) -> {
-        part_account ;
-        part_value = Int32.to_int v
-      }) l
 
 let get_nft_item_creators_from_metadata r =
   try EzEncoding.destruct (Json_encoding.list part_enc) r#creators
@@ -1416,250 +1803,6 @@ let get_nft_all_collections ?dbh ?continuation ?(size=50) () =
   Lwt.return_ok
     { nft_collections_collections ; nft_collections_continuation ; nft_collections_total }
 
-let mk_asset asset_class contract token_id asset_value =
-  let asset_value = Int64.to_string asset_value in
-  match asset_class with
-  (* For testing purposes*)
-  | "ERC721" ->
-    begin
-      match contract, token_id with
-      | Some c, Some id ->
-        let asset_type =
-          ATERC721
-            { asset_type_nft_contract = c ; asset_type_nft_token_id = id } in
-        Lwt.return_ok { asset_type; asset_value }
-      | _, _ ->
-        Lwt.return_error (`hook_error ("no contract addr or tokenId for ERC721 asset"))
-    end
-  | "ETH" ->
-    begin
-      match contract, token_id with
-      | None, None ->
-        Lwt.return_ok { asset_type = ATETH ; asset_value }
-      | _, _ ->
-        Lwt.return_error (`hook_error ("contract addr or tokenId for ETH asset"))
-    end
-    (* Tezos assets*)
-  | "XTZ" ->
-    begin
-      match contract, token_id with
-      | None, None ->
-        Lwt.return_ok { asset_type = ATXTZ ; asset_value }
-      | _, _ ->
-        Lwt.return_error (`hook_error ("contract addr or tokenId for XTZ asset"))
-    end
-  | "FA_1_2" ->
-    begin
-      match contract, token_id with
-      | Some c, None ->
-        let asset_type = ATFA_1_2 c in
-        Lwt.return_ok { asset_type; asset_value }
-      | _, _ ->
-        Lwt.return_error (`hook_error ("need contract and no tokenId for FA1.2 asset"))
-    end
-  | "FA_2" ->
-    begin
-      match contract, token_id with
-      | Some c, Some id ->
-        let asset_type =
-          ATFA_2
-            { asset_fa2_contract = c ; asset_fa2_token_id = id } in
-        Lwt.return_ok { asset_type; asset_value }
-      | _, _ ->
-        Lwt.return_error (`hook_error ("no contract addr for FA2 asset"))
-    end
-  | _ ->
-    Lwt.return_error (`hook_error ("invalid asset class " ^ asset_class))
-
-let db_from_asset asset =
-  let asset_value = Int64.of_string asset.asset_value in
-  match asset.asset_type with
-  (* For testing purposes*)
-  | ATERC721 data ->
-    Lwt.return_ok
-      (string_of_asset_type asset.asset_type,
-       Some data.asset_type_nft_contract,
-       Some data.asset_type_nft_token_id,
-       asset_value)
-  | ATETH ->
-    Lwt.return_ok
-      (string_of_asset_type asset.asset_type, None, None, asset_value)
-  (* Tezos assets*)
-  | ATXTZ ->
-    Lwt.return_ok
-      (string_of_asset_type asset.asset_type, None, None, asset_value)
-  | ATFA_1_2 c ->
-    Lwt.return_ok
-      (string_of_asset_type asset.asset_type,
-       Some c,
-       None,
-       asset_value)
-  | ATFA_2 fa2 ->
-    Lwt.return_ok
-      (string_of_asset_type asset.asset_type,
-       Some fa2.asset_fa2_contract,
-       Some fa2.asset_fa2_token_id,
-       asset_value)
-
-let get_order_price_history ?dbh hash_key =
-  use dbh @@ fun dbh ->
-  let|>? l = [%pgsql dbh
-      "select date, make_value, take_value \
-       from order_price_history where hash = $hash_key \
-       order by date desc"] in
-  List.map
-    (fun (date, make_value, take_value) -> {
-         order_price_history_record_date = date ;
-         order_price_history_record_make_value = Int64.to_string make_value ;
-         order_price_history_record_take_value = Int64.to_string take_value ;
-       }) l
-
-let get_order_origin_fees ?dbh hash_key =
-  use dbh @@ fun dbh ->
-  let|>? l = [%pgsql dbh
-      "select account, value from origin_fees where hash = $hash_key"] in
-  to_parts l
-
-let get_order_payouts ?dbh hash_key =
-  use dbh @@ fun dbh ->
-  let|>? l = [%pgsql dbh
-      "select account, value from payouts where hash = $hash_key"] in
-  to_parts l
-
-let get_fill hash rows =
-  List.fold_left (fun acc_fill r ->
-      let fill =
-        match r#hash_left, r#hash_right with
-        | hl, _hr when hl = hash -> r#fill_make_value
-        | _hl, hr when hr = hash -> r#fill_take_value
-        | _ -> 0L in
-      Int64.add acc_fill fill)
-    0L rows
-
-let get_cancelled hash l =
-  List.exists (fun r -> r#cancel = Some hash) l
-
-let get_make_balance ?dbh make owner = match make.asset_type with
-  | ATXTZ -> Lwt.return_ok 0L
-  | ATFA_1_2 _addr ->
-    Printf.eprintf "TODO : get_make_balance FA1.2\n%!" ;
-    Lwt.return_ok 0L
-  | ATFA_2 { asset_fa2_contract ; asset_fa2_token_id }->
-    let contract = asset_fa2_contract in
-    let token_id = Int64.of_string asset_fa2_token_id in
-    use dbh @@ fun dbh ->
-    let|>? l = [%pgsql.object dbh
-        "select amount from tokens where \
-         main and \
-         contract = $contract and token_id = $token_id and \
-         owner = $owner"] in
-    begin match l with
-      | [ r ] -> r#amount
-      | _ -> 0L
-    end
-  | _ -> Lwt.return_ok 0L
-
-let calculate_make_stock make take data fill make_balance cancelled =
-  (* TODO : protocol commission *)
-  let make_value = Int64.of_string make.asset_value in
-  let take_value = Int64.of_string take.asset_value in
-  let protocol_commission = 0L in
-  let fee_side = get_fee_side make take in
-  calculate_make_stock
-    make_value take_value fill data make_balance
-    protocol_commission fee_side cancelled
-
-let get_order_updates ?dbh obj make maker take data =
-  let hash = obj#hash in
-  use dbh @@ fun dbh ->
-  let>? cancel = [%pgsql.object dbh
-      "select * from order_cancel \
-       where main and (cancel = $hash) order by tsp"] in
-  match cancel with
-  | [ cancel ] ->
-    Lwt.return_ok (0L, 0L, true, cancel#tsp, 0L)
-  | _ ->
-    let>? matches = [%pgsql.object dbh
-        "select * from order_match \
-         where main and \
-         (hash_left = $hash or hash_right = $hash) order by tsp"] in
-    let fill = get_fill hash matches in
-    let owner = Tzfunc.Crypto.pk_to_tz1 maker in
-    let|>? make_balance = get_make_balance make owner in
-    let cancelled = false in
-    let make_stock = calculate_make_stock make take data fill make_balance cancelled in
-    let last_update_at = match matches with hd :: _ -> hd#tsp | [] -> obj#created_at in
-    fill, make_stock, cancelled, last_update_at, make_balance
-
-let mk_order ?dbh order_obj =
-  mk_asset
-    order_obj#make_asset_type_class
-    order_obj#make_asset_type_contract
-    order_obj#make_asset_type_token_id
-    order_obj#make_asset_value
-  >>=? fun order_elt_make ->
-  mk_asset
-    order_obj#take_asset_type_class
-    order_obj#take_asset_type_contract
-    order_obj#take_asset_type_token_id
-    order_obj#take_asset_value
-  >>=? fun order_elt_take ->
-  get_order_price_history ?dbh order_obj#hash >>=? fun price_history ->
-  get_order_origin_fees ?dbh order_obj#hash >>=? fun origin_fees ->
-  get_order_payouts ?dbh order_obj#hash >>=? fun payouts ->
-  let data = RaribleV2Order {
-    order_rarible_v2_data_v1_data_type = "RARIBLE_V2_DATA_V1" ;
-    order_rarible_v2_data_v1_payouts = payouts ;
-    order_rarible_v2_data_v1_origin_fees = origin_fees ;
-  } in
-  let>? (fill, make_stock, cancelled, last_update_at, make_balance) =
-    get_order_updates ?dbh order_obj order_elt_make order_obj#maker order_elt_take data in
-  let order_elt = {
-    order_elt_maker = order_obj#maker ;
-    order_elt_taker = order_obj#taker ;
-    order_elt_make ;
-    order_elt_take ;
-    order_elt_fill = Int64.to_string fill ;
-    order_elt_start = order_obj#start_date ;
-    order_elt_end = order_obj#end_date ;
-    order_elt_make_stock = Int64.to_string make_stock ;
-    order_elt_cancelled = cancelled ;
-    order_elt_salt = order_obj#salt ;
-    order_elt_signature = order_obj#signature ;
-    order_elt_created_at = order_obj#created_at ;
-    order_elt_last_update_at = last_update_at ;
-    order_elt_pending = None ;
-    order_elt_hash = order_obj#hash ;
-    order_elt_make_balance = Option.some @@ Int64.to_string make_balance ;
-    order_elt_make_price_usd = string_of_float order_obj#make_price_usd ;
-    order_elt_take_price_usd = string_of_float order_obj#take_price_usd ;
-    order_elt_price_history = price_history ;
-  } in
-  let rarible_v2_order = {
-    order_elt = order_elt ;
-    order_data = data ;
-  } in
-  Lwt.return_ok rarible_v2_order
-
-let get_order ?dbh hash_key =
-  Printf.eprintf "get_order %s\n%!" hash_key ;
-  use dbh @@ fun dbh ->
-  let>? l = [%pgsql.object dbh
-      "select maker, taker, \
-       make_asset_type_class, make_asset_type_contract, make_asset_type_token_id, \
-       make_asset_value, \
-       take_asset_type_class, take_asset_type_contract, take_asset_type_token_id, \
-       take_asset_value, \
-       start_date, end_date, salt, signature, created_at, hash, \
-       make_price_usd, take_price_usd \
-       from orders where hash = $hash_key"] in
-  match l with
-  | [] -> Lwt.return_ok None
-  | _ ->
-    one l >>=? fun r ->
-    mk_order r >>=? fun order ->
-    Lwt.return_ok @@ Some order
-
 let mk_order_continuation order =
   Printf.sprintf "%Ld_%s"
     (Int64.of_float @@ CalendarLib.Calendar.to_unixfloat order.order_elt.order_elt_last_update_at)
@@ -2112,7 +2255,7 @@ let get_bid_orders_by_maker ?dbh ?origin ?continuation ?(size=50) maker =
  *     Lwt.return_ok @@
  *     List.filter_map (fun x -> x) @@
  *     List.mapi (fun i order -> if i < Int64.to_int size then Some order else None) acc
- * 
+ *
  * let get_bid_orders_by_item ?dbh ?origin ?continuation ?(size=50) ?maker contract token_id =
  *   Format.eprintf "get_bid_orders_by_item %s %s %s %s %s %d@."
  *     (match maker with None -> "None" | Some s -> s)
@@ -2295,142 +2438,13 @@ let upsert_order ?dbh order =
     if last_update_at = created_at then insert_origin_fees dbh origin_fees hash_key
     else Lwt.return_ok ()
   end >>=? fun () ->
-  insert_payouts dbh payouts hash_key
+  insert_payouts dbh payouts hash_key >>=? fun () ->
+  produce_order_event dbh order.order_elt.order_elt_hash
 
 let mk_order_activity_continuation _obj =
   Printf.sprintf "TODO"
     (* (Int64.of_float @@ CalendarLib.Calendar.to_unixfloat obj#date)
      * obj#transaction *)
-
-(* Normalize here in case of ERC20 like asset *)
-let price left right =
-  if Int64.of_string left.asset_value > 0L then
-    Lwt.return_ok @@
-    Int64.(to_string (div (of_string left.asset_value) (of_string right.asset_value)))
-  else Lwt.return_ok "0"
-
-let nft_price left right =
-  match left.asset_type with
-  | ATFA_2 _ -> price left right
-  | _ -> price right left
-
-let mk_order_activity_bid obj =
-  mk_asset
-    obj#make_asset_type_class
-    obj#make_asset_type_contract
-    obj#make_asset_type_token_id
-    obj#make_asset_value
-  >>=? fun make ->
-  mk_asset
-    obj#take_asset_type_class
-    obj#take_asset_type_contract
-    obj#take_asset_type_token_id
-    obj#take_asset_value
-  >>=? fun take ->
-  nft_price make take >>=? fun price ->
-  Lwt.return_ok
-    {
-      order_activity_bid_hash = obj#o_hash;
-      order_activity_bid_maker = obj#maker ;
-      order_activity_bid_make = make ;
-      order_activity_bid_take = take ;
-      order_activity_bid_price = price ;
-      order_activity_bid_price_usd = None ;
-    }
-
-let mk_side_type asset = match asset.asset_type with
-  | ATFA_2 _ -> STBID
-  | _ -> STSELL
-
-let mk_left_side obj =
-  mk_asset
-    obj#oleft_make_asset_type_class
-    obj#oleft_make_asset_type_contract
-    obj#oleft_make_asset_type_token_id
-    obj#oleft_make_asset_value
-  >|=? fun asset ->
-  {
-    order_activity_match_side_maker = obj#oleft_maker ;
-    order_activity_match_side_hash = obj#oleft_hash ;
-    order_activity_match_side_asset = asset ;
-    order_activity_match_side_type = mk_side_type asset ;
-  }
-
-let mk_right_side obj =
-  mk_asset
-    obj#oright_take_asset_type_class
-    obj#oright_take_asset_type_contract
-    obj#oright_take_asset_type_token_id
-    obj#oright_take_asset_value
-  >|=? fun asset ->
-  {
-    order_activity_match_side_maker = Option.get obj#oright_taker ;
-    order_activity_match_side_hash = obj#oright_hash ;
-    order_activity_match_side_asset = asset ;
-    order_activity_match_side_type = mk_side_type asset ;
-  }
-
-let mk_order_activity_match obj =
-  let>? left = mk_left_side obj in
-  let>? right = mk_right_side obj in
-  nft_price
-    left.order_activity_match_side_asset
-    right.order_activity_match_side_asset
-  >|=? fun price ->
-  {
-    order_activity_match_left = left ;
-    order_activity_match_right = right ;
-    order_activity_match_price = price ;
-    order_activity_match_price_usd = None ;
-    order_activity_match_transaction_hash = Option.get obj#transaction ;
-    order_activity_match_block_hash = Option.get obj#block ;
-    order_activity_match_block_number = Int64.of_int32 @@ Option.get obj#level ;
-    order_activity_match_log_index = 0 ;
-  }
-
-let mk_order_activity_cancel obj =
-  mk_asset
-    obj#make_asset_type_class
-    obj#make_asset_type_contract
-    obj#make_asset_type_token_id
-    obj#make_asset_value
-  >>=? fun make ->
-  mk_asset
-    obj#take_asset_type_class
-    obj#take_asset_type_contract
-    obj#take_asset_type_token_id
-    obj#take_asset_value
-  >>=? fun take ->
-  let bid = {
-    order_activity_cancel_bid_hash = obj#o_hash;
-    order_activity_cancel_bid_maker = obj#maker ;
-    order_activity_cancel_bid_make = make.asset_type ;
-    order_activity_cancel_bid_take = take.asset_type ;
-    order_activity_cancel_bid_transction_hash = Option.get obj#transaction ;
-    order_activity_cancel_bid_block_hash = Option.get obj#block ;
-    order_activity_cancel_bid_block_number = Int64.of_int32 @@ Option.get obj#level ;
-    order_activity_cancel_bid_log_index = 0
-  } in
-  Lwt.return_ok @@
-  match make.asset_type with
-  | ATFA_2 _ ->
-    OrderActivityCancelList bid
-  | _ ->
-    OrderActivityCancelBid bid
-
-let mk_order_activity obj = match obj#order_activity_type with
-  | "list" ->
-    let|>? listing = mk_order_activity_bid obj in
-    OrderActivityList listing
-  | "bid" ->
-    let|>? listing = mk_order_activity_bid obj in
-    OrderActivityBid listing
-  | "match" ->
-    let|>? matched = mk_order_activity_match obj in
-    OrderActivityMatch matched
-  | "cancel" ->
-    mk_order_activity_cancel obj
-  | _ as t -> Lwt.return_error (`hook_error ("unknown order activity type " ^ t))
 
 let get_order_activities_by_collection ?dbh ?continuation ?(size=50) filter =
   Format.eprintf "get_order_activities_by_collection %s [%s] %s %d@."
