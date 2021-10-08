@@ -619,8 +619,8 @@ type order_elt = {
   order_elt_pending: order_exchange_history list option ;
   order_elt_hash: A.word;
   order_elt_make_balance: A.big_integer option;
-  order_elt_make_price_usd: A.big_decimal option;
-  order_elt_take_price_usd: A.big_decimal option;
+  order_elt_make_price_usd: A.big_decimal;
+  order_elt_take_price_usd: A.big_decimal;
   order_elt_price_history: order_price_history_record list ;
 } [@@deriving encoding {camel}]
 

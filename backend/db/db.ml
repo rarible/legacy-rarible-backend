@@ -1271,7 +1271,7 @@ let get_nft_ownerships_by_item ?dbh ?continuation ?(size=50) contract token_id =
        (last < $ts)) \
        order by last desc, id asc limit $size64"] in
   let>? nft_ownerships_total = [%pgsql dbh
-      "select count(owner) from tokens where main"] in
+      "select count(owner) from tokens where main and contract = $contract and token_id = $id64"] in
   let>? nft_ownerships_total = match nft_ownerships_total with
     | [ None ] -> Lwt.return_ok 0L
     | [ Some i64 ] -> Lwt.return_ok i64
@@ -1376,7 +1376,7 @@ let search_nft_collections_by_owner ?dbh ?continuation ?(size=50) owner =
        ($no_continuation or (address > $collection)) \
        order by address asc limit $size64"] in
   let>? nft_collections_total = [%pgsql dbh
-      "select count(address) from contracts where main and owner = $owner "] in
+      "select count(distinct address) from contracts where main and owner = $owner "] in
   let>? nft_collections_total = match nft_collections_total with
     | [ None ] -> Lwt.return_ok 0L
     | [ Some i64 ] -> Lwt.return_ok i64
@@ -1403,7 +1403,7 @@ let get_nft_all_collections ?dbh ?continuation ?(size=50) () =
        ($no_continuation or (address > $collection)) \
        order by address asc limit $size64"] in
   let>? nft_collections_total = [%pgsql dbh
-      "select count(address) from contracts where main "] in
+      "select count(distinct address) from contracts where main "] in
   let>? nft_collections_total = match nft_collections_total with
     | [ None ] -> Lwt.return_ok 0L
     | [ Some i64 ] -> Lwt.return_ok i64
@@ -1631,8 +1631,8 @@ let mk_order ?dbh order_obj =
     order_elt_pending = None ;
     order_elt_hash = order_obj#hash ;
     order_elt_make_balance = Option.some @@ Int64.to_string make_balance ;
-    order_elt_make_price_usd = string_opt_of_float_opt order_obj#make_price_usd ;
-    order_elt_take_price_usd = string_opt_of_float_opt order_obj#take_price_usd ;
+    order_elt_make_price_usd = string_of_float order_obj#make_price_usd ;
+    order_elt_take_price_usd = string_of_float order_obj#take_price_usd ;
     order_elt_price_history = price_history ;
   } in
   let rarible_v2_order = {
@@ -1666,9 +1666,7 @@ let mk_order_continuation order =
     order.order_elt.order_elt_hash
 
 let filter_orders ?origin orders =
-  Printf.eprintf "filter_orders %d\n%!" @@ List.length orders;
   List.filter (fun order ->
-      Printf.eprintf "filter_order %s\n%!" order.order_elt.order_elt_hash;
       (int_of_string order.order_elt.order_elt_make_stock) > 0 &&
       match origin with
       | Some orig ->
@@ -1695,11 +1693,12 @@ let rec get_orders_all_aux ?dbh ?origin ?continuation ~size acc =
     use dbh @@ fun dbh ->
     let>? l =
       [%pgsql dbh "select hash from orders \
-                   where ($no_continuation or \
-                   (last_update_at = $ts and hash < $h) or (last_update_at < $ts)) \
+                   where \
+                   ($no_continuation or \
+                   (last_update_at < $ts) or \
+                   (last_update_at = $ts and hash < $h)) \
                    order by last_update_at desc, hash desc limit $size"] in
     map_rp (fun h -> get_order ~dbh h) l >>=? fun orders ->
-    Printf.eprintf "orders %d\n%!" @@ List.length orders;
     match orders with
     | [] -> Lwt.return_ok acc
     | _ ->
@@ -1710,13 +1709,7 @@ let rec get_orders_all_aux ?dbh ?origin ?continuation ~size acc =
           Some (hd.order_elt.order_elt_last_update_at,
                 hd.order_elt.order_elt_hash) in
       let orders = filter_orders ?origin orders in
-      Printf.eprintf "orders %d\n%!" @@ List.length orders;
-      match orders with
-      | [] -> get_orders_all_aux ~dbh ?origin ?continuation ~size acc
-      | _ ->
-        Printf.eprintf "orders %d\n%!" @@ List.length orders;
-        let orders = acc @ orders in
-        get_orders_all_aux ~dbh ?origin ?continuation ~size orders
+      get_orders_all_aux ~dbh ?origin ?continuation ~size (acc @ orders)
   else
   if len = size then Lwt.return_ok acc
   else
@@ -1737,11 +1730,19 @@ let get_orders_all ?dbh ?origin ?continuation ?(size=50) () =
   let orders_pagination_contination =
     if len = 0L || len < size then None
     else Some
-        (mk_order_continuation @@ List.hd orders) in
+        (mk_order_continuation @@ List.hd @@ List.rev orders) in
   Lwt.return_ok
     { orders_pagination_orders = orders ; orders_pagination_contination }
 
 let rec get_sell_orders_by_maker_aux ?dbh ?origin ?continuation ~size ~maker acc =
+  Format.eprintf "get_sell_orders_by_maker_aux %s %s %Ld %s %d@."
+    (match origin with None -> "None" | Some s -> s)
+    (match continuation with
+     | None -> "None"
+     | Some (ts, s) -> (Tzfunc.Proto.A.cal_to_str ts) ^ "_" ^ s)
+    size
+    maker
+    (List.length acc) ;
   let no_continuation, (ts, h) =
     continuation = None,
     (match continuation with None -> CalendarLib.Calendar.now (), "" | Some (ts, h) -> (ts, h)) in
@@ -1750,25 +1751,26 @@ let rec get_sell_orders_by_maker_aux ?dbh ?origin ?continuation ~size ~maker acc
     use dbh @@ fun dbh ->
     let>? l =
       [%pgsql dbh "select hash from orders \
-                   where maker = $maker and \
-                   make_asset_type_class = 'FA_2' and \
+                   where \
+                   maker = $maker and \
                    ($no_continuation or \
-                   (last_update_at = $ts and hash > $h) or (last_update_at < $ts)) \
-                   order by last_update_at desc limit $size"] in
-    match l with
+                   (last_update_at < $ts) or \
+                   (last_update_at = $ts and hash < $h)) \
+                   order by last_update_at desc, hash desc limit $size"] in
+    map_rp (fun h -> get_order ~dbh h) l >>=? fun orders ->
+    match orders with
     | [] -> Lwt.return_ok acc
     | _ ->
-      map_rp (fun h -> get_order ~dbh h) l >>=? fun orders ->
       let orders = List.filter_map (fun x -> x) orders in
+      let continuation = match List.rev orders with
+        | [] -> None
+        | hd :: _ ->
+          Some (hd.order_elt.order_elt_last_update_at,
+                hd.order_elt.order_elt_hash) in
       let orders = filter_orders ?origin orders in
-      let last_order = List.hd (List.rev orders) in
-      let continuation =
-        last_order.order_elt.order_elt_last_update_at,
-        last_order.order_elt.order_elt_hash in
-      let orders = orders @ acc in
-      get_sell_orders_by_maker_aux ~dbh ?origin ~continuation ~size ~maker orders
+      get_sell_orders_by_maker_aux ~dbh ?origin ?continuation ~size ~maker (acc @ orders)
   else
-  if len = size  then Lwt.return_ok acc
+  if len = size then Lwt.return_ok acc
   else
     Lwt.return_ok @@
     List.filter_map (fun x -> x) @@
@@ -1787,70 +1789,122 @@ let get_sell_orders_by_maker ?dbh ?origin ?continuation ?(size=50) maker =
   let>? orders = get_sell_orders_by_maker_aux ?dbh ?origin ?continuation ~size ~maker [] in
   let len = Int64.of_int @@ List.length orders in
   let orders_pagination_contination =
-    if len <> size then None
+    if len = 0L || len < size then None
     else Some
-        (mk_order_continuation @@ List.hd (List.rev orders)) in
+        (mk_order_continuation @@ List.hd @@ List.rev orders) in
   Lwt.return_ok
     { orders_pagination_orders = orders ; orders_pagination_contination }
 
+(* let rec get_sell_orders_by_item_aux ?dbh ?origin ?continuation ?maker ~size contract token_id acc =
+ *   let no_continuation, (p, h) =
+ *     continuation = None,
+ *     (match continuation with None -> 0., "" | Some (p, h) -> (p, h)) in
+ *   let len = Int64.of_int @@ List.length acc in
+ *   let no_maker, maker_v = maker = None, (match maker with None -> "" | Some m -> m) in
+ *   if len < size  then
+ *     use dbh @@ fun dbh ->
+ *     let>? l =
+ *       [%pgsql dbh "select hash from orders \
+ *                    where make_asset_type_contract = $contract and \
+ *                    make_asset_type_token_id = $token_id and \
+ *                    ($no_maker or maker = $maker_v) and \
+ *                    ($no_continuation or \
+ *                    (make_price_usd > $p) or \
+ *                    (make_price_usd = $p and hash < $h)) \
+ *                    order by make_price_usd asc, hash desc limit $size"] in
+ *     map_rp (fun h -> get_order ~dbh h) l >>=? fun orders ->
+ *     match orders with
+ *     | [] -> Lwt.return_ok acc
+ *     | _ ->
+ *       let orders = List.filter_map (fun x -> x) orders in
+ *       let continuation = match List.rev orders with
+ *         | [] -> None
+ *         | hd :: _ ->
+ *           Some (float_of_string hd.order_elt.order_elt_make_price_usd,
+ *                 hd.order_elt.order_elt_hash) in
+ *       let orders = filter_orders ?origin orders in
+ *       get_sell_orders_by_item_aux
+ *         ~dbh ?origin ?continuation ?maker ~size contract token_id (acc @ orders)
+ *   else
+ *   if len = size then Lwt.return_ok acc
+ *   else
+ *     Lwt.return_ok @@
+ *     List.filter_map (fun x -> x) @@
+ *     List.mapi (fun i order -> if i < Int64.to_int size then Some order else None) acc *)
+
 let rec get_sell_orders_by_item_aux ?dbh ?origin ?continuation ?maker ~size contract token_id acc =
-  let no_continuation, (ts, h) =
+  Format.eprintf "get_orders_all_aux %s %s %Ld %s %s %d@."
+    (match origin with None -> "None" | Some s -> s)
+    (match continuation with
+     | None -> "None"
+     | Some (p, s) -> (string_of_float p) ^ "_" ^ s)
+    size
+    contract
+    token_id
+    (List.length acc) ;
+  let no_continuation, (p, h) =
     continuation = None,
-    (match continuation with None -> CalendarLib.Calendar.now (), "" | Some (ts, h) -> (ts, h)) in
-  let len = Int64.of_int @@ List.length acc in
+    (match continuation with None -> 0., "" | Some (ts, h) -> (ts, h)) in
   let no_maker, maker_v = maker = None, (match maker with None -> "" | Some m -> m) in
+  let len = Int64.of_int @@ List.length acc in
   if len < size  then
     use dbh @@ fun dbh ->
     let>? l =
       [%pgsql dbh "select hash from orders \
                    where make_asset_type_contract = $contract and \
-                   make_asset_type_class = 'FA_2' and \
                    make_asset_type_token_id = $token_id and \
                    ($no_maker or maker = $maker_v) and \
                    ($no_continuation or \
-                   (last_update_at = $ts and hash > $h) or (last_update_at < $ts)) \
-                   order by created_at desc limit $size"] in
-    match l with
+                   (make_price_usd > $p) or \
+                   (make_price_usd = $p and hash < $h)) \
+                   order by make_price_usd asc, hash desc limit $size"] in
+    map_rp (fun h -> get_order ~dbh h) l >>=? fun orders ->
+    match orders with
     | [] -> Lwt.return_ok acc
     | _ ->
-      map_rp (fun h -> get_order ~dbh h) l >>=? fun orders ->
       let orders = List.filter_map (fun x -> x) orders in
+      let continuation = match List.rev orders with
+        | [] -> None
+        | hd :: _ ->
+          Some (float_of_string hd.order_elt.order_elt_make_price_usd,
+                hd.order_elt.order_elt_hash) in
       let orders = filter_orders ?origin orders in
-      let last_order = List.hd (List.rev orders) in
-      let continuation =
-        last_order.order_elt.order_elt_last_update_at,
-        last_order.order_elt.order_elt_hash in
-      let orders = orders @ acc in
-      get_sell_orders_by_item_aux ~dbh ?origin ~continuation ~size contract token_id orders
+      get_sell_orders_by_item_aux
+        ~dbh ?origin ?continuation ?maker ~size contract token_id (acc @ orders)
   else
-  if len = size  then Lwt.return_ok acc
+  if len = size then Lwt.return_ok acc
   else
     Lwt.return_ok @@
     List.filter_map (fun x -> x) @@
     List.mapi (fun i order -> if i < Int64.to_int size then Some order else None) acc
 
 let get_sell_orders_by_item ?dbh ?origin ?continuation ?(size=50) ?maker contract token_id =
-  Format.eprintf "get_sell_orders_by_item %s %s %s %s %s %d@."
-    (match maker with None -> "None" | Some s -> s)
+  Format.eprintf "get_sell_orders_by_item %s %s %d@."
     (match origin with None -> "None" | Some s -> s)
-    contract
-    token_id
     (match continuation with
      | None -> "None"
-     | Some (ts, s) -> (Tzfunc.Proto.A.cal_to_str ts) ^ "_" ^ s)
+     | Some (f, s) -> (string_of_float f) ^ "_" ^ s)
     size ;
   let size = Int64.of_int size in
   let>? orders =
     get_sell_orders_by_item_aux ?dbh ?origin ?continuation ?maker ~size contract token_id [] in
   let len = Int64.of_int @@ List.length orders in
   let orders_pagination_contination =
-    if len <> size then None
+    if len = 0L || len < size then None
     else Some
-        (mk_order_continuation @@ List.hd (List.rev orders)) in
+        (mk_order_continuation @@ List.hd @@ List.rev orders) in
   Lwt.return_ok
     { orders_pagination_orders = orders ; orders_pagination_contination }
 
 let rec get_sell_orders_by_collection_aux ?dbh ?origin ?continuation ~size collection acc =
+  Format.eprintf "get_sell_orders_by_collection_aux %s %s %Ld %s %d@."
+    (match origin with None -> "None" | Some s -> s)
+    (match continuation with
+     | None -> "None"
+     | Some (ts, s) -> (Tzfunc.Proto.A.cal_to_str ts) ^ "_" ^ s)
+    size
+    collection
+    (List.length acc) ;
   let no_continuation, (ts, h) =
     continuation = None,
     (match continuation with None -> CalendarLib.Calendar.now (), "" | Some (ts, h) -> (ts, h)) in
@@ -1862,22 +1916,23 @@ let rec get_sell_orders_by_collection_aux ?dbh ?origin ?continuation ~size colle
                    where make_asset_type_contract = $collection and \
                    make_asset_type_class = 'FA_2' and \
                    ($no_continuation or \
-                   (last_update_at = $ts and hash > $h) or (last_update_at < $ts)) \
-                   order by created_at desc limit $size"] in
-    match l with
+                   (last_update_at < $ts) or \
+                   (last_update_at = $ts and hash < $h)) \
+                   order by last_update_at desc, hash desc limit $size"] in
+    map_rp (fun h -> get_order ~dbh h) l >>=? fun orders ->
+    match orders with
     | [] -> Lwt.return_ok acc
     | _ ->
-      map_rp (fun h -> get_order ~dbh h) l >>=? fun orders ->
       let orders = List.filter_map (fun x -> x) orders in
+      let continuation = match List.rev orders with
+        | [] -> None
+        | hd :: _ ->
+          Some (hd.order_elt.order_elt_last_update_at,
+                hd.order_elt.order_elt_hash) in
       let orders = filter_orders ?origin orders in
-      let last_order = List.hd (List.rev orders) in
-      let continuation =
-        last_order.order_elt.order_elt_last_update_at,
-        last_order.order_elt.order_elt_hash in
-      let orders = orders @ acc in
-      get_sell_orders_by_collection_aux ~dbh ?origin ~continuation ~size collection orders
+      get_sell_orders_by_collection_aux ~dbh ?origin ?continuation ~size collection (acc @ orders)
   else
-  if len = size  then Lwt.return_ok acc
+  if len = size then Lwt.return_ok acc
   else
     Lwt.return_ok @@
     List.filter_map (fun x -> x) @@
@@ -1896,13 +1951,20 @@ let get_sell_orders_by_collection ?dbh ?origin ?continuation ?(size=50) collecti
     get_sell_orders_by_collection_aux ?dbh ?origin ?continuation ~size collection [] in
   let len = Int64.of_int @@ List.length orders in
   let orders_pagination_contination =
-    if len <> size then None
+    if len = 0L || len < size then None
     else Some
-        (mk_order_continuation @@ List.hd (List.rev orders)) in
+        (mk_order_continuation @@ List.hd @@ List.rev orders) in
   Lwt.return_ok
     { orders_pagination_orders = orders ; orders_pagination_contination }
 
 let rec get_sell_orders_aux ?dbh ?origin ?continuation ~size acc =
+  Format.eprintf "get_sell_orders_aux %s %s %Ld %d@."
+    (match origin with None -> "None" | Some s -> s)
+    (match continuation with
+     | None -> "None"
+     | Some (ts, s) -> (Tzfunc.Proto.A.cal_to_str ts) ^ "_" ^ s)
+    size
+    (List.length acc) ;
   let no_continuation, (ts, h) =
     continuation = None,
     (match continuation with None -> CalendarLib.Calendar.now (), "" | Some (ts, h) -> (ts, h)) in
@@ -1913,22 +1975,23 @@ let rec get_sell_orders_aux ?dbh ?origin ?continuation ~size acc =
       [%pgsql dbh "select hash from orders \
                    where make_asset_type_class = 'FA_2' and \
                    ($no_continuation or \
-                   (last_update_at = $ts and hash > $h) or (last_update_at < $ts)) \
-                   order by created_at desc limit $size"] in
-    match l with
+                   (last_update_at < $ts) or \
+                   (last_update_at = $ts and hash < $h)) \
+                   order by last_update_at desc, hash desc limit $size"] in
+    map_rp (fun h -> get_order ~dbh h) l >>=? fun orders ->
+    match orders with
     | [] -> Lwt.return_ok acc
     | _ ->
-      map_rp (fun h -> get_order ~dbh h) l >>=? fun orders ->
       let orders = List.filter_map (fun x -> x) orders in
+      let continuation = match List.rev orders with
+        | [] -> None
+        | hd :: _ ->
+          Some (hd.order_elt.order_elt_last_update_at,
+                hd.order_elt.order_elt_hash) in
       let orders = filter_orders ?origin orders in
-      let last_order = List.hd (List.rev orders) in
-      let continuation =
-        last_order.order_elt.order_elt_last_update_at,
-        last_order.order_elt.order_elt_hash in
-      let orders = orders @ acc in
-      get_sell_orders_aux ~dbh ?origin ~continuation ~size orders
+      get_sell_orders_aux ~dbh ?origin ?continuation ~size (acc @ orders)
   else
-  if len = size  then Lwt.return_ok acc
+  if len = size then Lwt.return_ok acc
   else
     Lwt.return_ok @@
     List.filter_map (fun x -> x) @@
@@ -1942,17 +2005,24 @@ let get_sell_orders ?dbh ?origin ?continuation ?(size=50) () =
      | Some (ts, s) -> (Tzfunc.Proto.A.cal_to_str ts) ^ "_" ^ s)
     size ;
   let size = Int64.of_int size in
-  let>? orders =
-    get_sell_orders_aux ?dbh ?origin ?continuation ~size [] in
+  let>? orders = get_sell_orders_aux ?dbh ?origin ?continuation ~size [] in
   let len = Int64.of_int @@ List.length orders in
   let orders_pagination_contination =
-    if len <> size then None
+    if len = 0L || len < size then None
     else Some
-        (mk_order_continuation @@ List.hd (List.rev orders)) in
+        (mk_order_continuation @@ List.hd @@ List.rev orders) in
   Lwt.return_ok
     { orders_pagination_orders = orders ; orders_pagination_contination }
 
 let rec get_bid_orders_by_maker_aux ?dbh ?origin ?continuation ~size ~maker acc =
+  Format.eprintf "get_bid_orders_by_maker_aux %s %s %Ld %s %d@."
+    (match origin with None -> "None" | Some s -> s)
+    (match continuation with
+     | None -> "None"
+     | Some (ts, s) -> (Tzfunc.Proto.A.cal_to_str ts) ^ "_" ^ s)
+    size
+    maker
+    (List.length acc) ;
   let no_continuation, (ts, h) =
     continuation = None,
     (match continuation with None -> CalendarLib.Calendar.now (), "" | Some (ts, h) -> (ts, h)) in
@@ -1961,25 +2031,27 @@ let rec get_bid_orders_by_maker_aux ?dbh ?origin ?continuation ~size ~maker acc 
     use dbh @@ fun dbh ->
     let>? l =
       [%pgsql dbh "select hash from orders \
-                   where maker = $maker \
-                   and take_asset_type_class = 'FA_2' and \
+                   where \
+                   maker = $maker and \
+                   take_asset_type_class = 'FA_2' and \
                    ($no_continuation or \
-                   (last_update_at = $ts and hash > $h) or (last_update_at < $ts)) \
-                   order by created_at desc limit $size"] in
-    match l with
+                   (last_update_at < $ts) or \
+                   (last_update_at = $ts and hash < $h)) \
+                   order by last_update_at desc, hash desc limit $size"] in
+    map_rp (fun h -> get_order ~dbh h) l >>=? fun orders ->
+    match orders with
     | [] -> Lwt.return_ok acc
     | _ ->
-      map_rp (fun h -> get_order ~dbh h) l >>=? fun orders ->
       let orders = List.filter_map (fun x -> x) orders in
+      let continuation = match List.rev orders with
+        | [] -> None
+        | hd :: _ ->
+          Some (hd.order_elt.order_elt_last_update_at,
+                hd.order_elt.order_elt_hash) in
       let orders = filter_orders ?origin orders in
-      let last_order = List.hd (List.rev orders) in
-      let continuation =
-        last_order.order_elt.order_elt_last_update_at,
-        last_order.order_elt.order_elt_hash in
-      let orders = orders @ acc in
-      get_bid_orders_by_maker_aux ~dbh ?origin ~continuation ~size ~maker orders
+      get_bid_orders_by_maker_aux ~dbh ?origin ?continuation ~size ~maker (acc @ orders)
   else
-  if len = size  then Lwt.return_ok acc
+  if len = size then Lwt.return_ok acc
   else
     Lwt.return_ok @@
     List.filter_map (fun x -> x) @@
@@ -1998,68 +2070,131 @@ let get_bid_orders_by_maker ?dbh ?origin ?continuation ?(size=50) maker =
   let>? orders = get_bid_orders_by_maker_aux ?dbh ?origin ?continuation ~size ~maker [] in
   let len = Int64.of_int @@ List.length orders in
   let orders_pagination_contination =
-    if len <> size then None
+    if len = 0L || len < size then None
     else Some
-        (mk_order_continuation @@ List.hd (List.rev orders)) in
+        (mk_order_continuation @@ List.hd @@ List.rev orders) in
   Lwt.return_ok
     { orders_pagination_orders = orders ; orders_pagination_contination }
 
+(* let rec get_bid_orders_by_item_aux ?dbh ?origin ?continuation ?maker ~size contract token_id acc =
+ *   let no_continuation, (p, h) =
+ *     continuation = None,
+ *     (match continuation with None -> 0., "" | Some (p, h) -> (p, h)) in
+ *   let len = Int64.of_int @@ List.length acc in
+ *   let no_maker, maker_v = maker = None, (match maker with None -> "" | Some m -> m) in
+ *   if len < size  then
+ *     use dbh @@ fun dbh ->
+ *     let>? l =
+ *       [%pgsql dbh "select hash from orders \
+ *                    where \
+ *                    take_asset_type_contract = $contract and \
+ *                    take_asset_type_token_id = $token_id and \
+ *                    ($no_maker or maker = $maker_v) and \
+ *                    ($no_continuation or \
+ *                    (take_price_usd < $p) or \
+ *                    (take_price_usd = $p and hash < $h)) \
+ *                    order by take_price_usd desc, hash desc limit $size"] in
+ *     match l with
+ *     | [] -> Lwt.return_ok acc
+ *     | _ ->
+ *       map_rp (fun h -> get_order ~dbh h) l >>=? fun orders ->
+ *       let orders = List.filter_map (fun x -> x) orders in
+ *       let orders = filter_orders ?origin orders in
+ *       let last_order = List.hd (List.rev orders) in
+ *       let continuation =
+ *         float_of_string last_order.order_elt.order_elt_take_price_usd,
+ *         last_order.order_elt.order_elt_hash in
+ *       let orders = orders @ acc in
+ *       get_bid_orders_by_item_aux ~dbh ?origin ~continuation ~size contract token_id orders
+ *   else
+ *   if len = size  then Lwt.return_ok acc
+ *   else
+ *     Lwt.return_ok @@
+ *     List.filter_map (fun x -> x) @@
+ *     List.mapi (fun i order -> if i < Int64.to_int size then Some order else None) acc
+ * 
+ * let get_bid_orders_by_item ?dbh ?origin ?continuation ?(size=50) ?maker contract token_id =
+ *   Format.eprintf "get_bid_orders_by_item %s %s %s %s %s %d@."
+ *     (match maker with None -> "None" | Some s -> s)
+ *     (match origin with None -> "None" | Some s -> s)
+ *     contract
+ *     token_id
+ *     (match continuation with
+ *      | None -> "None"
+ *      | Some (f, s) -> string_of_float f ^ "_" ^ s)
+ *     size ;
+ *   let size = Int64.of_int size in
+ *   let>? orders =
+ *     get_bid_orders_by_item_aux ?dbh ?origin ?continuation ?maker ~size contract token_id [] in
+ *   let len = Int64.of_int @@ List.length orders in
+ *   let orders_pagination_contination =
+ *     if len <> size then None
+ *     else Some
+ *         (mk_order_continuation @@ List.hd (List.rev orders)) in
+ *   Lwt.return_ok
+ *     { orders_pagination_orders = orders ; orders_pagination_contination } *)
+
 let rec get_bid_orders_by_item_aux ?dbh ?origin ?continuation ?maker ~size contract token_id acc =
-  let no_continuation, (ts, h) =
+  Format.eprintf "get_bid_orders_by_item_aux %s %s %Ld %s %s %d@."
+    (match origin with None -> "None" | Some s -> s)
+    (match continuation with
+     | None -> "None"
+     | Some (p, s) -> (string_of_float p) ^ "_" ^ s)
+    size
+    contract
+    token_id
+    (List.length acc) ;
+  let no_continuation, (p, h) =
     continuation = None,
-    (match continuation with None -> CalendarLib.Calendar.now (), "" | Some (ts, h) -> (ts, h)) in
-  let len = Int64.of_int @@ List.length acc in
+    (match continuation with None -> 0., "" | Some (ts, h) -> (ts, h)) in
   let no_maker, maker_v = maker = None, (match maker with None -> "" | Some m -> m) in
+  let len = Int64.of_int @@ List.length acc in
   if len < size  then
     use dbh @@ fun dbh ->
     let>? l =
       [%pgsql dbh "select hash from orders \
-                   where \
-                   make_asset_type_contract = $contract and \
-                   make_asset_type_token_id = $token_id and \
-                   take_asset_type_class = 'FA_2' and \
-                   make_asset_type_class = 'FA_2' and \
+                   where take_asset_type_contract = $contract and \
+                   take_asset_type_token_id = $token_id and \
+                   ($no_maker or maker = $maker_v) and \
                    ($no_continuation or \
-                   (last_update_at = $ts and hash > $h) or (last_update_at < $ts)) and \
-                   ($no_maker or maker = $maker_v) \
-                   order by created_at desc limit $size"] in
-    match l with
+                   (take_price_usd < $p) or \
+                   (take_price_usd = $p and hash < $h)) \
+                   order by take_price_usd desc, hash desc limit $size"] in
+    map_rp (fun h -> get_order ~dbh h) l >>=? fun orders ->
+    match orders with
     | [] -> Lwt.return_ok acc
     | _ ->
-      map_rp (fun h -> get_order ~dbh h) l >>=? fun orders ->
       let orders = List.filter_map (fun x -> x) orders in
+      let continuation = match List.rev orders with
+        | [] -> None
+        | hd :: _ ->
+          Some (float_of_string hd.order_elt.order_elt_take_price_usd,
+                hd.order_elt.order_elt_hash) in
       let orders = filter_orders ?origin orders in
-      let last_order = List.hd (List.rev orders) in
-      let continuation =
-        last_order.order_elt.order_elt_last_update_at,
-        last_order.order_elt.order_elt_hash in
-      let orders = orders @ acc in
-      get_bid_orders_by_item_aux ~dbh ?origin ~continuation ~size contract token_id orders
+      get_bid_orders_by_item_aux
+        ~dbh ?origin ?continuation ?maker ~size contract token_id (acc @ orders)
   else
-  if len = size  then Lwt.return_ok acc
+  if len = size then Lwt.return_ok acc
   else
     Lwt.return_ok @@
     List.filter_map (fun x -> x) @@
     List.mapi (fun i order -> if i < Int64.to_int size then Some order else None) acc
 
 let get_bid_orders_by_item ?dbh ?origin ?continuation ?(size=50) ?maker contract token_id =
-  Format.eprintf "get_bid_orders_by_item %s %s %s %s %s %d@."
-    (match maker with None -> "None" | Some s -> s)
+  Format.eprintf "get_bid_orders_by_item %s %s %d@."
     (match origin with None -> "None" | Some s -> s)
-    contract
-    token_id
     (match continuation with
      | None -> "None"
-     | Some (ts, s) -> (Tzfunc.Proto.A.cal_to_str ts) ^ "_" ^ s)
+     | Some (f, s) -> (string_of_float f) ^ "_" ^ s)
     size ;
   let size = Int64.of_int size in
   let>? orders =
     get_bid_orders_by_item_aux ?dbh ?origin ?continuation ?maker ~size contract token_id [] in
   let len = Int64.of_int @@ List.length orders in
   let orders_pagination_contination =
-    if len <> size then None
+    if len = 0L || len < size then None
     else Some
-        (mk_order_continuation @@ List.hd (List.rev orders)) in
+        (mk_order_continuation @@ List.hd @@ List.rev orders) in
   Lwt.return_ok
     { orders_pagination_orders = orders ; orders_pagination_contination }
 
@@ -2086,6 +2221,32 @@ let insert_payouts dbh p hash_key =
            values ($account, $value, $hash_key)"])
     p
 
+let get_make_price_usd make take = match make.asset_type with
+  | ATFA_2 _ ->
+    begin match take.asset_type with
+      | ATXTZ ->
+        begin
+          try
+            (float_of_string take.asset_value) /. (float_of_string make.asset_value)
+          with _ -> 0.
+        end
+      | _ -> 0.
+    end
+  | _ -> 0.
+
+let get_take_price_usd make take = match take.asset_type with
+  | ATFA_2 _ ->
+    begin match make.asset_type with
+      | ATXTZ ->
+        begin
+          try
+            (float_of_string make.asset_value) /. (float_of_string take.asset_value)
+          with _ -> 0.
+        end
+      | _ -> 0.
+    end
+  | _ -> 0.
+
 let upsert_order ?dbh order =
   let order_elt = order.order_elt in
   let order_data = order.order_data in
@@ -2095,6 +2256,8 @@ let upsert_order ?dbh order =
     db_from_asset order_elt.order_elt_make in
   let>? take_class, take_contract, take_token_id, take_asset_value =
     db_from_asset order_elt.order_elt_take in
+  let make_price_usd = get_make_price_usd order_elt.order_elt_make order_elt.order_elt_take in
+  let take_price_usd = get_take_price_usd order_elt.order_elt_make order_elt.order_elt_take in
   let start_date = order_elt.order_elt_start in
   let end_date = order_elt.order_elt_end in
   let salt = order_elt.order_elt_salt in
@@ -2115,10 +2278,12 @@ let upsert_order ?dbh order =
        make_asset_value, \
        take_asset_type_class, take_asset_type_contract, take_asset_type_token_id, \
        take_asset_value, \
+       make_price_usd, take_price_usd,
        start_date, end_date, salt, signature, created_at, last_update_at, hash) \
        values($maker, $?taker, \
        $make_class, $?make_contract, $?make_token_id, $make_asset_value, \
        $take_class, $?take_contract, $?take_token_id, $take_asset_value, \
+       $make_price_usd, $take_price_usd, \
        $?start_date, $?end_date, $salt, $signature, $created_at, $last_update_at, $hash_key) \
        on conflict (hash) do update set (\
        make_asset_value, take_asset_value, last_update_at, signature) = \
@@ -2633,141 +2798,5 @@ let aggregate_nft_sell_by_collection ?dbh ?(size=50) start_date end_date =
        (tsp >= $start_date and tsp <= $end_date) \
        group by oleft.make_asset_type_contract limit $size64"] in
   map_rp mk_collection_aggregation_data l
-
-let mk_order_bids_pagination_continuation bid =
-  Printf.sprintf "%s_%s"
-    (Option.get bid.order_bid_elt.order_bid_elt_take_price_usd)
-    bid.order_bid_elt.order_bid_elt_order_hash
-
-let mk_order_status elt =
-  if elt.order_elt_cancelled then BSCANCELLED
-  else
-  if elt.order_elt_make_stock = "0" then BSINACTIVE
-  else
-  if elt.order_elt_fill = elt.order_elt_take.asset_value then BSFILLED
-  else BSACTIVE
-
-let mk_order_bid_elt order =
-  let elt = order.order_elt in
-  let status = mk_order_status elt in
-  {
-    order_bid_elt_order_hash = elt.order_elt_hash ;
-    order_bid_elt_status = status ;
-    order_bid_elt_maker = elt.order_elt_maker ;
-    order_bid_elt_taker = elt.order_elt_taker ;
-    order_bid_elt_make = elt.order_elt_make ;
-    order_bid_elt_take = elt.order_elt_take ;
-    order_bid_elt_make_balance = elt.order_elt_make_balance ;
-    order_bid_elt_make_price_usd = elt.order_elt_make_price_usd ;
-    order_bid_elt_take_price_usd = elt.order_elt_take_price_usd ;
-    order_bid_elt_fill = elt.order_elt_fill ;
-    order_bid_elt_make_stock = elt.order_elt_make_stock ;
-    order_bid_elt_cancelled = elt.order_elt_cancelled ;
-    order_bid_elt_salt = elt.order_elt_salt ;
-    order_bid_elt_signature = elt.order_elt_signature ;
-    order_bid_elt_created_at = elt.order_elt_created_at ;
-  }
-
-let mk_order_bid order =
-  let order_bid_elt = mk_order_bid_elt order in
-  { order_bid_elt ; order_bid_data = order.order_data }
-
-let filter_bids ?origin ?continuation status orders =
-  List.filter (fun order ->
-      begin
-        (order.order_elt.order_elt_cancelled &&
-         List.exists (function BSCANCELLED -> true | _ -> false) status) ||
-        (order.order_elt.order_elt_fill = order.order_elt.order_elt_take.asset_value &&
-         List.exists (function BSFILLED -> true | _ -> false) status) ||
-        (order.order_elt.order_elt_fill <> order.order_elt.order_elt_take.asset_value &&
-         List.exists (function BSACTIVE -> true | _ -> false) status) ||
-        (order.order_elt.order_elt_make_stock = "0" &&
-         List.exists (function BSINACTIVE -> true | _ -> false) status)
-      end &&
-      match origin, continuation with
-      | Some orig, Some (f, h) ->
-        let tp =
-          float_of_string @@
-          match order.order_elt.order_elt_take_price_usd with Some f -> f | None -> "0" in
-        let hash = order.order_elt.order_elt_hash in
-        let origin_fees = match order.order_data with
-          | RaribleV2Order data -> data.order_rarible_v2_data_v1_origin_fees
-          | _ -> [] in
-        ((tp = f && hash < h) || tp < f) &&
-        (List.exists (fun p -> p.part_account = orig) origin_fees)
-      | Some orig, None ->
-        let origin_fees = match order.order_data with
-          | RaribleV2Order data -> data.order_rarible_v2_data_v1_origin_fees
-          | _ -> [] in
-        List.exists (fun p -> p.part_account = orig) origin_fees
-      | None, Some (f, h) ->
-        let tp =
-          float_of_string @@
-          match order.order_elt.order_elt_take_price_usd with Some f -> f | None -> "0" in
-        let hash = order.order_elt.order_elt_hash in
-        ((tp = f && hash < h) || tp < f)
-      | None, None -> true)
-    orders
-
-let rec get_bids_by_item_aux
-    ?dbh ?start_date ?end_date ?continuation ~size contract token_id status acc =
-  let len = Int64.of_int @@ List.length acc in
-  let no_start_date, sd =
-    start_date = None,
-    (match start_date with None -> CalendarLib.Calendar.now () | Some d -> d) in
-  let no_end_date, ed =
-    start_date = None,
-    (match end_date with None -> CalendarLib.Calendar.now () | Some d -> d) in
-  if len < size  then
-    use dbh @@ fun dbh ->
-    let>? l =
-      [%pgsql dbh "select hash from orders \
-                   where \
-                   make_asset_type_contract = $contract and \
-                   make_asset_type_token_id = $token_id and \
-                   take_asset_type_class = 'FA_2' and \
-                   make_asset_type_class = 'FA_2' and \
-                   ($no_start_date or created_at >= $sd) and \
-                   ($no_end_date or created_at <= $ed) \
-                   order by take_price_usd desc, hash desc limit $size"] in
-    match l with
-    | [] -> Lwt.return_ok acc
-    | _ ->
-      map_rp (fun h -> get_order ~dbh h) l >>=? fun bids ->
-      let bids = List.filter_map (fun x -> x) bids in
-      let bids = filter_bids ?continuation status bids in
-      let bids = bids @ acc in
-      get_bids_by_item_aux ~dbh ?continuation ~size contract token_id status bids
-  else
-  if len = size  then Lwt.return_ok acc
-  else
-    Lwt.return_ok @@
-    List.filter_map (fun x -> x) @@
-    List.mapi (fun i bid -> if i < Int64.to_int size then Some bid else None) acc
-
-let get_bids_by_item ?dbh ?start_date ?end_date ?continuation ?(size=50) contract token_id status =
-  let statuses = order_bid_status_to_string status in
-  Printf.eprintf "get_bids_by_item %s %s %s %d %s %s [%s]\n%!"
-    (match start_date with None -> "None" | Some d -> CalendarLib.Printer.Calendar.to_string d)
-    (match end_date with None -> "None" | Some d -> CalendarLib.Printer.Calendar.to_string d)
-    (match continuation with
-     | None -> "None"
-     | Some (f, s) -> (string_of_float f) ^ "_" ^ s)
-    size
-    contract
-    token_id
-    statuses ;
-  let size = Int64.of_int size in
-  let>? items =
-    get_bids_by_item_aux
-      ?dbh ?start_date ?end_date ?continuation ~size contract token_id status [] in
-  let len = Int64.of_int @@ List.length items in
-  let items = List.map mk_order_bid items in
-  let order_bids_pagination_continuation =
-    if len <> size then None
-    else Some
-        (mk_order_bids_pagination_continuation @@ List.hd (List.rev items)) in
-  Lwt.return_ok
-    { order_bids_pagination_items = items ; order_bids_pagination_continuation }
 
   (* ORDER UPDATE field = fill, make_stock, cancelled, last_update, make_balance, make_price_usd, take_price_usd, assets values ?? *)
