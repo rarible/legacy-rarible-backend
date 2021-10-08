@@ -9,7 +9,6 @@ async function main() {
 
   const config = {
     exchange: "KT1C5kWbfzASApxCMHXFLbHuPtnRaJXE4WMu",
-    proxies: { fa_1_2: "", nft: "" },
     fees: 0n
   }
 

@@ -41,7 +41,6 @@ async function main() {
 
   const config = {
     exchange: argv.exchange,
-    proxies: { fa_1_2: "", nft: "" },
     fees: 0n
   }
 
