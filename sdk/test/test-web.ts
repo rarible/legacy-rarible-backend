@@ -1,4 +1,4 @@
-import { Provider, transfer, mint, burn, deploy_fa2, deploy_royalties, upsert_order, bid, sell, Part, AssetType, OrderForm, SellRequest, BidRequest, ExtendedAssetType, XTZAssetType, FA12AssetType, TokenAssetType, approve, fill_order, get_public_key, order_of_json, salt, pk_to_pkh } from "../main"
+import { Provider, transfer, mint, burn, deploy_fa2, deploy_royalties, upsert_order, bid, sell, Part, AssetType, OrderForm, SellRequest, BidRequest, ExtendedAssetType, XTZAssetType, FA12AssetType, TokenAssetType, approve, fill_order, get_public_key, order_of_json, salt, pk_to_pkh, get_address } from "../main"
 import { beacon_provider } from '../providers/beacon/beacon_provider'
 import JSONFormatter from "json-formatter-js"
 import Vue from "vue"
@@ -605,8 +605,10 @@ export default new Vue({
       } else {
         const p = (this.provider) ? this.provider : await provider(this.node, this.api_url)
         this.provider = p
-        const payouts = parse_parts(this.upsert.payouts)
+        let payouts = parse_parts(this.upsert.payouts)
         const origin_fees = parse_parts(this.upsert.origin_fees)
+        let account = await get_address(p)
+        if (payouts.length == 0) payouts = [ { account, value: 10000n} ]
         const op = await fill_order(p, this.fill.selected, {
           amount: BigInt(this.fill.amount),
           payouts, origin_fees
