@@ -1,4 +1,4 @@
-import { Provider, transfer, mint, burn, deploy_fa2, deploy_royalties, upsert_order, bid, sell, Part, AssetType, OrderForm, SellRequest, BidRequest, ExtendedAssetType, XTZAssetType, FA12AssetType, TokenAssetType, approve, fill_order, get_public_key, order_of_json, order_to_json, salt } from "../main"
+import { Provider, transfer, mint, burn, deploy_fa2, deploy_royalties, upsert_order, bid, sell, Part, AssetType, OrderForm, SellRequest, BidRequest, ExtendedAssetType, XTZAssetType, FA12AssetType, TokenAssetType, approve, fill_order, get_public_key, order_of_json, salt, pk_to_pkh } from "../main"
 import { beacon_provider } from '../providers/beacon/beacon_provider'
 import JSONFormatter from "json-formatter-js"
 import Vue from "vue"
@@ -440,7 +440,8 @@ export default new Vue({
         const take_asset_type = parse_asset_type(this.upsert.take.asset_type) as AssetType
         const make_value = BigInt(this.upsert.make.value)
         const take_value = BigInt(this.upsert.take.value)
-        const payouts = parse_parts(this.upsert.payouts)
+        let payouts = parse_parts(this.upsert.payouts)
+        if (payouts.length == 0) payouts = [ { account: pk_to_pkh(maker), value: 10000n} ]
         const origin_fees = parse_parts(this.upsert.origin_fees)
         if (!make_asset_type) {
           this.upsert.status = 'danger'
@@ -490,7 +491,8 @@ export default new Vue({
         const take_asset_type = parse_asset_type(this.sell.take_asset_type) as XTZAssetType | FA12AssetType
         const amount = BigInt(this.sell.amount)
         const price = BigInt(this.sell.price)
-        const payouts = parse_parts(this.sell.payouts)
+        let payouts = parse_parts(this.sell.payouts)
+        if (payouts.length == 0) payouts = [ { account: pk_to_pkh(maker), value: 10000n} ]
         const origin_fees = parse_parts(this.sell.origin_fees)
         if (!make_asset_type) {
           this.sell.status = 'danger'
@@ -539,7 +541,8 @@ export default new Vue({
         const take_asset_type = parse_asset_type(this.bid.take_asset_type) as ExtendedAssetType
         const amount = BigInt(this.bid.amount)
         const price = BigInt(this.bid.price)
-        const payouts = parse_parts(this.bid.payouts)
+        let payouts = parse_parts(this.bid.payouts)
+        if (payouts.length == 0) payouts = [ { account: pk_to_pkh(maker), value: 10000n} ]
         const origin_fees = parse_parts(this.bid.origin_fees)
         if (!make_asset_type) {
           this.bid.status = 'danger'
