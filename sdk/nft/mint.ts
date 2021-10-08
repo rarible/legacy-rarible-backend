@@ -22,7 +22,7 @@ function metadata_param(
   metadata : { [key: string] : string }) : MichelsonData {
   return { prim: 'Pair', args: [
     { int: token_id.toString() },
-    Object.keys(metadata).map(function(k) { return {prim: 'Elt', args: [ {string : k}, {string: metadata[k] }] }})
+    Object.keys(metadata).sort().map(function(k) { return {prim: 'Elt', args: [ {string : k}, {string: metadata[k] }] }})
   ] }
 }
 
