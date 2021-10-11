@@ -515,3 +515,15 @@ let mk_order_event event_id order_id order = {
   order_event_order = order ;
   order_event_type = "UPDATE" ;
 }
+
+let mk_item_event event_id item_id event = {
+  nft_item_event_event_id = event_id ;
+  nft_item_event_item_id = item_id ;
+  nft_item_event_event = event ;
+}
+
+let mk_ownership_event event_id ownership_id event = {
+  nft_ownership_event_event_id = event_id ;
+  nft_ownership_event_ownership_id = ownership_id ;
+  nft_ownership_event_event = event ;
+}

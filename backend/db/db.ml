@@ -4,6 +4,8 @@ open Rtypes
 open Hooks
 open Utils
 
+module Rarible_kafka = Rarible_kafka
+
 module SSet = Set.Make(String)
 
 module PGOCaml = Pg.PGOCaml
@@ -35,9 +37,6 @@ let get_extra_config ?dbh () =
       validator = r#validator_contract;
       ft_fa2 = List.filter_map (fun x -> x) r#ft_fa2;
       ft_fa1 = List.filter_map (fun x -> x) r#ft_fa1;
-      kafka_broker = "";
-      kafka_username = "";
-      kafka_password = "";
     })
   | [] -> Lwt.return_ok None
   | _ -> Lwt.return_error (`hook_error "wrong_state")
@@ -59,6 +58,22 @@ let update_extra_config ?dbh e =
         "update state set exchange_v2_contract = ${e.exchange_v2}, \
          royalties_contract = ${e.royalties}, validator_contract = ${e.validator}, \
          ft_fa1 = $ft_fa1, ft_fa2 = $ft_fa2"]
+
+(* Normalize here in case of ERC20 like asset *)
+let price left right =
+  if Int64.of_string left.asset_value > 0L then
+    Lwt.return_ok @@
+    Int64.(to_string (div (of_string left.asset_value) (of_string right.asset_value)))
+  else Lwt.return_ok "0"
+
+let nft_price left right =
+  match left.asset_type with
+  | ATFA_2 _ -> price left right
+  | _ -> price right left
+
+let mk_side_type asset = match asset.asset_type with
+  | ATFA_2 _ -> STBID
+  | _ -> STSELL
 
 let mk_asset asset_class contract token_id asset_value =
   let asset_value = Int64.to_string asset_value in
@@ -145,18 +160,6 @@ let db_from_asset asset =
        Some fa2.asset_fa2_token_id,
        asset_value)
 
-(* Normalize here in case of ERC20 like asset *)
-let price left right =
-  if Int64.of_string left.asset_value > 0L then
-    Lwt.return_ok @@
-    Int64.(to_string (div (of_string left.asset_value) (of_string right.asset_value)))
-  else Lwt.return_ok "0"
-
-let nft_price left right =
-  match left.asset_type with
-  | ATFA_2 _ -> price left right
-  | _ -> price right left
-
 let mk_order_activity_bid obj =
   mk_asset
     obj#make_asset_type_class
@@ -180,10 +183,6 @@ let mk_order_activity_bid obj =
       order_activity_bid_price = price ;
       order_activity_bid_price_usd = None ;
     }
-
-let mk_side_type asset = match asset.asset_type with
-  | ATFA_2 _ -> STBID
-  | _ -> STSELL
 
 let mk_left_side obj =
   mk_asset
@@ -249,7 +248,7 @@ let mk_order_activity_cancel obj =
     order_activity_cancel_bid_maker = obj#maker ;
     order_activity_cancel_bid_make = make.asset_type ;
     order_activity_cancel_bid_take = take.asset_type ;
-    order_activity_cancel_bid_transction_hash = Option.get obj#transaction ;
+    order_activity_cancel_bid_transaction_hash = Option.get obj#transaction ;
     order_activity_cancel_bid_block_hash = Option.get obj#block ;
     order_activity_cancel_bid_block_number = Int64.of_int32 @@ Option.get obj#level ;
     order_activity_cancel_bid_log_index = 0
@@ -434,7 +433,189 @@ let get_order ?dbh hash_key =
     mk_order r >>=? fun order ->
     Lwt.return_ok @@ Some order
 
-let produce_order_event dbh hash =
+let get_nft_item_creators_from_metadata r =
+  try EzEncoding.destruct (Json_encoding.list part_enc) r#creators
+  with _ -> []
+
+let get_nft_item_owners ?dbh contract token_id =
+  use dbh @@ fun dbh ->
+  [%pgsql dbh
+      "select owner FROM tokens where main and \
+       amount <> 0 and contract = $contract and token_id = $token_id"]
+
+let mk_nft_ownership obj =
+  let creators = get_nft_item_creators_from_metadata obj in
+  (* TODO : pending *)
+  (* TODO : last <> mint date ? *)
+  Lwt.return_ok {
+  nft_ownership_id = Option.get obj#id ;
+  nft_ownership_contract = obj#contract ;
+  nft_ownership_token_id = Int64.to_string obj#token_id ;
+  nft_ownership_owner = obj#owner ;
+  nft_ownership_creators = creators ;
+  nft_ownership_value = Int64.to_string obj#amount ;
+  nft_ownership_lazy_value = "0" ;
+  nft_ownership_date = obj#last ;
+  nft_ownership_pending = [] ;
+}
+
+let get_nft_ownership_by_id ?dbh contract token_id owner =
+  (* TODO : OWNERSHIP NOT FOUND *)
+  Format.eprintf "get_nft_ownership_by_id %s %s %s@." contract token_id owner ;
+  let id64 = Int64.of_string token_id in
+  use dbh @@ fun dbh ->
+  let>? l = [%pgsql.object dbh
+      "select concat(contract, ':', token_id, ':', owner) as id, \
+       contract, token_id, owner, last, amount, supply, metadata, \
+       name, creators, description, attributes, image, animation \
+       from tokens where \
+       main and contract = $contract and token_id = $id64 and owner = $owner"] in
+  let>? obj = one l in
+  let>? nft_ownership = mk_nft_ownership obj in
+  Lwt.return_ok nft_ownership
+
+(* let get_nft_item_royalties ?dbh id =
+ *   use dbh @@ fun dbh ->
+ *   let|>? l =
+ *     [%pgsql dbh
+ *         "select account, value FROM royalties where id = $id"] in
+ *   to_parts l *)
+
+(* let mk_item_transfer it_obj =
+ *   Lwt.return_ok {
+ *     item_transfer_type_ = "TRANSFER";
+ *     item_transfer_owner = it_obj#owner ;
+ *     item_transfer_value = Int64.to_string it_obj#value;
+ *     item_transfer_from = it_obj#transfer_from;
+ *   } *)
+
+(* let get_nft_item_pending ?dbh id =
+ *   use dbh @@ fun dbh ->
+ *   let>? l =
+ *     [%pgsql.object dbh
+ *         "select owner, value, transfer_from from item_transfers where id = $id "] in
+ *   map_rp (fun r -> mk_item_transfer r) l *)
+
+(* let mk_media_meta obj =
+ *   Lwt.return_ok
+ *     (MediaSizeOriginal {
+ *         meta_type = obj#media_type ;
+ *         meta_width = Option.map Int32.to_int obj#width ;
+ *         meta_height = Option.map Int32.to_int obj#height ;
+ *       })
+ *
+ * let mk_nft_media obj =
+ *   let|>? nft_media_meta = mk_media_meta obj in
+ *   {
+ *     nft_media_url = MediaSizeOriginal obj#url ;
+ *     nft_media_meta ;
+ *   } *)
+
+(* let mk_item_attribute obj =
+ *   Lwt.return_ok {
+ *     nft_item_attribute_key = obj#key ;
+ *     nft_item_attribute_value = obj#value ;
+ *   } *)
+
+(* let get_nft_item_meta ?dbh id =
+ *   use dbh @@ fun dbh ->
+ *   let>? meta = [%pgsql.object dbh
+ *       "select name, description from nft_item_meta where id = $id "] in
+ *   let>? meta = one meta in
+ *   let>? medias = [%pgsql.object dbh
+ *       "select url, media_type, width, height from nft_media where id = $id "] in
+ *   let>? media = one medias in
+ *   let>? attributes = [%pgsql.object dbh
+ *       "select key, value from nft_item_attributes where id = $id "] in
+ *   let>? image =
+ *     if media#media_type = "image/png" then
+ *       let|>? m = mk_nft_media media in
+ *       Some m
+ *     else Lwt.return_ok None in
+ *   let>? animation =
+ *     if media#media_type = "image/gif" then
+ *       let|>? m = mk_nft_media media in
+ *       Some m
+ *     else Lwt.return_ok None in
+ *   map_rp (fun r -> mk_item_attribute r) attributes >>=? fun attributes ->
+ *   let attrs = match attributes with [] -> None | _ -> Some attributes in
+ *   Lwt.return_ok {
+ *     nft_item_meta_name = meta#name ;
+ *     nft_item_meta_description = meta#description ;
+ *     nft_item_meta_attributes = attrs ;
+ *     nft_item_meta_image = image ;
+ *     nft_item_meta_animation = animation ;
+ *   } *)
+
+let mk_nft_media json =
+  try Some (EzEncoding.destruct nft_media_enc json)
+  with _ -> None
+
+let mk_nft_attributes json =
+  try Some (EzEncoding.destruct (Json_encoding.list nft_item_attribute_enc) json)
+  with _ -> None
+
+let mk_nft_item_meta r =
+  match r#name with
+  | None -> None
+  | Some nft_item_meta_name ->
+    let nft_item_meta_attributes = Option.bind r#attributes mk_nft_attributes in
+    let nft_item_meta_image = Option.bind r#image mk_nft_media in
+    let nft_item_meta_animation = Option.bind r#animation mk_nft_media in
+    Some {
+      nft_item_meta_name;
+      nft_item_meta_description = r#description;
+      nft_item_meta_attributes;
+      nft_item_meta_image;
+      nft_item_meta_animation }
+
+let mk_nft_item ?include_meta obj =
+  let creators = get_nft_item_creators_from_metadata obj in
+  get_nft_item_owners obj#contract obj#token_id >>=? fun owners ->
+  (* get_nft_item_royalties  >>=? fun royalties -> *)
+  let meta = match include_meta with
+    | Some true -> mk_nft_item_meta obj
+    | _ -> None in
+  Lwt.return_ok {
+    nft_item_id = Option.get obj#id ;
+    nft_item_contract = obj#contract ;
+    nft_item_token_id = Int64.to_string obj#token_id ;
+    nft_item_creators = creators ;
+    nft_item_supply = Int64.to_string obj#supply ;
+    nft_item_lazy_supply = Int64.to_string 0L ;
+    nft_item_owners = owners ;
+    nft_item_royalties = [] ;
+    nft_item_date = obj#last ;
+    nft_item_pending = None ;
+    nft_item_deleted = if obj#supply > 0L then Some false else Some true ;
+    nft_item_meta = meta ;
+  }
+
+let get_nft_item_by_id ?dbh ?include_meta contract token_id =
+  Format.eprintf "get_nft_item_by_id %s %s %s@."
+    contract
+    token_id
+    (match include_meta with None -> "None" | Some s -> string_of_bool s) ;
+  use dbh @@ fun dbh ->
+  let id64 = Int64.of_string token_id in
+  let>? l = [%pgsql.object dbh
+      "select concat(contract, ':', token_id) as id, contract, token_id, \
+       last, amount, supply, metadata, name, creators, description, attributes, \
+       image, animation \
+       from tokens where \
+       main and contract = $contract and token_id = $id64"] in
+  match l with
+  | obj :: _ ->
+    let>? nft_item = mk_nft_item ?include_meta obj in
+    Lwt.return_ok nft_item
+  | [] -> Lwt.return_error (`hook_error "nft_item not found")
+
+let produce_order_event order =
+  Rarible_kafka.produce_order_event
+    (mk_order_event "TODO-EVENTID" "TODO-ORDERID" order) >>= fun () ->
+  Lwt.return_ok ()
+
+let produce_order_event_hash dbh hash =
   let>? order = get_order ~dbh hash in
   begin
     match order with
@@ -444,6 +625,31 @@ let produce_order_event dbh hash =
     | None -> Lwt.return ()
   end >>= fun () ->
   Lwt.return_ok ()
+
+let produce_nft_item_event dbh contract token_id =
+  let>? item = get_nft_item_by_id ~dbh contract (Int64.to_string token_id) in
+  if item.nft_item_owners = [] then
+    Rarible_kafka.produce_item_event
+      (mk_item_event "TODO-EVENTID" "TODO-ITEMID" (NftItemDeleteEvent item))
+    >>= fun () ->
+    Lwt.return_ok ()
+  else
+    Rarible_kafka.produce_item_event
+      (mk_item_event "TODO-EVENTID" "TODO-ITEMID" (NftItemUpdateEvent item))
+    >>= fun () ->
+    Lwt.return_ok ()
+
+let produce_ownership_event os =
+  let event =
+    if os.nft_ownership_value = "0" then NftOwnershipDeleteEvent os
+    else NftOwnershipUpdateEvent os in
+  Rarible_kafka.produce_ownership_event
+    (mk_ownership_event "TODO-EVENTID" "TODO-OWNERSHIPID" event) >>= fun () ->
+  Lwt.return_ok ()
+
+let produce_nft_ownership_event dbh contract token_id owner =
+  let>? os = get_nft_ownership_by_id ~dbh contract (Int64.to_string token_id) owner in
+  produce_ownership_event os
 
 let insert_fake ?dbh address =
   use dbh @@ fun dbh ->
@@ -491,7 +697,7 @@ let insert_nft_activity dbh timestamp nft_activity =
        $token_id, \
        ${nft_activity.nft_activity_elt.nft_activity_owner}, $value, $?act_from) \
        on conflict do nothing"] >>=? fun () ->
-  Rarible_kafka.produce_activity nft_activity >>= fun () ->
+  Rarible_kafka.produce_nft_activity nft_activity >>= fun () ->
   Lwt.return_ok ()
 
 let create_nft_activity_elt op contract mi_op = {
@@ -519,7 +725,6 @@ let insert_nft_activity_burn dbh op kt1 mi_op =
     nft_activity_elt ;
   } in
   insert_nft_activity dbh op.bo_tsp nft_activity
-
 
 let insert_nft_activity_transfer dbh op kt1 source owner token_id amount =
   let nft_activity_elt = {
@@ -652,10 +857,109 @@ let insert_order_activity
        values ($?match_left, $?match_right, $?hash, $?transaction, \
        $?block, $?level, $date, $order_activity_type) \
        on conflict do nothing"]
-(* TODO : KAFKA *)
 
-let insert_order_activity_cancel dbh hash transaction block level date =
-  insert_order_activity dbh None None hash transaction block level date "cancel"
+let insert_order_activity dbh date activity =
+  begin match activity with
+    | OrderActivityList act ->
+      let hash = Some act.order_activity_bid_hash in
+      insert_order_activity dbh None None hash None None None date "list"
+    | OrderActivityBid act ->
+      let hash = Some act.order_activity_bid_hash in
+      insert_order_activity dbh None None hash None None None date "bid"
+    | OrderActivityCancelList act ->
+      let hash = Some act.order_activity_cancel_bid_hash in
+      let transaction = Some act.order_activity_cancel_bid_transaction_hash in
+      let block = Some act.order_activity_cancel_bid_block_hash in
+      let level = Some (Int64.to_int32 act.order_activity_cancel_bid_block_number) in
+      insert_order_activity dbh None None hash transaction block level date "cancel"
+    | OrderActivityCancelBid act ->
+      let hash = Some act.order_activity_cancel_bid_hash in
+      let transaction = Some act.order_activity_cancel_bid_transaction_hash in
+      let block = Some act.order_activity_cancel_bid_block_hash in
+      let level = Some (Int64.to_int32 act.order_activity_cancel_bid_block_number) in
+      insert_order_activity dbh None None hash transaction block level date "cancel"
+    | OrderActivityMatch act ->
+      let left = Some act.order_activity_match_left.order_activity_match_side_hash in
+      let right = Some act.order_activity_match_right.order_activity_match_side_hash in
+      let transaction = Some act.order_activity_match_transaction_hash in
+      let block = Some act.order_activity_match_block_hash in
+      let level = Some (Int64.to_int32 act.order_activity_match_block_number) in
+      insert_order_activity dbh left right left transaction block level date "match"
+  end >>=? fun () ->
+  Rarible_kafka.produce_order_activity activity >>= fun () ->
+  Lwt.return_ok ()
+
+let insert_order_activity_new dbh date order =
+  let make = order.order_elt.order_elt_make in
+  let take = order.order_elt.order_elt_take in
+  let>? price = nft_price make take in
+  let activity = {
+    order_activity_bid_hash = order.order_elt.order_elt_hash ;
+    order_activity_bid_maker = order.order_elt.order_elt_maker ;
+    order_activity_bid_make = make ;
+    order_activity_bid_take = take ;
+    order_activity_bid_price = price ;
+    order_activity_bid_price_usd = None ;
+  } in
+  let order_activity =
+    match order.order_elt.order_elt_make.asset_type,
+          order.order_elt.order_elt_take.asset_type with
+    | ATFA_2 _, _ -> OrderActivityList activity
+    | _, _ -> OrderActivityBid activity in
+  insert_order_activity dbh date order_activity
+
+let insert_order_activity_cancel dbh transaction block level date hash =
+  let>? order = get_order ~dbh hash in
+  match order with
+  | Some order ->
+    let activity = {
+      order_activity_cancel_bid_hash = order.order_elt.order_elt_hash ;
+      order_activity_cancel_bid_maker = order.order_elt.order_elt_maker ;
+      order_activity_cancel_bid_make = order.order_elt.order_elt_make.asset_type ;
+      order_activity_cancel_bid_take = order.order_elt.order_elt_take.asset_type ;
+      order_activity_cancel_bid_transaction_hash = transaction ;
+      order_activity_cancel_bid_block_hash = block ;
+      order_activity_cancel_bid_block_number = level ;
+      order_activity_cancel_bid_log_index = 0 ;
+    } in
+  let order_activity =
+    match order.order_elt.order_elt_make.asset_type,
+          order.order_elt.order_elt_take.asset_type with
+    | ATFA_2 _, _ -> OrderActivityCancelList activity
+    | _, _ -> OrderActivityCancelBid activity in
+    insert_order_activity dbh date order_activity
+  | None ->
+    Lwt.return_ok ()
+
+let insert_order_activity_match
+    dbh transaction block level date
+    hash_left left_maker left_asset
+    hash_right right_maker right_asset  =
+  let match_left = {
+    order_activity_match_side_maker = (match left_maker with Some s -> s | None -> "");
+    order_activity_match_side_hash = hash_left ;
+    order_activity_match_side_asset = left_asset ;
+    order_activity_match_side_type = mk_side_type left_asset ;
+  } in
+  let match_right = {
+    order_activity_match_side_maker = (match right_maker with Some s -> s | None -> "") ;
+    order_activity_match_side_hash = hash_right ;
+    order_activity_match_side_asset = right_asset ;
+    order_activity_match_side_type = mk_side_type right_asset ;
+  } in
+  let>? price = nft_price left_asset right_asset in
+  let order_activity =
+    OrderActivityMatch {
+      order_activity_match_left = match_left ;
+      order_activity_match_right = match_right ;
+      order_activity_match_price = price ;
+      order_activity_match_price_usd = None ;
+      order_activity_match_transaction_hash = transaction ;
+      order_activity_match_block_hash = block ;
+      order_activity_match_block_number = Int64.of_int32 level ;
+      order_activity_match_log_index = 0 ;
+    } in
+  insert_order_activity dbh date order_activity
 
 let insert_cancel dbh op hash =
   let source = op.bo_op.source in
@@ -664,12 +968,12 @@ let insert_cancel dbh op hash =
        values(${op.bo_hash}, ${op.bo_index}, ${op.bo_block}, ${op.bo_level}, \
        ${op.bo_tsp}, $source, $hash) \
        on conflict do nothing"] >>=? fun () ->
-  produce_order_event dbh hash
+  produce_order_event_hash dbh hash
 
-let insert_order_activity_match dbh left right transaction block level date =
-  insert_order_activity dbh left right left transaction block level date "match"
-
-let insert_do_transfers dbh op ~left ~right ~fill_make_value ~fill_take_value =
+let insert_do_transfers dbh op
+    ~left ~left_maker ~left_asset
+    ~right ~right_maker ~right_asset
+    ~fill_make_value ~fill_take_value =
   let source = op.bo_op.source in
   [%pgsql dbh
       "insert into order_match(transaction, index, block, level, tsp, source, \
@@ -678,17 +982,12 @@ let insert_do_transfers dbh op ~left ~right ~fill_make_value ~fill_take_value =
        ${op.bo_tsp}, $source, $left, $right, \
        $fill_make_value, $fill_take_value) \
        on conflict do nothing"] >>=? fun () ->
-  produce_order_event dbh left >>=? fun () ->
-  produce_order_event dbh right
-
-let insert_order_activity_new dbh hash date make_class take_class =
-  match make_class, take_class with
-  | "FA2", _ ->
-    insert_order_activity dbh None None (Some hash) None None None date "list"
-  | _, "FA2" ->
-    insert_order_activity dbh None None (Some hash) None None None date "bid"
-  | _, _ ->
-    Lwt.return_ok ()
+  produce_order_event_hash dbh left >>=? fun () ->
+  produce_order_event_hash dbh right >>=? fun () ->
+  insert_order_activity_match
+    dbh op.bo_hash op.bo_block op.bo_level op.bo_tsp
+    left left_maker left_asset
+    right right_maker right_asset
 
 let insert_ft_fa2 dbh op tr txs =
   iter_rp (fun tx ->
@@ -725,10 +1024,16 @@ let insert_transaction config dbh op tr =
         | Ok (Cancel hash) ->
           Format.printf "\027[0;35mcancel order %s %ld %s\027[0m@." (short op.bo_hash) op.bo_index hash;
           insert_cancel dbh op hash
-        | Ok (DoTransfers {left; right; fill_make_value; fill_take_value}) ->
+        | Ok (DoTransfers
+                {left; left_maker; left_asset;
+                 right; right_maker; right_asset;
+                 fill_make_value; fill_take_value}) ->
           Format.printf "\027[0;35mapply orders %s %ld %s %s\027[0m@." (short op.bo_hash) op.bo_index left right;
           insert_do_transfers
-            dbh op ~left ~right ~fill_make_value ~fill_take_value
+            dbh op
+            ~left ~left_maker ~left_asset
+            ~right ~right_maker ~right_asset
+            ~fill_make_value ~fill_take_value
         | _ ->
           (* todo : match order *)
           Lwt.return_ok ()
@@ -808,7 +1113,8 @@ let insert_origination config dbh op ori =
         "insert into contracts(kind, address, owner, block, level, tsp, \
          last_block, last_level, last, ledger_id) \
          values('nft', $kt1, $owner, ${op.bo_block}, ${op.bo_level}, \
-         ${op.bo_tsp}, ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, $ledger_id) on conflict do nothing"] in
+         ${op.bo_tsp}, ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, $ledger_id) \
+         on conflict do nothing"] in
     let open Crawlori.Config in
     match config.accounts with
     | None -> config.accounts <- Some (SSet.singleton kt1)
@@ -868,6 +1174,8 @@ let contract_updates_base dbh ~main ~contract ~block ~level ~tsp ~burn
        last_level = case when $main then $level else last_level end, \
        last = case when $main then $tsp else last end
        where token_id = $tk_token_id and contract = $contract and owner <> $tk_owner"] in
+  produce_nft_item_event dbh contract tk_token_id >>=? fun () ->
+  produce_nft_ownership_event dbh contract tk_token_id tk_owner >>=? fun () ->
   (* update account *)
   let>? new_amount = one ~err:"no amount for burn update" l_amount in
   let new_token = EzEncoding.construct account_token_enc {
@@ -965,7 +1273,11 @@ let transfer_updates dbh main ~contract ~block ~level ~tsp ~token_id ~source amo
          last_level = case when $main then $level else level end, \
          last = case when $main then $tsp else last end where token_id = $token_id and \
          owner = $destination and contract = $contract returning amount"] in
-  let>? new_dst_amount = one ~err:"destination token not found for transfer update" l_new_dst_amount in
+  let>? new_dst_amount =
+    one ~err:"destination token not found for transfer update" l_new_dst_amount in
+  produce_nft_item_event dbh contract token_id >>=? fun () ->
+  produce_nft_ownership_event dbh contract token_id source >>=? fun () ->
+  produce_nft_ownership_event dbh contract token_id destination >>=? fun () ->
   let at = { at_token_id = token_id; at_contract = contract; at_amount = new_src_amount } in
   let new_token_src = EzEncoding.construct account_token_enc at in
   let old_token_src = EzEncoding.construct account_token_enc {at with at_amount = Int64.add new_src_amount amount} in
@@ -1009,15 +1321,18 @@ let token_metadata_update dbh ~main ~contract ~block ~level ~tsp ~token_id meta 
         let c = EzEncoding.construct Json_encoding.(list any_ezjson_value) c in
         Some n, Some c, d, at, i, an
       with _ -> None, None, None, None, None, None in
-    [%pgsql dbh
-        "update tokens set metadata = $meta, \
-         name = $?name, description = $?description, attributes = $?attributes, \
-         image = $?image, animation = $?animation, creators = $?creators,\
-         last_block = case when $main then $block else last_block end, \
-         last_level = case when $main then $level else last_level end, \
-         last = case when $main then $tsp else last end \
-         where contract = $contract and \
-         token_id = $token_id"]
+    let>? () =
+      [%pgsql dbh
+          "update tokens set metadata = $meta, \
+           name = $?name, description = $?description, attributes = $?attributes, \
+           image = $?image, animation = $?animation, creators = $?creators,\
+           last_block = case when $main then $block else last_block end, \
+           last_level = case when $main then $level else last_level end, \
+           last = case when $main then $tsp else last end \
+           where contract = $contract and \
+           token_id = $token_id"] in
+    if main then produce_nft_item_event dbh contract token_id
+    else Lwt.return_ok ()
   else Lwt.return_ok ()
 
 let token_updates dbh main l =
@@ -1061,13 +1376,20 @@ let set_main _config dbh {Hooks.m_main; m_hash} =
   let>? () = [%pgsql dbh "update contracts set main = $m_main where block = $m_hash"] in
   let>? () = [%pgsql dbh "update tokens set main = $m_main where block = $m_hash"] in
   let>? () = [%pgsql dbh "update nft_activities set main = $m_main where block = $m_hash"] in
-  let>? () = [%pgsql dbh "update order_activities set main = $m_main where block = $m_hash"] in
-  let>? t_updates = [%pgsql.object dbh "update token_updates set main = $m_main where block = $m_hash returning *"] in
-  let>? c_updates = [%pgsql.object dbh "update contract_updates set main = $m_main where block = $m_hash returning *"] in
+  let>? () =
+    [%pgsql dbh "update order_activities set main = $m_main where block = $m_hash"] in
+  let>? t_updates =
+    [%pgsql.object dbh
+        "update token_updates set main = $m_main where block = $m_hash returning *"] in
+  let>? c_updates =
+    [%pgsql.object dbh
+        "update contract_updates set main = $m_main where block = $m_hash returning *"] in
 
   let>? () = [%pgsql dbh "update order_cancel set main = $m_main where block = $m_hash"] in
   let>? () = [%pgsql dbh "update order_match set main = $m_main where block = $m_hash"] in
-  let>? ft_updates = [%pgsql.object dbh "update ft_token_updates set main = $m_main where block = $m_hash returning *"] in
+  let>? ft_updates =
+    [%pgsql.object dbh
+        "update ft_token_updates set main = $m_main where block = $m_hash returning *"] in
   let>? () = contract_updates dbh m_main @@ sort c_updates in
   let>? () = token_updates dbh m_main @@ sort t_updates in
   let>? () = ft_token_updates dbh m_main @@ sort ft_updates in
@@ -1082,133 +1404,6 @@ let get_level ?dbh () =
   match res with
   | Some level -> Lwt.return_ok @@ Int32.to_int level
   | None -> Lwt.return_error (`hook_error "no level")
-
-let get_nft_item_creators_from_metadata r =
-  try EzEncoding.destruct (Json_encoding.list part_enc) r#creators
-  with _ -> []
-
-let get_nft_item_owners ?dbh contract token_id =
-  use dbh @@ fun dbh ->
-  [%pgsql dbh
-      "select owner FROM tokens where main and \
-       amount <> 0 and contract = $contract and token_id = $token_id"]
-
-(* let get_nft_item_royalties ?dbh id =
- *   use dbh @@ fun dbh ->
- *   let|>? l =
- *     [%pgsql dbh
- *         "select account, value FROM royalties where id = $id"] in
- *   to_parts l *)
-
-(* let mk_item_transfer it_obj =
- *   Lwt.return_ok {
- *     item_transfer_type_ = "TRANSFER";
- *     item_transfer_owner = it_obj#owner ;
- *     item_transfer_value = Int64.to_string it_obj#value;
- *     item_transfer_from = it_obj#transfer_from;
- *   } *)
-
-(* let get_nft_item_pending ?dbh id =
- *   use dbh @@ fun dbh ->
- *   let>? l =
- *     [%pgsql.object dbh
- *         "select owner, value, transfer_from from item_transfers where id = $id "] in
- *   map_rp (fun r -> mk_item_transfer r) l *)
-
-(* let mk_media_meta obj =
- *   Lwt.return_ok
- *     (MediaSizeOriginal {
- *         meta_type = obj#media_type ;
- *         meta_width = Option.map Int32.to_int obj#width ;
- *         meta_height = Option.map Int32.to_int obj#height ;
- *       })
- *
- * let mk_nft_media obj =
- *   let|>? nft_media_meta = mk_media_meta obj in
- *   {
- *     nft_media_url = MediaSizeOriginal obj#url ;
- *     nft_media_meta ;
- *   } *)
-
-(* let mk_item_attribute obj =
- *   Lwt.return_ok {
- *     nft_item_attribute_key = obj#key ;
- *     nft_item_attribute_value = obj#value ;
- *   } *)
-
-(* let get_nft_item_meta ?dbh id =
- *   use dbh @@ fun dbh ->
- *   let>? meta = [%pgsql.object dbh
- *       "select name, description from nft_item_meta where id = $id "] in
- *   let>? meta = one meta in
- *   let>? medias = [%pgsql.object dbh
- *       "select url, media_type, width, height from nft_media where id = $id "] in
- *   let>? media = one medias in
- *   let>? attributes = [%pgsql.object dbh
- *       "select key, value from nft_item_attributes where id = $id "] in
- *   let>? image =
- *     if media#media_type = "image/png" then
- *       let|>? m = mk_nft_media media in
- *       Some m
- *     else Lwt.return_ok None in
- *   let>? animation =
- *     if media#media_type = "image/gif" then
- *       let|>? m = mk_nft_media media in
- *       Some m
- *     else Lwt.return_ok None in
- *   map_rp (fun r -> mk_item_attribute r) attributes >>=? fun attributes ->
- *   let attrs = match attributes with [] -> None | _ -> Some attributes in
- *   Lwt.return_ok {
- *     nft_item_meta_name = meta#name ;
- *     nft_item_meta_description = meta#description ;
- *     nft_item_meta_attributes = attrs ;
- *     nft_item_meta_image = image ;
- *     nft_item_meta_animation = animation ;
- *   } *)
-
-let mk_nft_media json =
-  try Some (EzEncoding.destruct nft_media_enc json)
-  with _ -> None
-
-let mk_nft_attributes json =
-  try Some (EzEncoding.destruct (Json_encoding.list nft_item_attribute_enc) json)
-  with _ -> None
-
-let mk_nft_item_meta r =
-  match r#name with
-  | None -> None
-  | Some nft_item_meta_name ->
-    let nft_item_meta_attributes = Option.bind r#attributes mk_nft_attributes in
-    let nft_item_meta_image = Option.bind r#image mk_nft_media in
-    let nft_item_meta_animation = Option.bind r#animation mk_nft_media in
-    Some {
-      nft_item_meta_name;
-      nft_item_meta_description = r#description;
-      nft_item_meta_attributes;
-      nft_item_meta_image;
-      nft_item_meta_animation }
-
-let mk_nft_item ?include_meta obj =
-  let creators = get_nft_item_creators_from_metadata obj in
-  get_nft_item_owners obj#contract obj#token_id >>=? fun owners ->
-  (* get_nft_item_royalties  >>=? fun royalties -> *)
-  let meta = match include_meta with
-    | Some true -> mk_nft_item_meta obj
-    | _ -> None in
-  Lwt.return_ok {
-    nft_item_id = Option.get obj#id ;
-    nft_item_contract = obj#contract ;
-    nft_item_token_id = Int64.to_string obj#token_id ;
-    nft_item_creators = creators ;
-    nft_item_supply = Int64.to_string obj#supply ;
-    nft_item_lazy_supply = Int64.to_string 0L ;
-    nft_item_owners = owners ;
-    nft_item_royalties = [] ;
-    nft_item_date = obj#last ;
-    nft_item_pending = None ;
-    nft_item_deleted = if obj#supply > 0L then Some false else Some true ;
-    nft_item_meta = meta ;
-  }
 
 let mk_nft_items_continuation nft_item =
   Printf.sprintf "%Ld_%s"
@@ -1291,25 +1486,6 @@ let get_nft_items_by_creator ?dbh ?include_meta ?continuation ?(size=50) creator
         (mk_nft_items_continuation @@ List.hd (List.rev nft_items_items)) in
   Lwt.return_ok
     { nft_items_items ; nft_items_continuation ; nft_items_total }
-
-let get_nft_item_by_id ?dbh ?include_meta contract token_id =
-  Format.eprintf "get_nft_item_by_id %s %s %s@."
-    contract
-    token_id
-    (match include_meta with None -> "None" | Some s -> string_of_bool s) ;
-  use dbh @@ fun dbh ->
-  let id64 = Int64.of_string token_id in
-  let>? l = [%pgsql.object dbh
-      "select concat(contract, ':', token_id) as id, contract, token_id, \
-       last, amount, supply, metadata, name, creators, description, attributes, \
-       image, animation \
-       from tokens where \
-       main and contract = $contract and token_id = $id64"] in
-  match l with
-  | obj :: _ ->
-    let>? nft_item = mk_nft_item ?include_meta obj in
-    Lwt.return_ok nft_item
-  | [] -> Lwt.return_error (`hook_error "nft_item not found")
 
 let get_nft_items_by_collection ?dbh ?include_meta ?continuation ?(size=50) contract =
   Format.eprintf "get_nft_items_by_collection %s %s %s %d@."
@@ -1601,37 +1777,6 @@ let mk_nft_ownerships_continuation nft_ownership =
   Printf.sprintf "%Ld_%s"
     (Int64.of_float @@ CalendarLib.Calendar.to_unixfloat nft_ownership.nft_ownership_date)
     nft_ownership.nft_ownership_id
-
-let mk_nft_ownership obj =
-  let creators = get_nft_item_creators_from_metadata obj in
-  (* TODO : pending *)
-  (* TODO : last <> mint date ? *)
-  Lwt.return_ok {
-  nft_ownership_id = Option.get obj#id ;
-  nft_ownership_contract = obj#contract ;
-  nft_ownership_token_id = Int64.to_string obj#token_id ;
-  nft_ownership_owner = obj#owner ;
-  nft_ownership_creators = creators ;
-  nft_ownership_value = Int64.to_string obj#amount ;
-  nft_ownership_lazy_value = "0" ;
-  nft_ownership_date = obj#last ;
-  nft_ownership_pending = [] ;
-}
-
-let get_nft_ownership_by_id ?dbh contract token_id owner =
-  (* TODO : OWNERSHIP NOT FOUND *)
-  Format.eprintf "get_nft_ownership_by_id %s %s %s@." contract token_id owner ;
-  let id64 = Int64.of_string token_id in
-  use dbh @@ fun dbh ->
-  let>? l = [%pgsql.object dbh
-      "select concat(contract, ':', token_id, ':', owner) as id, \
-       contract, token_id, owner, last, amount, supply, metadata, \
-       name, creators, description, attributes, image, animation \
-       from tokens where \
-       main and contract = $contract and token_id = $id64 and owner = $owner"] in
-  let>? obj = one l in
-  let>? nft_ownership = mk_nft_ownership obj in
-  Lwt.return_ok nft_ownership
 
 let get_nft_ownerships_by_item ?dbh ?continuation ?(size=50) contract token_id =
   Format.eprintf "get_nft_ownerships_by_item %s %s %s %d@."
@@ -2431,15 +2576,14 @@ let upsert_order ?dbh order =
        on conflict (hash) do update set (\
        make_asset_value, take_asset_value, last_update_at, signature) = \
        ($make_asset_value, $take_asset_value, $last_update_at, $signature)"] in
-  insert_order_activity_new
-    dbh hash_key created_at make_class take_class >>=? fun () ->
+  insert_order_activity_new dbh created_at order >>=? fun () ->
   insert_price_history dbh last_update_at make_asset_value take_asset_value hash_key >>=? fun () ->
   begin
     if last_update_at = created_at then insert_origin_fees dbh origin_fees hash_key
     else Lwt.return_ok ()
   end >>=? fun () ->
   insert_payouts dbh payouts hash_key >>=? fun () ->
-  produce_order_event dbh order.order_elt.order_elt_hash
+  produce_order_event order
 
 let mk_order_activity_continuation _obj =
   Printf.sprintf "TODO"

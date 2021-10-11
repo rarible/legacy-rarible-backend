@@ -19,9 +19,6 @@ let config = {
   royalties = "" ;
   ft_fa2 = [];
   ft_fa1 = [];
-  kafka_broker = "localhost:9092";
-  kafka_username = "";
-  kafka_password = "";
 }
 
 let api_pid = ref None
@@ -1887,9 +1884,9 @@ let reset_db () =
     let c, o, e =  sys_command "make" in
     if c <> 0 then failwith ("failure when resetting db : log " ^ o ^ " & " ^ e)
 
-let start_api () =
+let start_api kafka_config =
   let prog = "./_bin/api" in
-  let args = [| prog |] in
+  let args = [| prog ; "--kafka-config" ; kafka_config |] in
   let stdout, fn_out, stderr, fn_err = create_descr2 "api" in
   let pid = create_process ~stdout ~stderr prog args in
   Printf.eprintf "API STARTED (out %s, err %s)\n%!" fn_out fn_err ;
@@ -1920,7 +1917,6 @@ let make_config admin_wallet validator exchange_v2 royalties ft_fa1 ft_fa2
       allow_no_metadata = false ;
       extra = {
         admin_wallet ; validator ; exchange_v2 ; royalties; ft_fa1; ft_fa2;
-        kafka_broker; kafka_username; kafka_password;
       } ;
     } in
     let temp_fn = Filename.temp_file "config" "" in
@@ -1929,19 +1925,26 @@ let make_config admin_wallet validator exchange_v2 royalties ft_fa1 ft_fa2
     let c = open_out temp_fn in
     output_string c json ;
     close_out c ;
-    Lwt.return temp_fn
+    let kafka_config = { kafka_broker; kafka_username; kafka_password; } in
+    let kafka_temp_fn = Filename.temp_file "kafka_config" "" in
+    let kafka_json = EzEncoding.construct Rtypes.kafka_config_enc kafka_config in
+    Printf.eprintf "Crawler kafka config:\n%s\n\n%!" kafka_json ;
+    let c = open_out kafka_temp_fn in
+    output_string c kafka_json ;
+    close_out c ;
+    Lwt.return (temp_fn, kafka_temp_fn)
 
 let start_crawler admin_wallet validator exchange_v2 royalties ft_fa1 ft_fa2
     kafka_broker kafka_username kafka_password =
   make_config
     admin_wallet validator exchange_v2 royalties ft_fa1 ft_fa2
-    kafka_broker kafka_username kafka_password  >>= fun config ->
+    kafka_broker kafka_username kafka_password  >>= fun (config, kafka_config) ->
   let prog = "./_bin/crawler" in
-  let args = [| prog ; config |] in
+  let args = [| prog ; config ; "--kafka-config" ; kafka_config |] in
   let stdout, fn_out, stderr, fn_err = create_descr2 "crawler" in
   let pid = create_process ~stdout ~stderr prog args in
   Printf.eprintf "CRAWLER STARTED (out %S err %S)\n%!" fn_out fn_err ;
-  Lwt.return pid
+  Lwt.return (pid, kafka_config)
 
 let random_test () =
   reset_db () ;
@@ -1949,8 +1952,8 @@ let random_test () =
   let r_alias, _r_source = create_royalties () in
   let r_kt1 = find_kt1 r_alias in
   Printf.eprintf "New royalties %s\n%!" r_kt1 ;
-  api_pid := Some (start_api ()) ;
-  start_crawler "" validator exchange_v2 r_kt1 [] [] "" "" "" >>= fun cpid ->
+  start_crawler "" validator exchange_v2 r_kt1 [] [] "" "" "" >>= fun (cpid, kafka_config) ->
+  api_pid := Some (start_api kafka_config) ;
   crawler_pid := Some cpid ;
   Printf.eprintf "Waiting 6sec to let crawler catch up...\n%!" ;
   Lwt_unix.sleep 6. >>= fun () ->
@@ -2040,8 +2043,8 @@ let test_1 () =
   let v_alias, _v_source = create_validator ~exchange:ex_kt1 ~royalties:r_kt1 in
   let v_kt1 = find_kt1 v_alias in
   Printf.eprintf "New validator %s\n%!" v_kt1 ;
-  api_pid := Some (start_api ()) ;
-  start_crawler "" v_kt1 ex_kt1 r_kt1 [] [] "" "" "" >>= fun cpid ->
+  start_crawler "" v_kt1 ex_kt1 r_kt1 [] [] "" "" "" >>= fun (cpid, kafka_config) ->
+  api_pid := Some (start_api kafka_config) ;
   crawler_pid := Some cpid ;
   set_validator v_kt1 ex_admin ex_kt1 >>= fun () ->
   Printf.eprintf "Waiting 6sec to let crawler catch up...\n%!" ;
@@ -2101,8 +2104,8 @@ let test_2 () =
   let v_alias, _v_source = create_validator ~exchange:ex_kt1 ~royalties:r_kt1 in
   let v_kt1 = find_kt1 v_alias in
   Printf.eprintf "New validator %s\n%!" v_kt1 ;
-  api_pid := Some (start_api ()) ;
-  start_crawler "" v_kt1 ex_kt1 r_kt1 [] [] "" "" "" >>= fun cpid ->
+  start_crawler "" v_kt1 ex_kt1 r_kt1 [] [] "" "" "" >>= fun (cpid, kafka_config) ->
+  api_pid := Some (start_api kafka_config) ;
   crawler_pid := Some cpid ;
   set_validator v_kt1 ex_admin ex_kt1 >>= fun () ->
   Printf.eprintf "Waiting 6sec to let crawler catch up...\n%!" ;
@@ -2207,8 +2210,8 @@ let fill_orders () =
   let v_alias, _v_source = create_validator ~exchange:ex_kt1 ~royalties:r_kt1 in
   let v_kt1 = find_kt1 v_alias in
   Printf.eprintf "New validator %s\n%!" v_kt1 ;
-  api_pid := Some (start_api ()) ;
-  start_crawler "" v_kt1 ex_kt1 r_kt1 [] [] "" "" "" >>= fun cpid ->
+  start_crawler "" v_kt1 ex_kt1 r_kt1 [] [] "" "" "" >>= fun (cpid, kafka_config) ->
+  api_pid := Some (start_api kafka_config) ;
   crawler_pid := Some cpid ;
   set_validator v_kt1 ex_admin ex_kt1 >>= fun () ->
   Printf.eprintf "Waiting 6sec to let crawler catch up...\n%!" ;
