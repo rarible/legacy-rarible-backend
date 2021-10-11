@@ -244,7 +244,8 @@ let mk_order_form
     order_rarible_v2_data_v1_origin_fees = origin_fees ;
   } in {
     order_form_elt = elt ;
-    order_form_data = RaribleV2Order data ;
+    order_form_data = data ;
+    order_form_type = ()
   }
 
 let generate_order () =
@@ -1102,31 +1103,21 @@ let mich_order order =
   let salt = order.order_elt.order_elt_salt in
   let start_date = order.order_elt.order_elt_start in
   let end_date = order.order_elt.order_elt_end in
-  match order.order_data with
-  | RaribleV2Order data ->
-    mich_order_form
-      ~maker ~make ~taker ~take ~salt ~start_date ~end_date
-      ~data_type:"V1"
-      ~payouts:data.order_rarible_v2_data_v1_payouts
-      ~origin_fees:data.order_rarible_v2_data_v1_origin_fees
-  | _ ->
-    mich_order_form
-      ~maker ~make ~taker ~take ~salt ~start_date ~end_date
-      ~data_type:"V0"
-      ~payouts:[]
-      ~origin_fees:[]
+  mich_order_form
+    ~maker ~make ~taker ~take ~salt ~start_date ~end_date
+    ~data_type:"V1"
+    ~payouts:order.order_data.order_rarible_v2_data_v1_payouts
+    ~origin_fees:order.order_data.order_rarible_v2_data_v1_origin_fees
 
-let payouts order = match order.order_data with
-  | RaribleV2Order data ->
-    let payouts = match data.order_rarible_v2_data_v1_payouts with
-      | [] ->
-        let tz1 = Tzfunc.Crypto.pk_to_tz1 order.order_elt.order_elt_maker in
-        let part = { part_account = tz1 ; part_value = 10000 } in
-        [ part ]
-      | payouts -> payouts in
-    let data = RaribleV2Order { data with order_rarible_v2_data_v1_payouts = payouts } in
-    { order with order_data = data }
-  | _ -> order
+let payouts order =
+  let payouts = match order.order_data.order_rarible_v2_data_v1_payouts with
+    | [] ->
+      let tz1 = Tzfunc.Crypto.pk_to_tz1 order.order_elt.order_elt_maker in
+      let part = { part_account = tz1 ; part_value = 10000 } in
+      [ part ]
+    | payouts -> payouts in
+  let data = { order.order_data with order_rarible_v2_data_v1_payouts = payouts } in
+  { order with order_data = data }
 
 let match_orders ?amount ~source ~contract order_left order_right =
   let open Tzfunc.Crypto in
@@ -1363,8 +1354,8 @@ let check_nft_activity ?(from=false) activity kt1 owner amount tid =
 let check_mint_activity (kt1, (owner, amount, tid, _royalties, _metadata)) =
   let owner = fst owner in
   let mint_activity_exists activities =
-    List.exists (fun act -> match act.nft_activity_type with
-        | NftActivityMint -> check_nft_activity act.nft_activity_elt kt1 owner amount tid
+    List.exists (fun act -> match act with
+        | NftActivityMint elt -> check_nft_activity elt kt1 owner amount tid
         | _ -> false) activities in
   (* MINT ONLY ACTIVITIES *)
   call_get_nft_activities_by_item_mint kt1 tid >|= begin function
@@ -1555,11 +1546,11 @@ let check_mint_activity (kt1, (owner, amount, tid, _royalties, _metadata)) =
 let check_transfer_activity ?(from=false) (kt1, (owner, amount, tid, _royalties, _metadata)) =
   let owner = fst owner in
   let transfer_activity_exists activities =
-    List.exists (fun act -> match act.nft_activity_type with
-        | NftActivityTransfer addr ->
+    List.exists (fun act -> match act with
+        | NftActivityTransfer {transfer=addr; elt} ->
           if from then
-            check_nft_activity ~from act.nft_activity_elt kt1 addr amount tid
-          else check_nft_activity act.nft_activity_elt kt1 owner amount tid
+            check_nft_activity ~from elt kt1 addr amount tid
+          else check_nft_activity elt kt1 owner amount tid
         | _ -> false) activities in
   (* MINT ONLY ACTIVITIES *)
   call_get_nft_activities_by_item_mint kt1 tid >|= begin function
