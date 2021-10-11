@@ -4,10 +4,12 @@ open Make(Pg)(struct type extra = Rtypes.config end)
 open Rtypes
 open Config
 
+let kafka_config_file = ref ""
+let filename = ref None
+
 let dummy_extra = {
   admin_wallet = ""; exchange_v2 = ""; royalties = ""; validator = "";
   ft_fa2 = []; ft_fa1 = [];
-  kafka_broker = "localhost:9092"; kafka_username = "" ; kafka_password = "" ;
 }
 
 let rarible_contracts ?(db=dummy_extra) config =
@@ -22,9 +24,6 @@ let rarible_contracts ?(db=dummy_extra) config =
     let extra = if extra.validator = "" then { extra with validator = db.validator } else extra in
     let extra = if extra.ft_fa2 = [] then { extra with ft_fa2 = db.ft_fa2 } else extra in
     let extra = if extra.ft_fa1 = [] then { extra with ft_fa1 = db.ft_fa1 } else extra in
-    let extra = if extra.kafka_broker = "" then { extra with kafka_broker = db.kafka_broker } else extra in
-    let extra = if extra.kafka_username = "" then { extra with kafka_username = db.kafka_username } else extra in
-    let extra = if extra.kafka_password = "" then { extra with kafka_password = db.kafka_password } else extra in
     let s = match config.accounts with
       | None -> SSet.empty
       | Some s -> s in
@@ -47,9 +46,31 @@ let fill_config config =
   let>? () = Db.update_extra_config config.extra in
   Lwt.return_ok config
 
+
+let args = [
+  ("--kafka-config", Arg.Set_string kafka_config_file, "set kafka configuration")
+]
+
+let usage = "usage: " ^ Sys.argv.(0) ^ " conf.json [--kafka-config string]"
+
+let get_config extra =
+  Crp.print_rp @@
+  match !filename with
+  | None -> Crp.rerr `no_config
+  | Some f ->
+    try
+      let ic = open_in f in
+      let json = Ezjsonm.from_channel ic in
+      close_in ic;
+      let config = Json_encoding.(destruct (Cconfig.enc extra) json) in
+      Crp.rok config
+    with exn -> Crp.rerr (`cannot_parse_config exn)
+
 let () =
   EzLwtSys.run @@ fun () ->
+  Arg.parse args (fun f -> filename := Some f) usage;
   Lwt.map (fun _ -> ()) @@
+  let>? () = Db.Rarible_kafka.may_set_kafka_config !kafka_config_file in
   let>? config = Unix_sys.get_config Rtypes.config_enc in
   Hooks.set_operation Db.insert_operation;
   Hooks.set_block Db.insert_block;

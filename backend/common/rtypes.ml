@@ -9,9 +9,12 @@ type config = {
   royalties: string; [@dft ""]
   ft_fa2: string list; [@dft []]
   ft_fa1: string list; [@dft []]
-  kafka_broker : string; [@dft "localhost:9092"]
-  kafka_username : string; [@dft ""]
-  kafka_password : string; [@dft ""]
+} [@@deriving encoding]
+
+type kafka_config = {
+  kafka_broker : string;
+  kafka_username : string;
+  kafka_password : string;
 } [@@deriving encoding]
 
 (** Api *)

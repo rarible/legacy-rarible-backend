@@ -4,6 +4,8 @@ open Rtypes
 open Hooks
 open Utils
 
+module Rarible_kafka = Rarible_kafka
+
 module SSet = Set.Make(String)
 
 module PGOCaml = Pg.PGOCaml
@@ -35,9 +37,6 @@ let get_extra_config ?dbh () =
       validator = r#validator_contract;
       ft_fa2 = List.filter_map (fun x -> x) r#ft_fa2;
       ft_fa1 = List.filter_map (fun x -> x) r#ft_fa1;
-      kafka_broker = "";
-      kafka_username = "";
-      kafka_password = "";
     })
   | [] -> Lwt.return_ok None
   | _ -> Lwt.return_error (`hook_error "wrong_state")
