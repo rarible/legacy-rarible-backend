@@ -8,8 +8,5 @@
   ],
   "validator": "KT1Vx7UddodXEVAjvgC2et267JqKSYX7WAr7",
   "exchange_v2": "KT1C5kWbfzASApxCMHXFLbHuPtnRaJXE4WMu",
-  "royalties": "KT1BkQiZcEL8kvx66WZCnFBCCjhJHsQsScw7",
-  "kafka_broker" : "127.0.0.1:9092",
-  "kafka_username" : "rarible",
-  "kafka_password" : "PLgiE%np@v7Y^SqtqMA8eN^F4NNjk87$"
+  "royalties": "KT1BkQiZcEL8kvx66WZCnFBCCjhJHsQsScw7"
 }
