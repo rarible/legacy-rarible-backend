@@ -1174,8 +1174,13 @@ let contract_updates_base dbh ~main ~contract ~block ~level ~tsp ~burn
        last_level = case when $main then $level else last_level end, \
        last = case when $main then $tsp else last end
        where token_id = $tk_token_id and contract = $contract and owner <> $tk_owner"] in
-  produce_nft_item_event dbh contract tk_token_id >>=? fun () ->
-  produce_nft_ownership_event dbh contract tk_token_id tk_owner >>=? fun () ->
+  begin if main then
+      begin
+        produce_nft_item_event dbh contract tk_token_id >>=? fun () ->
+        produce_nft_ownership_event dbh contract tk_token_id tk_owner
+      end
+    else Lwt.return_ok ()
+  end >>=? fun () ->
   (* update account *)
   let>? new_amount = one ~err:"no amount for burn update" l_amount in
   let new_token = EzEncoding.construct account_token_enc {
@@ -1275,9 +1280,15 @@ let transfer_updates dbh main ~contract ~block ~level ~tsp ~token_id ~source amo
          owner = $destination and contract = $contract returning amount"] in
   let>? new_dst_amount =
     one ~err:"destination token not found for transfer update" l_new_dst_amount in
-  produce_nft_item_event dbh contract token_id >>=? fun () ->
-  produce_nft_ownership_event dbh contract token_id source >>=? fun () ->
-  produce_nft_ownership_event dbh contract token_id destination >>=? fun () ->
+  begin
+    if main then
+      begin
+        produce_nft_item_event dbh contract token_id >>=? fun () ->
+        produce_nft_ownership_event dbh contract token_id source >>=? fun () ->
+        produce_nft_ownership_event dbh contract token_id destination
+      end
+    else Lwt.return_ok ()
+  end >>=? fun () ->
   let at = { at_token_id = token_id; at_contract = contract; at_amount = new_src_amount } in
   let new_token_src = EzEncoding.construct account_token_enc at in
   let old_token_src = EzEncoding.construct account_token_enc {at with at_amount = Int64.add new_src_amount amount} in
