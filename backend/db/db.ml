@@ -626,22 +626,34 @@ let produce_order_event_hash dbh hash =
   end >>= fun () ->
   Lwt.return_ok ()
 
-let produce_nft_item_event dbh contract token_id =
+let produce_nft_item_event dbh eventid contract token_id =
   let>? item = get_nft_item_by_id ~dbh contract (Int64.to_string token_id) in
   if item.nft_item_owners = [] then
+    let deleted_item = {
+      nft_deleted_item_id = item.nft_item_id ;
+      nft_deleted_item_token = item.nft_item_contract ;
+      nft_deleted_item_token_id = item.nft_item_token_id ;
+    } in
     Rarible_kafka.produce_item_event
-      (mk_item_event "TODO-EVENTID" "TODO-ITEMID" (NftItemDeleteEvent item))
+      (mk_item_event eventid "TODO-ITEMID" (NftItemDeleteEvent deleted_item))
     >>= fun () ->
     Lwt.return_ok ()
   else
     Rarible_kafka.produce_item_event
-      (mk_item_event "TODO-EVENTID" "TODO-ITEMID" (NftItemUpdateEvent item))
+      (mk_item_event eventid "TODO-ITEMID" (NftItemUpdateEvent item))
     >>= fun () ->
     Lwt.return_ok ()
 
 let produce_ownership_event os =
   let event =
-    if os.nft_ownership_value = "0" then NftOwnershipDeleteEvent os
+    if os.nft_ownership_value = "0" then
+      let deleted_os = {
+        nft_deleted_ownership_id = os.nft_ownership_id ;
+        nft_deleted_ownership_token = os.nft_ownership_contract ;
+        nft_deleted_ownership_token_id = os.nft_ownership_token_id ;
+        nft_deleted_ownership_owner = os. nft_ownership_owner ;
+      } in
+      NftOwnershipDeleteEvent deleted_os
     else NftOwnershipUpdateEvent os in
   Rarible_kafka.produce_ownership_event
     (mk_ownership_event "TODO-EVENTID" "TODO-OWNERSHIPID" event) >>= fun () ->
@@ -1174,13 +1186,6 @@ let contract_updates_base dbh ~main ~contract ~block ~level ~tsp ~burn
        last_level = case when $main then $level else last_level end, \
        last = case when $main then $tsp else last end
        where token_id = $tk_token_id and contract = $contract and owner <> $tk_owner"] in
-  begin if main then
-      begin
-        produce_nft_item_event dbh contract tk_token_id >>=? fun () ->
-        produce_nft_ownership_event dbh contract tk_token_id tk_owner
-      end
-    else Lwt.return_ok ()
-  end >>=? fun () ->
   (* update account *)
   let>? new_amount = one ~err:"no amount for burn update" l_amount in
   let new_token = EzEncoding.construct account_token_enc {
@@ -1191,11 +1196,19 @@ let contract_updates_base dbh ~main ~contract ~block ~level ~tsp ~burn
       at_token_id = tk_token_id;
       at_contract = contract;
       at_amount = Int64.(sub new_amount (mul main_s tk_amount))  } in
-  [%pgsql dbh
-      "update accounts set tokens = array_append(array_remove(tokens, $old_token), $new_token), \
-       last_block = case when $main then $block else last_block end, \
-       last_level = case when $main then $level else last_level end, \
-       last = case when $main then $tsp else last end where address = $tk_owner"]
+  let>? () =
+    [%pgsql dbh
+        "update accounts set tokens = array_append(array_remove(tokens, $old_token), $new_token), \
+         last_block = case when $main then $block else last_block end, \
+         last_level = case when $main then $level else last_level end, \
+         last = case when $main then $tsp else last end where address = $tk_owner"] in
+  if main then
+    begin
+      produce_nft_item_event dbh "contract_updates" contract tk_token_id >>=? fun () ->
+      produce_nft_ownership_event dbh contract tk_token_id tk_owner
+    end
+  else Lwt.return_ok ()
+
 
 let metadata_uri_enc =
   EzEncoding.ignore_enc @@ Json_encoding.(obj2 (req "name" string) (opt "symbol" string))
@@ -1283,7 +1296,7 @@ let transfer_updates dbh main ~contract ~block ~level ~tsp ~token_id ~source amo
   begin
     if main then
       begin
-        produce_nft_item_event dbh contract token_id >>=? fun () ->
+        produce_nft_item_event dbh "transfer_updates" contract token_id >>=? fun () ->
         produce_nft_ownership_event dbh contract token_id source >>=? fun () ->
         produce_nft_ownership_event dbh contract token_id destination
       end
@@ -1342,7 +1355,7 @@ let token_metadata_update dbh ~main ~contract ~block ~level ~tsp ~token_id meta 
            last = case when $main then $tsp else last end \
            where contract = $contract and \
            token_id = $token_id"] in
-    if main then produce_nft_item_event dbh contract token_id
+    if main then produce_nft_item_event dbh "token_metadata" contract token_id
     else Lwt.return_ok ()
   else Lwt.return_ok ()
 

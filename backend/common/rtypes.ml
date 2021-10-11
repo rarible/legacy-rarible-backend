@@ -838,9 +838,15 @@ type order_event = {
   order_event_type : string ;
 } [@@deriving encoding {camel}]
 
+type nft_deleted_item = {
+  nft_deleted_item_id : string ;
+  nft_deleted_item_token : A.address ;
+  nft_deleted_item_token_id : A.big_integer ;
+} [@@deriving encoding {camel}]
+
 type nft_event =
   | NftItemUpdateEvent of nft_item [@wrap "item"] [@kind "UPDATE"] [@kind_label "type"]
-  | NftItemDeleteEvent of nft_item [@wrap "item"] [@kind "DELETE"] [@kind_label "type"]
+  | NftItemDeleteEvent of nft_deleted_item [@wrap "item"] [@kind "DELETE"] [@kind_label "type"]
  [@@deriving encoding]
 
 type nft_item_event = {
@@ -849,11 +855,18 @@ type nft_item_event = {
   nft_item_event_event : nft_event ; [@merge]
 } [@@deriving encoding {camel}]
 
+type nft_deleted_ownership = {
+  nft_deleted_ownership_id : string ;
+  nft_deleted_ownership_token : A.address ;
+  nft_deleted_ownership_token_id : A.big_integer ;
+  nft_deleted_ownership_owner : A.address ;
+} [@@deriving encoding {camel}]
+
 type ownership_event =
   | NftOwnershipUpdateEvent of
       nft_ownership [@wrap "ownership"] [@kind "UPDATE"] [@kind_label "type"]
   | NftOwnershipDeleteEvent of
-      nft_ownership [@wrap "ownership"] [@kind "DELTE"] [@kind_label "type"]
+      nft_deleted_ownership [@wrap "ownership"] [@kind "DELTE"] [@kind_label "type"]
 [@@deriving encoding]
 
 type nft_ownership_event = {
