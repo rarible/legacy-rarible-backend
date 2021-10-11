@@ -57,24 +57,26 @@ let kafka_produce ?(partition=0) topic message =
   Kafka_lwt.produce topic partition message
 
 (** Producer *)
-let produce_item_event msg =
+let produce_item_event item_event =
   match !kafka_config with
   | Some _c ->
     begin match !topic_item with
       | None -> create topic_item_name
       | Some t -> Lwt.return t
     end >>= fun t ->
-    kafka_produce t msg
+    EzEncoding.construct Rtypes.nft_item_event_enc item_event
+    |> kafka_produce t
   | None -> Lwt.return ()
 
-let produce_ownership_event msg =
+let produce_ownership_event ownership_event =
   match !kafka_config with
   | Some _c ->
     begin match !topic_ownership with
       | None -> create topic_ownership_name
       | Some t -> Lwt.return t
     end >>= fun t ->
-    kafka_produce t msg
+    EzEncoding.construct Rtypes.nft_ownership_event_enc ownership_event
+    |> kafka_produce t
   | _ -> Lwt.return ()
 
 let produce_order_event order_event =
@@ -88,7 +90,7 @@ let produce_order_event order_event =
     |> kafka_produce t
   | _ -> Lwt.return ()
 
-let produce_activity activity =
+let produce_nft_activity activity =
   match !kafka_config with
   | Some _c ->
     begin match !topic_activity with
@@ -96,6 +98,17 @@ let produce_activity activity =
       | Some t -> Lwt.return t
     end >>= fun t ->
     EzEncoding.construct Rtypes.nft_activity_enc activity
+    |> kafka_produce t
+  | None -> Lwt.return ()
+
+let produce_order_activity activity =
+  match !kafka_config with
+  | Some _c ->
+    begin match !topic_activity with
+      | None -> create topic_activity_name
+      | Some t -> Lwt.return t
+    end >>= fun t ->
+    EzEncoding.construct Rtypes.order_activity_enc activity
     |> kafka_produce t
   | None -> Lwt.return ()
 

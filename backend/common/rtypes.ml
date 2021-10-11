@@ -762,7 +762,7 @@ type order_activity_cancel_bid = {
   order_activity_cancel_bid_maker : A.address ;
   order_activity_cancel_bid_make : asset_type ;
   order_activity_cancel_bid_take : asset_type ;
-  order_activity_cancel_bid_transction_hash : A.word ;
+  order_activity_cancel_bid_transaction_hash : A.word ;
   order_activity_cancel_bid_block_hash : A.word ;
   order_activity_cancel_bid_block_number : int64 ;
   order_activity_cancel_bid_log_index : int ;
@@ -826,11 +826,38 @@ type fee_side = FeeSideMake | FeeSideTake
 
 type exchange_param =
   | Cancel of string
-  | DoTransfers of {left: string; right: string ; fill_make_value: int64; fill_take_value: int64}
+  | DoTransfers of
+      {left: string; left_maker : string option; left_asset: asset ;
+       right: string ; right_maker: string option; right_asset: asset ;
+       fill_make_value: int64; fill_take_value: int64}
 
 type order_event = {
   order_event_event_id : string ;
   order_event_order_id : string ;
   order_event_order : order ;
   order_event_type : string ;
-} [@@deriving encoding {camel} ]
+} [@@deriving encoding {camel}]
+
+type nft_event =
+  | NftItemUpdateEvent of nft_item [@wrap "item"] [@kind "UPDATE"] [@kind_label "type"]
+  | NftItemDeleteEvent of nft_item [@wrap "item"] [@kind "DELETE"] [@kind_label "type"]
+ [@@deriving encoding]
+
+type nft_item_event = {
+  nft_item_event_event_id : string ;
+  nft_item_event_item_id : string ;
+  nft_item_event_event : nft_event ; [@merge]
+} [@@deriving encoding {camel}]
+
+type ownership_event =
+  | NftOwnershipUpdateEvent of
+      nft_ownership [@wrap "ownership"] [@kind "UPDATE"] [@kind_label "type"]
+  | NftOwnershipDeleteEvent of
+      nft_ownership [@wrap "ownership"] [@kind "DELTE"] [@kind_label "type"]
+[@@deriving encoding]
+
+type nft_ownership_event = {
+  nft_ownership_event_event_id : string ;
+  nft_ownership_event_ownership_id : string ;
+  nft_ownership_event_event : ownership_event ; [@merge]
+} [@@deriving encoding {camel}]

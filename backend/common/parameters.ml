@@ -254,10 +254,10 @@ let parse_do_transfers = function
   | Mprim { prim = `Pair; args = [
       _m_asset_class; _m_asset_data; _t_asset_class; _t_asset_data;
       Mint fill_m_value; Mint fill_t_value;
-      left_maker; left_m_asset_class; left_m_asset_data; _left_m_asset_value;
+      left_maker; left_m_asset_class; left_m_asset_data; Mstring left_m_asset_value;
       _left_taker; left_t_asset_class;  left_t_asset_data; _left_t_asset_value;
       Mint left_salt; _left_start; _left_end; _left_data_type; _left_data;
-      right_maker; right_m_asset_class; right_m_asset_data; _right_m_asset_value;
+      right_maker; right_m_asset_class; right_m_asset_data; Mstring right_m_asset_value;
       _right_taker; right_t_asset_class;  right_t_asset_data; _right_t_asset_value;
       Mint right_salt; _right_start; _right_end; _right_data_type; _right_data;
       _fee_side; _royalties
@@ -266,10 +266,10 @@ let parse_do_transfers = function
       Mprim { prim = `Pair; args = [ _m_asset_class; _m_asset_data ]; _ };
       Mprim { prim = `Pair; args = [ _t_asset_class; _t_asset_data ]; _ };
       Mprim { prim = `Pair; args = [ Mint fill_m_value; Mint fill_t_value ]; _ };
-      Mseq [ left_maker; left_m_asset_class; left_m_asset_data; _left_m_asset_value;
+      Mseq [ left_maker; left_m_asset_class; left_m_asset_data; Mstring left_m_asset_value;
              _left_taker; left_t_asset_class;  left_t_asset_data; _left_t_asset_value;
              Mint left_salt; _left_start; _left_end; _left_data_type; _left_data ];
-      Mseq [ right_maker; right_m_asset_class; right_m_asset_data; _right_m_asset_value;
+      Mseq [ right_maker; right_m_asset_class; right_m_asset_data; Mstring right_m_asset_value;
              _right_taker; right_t_asset_class;  right_t_asset_data; _right_t_asset_value;
              Mint right_salt; _right_start; _right_end; _right_data_type; _right_data ];
       _fee_side; _royalties ] ->
@@ -278,14 +278,19 @@ let parse_do_transfers = function
     let$ left_tat = parse_asset_type left_t_asset_class left_t_asset_data in
     let left_salt = Z.to_string left_salt in
     let$ left = Utils.hash_key left_maker left_mat left_tat left_salt in
+    let left_asset = { asset_type = left_mat ; asset_value = left_m_asset_value } in
     let$ right_maker = parse_option_key right_maker in
     let$ right_mat = parse_asset_type right_m_asset_class right_m_asset_data in
     let$ right_tat = parse_asset_type right_t_asset_class right_t_asset_data in
     let right_salt = Z.to_string right_salt in
     let$ right = Utils.hash_key right_maker right_mat right_tat right_salt in
+    let right_asset = { asset_type = right_mat ; asset_value = right_m_asset_value } in
     let fill_make_value = Z.to_int64 fill_m_value in
     let fill_take_value = Z.to_int64 fill_t_value in
-    Ok (DoTransfers {left; right; fill_make_value; fill_take_value})
+    Ok (DoTransfers
+          {left; left_maker; left_asset;
+           right; right_maker; right_asset;
+           fill_make_value; fill_take_value})
 
   | _ -> unexpected_michelson
 

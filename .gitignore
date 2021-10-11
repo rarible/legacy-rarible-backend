@@ -6,6 +6,7 @@
 /sdk/dist
 *.tz
 /config/crawler_config.json
+/config/kafka_config.json
 /sdk/www/*.js
 /sdk/www/*.js.*
 /deployment/crawler_config.json
