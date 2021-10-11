@@ -143,8 +143,8 @@ let string_of_asset_type = function
   | ATXTZ -> "XTZ"
   | ATFA_1_2 _ -> "FA_1_2"
   | ATFA_2 _ -> "FA_2"
-  | ATETH -> "ETH"
-  | ATERC721 _ -> "ERC721"
+  (* | ATETH -> "ETH"
+   * | ATERC721 _ -> "ERC721" *)
 
 (* fun AssetType.hash(type: AssetType): Word = keccak256(Tuples.assetTypeHashType().encode(Tuple3.apply(
  *     TYPE_HASH.bytes(),
@@ -168,8 +168,8 @@ let asset_class_mich = function
   | ATXTZ -> prim `Left ~args:[prim `Unit]
   | ATFA_1_2 _ -> prim `Right ~args:[prim `Left ~args:[ prim `Unit ]]
   | ATFA_2 _ -> prim `Right ~args:[prim `Right ~args:[ prim `Left ~args:[ prim `Unit ] ]]
-  | ATETH -> assert false
-  | ATERC721 _ -> assert false
+  (* | ATETH -> assert false
+   * | ATERC721 _ -> assert false *)
 
 let asset_class_type =
   (prim `or_ ~args:[prim `unit; prim `or_ ~args:[prim `unit; prim `or_ ~args:[
@@ -181,8 +181,8 @@ let asset_data = function
   | ATFA_2 { asset_fa2_contract; asset_fa2_token_id } ->
     Tzfunc.Forge.pack (prim `pair ~args:[ prim `address; prim `nat ])
       (prim `Pair ~args:[ Mstring asset_fa2_contract; Mint (Z.of_string asset_fa2_token_id) ])
-  | ATETH -> assert false
-  | ATERC721 _ -> assert false
+  (* | ATETH -> assert false
+   * | ATERC721 _ -> assert false *)
 
 
 let asset_type_mich a =
@@ -322,12 +322,10 @@ let calculate_remaining make_value take_value fill cancelled =
     let make = Int64.(div (mul take make_value) take_value) in
     make, take
 
-let calculate_fee data protocol_commission = match data with
-  | RaribleV2Order { order_rarible_v2_data_v1_origin_fees ; _ } ->
-    List.fold_left (fun acc p -> Int64.(add acc (of_int p.part_value)))
-      protocol_commission
-      order_rarible_v2_data_v1_origin_fees
-  | _ -> assert false
+let calculate_fee data protocol_commission =
+  List.fold_left (fun acc p -> Int64.(add acc (of_int p.part_value)))
+    protocol_commission
+    data.order_rarible_v2_data_v1_origin_fees
 
 let calculate_rounded_make_balance make_value take_value make_balance =
   let max_take = Int64.(div (mul make_balance take_value) make_value) in
@@ -388,7 +386,7 @@ let order_elt_from_order_form_elt elt =
 
 let order_from_order_form form =
   let$ order_elt = order_elt_from_order_form_elt form.order_form_elt in
-  Ok { order_elt; order_data = form.order_form_data }
+  Ok { order_elt; order_data = form.order_form_data; order_type = () }
 
 let order_form_elt_from_order_elt order_elt = {
   order_form_elt_maker = order_elt.order_elt_maker ;
@@ -403,7 +401,7 @@ let order_form_elt_from_order_elt order_elt = {
 
 let order_form_from_order order = {
   order_form_elt =  order_form_elt_from_order_elt order.order_elt ;
-  order_form_data = order.order_data
+  order_form_data = order.order_data; order_form_type = ()
 }
 
 let string_opt_of_float_opt = function

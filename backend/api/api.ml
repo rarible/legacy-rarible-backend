@@ -745,11 +745,10 @@ let search_nft_all_collections req () =
 
 let validate_signature order =
   let order_elt = order.order_elt in
-  let data_type, payouts, origin_fees = match order.order_data with
-    | RaribleV2Order d ->
-      d.order_rarible_v2_data_v1_data_type, d.order_rarible_v2_data_v1_payouts,
-      d.order_rarible_v2_data_v1_origin_fees
-    | _ -> assert false in
+  let data_type, payouts, origin_fees =
+    let d = order.order_data in
+    d.order_rarible_v2_data_v1_data_type, d.order_rarible_v2_data_v1_payouts,
+    d.order_rarible_v2_data_v1_origin_fees in
   let$> msg = hash_order_form order_elt.order_elt_maker order_elt.order_elt_make
       order_elt.order_elt_taker order_elt.order_elt_take
       order_elt.order_elt_salt order_elt.order_elt_start order_elt.order_elt_end

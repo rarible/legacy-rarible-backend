@@ -79,25 +79,25 @@ let mk_asset asset_class contract token_id asset_value =
   let asset_value = Int64.to_string asset_value in
   match asset_class with
   (* For testing purposes*)
-  | "ERC721" ->
-    begin
-      match contract, token_id with
-      | Some c, Some id ->
-        let asset_type =
-          ATERC721
-            { asset_type_nft_contract = c ; asset_type_nft_token_id = id } in
-        Lwt.return_ok { asset_type; asset_value }
-      | _, _ ->
-        Lwt.return_error (`hook_error ("no contract addr or tokenId for ERC721 asset"))
-    end
-  | "ETH" ->
-    begin
-      match contract, token_id with
-      | None, None ->
-        Lwt.return_ok { asset_type = ATETH ; asset_value }
-      | _, _ ->
-        Lwt.return_error (`hook_error ("contract addr or tokenId for ETH asset"))
-    end
+  (* | "ERC721" ->
+   *   begin
+   *     match contract, token_id with
+   *     | Some c, Some id ->
+   *       let asset_type =
+   *         ATERC721
+   *           { asset_type_nft_contract = c ; asset_type_nft_token_id = id } in
+   *       Lwt.return_ok { asset_type; asset_value }
+   *     | _, _ ->
+   *       Lwt.return_error (`hook_error ("no contract addr or tokenId for ERC721 asset"))
+   *   end
+   * | "ETH" ->
+   *   begin
+   *     match contract, token_id with
+   *     | None, None ->
+   *       Lwt.return_ok { asset_type = ATETH ; asset_value }
+   *     | _, _ ->
+   *       Lwt.return_error (`hook_error ("contract addr or tokenId for ETH asset"))
+   *   end *)
     (* Tezos assets*)
   | "XTZ" ->
     begin
@@ -134,15 +134,15 @@ let db_from_asset asset =
   let asset_value = Int64.of_string asset.asset_value in
   match asset.asset_type with
   (* For testing purposes*)
-  | ATERC721 data ->
-    Lwt.return_ok
-      (string_of_asset_type asset.asset_type,
-       Some data.asset_type_nft_contract,
-       Some data.asset_type_nft_token_id,
-       asset_value)
-  | ATETH ->
-    Lwt.return_ok
-      (string_of_asset_type asset.asset_type, None, None, asset_value)
+  (* | ATERC721 data ->
+   *   Lwt.return_ok
+   *     (string_of_asset_type asset.asset_type,
+   *      Some data.asset_type_nft_contract,
+   *      Some data.asset_type_nft_token_id,
+   *      asset_value)
+   * | ATETH ->
+   *   Lwt.return_ok
+   *     (string_of_asset_type asset.asset_type, None, None, asset_value) *)
   (* Tezos assets*)
   | ATXTZ ->
     Lwt.return_ok
@@ -326,11 +326,9 @@ let get_make_balance ?dbh make owner = match make.asset_type with
          main and \
          contract = $contract and token_id = $token_id and \
          owner = $owner"] in
-    begin match l with
-      | [ r ] -> r#amount
-      | _ -> 0L
-    end
-  | _ -> Lwt.return_ok 0L
+    match l with
+    | [ r ] -> r#amount
+    | _ -> 0L
 
 let calculate_make_stock make take data fill make_balance cancelled =
   (* TODO : protocol commission *)
@@ -380,7 +378,7 @@ let mk_order ?dbh order_obj =
   get_order_price_history ?dbh order_obj#hash >>=? fun price_history ->
   get_order_origin_fees ?dbh order_obj#hash >>=? fun origin_fees ->
   get_order_payouts ?dbh order_obj#hash >>=? fun payouts ->
-  let data = RaribleV2Order {
+  let data = {
     order_rarible_v2_data_v1_data_type = "RARIBLE_V2_DATA_V1" ;
     order_rarible_v2_data_v1_payouts = payouts ;
     order_rarible_v2_data_v1_origin_fees = origin_fees ;
@@ -411,6 +409,7 @@ let mk_order ?dbh order_obj =
   let rarible_v2_order = {
     order_elt = order_elt ;
     order_data = data ;
+    order_type = ();
   } in
   Lwt.return_ok rarible_v2_order
 
@@ -687,27 +686,26 @@ let insert_account dbh addr ~block ~tsp ~level =
        values($addr, $block, $level, $tsp) on conflict do nothing"]
 
 let insert_nft_activity dbh timestamp nft_activity =
-  let act_type, act_from =
-    match nft_activity.nft_activity_type with
-    | NftActivityMint -> "mint", None
-    | NftActivityBurn -> "burn", None
-    | NftActivityTransfer fr -> "transfer", Some fr in
+  let act_type, act_from, elt =  match nft_activity with
+    | NftActivityMint elt -> "mint", None, elt
+    | NftActivityBurn elt -> "burn", None, elt
+    | NftActivityTransfer {elt; transfer} -> "transfer", Some transfer, elt in
   let token_id =
-    Int64.of_string nft_activity.nft_activity_elt.nft_activity_token_id in
+    Int64.of_string elt.nft_activity_token_id in
   let value =
-    Int64.of_string nft_activity.nft_activity_elt.nft_activity_value in
+    Int64.of_string elt.nft_activity_value in
   let level =
-    Int64.to_int32 nft_activity.nft_activity_elt.nft_activity_block_number in
+    Int64.to_int32 elt.nft_activity_block_number in
   [%pgsql dbh
       "insert into nft_activities(\
        activity_type, transaction, block, level, date, contract, token_id, \
        owner, amount, tr_from) values ($act_type, \
-       ${nft_activity.nft_activity_elt.nft_activity_transaction_hash}, \
-       ${nft_activity.nft_activity_elt.nft_activity_block_hash}, \
+       ${elt.nft_activity_transaction_hash}, \
+       ${elt.nft_activity_block_hash}, \
        $level, $timestamp, \
-       ${nft_activity.nft_activity_elt.nft_activity_contract}, \
+       ${elt.nft_activity_contract}, \
        $token_id, \
-       ${nft_activity.nft_activity_elt.nft_activity_owner}, $value, $?act_from) \
+       ${elt.nft_activity_owner}, $value, $?act_from) \
        on conflict do nothing"] >>=? fun () ->
   Rarible_kafka.produce_nft_activity nft_activity >>= fun () ->
   Lwt.return_ok ()
@@ -724,22 +722,16 @@ let create_nft_activity_elt op contract mi_op = {
 
 let insert_nft_activity_mint dbh op kt1 mi_op =
   let nft_activity_elt = create_nft_activity_elt op kt1 mi_op in
-  let nft_activity = {
-    nft_activity_type = NftActivityMint ;
-    nft_activity_elt ;
-  } in
+  let nft_activity = NftActivityMint nft_activity_elt in
   insert_nft_activity dbh op.bo_tsp nft_activity
 
 let insert_nft_activity_burn dbh op kt1 mi_op =
   let nft_activity_elt = create_nft_activity_elt op kt1 mi_op in
-  let nft_activity = {
-    nft_activity_type = NftActivityBurn ;
-    nft_activity_elt ;
-  } in
+  let nft_activity = NftActivityBurn nft_activity_elt in
   insert_nft_activity dbh op.bo_tsp nft_activity
 
-let insert_nft_activity_transfer dbh op kt1 source owner token_id amount =
-  let nft_activity_elt = {
+let insert_nft_activity_transfer dbh op kt1 transfer owner token_id amount =
+  let elt = {
     nft_activity_owner = owner ;
     nft_activity_contract = kt1;
     nft_activity_token_id = Int64.to_string token_id ;
@@ -748,10 +740,7 @@ let insert_nft_activity_transfer dbh op kt1 source owner token_id amount =
     nft_activity_block_hash = op.bo_block ;
     nft_activity_block_number = Int64.of_int32 op.bo_level ;
   } in
-  let nft_activity = {
-    nft_activity_type = NftActivityTransfer source ;
-    nft_activity_elt ;
-  } in
+  let nft_activity = NftActivityTransfer {transfer; elt} in
   insert_nft_activity dbh op.bo_tsp nft_activity
 
 let insert_mint dbh op kt1 m =
@@ -1634,23 +1623,14 @@ let mk_nft_activity_elt obj = {
 let mk_nft_activity obj = match obj#activity_type with
   | "mint" ->
     let nft_activity_elt = mk_nft_activity_elt obj in
-    Lwt.return_ok {
-      nft_activity_type = NftActivityMint ;
-      nft_activity_elt ;
-    }
+    Lwt.return_ok @@ NftActivityMint nft_activity_elt
   | "burn" ->
     let nft_activity_elt = mk_nft_activity_elt obj in
-    Lwt.return_ok {
-      nft_activity_type = NftActivityBurn ;
-      nft_activity_elt ;
-    }
+    Lwt.return_ok @@ NftActivityBurn nft_activity_elt
   | "transfer" ->
-    let nft_activity_elt = mk_nft_activity_elt obj in
-    let tr_from = Option.get obj#tr_from in
-    Lwt.return_ok {
-      nft_activity_type = NftActivityTransfer tr_from ;
-      nft_activity_elt ;
-    }
+    let elt = mk_nft_activity_elt obj in
+    let transfer = Option.get obj#tr_from in
+    Lwt.return_ok @@ NftActivityTransfer {elt; transfer}
   | _ as t -> Lwt.return_error (`hook_error ("unknown nft activity type " ^ t))
 
 let get_nft_activities_by_collection ?dbh ?continuation ?(size=50) filter =
@@ -1885,7 +1865,7 @@ let generate_nft_token_id ?dbh contract =
   match r with
   | [ i ] -> Lwt.return_ok {
       nft_token_id = Int64.(to_string @@ succ i) ;
-      nft_token_id_signatures = [] ;
+      nft_token_id_signature = None ;
     }
   | _ -> Lwt.return_error (`hook_error "no contracts entry for this contract")
 
@@ -1982,9 +1962,7 @@ let filter_orders ?origin orders =
       (int_of_string order.order_elt.order_elt_make_stock) > 0 &&
       match origin with
       | Some orig ->
-        let origin_fees = match order.order_data with
-          | RaribleV2Order data -> data.order_rarible_v2_data_v1_origin_fees
-          | _ -> [] in
+        let origin_fees = order.order_data.order_rarible_v2_data_v1_origin_fees in
         List.exists (fun p -> p.part_account = orig) origin_fees
       | None -> true)
     orders
@@ -2576,12 +2554,8 @@ let upsert_order ?dbh order =
   let signature = order_elt.order_elt_signature in
   let created_at = order_elt.order_elt_created_at in
   let last_update_at = order_elt.order_elt_last_update_at in
-  let payouts = match order_data with
-    | RaribleV2Order data -> data.order_rarible_v2_data_v1_payouts
-    | _ -> assert false in
-  let origin_fees = match order_data with
-    | RaribleV2Order data -> data.order_rarible_v2_data_v1_origin_fees
-    | _ -> assert false in
+  let payouts = order_data.order_rarible_v2_data_v1_payouts in
+  let origin_fees = order_data.order_rarible_v2_data_v1_origin_fees in
   let hash_key = order_elt.order_elt_hash in
   use dbh @@ fun dbh ->
   let>? () = [%pgsql dbh
