@@ -61,7 +61,10 @@ let produce_item_event item_event =
   match !kafka_config with
   | Some _c ->
     begin match !topic_item with
-      | None -> create topic_item_name
+      | None ->
+        create topic_item_name >>= fun t ->
+        topic_item := Some t ;
+        Lwt.return t
       | Some t -> Lwt.return t
     end >>= fun t ->
     EzEncoding.construct Rtypes.nft_item_event_enc item_event
@@ -72,7 +75,10 @@ let produce_ownership_event ownership_event =
   match !kafka_config with
   | Some _c ->
     begin match !topic_ownership with
-      | None -> create topic_ownership_name
+      | None ->
+        create topic_ownership_name >>= fun t ->
+        topic_ownership := Some t ;
+        Lwt.return t
       | Some t -> Lwt.return t
     end >>= fun t ->
     EzEncoding.construct Rtypes.nft_ownership_event_enc ownership_event
@@ -83,7 +89,10 @@ let produce_order_event order_event =
   match !kafka_config with
   | Some _c ->
     begin match !topic_order with
-      | None -> create topic_order_name
+      | None ->
+        create topic_order_name >>= fun t ->
+        topic_order := Some t ;
+        Lwt.return t
       | Some t -> Lwt.return t
     end >>= fun t ->
     EzEncoding.construct Rtypes.order_event_enc order_event
@@ -94,7 +103,10 @@ let produce_nft_activity activity =
   match !kafka_config with
   | Some _c ->
     begin match !topic_activity with
-      | None -> create topic_activity_name
+      | None ->
+        create topic_activity_name >>= fun t ->
+        topic_activity := Some t ;
+         Lwt.return t
       | Some t -> Lwt.return t
     end >>= fun t ->
     EzEncoding.construct Rtypes.nft_activity_enc activity
@@ -105,7 +117,10 @@ let produce_order_activity activity =
   match !kafka_config with
   | Some _c ->
     begin match !topic_activity with
-      | None -> create topic_activity_name
+      | None ->
+        create topic_activity_name >>= fun t ->
+         topic_activity := Some t ;
+         Lwt.return t
       | Some t -> Lwt.return t
     end >>= fun t ->
     EzEncoding.construct Rtypes.order_activity_enc activity
@@ -116,7 +131,10 @@ let produce_test msg =
   match !kafka_config with
   | Some _c ->
     begin match !topic_test with
-      | None -> create topic_test_name
+      | None ->
+        create topic_test_name >>= fun t ->
+        topic_test := Some t ;
+        Lwt.return t
       | Some t -> Lwt.return t
     end >>= fun t ->
     kafka_produce t msg
