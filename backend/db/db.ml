@@ -550,6 +550,13 @@ let get_nft_ownership_by_id ?dbh contract token_id owner =
 
 let mk_nft_media json =
   try Some (EzEncoding.destruct nft_media_enc json)
+  with _ ->
+  try
+    let url = EzEncoding.destruct Json_encoding.string json in
+    Some {
+      nft_media_url = [ "", url ] ;
+      nft_media_meta = [] ;
+    }
   with _ -> None
 
 let mk_nft_attributes json =
