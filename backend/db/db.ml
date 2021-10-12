@@ -700,7 +700,7 @@ let insert_account dbh addr ~block ~tsp ~level =
        values($addr, $block, $level, $tsp) on conflict do nothing"]
 
 let insert_nft_activity dbh timestamp nft_activity =
-  let act_type, act_from, elt =  match nft_activity with
+  let act_type, act_from, elt =  match nft_activity.nft_activity_type with
     | NftActivityMint elt -> "mint", None, elt
     | NftActivityBurn elt -> "burn", None, elt
     | NftActivityTransfer {elt; transfer} -> "transfer", Some transfer, elt in
@@ -736,12 +736,22 @@ let create_nft_activity_elt op contract mi_op = {
 
 let insert_nft_activity_mint dbh op kt1 mi_op =
   let nft_activity_elt = create_nft_activity_elt op kt1 mi_op in
-  let nft_activity = NftActivityMint nft_activity_elt in
+  let nft_activity_type = NftActivityMint nft_activity_elt in
+  let nft_activity = {
+    nft_activity_type ;
+    nft_activity_id = Printf.sprintf "%s_%ld" op.bo_block op.bo_index ;
+    nft_activity_date = op.bo_tsp ;
+  } in
   insert_nft_activity dbh op.bo_tsp nft_activity
 
 let insert_nft_activity_burn dbh op kt1 mi_op =
   let nft_activity_elt = create_nft_activity_elt op kt1 mi_op in
-  let nft_activity = NftActivityBurn nft_activity_elt in
+  let nft_activity_type = NftActivityBurn nft_activity_elt in
+  let nft_activity = {
+    nft_activity_type ;
+    nft_activity_id = Printf.sprintf "%s_%ld" op.bo_block op.bo_index ;
+    nft_activity_date = op.bo_tsp ;
+  } in
   insert_nft_activity dbh op.bo_tsp nft_activity
 
 let insert_nft_activity_transfer dbh op kt1 transfer owner token_id amount =
@@ -754,7 +764,12 @@ let insert_nft_activity_transfer dbh op kt1 transfer owner token_id amount =
     nft_activity_block_hash = op.bo_block ;
     nft_activity_block_number = Int64.of_int32 op.bo_level ;
   } in
-  let nft_activity = NftActivityTransfer {transfer; elt} in
+  let nft_activity_type = NftActivityTransfer {transfer; elt} in
+  let nft_activity = {
+    nft_activity_type ;
+    nft_activity_id = Printf.sprintf "%s_%ld" op.bo_block op.bo_index ;
+    nft_activity_date = op.bo_tsp ;
+  } in
   insert_nft_activity dbh op.bo_tsp nft_activity
 
 let insert_mint dbh op kt1 m =
@@ -874,7 +889,7 @@ let insert_order_activity
        on conflict do nothing"]
 
 let insert_order_activity dbh date activity =
-  begin match activity with
+  begin match activity.order_activity_type with
     | OrderActivityList act ->
       let hash = Some act.order_activity_bid_hash in
       insert_order_activity dbh None None hash None None None date "list"
@@ -916,14 +931,20 @@ let insert_order_activity_new dbh date order =
     order_activity_bid_price = price ;
     order_activity_bid_price_usd = None ;
   } in
-  let order_activity =
+  let order_activity_type =
     match order.order_elt.order_elt_make.asset_type,
           order.order_elt.order_elt_take.asset_type with
     | ATFA_2 _, _ -> OrderActivityList activity
     | _, _ -> OrderActivityBid activity in
+  let order_activity = {
+    order_activity_id = Hex.show @@ Hex.of_bigstring @@ Hacl.Rand.gen 128 ;
+    order_activity_date = date ;
+    order_activity_source = "RARIBLE" ;
+    order_activity_type = order_activity_type ;
+  } in
   insert_order_activity dbh date order_activity
 
-let insert_order_activity_cancel dbh transaction block level date hash =
+let insert_order_activity_cancel dbh transaction block index level date hash =
   let>? order = get_order ~dbh hash in
   match order with
   | Some order ->
@@ -934,20 +955,26 @@ let insert_order_activity_cancel dbh transaction block level date hash =
       order_activity_cancel_bid_take = order.order_elt.order_elt_take.asset_type ;
       order_activity_cancel_bid_transaction_hash = transaction ;
       order_activity_cancel_bid_block_hash = block ;
-      order_activity_cancel_bid_block_number = level ;
+      order_activity_cancel_bid_block_number = Int64.of_int32 level ;
       order_activity_cancel_bid_log_index = 0 ;
     } in
-  let order_activity =
+  let order_activity_type =
     match order.order_elt.order_elt_make.asset_type,
           order.order_elt.order_elt_take.asset_type with
     | ATFA_2 _, _ -> OrderActivityCancelList activity
     | _, _ -> OrderActivityCancelBid activity in
+  let order_activity = {
+    order_activity_id = Printf.sprintf "%s_%ld" block index ;
+    order_activity_date = date ;
+    order_activity_source = "RARIBLE" ;
+    order_activity_type = order_activity_type ;
+  } in
     insert_order_activity dbh date order_activity
   | None ->
     Lwt.return_ok ()
 
 let insert_order_activity_match
-    dbh transaction block level date
+    dbh transaction block index level date
     hash_left left_maker left_asset
     hash_right right_maker right_asset  =
   let match_left = {
@@ -963,7 +990,7 @@ let insert_order_activity_match
     order_activity_match_side_type = mk_side_type right_asset ;
   } in
   let>? price = nft_price left_asset right_asset in
-  let order_activity =
+  let order_activity_type =
     OrderActivityMatch {
       order_activity_match_left = match_left ;
       order_activity_match_right = match_right ;
@@ -974,6 +1001,12 @@ let insert_order_activity_match
       order_activity_match_block_number = Int64.of_int32 level ;
       order_activity_match_log_index = 0 ;
     } in
+  let order_activity = {
+    order_activity_id = Printf.sprintf "%s_%ld" block index ;
+    order_activity_date = date ;
+    order_activity_source = "RARIBLE" ;
+    order_activity_type = order_activity_type ;
+  } in
   insert_order_activity dbh date order_activity
 
 let insert_cancel dbh op hash =
@@ -983,7 +1016,9 @@ let insert_cancel dbh op hash =
        values(${op.bo_hash}, ${op.bo_index}, ${op.bo_block}, ${op.bo_level}, \
        ${op.bo_tsp}, $source, $hash) \
        on conflict do nothing"] >>=? fun () ->
-  produce_order_event_hash dbh hash
+  produce_order_event_hash dbh hash >>=? fun () ->
+  insert_order_activity_cancel
+    dbh op.bo_hash op.bo_block op.bo_index op.bo_level op.bo_tsp hash
 
 let insert_do_transfers dbh op
     ~left ~left_maker ~left_asset
@@ -1000,7 +1035,7 @@ let insert_do_transfers dbh op
   produce_order_event_hash dbh left >>=? fun () ->
   produce_order_event_hash dbh right >>=? fun () ->
   insert_order_activity_match
-    dbh op.bo_hash op.bo_block op.bo_level op.bo_tsp
+    dbh op.bo_hash op.bo_block op.bo_index op.bo_level op.bo_tsp
     left left_maker left_asset
     right right_maker right_asset
 

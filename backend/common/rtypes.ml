@@ -357,15 +357,21 @@ type nft_activity_elt = {
   nft_activity_block_number : A.block_number ;
 } [@@deriving encoding {camel}]
 
-type nft_activity =
+type nft_activity_type =
   | NftActivityMint of nft_activity_elt [@kind "mint"] [@kind_label "@type"] [@title "Mint"]
   | NftActivityBurn of nft_activity_elt [@kind "burn"] [@kind_label "@type"] [@title "Burn"]
   | NftActivityTransfer of {elt: nft_activity_elt; transfer: A.address} [@kind "mint"] [@kind_label "@type"] [@title "Transfer"]
 [@@deriving encoding]
 
+type nft_activity = {
+  nft_activity_id : string ;
+  nft_activity_date : A.date ;
+  nft_activity_type : nft_activity_type ; [@merge]
+} [@@deriving encoding]
+
 type nft_activities = {
   nft_activities_continuation : string option ; [@opt]
-  nft_activities_items : nft_activity list
+  nft_activities_items : nft_activity_type list
 } [@@deriving encoding]
 
 type item_history_elt = {
@@ -749,7 +755,7 @@ type order_activity_cancel_bid = {
   order_activity_cancel_bid_log_index : int ;
 } [@@deriving encoding {camel}]
 
-type order_activity =
+type order_activity_type =
   | OrderActivityMatch of order_activity_match [@kind "match"] [@kind_label "@type"] [@title "OrderActivityMatch"]
   | OrderActivityList of order_activity_bid [@kind "list"] [@kind_label "@type"] [@title "OrderActivityList"]
   | OrderActivityBid of order_activity_bid [@kind "bid"] [@kind_label "@type"] [@title "OrderActivityBid"]
@@ -757,8 +763,15 @@ type order_activity =
   | OrderActivityCancelList of order_activity_cancel_bid [@kind "cancel_list"] [@kind_label "@type"] [@title "OrderActivityCancelList"]
 [@@deriving encoding]
 
+type order_activity = {
+  order_activity_id : string ;
+  order_activity_date : A.date ;
+  order_activity_source : string ;
+  order_activity_type : order_activity_type ; [@merge]
+} [@@deriving encoding]
+
 type order_activities = {
-  order_activities_items : order_activity list ;
+  order_activities_items : order_activity_type list ;
   order_activities_continuation : string option ; [@opt]
 } [@@deriving encoding]
 
