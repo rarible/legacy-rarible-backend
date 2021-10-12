@@ -611,8 +611,7 @@ let get_nft_item_by_id ?dbh ?include_meta contract token_id =
   | [] -> Lwt.return_error (`hook_error "nft_item not found")
 
 let produce_order_event order =
-  Rarible_kafka.produce_order_event
-    (mk_order_event "TODO-EVENTID" "TODO-ORDERID" order) >>= fun () ->
+  Rarible_kafka.produce_order_event (mk_order_event order) >>= fun () ->
   Lwt.return_ok ()
 
 let produce_order_event_hash dbh hash =
@@ -620,13 +619,12 @@ let produce_order_event_hash dbh hash =
   begin
     match order with
     | Some order ->
-      Rarible_kafka.produce_order_event
-        (mk_order_event "TODO-EVENTID" "TODO-ORDERID" order)
+      Rarible_kafka.produce_order_event (mk_order_event order)
     | None -> Lwt.return ()
   end >>= fun () ->
   Lwt.return_ok ()
 
-let produce_nft_item_event dbh eventid contract token_id =
+let produce_nft_item_event dbh contract token_id =
   let>? item = get_nft_item_by_id ~dbh ~include_meta:true contract (Int64.to_string token_id) in
   if Int64.of_string item.nft_item_supply = 0L then
     let deleted_item = {
@@ -635,12 +633,12 @@ let produce_nft_item_event dbh eventid contract token_id =
       nft_deleted_item_token_id = item.nft_item_token_id ;
     } in
     Rarible_kafka.produce_item_event
-      (mk_item_event eventid "TODO-ITEMID" (NftItemDeleteEvent deleted_item))
+      (mk_item_event contract token_id (NftItemDeleteEvent deleted_item))
     >>= fun () ->
     Lwt.return_ok ()
   else
     Rarible_kafka.produce_item_event
-      (mk_item_event eventid "TODO-ITEMID" (NftItemUpdateEvent item))
+      (mk_item_event contract token_id (NftItemUpdateEvent item))
     >>= fun () ->
     Lwt.return_ok ()
 
@@ -656,7 +654,11 @@ let produce_nft_ownership_update_event os =
       NftOwnershipDeleteEvent deleted_os
     else NftOwnershipUpdateEvent os in
   Rarible_kafka.produce_ownership_event
-    (mk_ownership_event "TODO-EVENTID" "TODO-OWNERSHIPID" event) >>= fun () ->
+    (mk_ownership_event
+       os.nft_ownership_contract
+       (Int64.of_string os.nft_ownership_token_id)
+       os.nft_ownership_owner
+       event) >>= fun () ->
   Lwt.return_ok ()
 
 let produce_nft_ownership_delete_event contract token_id owner =
@@ -668,7 +670,7 @@ let produce_nft_ownership_delete_event contract token_id owner =
   } in
   let event = NftOwnershipDeleteEvent deleted_os in
   Rarible_kafka.produce_ownership_event
-    (mk_ownership_event "TODO-EVENTID" "TODO-OWNERSHIPID" event) >>= fun () ->
+    (mk_ownership_event contract token_id owner event) >>= fun () ->
   Lwt.return_ok ()
 
 let produce_nft_ownership_event dbh contract token_id owner =
@@ -700,7 +702,7 @@ let insert_account dbh addr ~block ~tsp ~level =
        values($addr, $block, $level, $tsp) on conflict do nothing"]
 
 let insert_nft_activity dbh timestamp nft_activity =
-  let act_type, act_from, elt =  match nft_activity with
+  let act_type, act_from, elt =  match nft_activity.nft_activity_type with
     | NftActivityMint elt -> "mint", None, elt
     | NftActivityBurn elt -> "burn", None, elt
     | NftActivityTransfer {elt; transfer} -> "transfer", Some transfer, elt in
@@ -736,12 +738,22 @@ let create_nft_activity_elt op contract mi_op = {
 
 let insert_nft_activity_mint dbh op kt1 mi_op =
   let nft_activity_elt = create_nft_activity_elt op kt1 mi_op in
-  let nft_activity = NftActivityMint nft_activity_elt in
+  let nft_activity_type = NftActivityMint nft_activity_elt in
+  let nft_activity = {
+    nft_activity_type ;
+    nft_activity_id = Printf.sprintf "%s_%ld" op.bo_block op.bo_index ;
+    nft_activity_date = op.bo_tsp ;
+  } in
   insert_nft_activity dbh op.bo_tsp nft_activity
 
 let insert_nft_activity_burn dbh op kt1 mi_op =
   let nft_activity_elt = create_nft_activity_elt op kt1 mi_op in
-  let nft_activity = NftActivityBurn nft_activity_elt in
+  let nft_activity_type = NftActivityBurn nft_activity_elt in
+  let nft_activity = {
+    nft_activity_type ;
+    nft_activity_id = Printf.sprintf "%s_%ld" op.bo_block op.bo_index ;
+    nft_activity_date = op.bo_tsp ;
+  } in
   insert_nft_activity dbh op.bo_tsp nft_activity
 
 let insert_nft_activity_transfer dbh op kt1 transfer owner token_id amount =
@@ -754,7 +766,12 @@ let insert_nft_activity_transfer dbh op kt1 transfer owner token_id amount =
     nft_activity_block_hash = op.bo_block ;
     nft_activity_block_number = Int64.of_int32 op.bo_level ;
   } in
-  let nft_activity = NftActivityTransfer {transfer; elt} in
+  let nft_activity_type = NftActivityTransfer {transfer; elt} in
+  let nft_activity = {
+    nft_activity_type ;
+    nft_activity_id = Printf.sprintf "%s_%ld" op.bo_block op.bo_index ;
+    nft_activity_date = op.bo_tsp ;
+  } in
   insert_nft_activity dbh op.bo_tsp nft_activity
 
 let insert_mint dbh op kt1 m =
@@ -874,7 +891,7 @@ let insert_order_activity
        on conflict do nothing"]
 
 let insert_order_activity dbh date activity =
-  begin match activity with
+  begin match activity.order_activity_type with
     | OrderActivityList act ->
       let hash = Some act.order_activity_bid_hash in
       insert_order_activity dbh None None hash None None None date "list"
@@ -916,14 +933,20 @@ let insert_order_activity_new dbh date order =
     order_activity_bid_price = price ;
     order_activity_bid_price_usd = None ;
   } in
-  let order_activity =
+  let order_activity_type =
     match order.order_elt.order_elt_make.asset_type,
           order.order_elt.order_elt_take.asset_type with
     | ATFA_2 _, _ -> OrderActivityList activity
     | _, _ -> OrderActivityBid activity in
+  let order_activity = {
+    order_activity_id = Hex.show @@ Hex.of_bigstring @@ Hacl.Rand.gen 128 ;
+    order_activity_date = date ;
+    order_activity_source = "RARIBLE" ;
+    order_activity_type = order_activity_type ;
+  } in
   insert_order_activity dbh date order_activity
 
-let insert_order_activity_cancel dbh transaction block level date hash =
+let insert_order_activity_cancel dbh transaction block index level date hash =
   let>? order = get_order ~dbh hash in
   match order with
   | Some order ->
@@ -934,20 +957,26 @@ let insert_order_activity_cancel dbh transaction block level date hash =
       order_activity_cancel_bid_take = order.order_elt.order_elt_take.asset_type ;
       order_activity_cancel_bid_transaction_hash = transaction ;
       order_activity_cancel_bid_block_hash = block ;
-      order_activity_cancel_bid_block_number = level ;
+      order_activity_cancel_bid_block_number = Int64.of_int32 level ;
       order_activity_cancel_bid_log_index = 0 ;
     } in
-  let order_activity =
+  let order_activity_type =
     match order.order_elt.order_elt_make.asset_type,
           order.order_elt.order_elt_take.asset_type with
     | ATFA_2 _, _ -> OrderActivityCancelList activity
     | _, _ -> OrderActivityCancelBid activity in
+  let order_activity = {
+    order_activity_id = Printf.sprintf "%s_%ld" block index ;
+    order_activity_date = date ;
+    order_activity_source = "RARIBLE" ;
+    order_activity_type = order_activity_type ;
+  } in
     insert_order_activity dbh date order_activity
   | None ->
     Lwt.return_ok ()
 
 let insert_order_activity_match
-    dbh transaction block level date
+    dbh transaction block index level date
     hash_left left_maker left_asset
     hash_right right_maker right_asset  =
   let match_left = {
@@ -963,7 +992,7 @@ let insert_order_activity_match
     order_activity_match_side_type = mk_side_type right_asset ;
   } in
   let>? price = nft_price left_asset right_asset in
-  let order_activity =
+  let order_activity_type =
     OrderActivityMatch {
       order_activity_match_left = match_left ;
       order_activity_match_right = match_right ;
@@ -974,6 +1003,12 @@ let insert_order_activity_match
       order_activity_match_block_number = Int64.of_int32 level ;
       order_activity_match_log_index = 0 ;
     } in
+  let order_activity = {
+    order_activity_id = Printf.sprintf "%s_%ld" block index ;
+    order_activity_date = date ;
+    order_activity_source = "RARIBLE" ;
+    order_activity_type = order_activity_type ;
+  } in
   insert_order_activity dbh date order_activity
 
 let insert_cancel dbh op hash =
@@ -983,7 +1018,9 @@ let insert_cancel dbh op hash =
        values(${op.bo_hash}, ${op.bo_index}, ${op.bo_block}, ${op.bo_level}, \
        ${op.bo_tsp}, $source, $hash) \
        on conflict do nothing"] >>=? fun () ->
-  produce_order_event_hash dbh hash
+  produce_order_event_hash dbh hash >>=? fun () ->
+  insert_order_activity_cancel
+    dbh op.bo_hash op.bo_block op.bo_index op.bo_level op.bo_tsp hash
 
 let insert_do_transfers dbh op
     ~left ~left_maker ~left_asset
@@ -1000,7 +1037,7 @@ let insert_do_transfers dbh op
   produce_order_event_hash dbh left >>=? fun () ->
   produce_order_event_hash dbh right >>=? fun () ->
   insert_order_activity_match
-    dbh op.bo_hash op.bo_block op.bo_level op.bo_tsp
+    dbh op.bo_hash op.bo_block op.bo_index op.bo_level op.bo_tsp
     left left_maker left_asset
     right right_maker right_asset
 
@@ -1231,14 +1268,14 @@ let contract_updates dbh main l =
           let>? () =
             contract_updates_base dbh ~main ~contract ~block ~level ~tsp ~burn:false tk in
           let>? () =
-            produce_nft_item_event dbh "contract_updates" contract tk.tk_op.tk_token_id in
+            produce_nft_item_event dbh contract tk.tk_op.tk_token_id in
           produce_nft_ownership_event dbh contract tk.tk_op.tk_token_id tk.tk_owner
         | _, Some json, _ ->
           let tk = EzEncoding.destruct token_op_owner_enc json in
           let>? () =
             contract_updates_base dbh ~main ~contract ~block ~level ~tsp ~burn:true tk in
           let>? () =
-            produce_nft_item_event dbh "contract_updates" contract tk.tk_op.tk_token_id in
+            produce_nft_item_event dbh contract tk.tk_op.tk_token_id in
           produce_nft_ownership_event dbh contract tk.tk_op.tk_token_id tk.tk_owner
         | _, _, Some uri ->
           metadata_uri_update dbh ~main ~contract ~block ~level ~tsp uri
@@ -1300,7 +1337,7 @@ let transfer_updates dbh main ~contract ~block ~level ~tsp ~token_id ~source amo
   begin
     if main then
       begin
-        let>? () = produce_nft_item_event dbh "transfer_updates" contract token_id in
+        let>? () = produce_nft_item_event dbh contract token_id in
         let>? () = produce_nft_ownership_event dbh contract token_id source in
         produce_nft_ownership_event dbh contract token_id destination
       end
@@ -1359,7 +1396,7 @@ let token_metadata_update dbh ~main ~contract ~block ~level ~tsp ~token_id meta 
            last = case when $main then $tsp else last end \
            where contract = $contract and \
            token_id = $token_id"] in
-    produce_nft_item_event dbh "token_metadata" contract token_id
+    produce_nft_item_event dbh contract token_id
   else Lwt.return_ok ()
 
 let token_updates dbh main l =

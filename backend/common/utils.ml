@@ -507,21 +507,21 @@ let to_parts l =
         part_value = Int32.to_int v
       }) l
 
-let mk_order_event event_id order_id order = {
-  order_event_event_id = event_id ;
-  order_event_order_id = order_id ;
+let mk_order_event order = {
+  order_event_event_id = Hex.show @@ Hex.of_bigstring @@ Hacl.Rand.gen 128 ;
+  order_event_order_id = order.order_elt.order_elt_hash ;
   order_event_order = order ;
   order_event_type = "UPDATE" ;
 }
 
-let mk_item_event event_id item_id event = {
-  nft_item_event_event_id = event_id ;
-  nft_item_event_item_id = item_id ;
+let mk_item_event token token_id event = {
+  nft_item_event_event_id = Hex.show @@ Hex.of_bigstring @@ Hacl.Rand.gen 128 ;
+  nft_item_event_item_id = Printf.sprintf "%s:%Ld" token token_id ;
   nft_item_event_event = event ;
 }
 
-let mk_ownership_event event_id ownership_id event = {
-  nft_ownership_event_event_id = event_id ;
-  nft_ownership_event_ownership_id = ownership_id ;
+let mk_ownership_event token token_id owner event = {
+  nft_ownership_event_event_id = Hex.show @@ Hex.of_bigstring @@ Hacl.Rand.gen 128 ;
+  nft_ownership_event_ownership_id = Printf.sprintf "%s:%Ld:%s" token token_id owner ;
   nft_ownership_event_event = event ;
 }
