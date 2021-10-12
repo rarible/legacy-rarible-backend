@@ -405,6 +405,7 @@ let mk_order ?dbh order_obj =
     order_elt_make_price_usd = string_of_float order_obj#make_price_usd ;
     order_elt_take_price_usd = string_of_float order_obj#take_price_usd ;
     order_elt_price_history = price_history ;
+    order_elt_status = None (* todo *)
   } in
   let rarible_v2_order = {
     order_elt = order_elt ;
@@ -1937,6 +1938,7 @@ let mk_nft_collection obj =
     nft_collection_symbol = symbol ;
     nft_collection_features = [] ;
     nft_collection_supports_lazy_mint = false ;
+    nft_collection_minters = Some [ obj#owner ]
   }
 
 let get_nft_collection_by_id ?dbh collection =
@@ -2549,7 +2551,7 @@ let insert_price_history dbh date make_value take_value hash_key =
 let insert_origin_fees dbh fees hash_key =
   iter_rp (fun part ->
       let account = part.part_account in
-      let value = Int32.of_int part.part_value in
+      let value = Int32.of_string part.part_value in
       [%pgsql dbh
           "insert into origin_fees (account, value, hash) \
            values ($account, $value, $hash_key)"])
@@ -2558,7 +2560,7 @@ let insert_origin_fees dbh fees hash_key =
 let insert_payouts dbh p hash_key =
   iter_rp (fun part ->
       let account = part.part_account in
-      let value = Int32.of_int part.part_value in
+      let value = Int32.of_string part.part_value in
       [%pgsql dbh
           "insert into payouts (account, value, hash) \
            values ($account, $value, $hash_key)"])
