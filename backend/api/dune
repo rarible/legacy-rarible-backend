@@ -15,8 +15,19 @@
  (modules doc openapi)
  (libraries api ez_api.openAPI))
 
+(executable
+ (name kafka_openapi)
+ (modules kafka_openapi)
+ (libraries api ez_api.openAPI))
+
 (rule
  (deps openapi.exe)
  (targets openapi.json)
  (action (with-stdout-to %{targets}
           (run %{project_root}/backend/api/openapi.exe --title "Tezos Rarible API" --version "0.1"))))
+
+(rule
+ (deps kafka_openapi.exe)
+ (targets kafka_openapi.json)
+ (action (with-stdout-to %{targets}
+          (run %{project_root}/backend/api/kafka_openapi.exe --title "Tezos Rarible Kafka Types" --version "0.1" -o "kafka_openapi.json"))))
