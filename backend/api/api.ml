@@ -28,9 +28,11 @@ let aggregation_section =
   EzAPI.Doc.{section_name = "order-aggregation-controller"; section_docs = []}
 let order_bid_section =
   EzAPI.Doc.{section_name = "order-bid-controller"; section_docs = []}
+let kafka_section =
+  EzAPI.Doc.{section_name = "kafka-controller"; section_docs = []}
 let sections = [
   nft_section; ownerships_section; items_section; collections_section;
-  orders_section; order_activities_section; aggregation_section; order_bid_section ]
+  orders_section; order_activities_section; aggregation_section; order_bid_section]
 
 let pstring ?enc ?required name =
   let schema = Option.map (Json_encoding.schema ~definitions_path:"/components/schemas/") enc in
@@ -1220,6 +1222,41 @@ let get_order_activities req input =
    output=order_activities_enc;
    errors=[rarible_error_500];
    section=order_activities_section}]
+
+[@@@get
+  {register=true;
+   path="/kafka/item";
+   name="kafka_item";
+   output=nft_item_event_enc;
+   section=kafka_section}]
+
+[@@@get
+  {register=true;
+   path="/kafka/order";
+   name="kafka_order";
+   output=order_event_enc;
+   section=kafka_section}]
+
+[@@@get
+  {register=true;
+   path="/kafka/ownership";
+   name="kafka_ownership";
+   output=nft_ownership_event_enc;
+   section=kafka_section}]
+
+[@@@get
+  {register=true;
+   path="/kafka/nft_activity";
+   name="kafka_nft_activity";
+   output=nft_activity_enc;
+   section=kafka_section}]
+
+[@@@get
+  {register=true;
+   path="/kafka/order_activity";
+   name="kafka_order_activity";
+   output=order_activity_enc;
+   section=kafka_section}]
 
 (* module V_0_1 = struct
  *

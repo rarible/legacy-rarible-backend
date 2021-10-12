@@ -8,7 +8,7 @@ all: copy
 build:
 	@CRAWLORI_NO_UPDATE=true PGDATABASE=$(DB) PGCUSTOM_CONVERTERS_CONFIG=$(CONVERTERS) dune build backend
 
-copy: build openapi
+copy: build openapi kafka_openapi
 	@mkdir -p _bin
 	@cp -f _build/default/backend/crawler/crawler.exe _bin/crawler
 	@cp -f _build/default/backend/api/main_api.exe _bin/api
@@ -67,6 +67,9 @@ arl:
 
 openapi:
 	@cp -f _build/default/backend/api/openapi.json public/api
+
+kafka_openapi:
+	@cp -f _build/default/backend/api/kafka_openapi.json public/api
 
 typedoc:
 	@npx typedoc --tsconfig sdk/tsconfig.json --options sdk/typedoc.json
