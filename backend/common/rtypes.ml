@@ -878,8 +878,8 @@ type set_royalties = {
 } [@@deriving encoding]
 
 type exchange_param =
-  | Cancel of string
+  | Cancel of Tzfunc.H.t
   | DoTransfers of
-      {left: string; left_maker : string option; left_asset: asset ;
-       right: string ; right_maker: string option; right_asset: asset ;
+      {left: Tzfunc.H.t; left_maker : string option; left_asset: asset ;
+       right: Tzfunc.H.t ; right_maker: string option; right_asset: asset ;
        fill_make_value: int64; fill_take_value: int64}

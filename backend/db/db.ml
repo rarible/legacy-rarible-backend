@@ -355,7 +355,7 @@ let get_order_updates ?dbh obj make maker take data =
          where main and \
          (hash_left = $hash or hash_right = $hash) order by tsp"] in
     let fill = get_fill hash matches in
-    let owner = Tzfunc.Crypto.pk_to_tz1 maker in
+    let owner = Tzfunc.Crypto.pk_to_pkh maker in
     let|>? make_balance = get_make_balance make owner in
     let cancelled = false in
     let make_stock = calculate_make_stock make take data fill make_balance cancelled in
@@ -1012,7 +1012,8 @@ let insert_order_activity_match
   } in
   insert_order_activity dbh date order_activity
 
-let insert_cancel dbh op hash =
+let insert_cancel dbh op (hash : Tzfunc.H.t) =
+  let hash = ( hash :> string ) in
   let source = op.bo_op.source in
   [%pgsql dbh
       "insert into order_cancel(transaction, index, block, level, tsp, source, cancel) \
@@ -1024,9 +1025,11 @@ let insert_cancel dbh op hash =
     dbh op.bo_hash op.bo_block op.bo_index op.bo_level op.bo_tsp hash
 
 let insert_do_transfers dbh op
-    ~left ~left_maker ~left_asset
-    ~right ~right_maker ~right_asset
+    ~(left : Tzfunc.H.t) ~left_maker ~left_asset
+    ~(right : Tzfunc.H.t) ~right_maker ~right_asset
     ~fill_make_value ~fill_take_value =
+  let left = ( left :> string ) in
+  let right = ( right :> string ) in
   let source = op.bo_op.source in
   [%pgsql dbh
       "insert into order_match(transaction, index, block, level, tsp, source, \
@@ -1075,13 +1078,15 @@ let insert_transaction config dbh op tr =
     else if tr.destination = config.Crawlori.Config.extra.exchange_v2 then (* exchange_v2 *)
       begin match Parameters.parse_exchange entrypoint m with
         | Ok (Cancel hash) ->
-          Format.printf "\027[0;35mcancel order %s %ld %s\027[0m@." (short op.bo_hash) op.bo_index hash;
+          Format.printf "\027[0;35mcancel order %s %ld %s\027[0m@."
+            (short op.bo_hash) op.bo_index (hash :> string);
           insert_cancel dbh op hash
         | Ok (DoTransfers
                 {left; left_maker; left_asset;
                  right; right_maker; right_asset;
                  fill_make_value; fill_take_value}) ->
-          Format.printf "\027[0;35mapply orders %s %ld %s %s\027[0m@." (short op.bo_hash) op.bo_index left right;
+          Format.printf "\027[0;35mapply orders %s %ld %s %s\027[0m@."
+            (short op.bo_hash) op.bo_index (left :> string) (right :> string);
           insert_do_transfers
             dbh op
             ~left ~left_maker ~left_asset
