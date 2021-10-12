@@ -199,7 +199,7 @@ let generate_token_id () = string_of_int @@ generate_amount ~max:1_000_000 ()
 
 let generate_part () =
   let part_account = generate_origin () in
-  let part_value = (Random.int 50) * 100 in
+  let part_value = string_of_int @@ (Random.int 50) * 100 in
   { part_account ; part_value }
 
 let generate_parts () =
@@ -284,7 +284,7 @@ let order_form_from_items ?(salt=0) collection item1 item2 =
   let start_date = None in
   let end_date = None in
   let data_type = "V1" in
-  let payouts = [ { part_account = Tzfunc.Crypto.pk_to_tz1 maker_pk; part_value = 10000 } ] in
+  let payouts = [ { part_account = Tzfunc.Crypto.pk_to_tz1 maker_pk; part_value = "10000" } ] in
   let origin_fees = [] in
   let$ to_sign =
     hash_order_form
@@ -303,7 +303,7 @@ let sell_order_form_from_item ?(salt=0) collection item1 take =
   let start_date = None in
   let end_date = None in
   let data_type = "V1" in
-  let payouts = [ { part_account = Tzfunc.Crypto.pk_to_tz1 maker_pk; part_value = 10000 } ] in
+  let payouts = [ { part_account = Tzfunc.Crypto.pk_to_tz1 maker_pk; part_value = "10000" } ] in
   let origin_fees = [] in
   let$ to_sign =
     hash_order_form
@@ -321,7 +321,7 @@ let buy_order_form_from_item ?(salt=0) collection item1 (maker_pk, maker_sk) mak
   let start_date = None in
   let end_date = None in
   let data_type = "V1" in
-  let payouts = [ { part_account = Tzfunc.Crypto.pk_to_tz1 maker_pk; part_value = 10000 } ] in
+  let payouts = [ { part_account = Tzfunc.Crypto.pk_to_tz1 maker_pk; part_value = "10000" } ] in
   let origin_fees = [] in
   let$ to_sign =
     hash_order_form
@@ -1113,7 +1113,7 @@ let payouts order =
   let payouts = match order.order_data.order_rarible_v2_data_v1_payouts with
     | [] ->
       let tz1 = Tzfunc.Crypto.pk_to_tz1 order.order_elt.order_elt_maker in
-      let part = { part_account = tz1 ; part_value = 10000 } in
+      let part = { part_account = tz1 ; part_value = "10000" } in
       [ part ]
     | payouts -> payouts in
   let data = { order.order_data with order_rarible_v2_data_v1_payouts = payouts } in
@@ -1186,7 +1186,7 @@ let check_royalties item_royalties royalties =
   List.for_all (fun p ->
       try
         let v = List.assoc p.part_account royalties in
-        v = Int64.of_int p.part_value
+        v = Int64.of_string p.part_value
       with Not_found ->
   false) item_royalties
 

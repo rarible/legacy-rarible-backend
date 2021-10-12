@@ -32,32 +32,44 @@ let sections = [
   nft_section; ownerships_section; items_section; collections_section;
   orders_section; order_activities_section; aggregation_section; order_bid_section ]
 
-let blockchain_param = EzAPI.Param.string "blockchain"
-let address_param = EzAPI.Param.string "address"
+let pstring ?enc ?required name =
+  let schema = Option.map (Json_encoding.schema ~definitions_path:"/components/schemas/") enc in
+  EzAPI.Param.(make ?schema ?required PARAM_STRING name)
+
+let pint ?enc ?required name =
+  let schema = Option.map (Json_encoding.schema ~definitions_path:"/components/schemas/") enc in
+  EzAPI.Param.(make ?schema ?required PARAM_INT name)
+
+let pbool ?enc ?required name =
+  let schema = Option.map (Json_encoding.schema ~definitions_path:"/components/schemas/") enc in
+  EzAPI.Param.(make ?schema ?required PARAM_BOOL name)
+
+let blockchain_param = pstring "blockchain"
+let address_param = pstring ~enc:A.address_enc "address"
 (* TODO : int64 ?*)
-let at_param = EzAPI.Param.int "at"
-let continuation_param = EzAPI.Param.string "continuation"
-let size_param = EzAPI.Param.int "size"
-let contract_param = EzAPI.Param.string "contract"
+let at_param = pint "at"
+let continuation_param = pstring "continuation"
+let size_param = pint "size"
+let contract_param = pstring ~enc:A.address_enc "contract"
 (* TODO : big_integer *)
-let token_id_param = EzAPI.Param.int "tokenId"
-let include_meta_param = EzAPI.Param.string "includeMeta"
-let owner_param = EzAPI.Param.string "owner"
-let creator_param = EzAPI.Param.string "creator"
-let collection_param = EzAPI.Param.string "collection"
-let show_deleted_param = EzAPI.Param.bool "showDeleted"
-let last_updated_from_param = EzAPI.Param.string "lastUpdateFrom"
-let last_updated_to_param = EzAPI.Param.string "lastUpdateTo"
-let origin_param = EzAPI.Param.string "origin"
+let token_id_param = pstring ~enc:A.big_integer_enc "tokenId"
+let include_meta_param = pbool "includeMeta"
+let owner_param = pstring ~enc:A.address_enc "owner"
+let creator_param = pstring ~enc:A.address_enc "creator"
+let collection_param = pstring ~enc:A.address_enc "collection"
+let show_deleted_param = pbool "showDeleted"
+let last_updated_from_param = pstring "lastUpdateFrom"
+let last_updated_to_param = pstring "lastUpdateTo"
+let origin_param = pstring "origin"
 (* TODO : ALL | RARIBLE | OPEN_SEA *)
-let platform_param = EzAPI.Param.string "platform"
-let fee_param = EzAPI.Param.int "fee"
-let maker_param = EzAPI.Param.string "maker"
-let start_date_param = EzAPI.Param.string "startDate"
-let end_date_param = EzAPI.Param.string "endDate"
+let platform_param = pstring "platform"
+let fee_param = pint "fee"
+let maker_param = pstring ~enc:A.edpk_enc "maker"
+let start_date_param = pint ~required:true "startDate"
+let end_date_param = pint ~required:true "endDate"
 (* TODO : ALL | RARIBLE | OPEN_SEA *)
-let source_param = EzAPI.Param.string "source"
-let status_param = EzAPI.Param.string "status"
+let source_param = pstring "source"
+let status_param = pstring "status"
 
 let hash_arg = EzAPI.Arg.string "hash"
 let item_id_arg = EzAPI.Arg.string "itemId"

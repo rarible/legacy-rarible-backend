@@ -265,10 +265,10 @@ let mich_order_form
       (prim `Pair ~args:[
           Mseq (List.map (fun p -> prim `Pair ~args:[
               Mstring p.part_account;
-              Mint (Z.of_int p.part_value) ]) payouts);
+              Mint (Z.of_string p.part_value) ]) payouts);
           Mseq (List.map (fun p -> prim `Pair ~args:[
               Mstring p.part_account;
-              Mint (Z.of_int p.part_value) ]) origin_fees);
+              Mint (Z.of_string p.part_value) ]) origin_fees);
         ]) in
   let$ asset_make = asset_mich make in
   let$ asset_take = asset_mich take in
@@ -323,7 +323,7 @@ let calculate_remaining make_value take_value fill cancelled =
     make, take
 
 let calculate_fee data protocol_commission =
-  List.fold_left (fun acc p -> Int64.(add acc (of_int p.part_value)))
+  List.fold_left (fun acc p -> Int64.(add acc (of_string p.part_value)))
     protocol_commission
     data.order_rarible_v2_data_v1_origin_fees
 
@@ -382,6 +382,7 @@ let order_elt_from_order_form_elt elt =
     order_elt_make_price_usd = "0";
     order_elt_take_price_usd = "0";
     order_elt_price_history = [];
+    order_elt_status = None
   }
 
 let order_from_order_form form =
@@ -504,7 +505,7 @@ let short ?(len=8) h =
 let to_parts l =
   List.map (fun (part_account, v) -> {
         part_account ;
-        part_value = Int32.to_int v
+        part_value = Int32.to_string v
       }) l
 
 let mk_order_event order = {
