@@ -706,7 +706,7 @@ let insert_nft_activity dbh timestamp nft_activity =
   let act_type, act_from, elt =  match nft_activity.nft_activity_type with
     | NftActivityMint elt -> "mint", None, elt
     | NftActivityBurn elt -> "burn", None, elt
-    | NftActivityTransfer {elt; transfer} -> "transfer", Some transfer, elt in
+    | NftActivityTransfer {elt; from} -> "transfer", Some from, elt in
   let token_id =
     Int64.of_string elt.nft_activity_token_id in
   let value =
@@ -757,7 +757,7 @@ let insert_nft_activity_burn dbh op kt1 mi_op =
   } in
   insert_nft_activity dbh op.bo_tsp nft_activity
 
-let insert_nft_activity_transfer dbh op kt1 transfer owner token_id amount =
+let insert_nft_activity_transfer dbh op kt1 from owner token_id amount =
   let elt = {
     nft_activity_owner = owner ;
     nft_activity_contract = kt1;
@@ -767,7 +767,7 @@ let insert_nft_activity_transfer dbh op kt1 transfer owner token_id amount =
     nft_activity_block_hash = op.bo_block ;
     nft_activity_block_number = Int64.of_int32 op.bo_level ;
   } in
-  let nft_activity_type = NftActivityTransfer {transfer; elt} in
+  let nft_activity_type = NftActivityTransfer {from; elt} in
   let nft_activity = {
     nft_activity_type ;
     nft_activity_id = Printf.sprintf "%s_%ld" op.bo_block op.bo_index ;
@@ -1681,8 +1681,8 @@ let mk_nft_activity obj = match obj#activity_type with
     Lwt.return_ok @@ NftActivityBurn nft_activity_elt
   | "transfer" ->
     let elt = mk_nft_activity_elt obj in
-    let transfer = Option.get obj#tr_from in
-    Lwt.return_ok @@ NftActivityTransfer {elt; transfer}
+    let from = Option.get obj#tr_from in
+    Lwt.return_ok @@ NftActivityTransfer {elt; from}
   | _ as t -> Lwt.return_error (`hook_error ("unknown nft activity type " ^ t))
 
 let get_nft_activities_by_collection ?dbh ?continuation ?(size=50) filter =

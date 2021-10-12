@@ -305,7 +305,7 @@ type nft_activity_elt = {
 type nft_activity_type =
   | NftActivityMint of nft_activity_elt [@kind "mint"] [@kind_label "@type"] [@title "Mint"]
   | NftActivityBurn of nft_activity_elt [@kind "burn"] [@kind_label "@type"] [@title "Burn"]
-  | NftActivityTransfer of {elt: nft_activity_elt; transfer: A.address} [@kind "mint"] [@kind_label "@type"] [@title "Transfer"]
+  | NftActivityTransfer of {elt: nft_activity_elt; from: A.address} [@kind "transfer"] [@kind_label "@type"] [@title "Transfer"]
 [@@deriving encoding {title="NftActivity"}]
 
 type nft_activity = {
@@ -648,7 +648,7 @@ type order_activity_filter =
       order_activity_by_item [@kind "by_item"] [@kind_label "@type"] [@title "OrderActivityFilterByItem"]
   | OrderActivityFilterByCollection of
       order_activity_by_collection [@kind "by_collection"] [@kind_label "@type"] [@title "OrderActivityFilterByCollection"]
-[@@deriving encoding]
+[@@deriving encoding {title="OrderActivityFilter"}]
 
 type order_activity_source =
   | SourceRARIBLE

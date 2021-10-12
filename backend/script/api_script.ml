@@ -1547,7 +1547,7 @@ let check_transfer_activity ?(from=false) (kt1, (owner, amount, tid, _royalties,
   let owner = fst owner in
   let transfer_activity_exists activities =
     List.exists (fun act -> match act with
-        | NftActivityTransfer {transfer=addr; elt} ->
+        | NftActivityTransfer {from=addr; elt} ->
           if from then
             check_nft_activity ~from elt kt1 addr amount tid
           else check_nft_activity elt kt1 owner amount tid
