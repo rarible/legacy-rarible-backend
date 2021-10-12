@@ -306,13 +306,13 @@ type nft_activity_type =
   | NftActivityMint of nft_activity_elt [@kind "mint"] [@kind_label "@type"] [@title "Mint"]
   | NftActivityBurn of nft_activity_elt [@kind "burn"] [@kind_label "@type"] [@title "Burn"]
   | NftActivityTransfer of {elt: nft_activity_elt; from: A.address} [@kind "transfer"] [@kind_label "@type"] [@title "Transfer"]
-[@@deriving encoding {title="NftActivity"}]
+[@@deriving encoding {title="NftActivityType"}]
 
 type nft_activity = {
   nft_activity_id : string ;
   nft_activity_date : A.date ;
   nft_activity_type : nft_activity_type ; [@merge]
-} [@@deriving encoding]
+} [@@deriving encoding {title="NftActivity"}]
 
 type nft_activities = {
   nft_activities_continuation : string option ; [@opt]
@@ -810,7 +810,7 @@ type nft_ownership_event = {
   nft_ownership_event_event_id : string ;
   nft_ownership_event_ownership_id : string ;
   nft_ownership_event_event : ownership_event ; [@merge]
-} [@@deriving encoding {camel; title="OwnerShipEvent"}]
+} [@@deriving encoding {camel; title="NftOwnerShipEvent"}]
 
 
 (** Interaction with Tezos contract *)
