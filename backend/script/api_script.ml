@@ -94,11 +94,6 @@ let spec = [
   "--js", Arg.Set js, "use js sdk";
 ]
 
-let ko_colored = Fmt.styled (`Fg (`Hi `Red)) Format.pp_print_string
-let ok_colored = Fmt.styled (`Fg `Green) Format.pp_print_string
-(* let print_ok msg = Printf.eprintf "%a %s" ok_colored "[Ok]" msg *)
-
-
 let by_pk i =
   try
     List.find (fun (_, pk, _) -> pk = i) accounts

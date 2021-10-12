@@ -14,4 +14,4 @@
  (public_name rarible.api_script)
  (modules api_script)
  (name api_script)
- (libraries script fmt api script_js ez_api.icurl_lwt ez_api.icurl))
+ (libraries script api script_js ez_api.icurl_lwt ez_api.icurl))
