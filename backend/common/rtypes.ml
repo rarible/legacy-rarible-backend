@@ -311,7 +311,7 @@ type nft_activity_type =
 type nft_activity = {
   nft_activity_id : string ;
   nft_activity_date : A.date ;
-  nft_activity_type : nft_activity_type ; [@merge]
+  nft_activity_type : nft_activity_type ;
 } [@@deriving encoding {title="NftActivity"}]
 
 type nft_activities = {
@@ -716,7 +716,7 @@ type order_activity = {
   order_activity_id : string ;
   order_activity_date : A.date ;
   order_activity_source : string ;
-  order_activity_type : order_activity_type ; [@merge]
+  order_activity_type : order_activity_type ;
 } [@@deriving encoding {title="OrderActivity"}]
 
 type order_activities = {
@@ -782,14 +782,14 @@ type nft_deleted_item = {
 } [@@deriving encoding {camel; title="NftDeletedItem"}]
 
 type nft_event =
-  | NftItemUpdateEvent of nft_item [@wrap "item"] [@kind "UPDATE"] [@kind_label "type"] [@title "NftItemUpdateEvent"]
-  | NftItemDeleteEvent of nft_deleted_item [@wrap "item"] [@kind "DELETE"] [@kind_label "type"] [@title "NftItemDeleteEvent"]
+  | NftItemUpdateEvent of nft_item [@kind "UPDATE"] [@kind_label "type"] [@title "NftItemUpdateEvent"]
+  | NftItemDeleteEvent of nft_deleted_item [@kind "DELETE"] [@kind_label "type"] [@title "NftItemDeleteEvent"]
  [@@deriving encoding {title="NftEvent"}]
 
 type nft_item_event = {
   nft_item_event_event_id : string ;
   nft_item_event_item_id : string ;
-  nft_item_event_event : nft_event ; [@merge]
+  nft_item_event_item : nft_event ;
 } [@@deriving encoding {camel; title="NftItemEvent"}]
 
 type nft_deleted_ownership = {
@@ -801,15 +801,15 @@ type nft_deleted_ownership = {
 
 type ownership_event =
   | NftOwnershipUpdateEvent of
-      nft_ownership [@wrap "ownership"] [@kind "UPDATE"] [@kind_label "type"]
+      nft_ownership [@kind "UPDATE"] [@kind_label "type"]
   | NftOwnershipDeleteEvent of
-      nft_deleted_ownership [@wrap "ownership"] [@kind "DELTE"] [@kind_label "type"]
+      nft_deleted_ownership [@kind "DELETE"] [@kind_label "type"]
 [@@deriving encoding {title="OwnerShipEvent"}]
 
 type nft_ownership_event = {
   nft_ownership_event_event_id : string ;
   nft_ownership_event_ownership_id : string ;
-  nft_ownership_event_event : ownership_event ; [@merge]
+  nft_ownership_event_ownership : ownership_event ; [@merge]
 } [@@deriving encoding {camel; title="NftOwnerShipEvent"}]
 
 

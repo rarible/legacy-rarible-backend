@@ -519,11 +519,11 @@ let mk_order_event order = {
 let mk_item_event token token_id event = {
   nft_item_event_event_id = Hex.show @@ Hex.of_bigstring @@ Hacl.Rand.gen 128 ;
   nft_item_event_item_id = Printf.sprintf "%s:%Ld" token token_id ;
-  nft_item_event_event = event ;
+  nft_item_event_item = event ;
 }
 
 let mk_ownership_event token token_id owner event = {
   nft_ownership_event_event_id = Hex.show @@ Hex.of_bigstring @@ Hacl.Rand.gen 128 ;
   nft_ownership_event_ownership_id = Printf.sprintf "%s:%Ld:%s" token token_id owner ;
-  nft_ownership_event_event = event ;
+  nft_ownership_event_ownership = event ;
 }

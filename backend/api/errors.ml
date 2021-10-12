@@ -1,5 +1,7 @@
 open Rtypes
 
+(* TODO : redo this @max *)
+
 let rarible_error_500 =
   EzAPI.Err.make
     ~code:500
