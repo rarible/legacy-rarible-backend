@@ -10,7 +10,7 @@ let parse_address = function
   | Mstring s -> Ok s
   | Mbytes h ->
     Result.map fst
-      Tzfunc.Binary.Reader.(contract {s = Hex.to_string h; offset = 0})
+      Tzfunc.Binary.Reader.(contract {s = Tzfunc.Crypto.hex_to_raw h; offset = 0})
   | _ -> unexpected_michelson
 
 let parse_update_operators m =
@@ -103,7 +103,7 @@ let parse_burn = function
   | _ -> unexpected_michelson
 
 let parse_metadata_uri = function
-  | Mbytes h -> Ok (Metadata_uri (Hex.to_string h))
+  | Mbytes h -> Ok (Metadata_uri (Tzfunc.Crypto.hex_to_raw h :> string))
   | _ -> unexpected_michelson
 
 let parse_token_metadata = function
@@ -196,7 +196,7 @@ let parse_edpk = function
   | Mstring s -> Ok s
   | Mbytes h ->
     Result.map fst
-      Tzfunc.Binary.Reader.(pk {s = Hex.to_string h; offset = 0})
+      Tzfunc.Binary.Reader.(pk {s = Tzfunc.Crypto.hex_to_raw h; offset = 0})
   | _ -> unexpected_michelson
 
 let parse_option_key = function
@@ -211,7 +211,7 @@ let parse_asset_type mclass mdata = match mclass, mdata with
   | Mprim { prim = `Right; args = [ Mprim { prim = `Left; args = [ Mprim { prim = `Unit; _} ]; _ } ]; _},
     Mbytes h ->
     begin match
-        Tzfunc.Read.unpack (Forge.prim `address) (Hex.to_string h) with
+        Tzfunc.Read.unpack (Forge.prim `address) (Tzfunc.Crypto.hex_to_raw h) with
     | Ok (Mstring a) -> Ok (ATFA_1_2 a)
     | _ -> unexpected_michelson
     end
@@ -220,7 +220,7 @@ let parse_asset_type mclass mdata = match mclass, mdata with
     Mbytes h ->
     begin match
         Tzfunc.Read.unpack (Forge.prim `pair ~args:[ Forge.prim `address; Forge.prim `nat ])
-          (Hex.to_string h) with
+          (Tzfunc.Crypto.hex_to_raw h) with
     | Ok (Mprim { prim = `Pair; args = [ Mstring asset_fa2_contract; Mint token_id ]; _}) ->
       let asset_fa2_token_id = Z.to_string token_id in
       Ok (ATFA_2 {asset_fa2_contract; asset_fa2_token_id})

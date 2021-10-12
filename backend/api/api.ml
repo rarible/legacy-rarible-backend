@@ -86,7 +86,7 @@ let get_origin_param req =
   | None -> Ok None
   | Some o ->
     try
-      ignore @@ Base58.decode Prefix.ed25519_public_key o ;
+      ignore @@ Pk.b58dec o ;
       Ok (Some o)
     with _ ->
       mk_invalid_argument origin_param "must be an edpk"
@@ -123,7 +123,7 @@ let get_required_maker_param req =
   | None -> mk_invalid_argument maker_param "param is required"
   | Some o ->
     try
-      ignore @@ Base58.decode Prefix.ed25519_public_key o ;
+      ignore @@ Pk.b58dec o ;
       Ok o
     with _ ->
       mk_invalid_argument maker_param "must be an epdk"
@@ -134,7 +134,7 @@ let get_maker_param req =
   | None -> Ok None
   | Some o ->
     try
-      ignore @@ Base58.decode Prefix.ed25519_public_key o ;
+      ignore @@ Pk.b58dec o ;
       Ok (Some o)
     with _ ->
       mk_invalid_argument maker_param "must be an epdk"
@@ -145,7 +145,7 @@ let get_required_contract_param req =
   | None -> mk_invalid_argument contract_param "param is required"
   | Some o ->
     try
-      ignore @@ Base58.decode Prefix.contract_public_key_hash o ;
+      ignore @@ Base58.decode ~prefix:Prefix.contract_public_key_hash o ;
       Ok o
     with _ ->
       mk_invalid_argument contract_param "must be a tezos smart contract address"
@@ -161,7 +161,7 @@ let get_required_collection_param req =
   | None -> mk_invalid_argument collection_param "param is required"
   | Some o ->
     try
-      ignore @@ Base58.decode Prefix.contract_public_key_hash o ;
+      ignore @@ Base58.decode ~prefix:Prefix.contract_public_key_hash o ;
       Ok o
     with _ ->
       mk_invalid_argument collection_param "must be a tezos smart contract address"
@@ -219,7 +219,7 @@ let parse_item_id s =
     let l = String.split_on_char ':' s in
     match l with
     | c :: tid :: [] ->
-      ignore @@ Base58.decode Prefix.contract_public_key_hash c ;
+      ignore @@ Base58.decode ~prefix:Prefix.contract_public_key_hash c ;
       Ok (c, Int64.(to_string @@ of_string tid))
     | _ ->
       Error (invalid_argument "itemId must be in format contract:token_id")
@@ -261,7 +261,7 @@ let get_required_creator_param req =
 let parse_collection_id s =
   let open Tzfunc.Crypto in
   try
-    ignore @@ Base58.decode Prefix.contract_public_key_hash s ;
+    ignore @@ Base58.decode ~prefix:Prefix.contract_public_key_hash s ;
     Ok s
   with _ ->
     Error (invalid_argument  "collection must be a tezos smart contract address")
@@ -283,8 +283,8 @@ let parse_ownership_id s =
     let l = String.split_on_char ':' s in
     match l with
     | c :: tid :: owner :: [] ->
-      ignore @@ Base58.decode Prefix.contract_public_key_hash c ;
-      ignore @@ Base58.decode Prefix.contract_public_key_hash owner ;
+      ignore @@ Base58.decode ~prefix:Prefix.contract_public_key_hash c ;
+      ignore @@ Base58.decode ~prefix:Prefix.contract_public_key_hash owner ;
       Ok (c, Int64.(to_string @@ of_string tid), owner)
     | _ ->
       Error (invalid_argument "itemId must be in format contract:token_id:owner")

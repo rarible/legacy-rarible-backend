@@ -176,7 +176,7 @@ let asset_class_type =
        prim `unit; prim `or_ ~args:[prim `unit; prim `bytes ]]]])
 
 let asset_data = function
-  | ATXTZ -> Ok "\000"
+  | ATXTZ -> Ok (Tzfunc.Raw.mk "\000")
   | ATFA_1_2 a -> Tzfunc.Forge.pack (prim `address) (Mstring a)
   | ATFA_2 { asset_fa2_contract; asset_fa2_token_id } ->
     Tzfunc.Forge.pack (prim `pair ~args:[ prim `address; prim `nat ])
@@ -189,7 +189,7 @@ let asset_type_mich a =
   let$ data = asset_data a in
   Result.ok @@ prim `Pair ~args:[
     asset_class_mich a;
-    Mbytes (Hex.of_string data)
+    Mbytes (Tzfunc.Crypto.hex_of_raw data)
   ]
 
 let asset_mich a =
@@ -206,11 +206,11 @@ let option_mich f = function
   | None -> prim `None
   | Some x -> prim `Some ~args:[ f x ]
 
-let keccak s =
-  Digestif.KECCAK_256.(to_raw_string @@ digest_string s)
+let keccak (s : Tzfunc.Raw.t) =
+  Tzfunc.Raw.mk @@ Digestif.KECCAK_256.(to_raw_string @@ digest_string (s :> string))
 
 let hash_key maker make_asset_type take_asset_type salt =
-  let$ maker = Tzfunc.Forge.pack (prim `option ~args:[prim `key])
+  let maker = Tzfunc.Forge.pack (prim `option ~args:[prim `key])
       (option_mich (fun s -> Mstring s) maker) in
   let$ make_asset_type_mich = asset_type_mich make_asset_type in
   let$ make_asset_type =
@@ -218,13 +218,14 @@ let hash_key maker make_asset_type take_asset_type salt =
   let$ take_asset_type_mich = asset_type_mich take_asset_type in
   let$ take_asset_type =
     Tzfunc.Forge.pack asset_type_type take_asset_type_mich in
-  let$ salt = Tzfunc.Forge.pack (prim `nat) @@ Mint (Z.of_string salt) in
-  Result.ok @@ Hex.show @@ Hex.of_string @@ keccak @@ String.concat "" [
-    maker;
-    keccak make_asset_type;
-    keccak take_asset_type;
-    salt
-  ]
+  let salt = Tzfunc.Forge.pack (prim `nat) @@ Mint (Z.of_string salt) in
+  let$ b = Tzfunc.Binary.Writer.concat [
+      maker;
+      Ok (keccak make_asset_type);
+      Ok (keccak take_asset_type);
+      salt
+    ] in
+  Result.ok @@ Tzfunc.Crypto.hex_of_raw @@ keccak b
 
 let part_type = prim `pair ~args:[ prim `address; prim `nat ]
 let order_data_type =
@@ -287,8 +288,8 @@ let mich_order_form
                 prim `Pair ~args:[
                   option_mich (fun c -> Mstring (Proto.A.cal_to_str c)) end_date;
                   prim `Pair ~args:[
-                    Mbytes (Hex.of_string @@ keccak data_type);
-                    Mbytes (Hex.of_string data);
+                    Mbytes (Tzfunc.Crypto.hex_of_raw @@ keccak data_type);
+                    Mbytes (Tzfunc.Crypto.hex_of_raw data);
                   ]
                 ]
               ]
@@ -377,7 +378,7 @@ let order_elt_from_order_form_elt elt =
     order_elt_created_at = now;
     order_elt_last_update_at = now;
     order_elt_pending = Some [];
-    order_elt_hash = hash;
+    order_elt_hash = (hash :> string);
     order_elt_make_balance = None;
     order_elt_make_price_usd = "0";
     order_elt_take_price_usd = "0";
@@ -486,17 +487,17 @@ let order_bid_status_to_string l =
 
 let sign ~edsk ~bytes =
   let open Tzfunc.Crypto in
-  let sk = Hacl.Sign.unsafe_sk_of_bytes (Bigstring.of_string @@ Base58.decode Prefix.ed25519_seed edsk) in
-  let msg = Bigstring.of_string @@ Crypto.Blake2b_32.hash [bytes] in
+  let sk = Hacl.Sign.unsafe_sk_of_bytes (Bigstring.of_string @@ (Sk.b58dec edsk :> string)) in
+  let msg = Bigstring.of_string @@ (Crypto.Blake2b_32.hash [bytes] :> string) in
   let signature = Bigstring.create 64 in
   Hacl.Sign.sign ~sk ~msg ~signature;
-  Base58.encode Prefix.ed25519_signature @@ Bigstring.to_string @@ signature
+  Base58.encode ~prefix:Prefix.ed25519_signature @@ Tzfunc.Raw.mk (Bigstring.to_string signature)
 
 let check ~edpk ~signature ~bytes =
   let open Tzfunc.Crypto in
-  let pk = Hacl.Sign.unsafe_pk_of_bytes (Bigstring.of_string @@ Base58.decode Prefix.ed25519_public_key edpk) in
-  let msg = Bigstring.of_string @@ Crypto.Blake2b_32.hash [bytes] in
-  let signature = Bigstring.of_string @@ Base58.decode Prefix.ed25519_signature signature in
+  let pk = Hacl.Sign.unsafe_pk_of_bytes (Bigstring.of_string @@ (Pk.b58dec edpk :> string)) in
+  let msg = Bigstring.of_string (Crypto.Blake2b_32.hash [bytes] :> string) in
+  let signature = Bigstring.of_string @@ (Base58.decode ~prefix:Prefix.ed25519_signature signature :> string) in
   Hacl.Sign.verify ~pk ~msg ~signature
 
 let short ?(len=8) h =
