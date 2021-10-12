@@ -468,7 +468,8 @@ let get_nft_ownership_by_id ?dbh contract token_id owner =
        contract, token_id, owner, last, amount, supply, metadata, \
        name, creators, description, attributes, image, animation \
        from tokens where \
-       main and contract = $contract and token_id = $id64 and owner = $owner"] in
+       main and contract = $contract and token_id = $id64 and \
+       owner = $owner and amount <> 0"] in
   let>? obj = one l in
   let>? nft_ownership = mk_nft_ownership obj in
   Lwt.return_ok nft_ownership
@@ -1814,13 +1815,15 @@ let get_nft_ownerships_by_item ?dbh ?continuation ?(size=50) contract token_id =
        contract, token_id, owner, last, amount, supply, metadata, \
        name, creators, description, attributes, image, animation \
        from tokens where \
-       main and contract = $contract and token_id = $id64 and \
+       main and contract = $contract and token_id = $id64 and amount <> 0 and \
        ($no_continuation or \
        (last = $ts and concat(contract, ':', token_id, ':', owner) > $id) or \
        (last < $ts)) \
        order by last desc, id asc limit $size64"] in
   let>? nft_ownerships_total = [%pgsql dbh
-      "select count(owner) from tokens where main and contract = $contract and token_id = $id64"] in
+      "select count(owner) from tokens where \
+       main and contract = $contract and token_id = $id64 and \
+       amount <> 0"] in
   let>? nft_ownerships_total = match nft_ownerships_total with
     | [ None ] -> Lwt.return_ok 0L
     | [ Some i64 ] -> Lwt.return_ok i64
@@ -1850,13 +1853,13 @@ let get_nft_all_ownerships ?dbh ?continuation ?(size=50) () =
        contract, token_id, owner, last, amount, supply, metadata, \
        name, creators, description, attributes, image, animation \
        from tokens where \
-       main and \
+       main and amount <> 0 and \
        ($no_continuation or \
        (last = $ts and concat(contract, ':', token_id, ':', owner) > $id) or \
        (last < $ts)) \
        order by last desc, id asc limit $size64"] in
   let>? nft_ownerships_total = [%pgsql dbh
-      "select count(owner) from tokens where main"] in
+      "select count(owner) from tokens where main and amount <> 0"] in
   let>? nft_ownerships_total = match nft_ownerships_total with
     | [ None ] -> Lwt.return_ok 0L
     | [ Some i64 ] -> Lwt.return_ok i64
