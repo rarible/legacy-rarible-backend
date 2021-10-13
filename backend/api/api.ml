@@ -28,9 +28,12 @@ let aggregation_section =
   EzAPI.Doc.{section_name = "order-aggregation-controller"; section_docs = []}
 let order_bid_section =
   EzAPI.Doc.{section_name = "order-bid-controller"; section_docs = []}
+let signature_section =
+  EzAPI.Doc.{section_name = "order-signature-controller"; section_docs = []}
 let sections = [
   nft_section; ownerships_section; items_section; collections_section;
-  orders_section; order_activities_section; aggregation_section; order_bid_section]
+  orders_section; order_activities_section; aggregation_section; order_bid_section;
+  signature_section]
 
 let pstring ?enc ?required name =
   let schema = Option.map (Json_encoding.schema ~definitions_path:"/components/schemas/") enc in
@@ -1220,6 +1223,17 @@ let get_order_activities req input =
    output=order_activities_enc;
    errors=[rarible_error_500];
    section=order_activities_section}]
+
+let validate _req input =
+  return_ok @@
+  check ~edpk:input.svf_signer ~signature:input.svf_signature ~bytes:(Tzfunc.Raw.mk input.svf_message)
+[@@post
+  {path="/v0.1/order/signature/validate";
+   name="validate";
+   input=signature_validation_form_enc;
+   output=Json_encoding.bool;
+   errors=[rarible_error_500];
+   section=signature_section}]
 
 
 (* module V_0_1 = struct

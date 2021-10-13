@@ -955,6 +955,33 @@ paths:
               schema:
                 $ref: '#/components/schemas/AggregationDatas'
       security: []
+  /v0.1/order/signature/validate:
+    description: Validate a message
+    post:
+      tags:
+      - order-signature-controller
+      description: Validate a message
+      operationId: validate
+      parameters: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignatureValidationForm'
+      responses:
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error500'
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: boolean
+      security: []
 components:
   schemas:
     Address:
@@ -2084,6 +2111,20 @@ components:
       required:
       - value
       - account
+      additionalProperties: false
+    SignatureValidationForm:
+      type: object
+      properties:
+        signer:
+          $ref: '#/components/schemas/edpk'
+        message:
+          type: string
+        signature:
+          $ref: '#/components/schemas/edsig'
+      required:
+      - signature
+      - message
+      - signer
       additionalProperties: false
     Transfer:
       type: object

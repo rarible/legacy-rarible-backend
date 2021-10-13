@@ -795,6 +795,11 @@ type nft_ownership_event = {
   nft_ownership_event_ownership : ownership_event ; [@merge]
 } [@@deriving encoding {camel; title="NftOwnerShipEvent"; def_title}]
 
+type signature_validation_form = {
+  svf_signer: A.edpk;
+  svf_message: string;
+  svf_signature: A.edsig;
+} [@@deriving encoding {title="SignatureValidationForm"; def_title}]
 
 (** Interaction with Tezos contract *)
 
