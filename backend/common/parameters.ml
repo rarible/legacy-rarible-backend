@@ -199,25 +199,20 @@ let parse_edpk = function
       Tzfunc.Binary.Reader.(pk {s = Tzfunc.Crypto.hex_to_raw h; offset = 0})
   | _ -> unexpected_michelson
 
-let parse_option_key = function
-  | Mprim { prim = `None; _ } -> Ok None
-  | Mprim { prim = `Some; args = [ a ]; _} ->
-    let$ edpk = parse_edpk a in
-    Ok (Some edpk)
+let parse_option_key : typed_micheline -> (string option, _) result = function
+  | `none -> Ok None
+  | `some [ `key maker ] -> Ok (Some maker)
   | _ -> unexpected_michelson
 
-let parse_asset_type mclass mdata = match mclass, mdata with
-  | Mprim { prim = `Left; args = [ Mprim { prim = `Unit; _ } ]; _ }, _ -> Ok ATXTZ
-  | Mprim { prim = `Right; args = [ Mprim { prim = `Left; args = [ Mprim { prim = `Unit; _} ]; _ } ]; _},
-    Mbytes h ->
+let parse_asset_type (mclass : typed_micheline) (mdata : typed_micheline) = match mclass, mdata with
+  | `left [ `unit ], _ -> Ok ATXTZ
+  | `right [ `left [ `unit ] ], `bytes h ->
     begin match
         Tzfunc.Read.unpack (Forge.prim `address) (Tzfunc.Crypto.hex_to_raw h) with
     | Ok (Mstring a) -> Ok (ATFA_1_2 a)
     | _ -> unexpected_michelson
     end
-  | Mprim { prim = `Right; args = [ Mprim { prim = `Right; args = [
-      Mprim { prim = `Left; args = [ Mprim { prim = `Unit; _} ]; _ } ]; _} ]; _},
-    Mbytes h ->
+  | `right [ `right [ `left [ `unit ] ] ], `bytes h ->
     begin match
         Tzfunc.Read.unpack (Forge.prim `pair ~args:[ Forge.prim `address; Forge.prim `nat ])
           (Tzfunc.Crypto.hex_to_raw h) with
@@ -229,19 +224,19 @@ let parse_asset_type mclass mdata = match mclass, mdata with
   | _ -> unexpected_michelson
 
 let parse_option_tsp = function
-  | Mprim { prim = `None; _ } -> Ok None
-  | Mprim { prim = `Some; args = [ Mstring s ]; _ } ->
-    Ok (Some (Proto.A.cal_of_str s))
-  | Mprim { prim = `Some; args = [ Mint i ]; _ } ->
-    Ok (Some (CalendarLib.Calendar.from_unixfloat @@ Z.to_float i))
+  | `none -> Ok None
+  | `some [ `timestamp tsp ] -> Ok (Some tsp)
   | _ -> unexpected_michelson
 
-let parse_cancel = function
-  | Mprim { prim = `Pair; args = [
-      maker; make_asset_class; make_asset_data; _;
-      _; take_asset_class; take_asset_data; _;
-      Mint salt; _; _; _; _ ]; _ } ->
-    let$ maker = parse_option_key maker in
+let parse_cancel m =
+  match parse_typed flat_order_type m with
+  | Ok [ maker; make_asset_class; make_asset_data; _;
+         _; take_asset_class; take_asset_data; _;
+         `nat salt; _; _; _; _ ] ->
+    let$ maker = match maker with
+      | `none -> Ok None
+      | `some [ `key maker ] -> Ok (Some maker)
+      | _ -> unexpected_michelson in
     let$ mat = parse_asset_type make_asset_class make_asset_data in
     let$ tat = parse_asset_type take_asset_class take_asset_data in
     let salt = Z.to_string salt in
@@ -250,52 +245,39 @@ let parse_cancel = function
   | _ -> unexpected_michelson
 
 
-let parse_do_transfers = function
-  | Mprim { prim = `Pair; args = [
+let parse_do_transfers m =
+  match parse_typed do_transfers_type m with
+  | Ok [
       _m_asset_class; _m_asset_data; _t_asset_class; _t_asset_data;
-      Mint fill_m_value; Mint fill_t_value;
-      left_maker; left_m_asset_class; left_m_asset_data; Mstring left_m_asset_value;
+      `nat fill_m_value; `nat fill_t_value;
+      left_maker; left_m_asset_class; left_m_asset_data; `nat left_m_asset_value;
       _left_taker; left_t_asset_class;  left_t_asset_data; _left_t_asset_value;
-      Mint left_salt; _left_start; _left_end; _left_data_type; _left_data;
-      right_maker; right_m_asset_class; right_m_asset_data; Mstring right_m_asset_value;
+      `nat left_salt; _left_start; _left_end; _left_data_type; _left_data;
+      right_maker; right_m_asset_class; right_m_asset_data; `nat right_m_asset_value;
       _right_taker; right_t_asset_class;  right_t_asset_data; _right_t_asset_value;
-      Mint right_salt; _right_start; _right_end; _right_data_type; _right_data;
-      _fee_side; _royalties
-    ]; _ }
-  | Mseq [
-      Mprim { prim = `Pair; args = [ _m_asset_class; _m_asset_data ]; _ };
-      Mprim { prim = `Pair; args = [ _t_asset_class; _t_asset_data ]; _ };
-      Mprim { prim = `Pair; args = [ Mint fill_m_value; Mint fill_t_value ]; _ };
-      Mseq [ left_maker; left_m_asset_class; left_m_asset_data; Mstring left_m_asset_value;
-             _left_taker; left_t_asset_class;  left_t_asset_data; _left_t_asset_value;
-             Mint left_salt; _left_start; _left_end; _left_data_type; _left_data ];
-      Mseq [ right_maker; right_m_asset_class; right_m_asset_data; Mstring right_m_asset_value;
-             _right_taker; right_t_asset_class;  right_t_asset_data; _right_t_asset_value;
-             Mint right_salt; _right_start; _right_end; _right_data_type; _right_data ];
+      `nat right_salt; _right_start; _right_end; _right_data_type; _right_data;
       _fee_side; _royalties ] ->
     let$ left_maker = parse_option_key left_maker in
     let$ left_mat = parse_asset_type left_m_asset_class left_m_asset_data in
     let$ left_tat = parse_asset_type left_t_asset_class left_t_asset_data in
     let left_salt = Z.to_string left_salt in
     let$ left = Utils.hash_key left_maker left_mat left_tat left_salt in
-    let left_asset = { asset_type = left_mat ; asset_value = left_m_asset_value } in
+    let left_asset = { asset_type = left_mat ; asset_value = Z.to_string left_m_asset_value } in
     let$ right_maker = parse_option_key right_maker in
     let$ right_mat = parse_asset_type right_m_asset_class right_m_asset_data in
     let$ right_tat = parse_asset_type right_t_asset_class right_t_asset_data in
     let right_salt = Z.to_string right_salt in
     let$ right = Utils.hash_key right_maker right_mat right_tat right_salt in
-    let right_asset = { asset_type = right_mat ; asset_value = right_m_asset_value } in
+    let right_asset = { asset_type = right_mat ; asset_value = Z.to_string right_m_asset_value } in
     let fill_make_value = Z.to_int64 fill_m_value in
     let fill_take_value = Z.to_int64 fill_t_value in
     Ok (DoTransfers
           {left; left_maker; left_asset;
            right; right_maker; right_asset;
            fill_make_value; fill_take_value})
-
   | _ -> unexpected_michelson
 
 let rec parse_exchange e p =
-  let p = flatten p in
   match e, p with
   | EPdefault, Mprim { prim = `Left; args = [ m ]; _ } ->
     parse_exchange (EPnamed "left") m
