@@ -21,22 +21,22 @@ module A = struct
   let uint53 =
     Json_encoding.ranged_int53 ~minimum:0L ~maximum:(Int64.shift_left 1L 53) "uint53"
 
-  type big_integer = string [@@deriving encoding {title="BigInteger"}]
+  type big_integer = string [@@deriving encoding {title="BigInteger"; def_title}]
 
   (* TODO : B58CHECK ? *)
-  type address = string [@@deriving encoding {title="Address"}]
+  type address = string [@@deriving encoding {title="Address"; def_title}]
   (* TODO : B58CHECK ? EX TRANSACTION HASH*)
-  type word = string [@@deriving encoding {title="Word"}]
+  type word = string [@@deriving encoding {title="Word"; def_title}]
 
-  type nonce = int64 [@encoding uint53] [@title "Nonce"] [@@deriving encoding {title="Nonce"}]
+  type nonce = int64 [@encoding uint53] [@@deriving encoding {title="Nonce"; def_title}]
 
-  type block_number = int64 [@encoding uint53] [@@deriving encoding {title="BlockNumber"}]
+  type block_number = int64 [@encoding uint53] [@@deriving encoding {title="BlockNumber"; def_title}]
 
-  type big_decimal = string [@@deriving encoding {title="BigDecimal"}]
+  type big_decimal = string [@@deriving encoding {title="BigDecimal"; def_title}]
 
-  type base58 = string [@@deriving encoding {title="Base58"}]
-  type edsig = string [@@deriving encoding {title="edsig"}]
-  type edpk = string [@@deriving encoding {title="edpk"}]
+  type base58 = string [@@deriving encoding {title="Base58"; def_title}]
+  type edsig = string [@@deriving encoding {title="edsig"; def_title}]
+  type edpk = string [@@deriving encoding {title="edpk"; def_title}]
 
   (* TODO : data format 2017-07-21T17:32:28Z *)
   let date_schema = Json_schema.(
@@ -58,7 +58,7 @@ end
 type part = {
   part_account : A.address;
   part_value : A.big_integer ;
-} [@@deriving encoding {title="Part"} ]
+} [@@deriving encoding {title="Part"; def_title} ]
 
 
 type rarible_error_500_code =
@@ -84,7 +84,7 @@ type rarible_error_500 = {
   rarible_error_500_status : int;
   rarible_error_500_message : string;
   rarible_error_500_code : rarible_error_500_code;
-} [@@deriving encoding {title="Error500"}]
+} [@@deriving encoding {title="Error500"; def_title}]
 
 type rarible_error_404_status =
   (* erc20-controllers *)
@@ -102,7 +102,7 @@ type rarible_error_404 = {
   rarible_error_404_status : int;
   rarible_error_404_message : string;
   rarible_error_404_code : rarible_error_404_status;
-} [@@deriving encoding {title="Error404"}]
+} [@@deriving encoding {title="Error404"; def_title}]
 
 type rarible_error_400_status =
   (* lock-controller *)
@@ -114,7 +114,7 @@ type rarible_error_400 = {
   rarible_error_400_status : int;
   rarible_error_400_message : string;
   rarible_error_400_code : rarible_error_400_status;
-} [@@deriving encoding {title="Error400"}]
+} [@@deriving encoding {title="Error400"; def_title}]
 
 type create_transaction_request = {
   req_hash : string;
@@ -185,20 +185,20 @@ type create_transaction_request = {
 type item_transfer = {
   item_transfer_type : unit [@encoding Json_encoding.constant "TRANSFER"];
   item_transfer_from : A.address;
-} [@@deriving encoding {title="ItemTransfer"}]
+} [@@deriving encoding {title="ItemTransferElt"; def_title}]
 
 type nft_item_attribute = {
   nft_item_attribute_key : string ;
   nft_item_attribute_value : string option ; [@opt]
   nft_item_attribute_type : string option; [@opt]
   nft_item_attribute_format : string option; [@opt]
-} [@@deriving encoding {title="NftItemAttribute"}]
+} [@@deriving encoding {title="NftItemAttribute"; def_title}]
 
 type meta = {
   meta_type : string;
   meta_width : int option; [@opt]
   meta_height : int option; [@opt]
-} [@@deriving encoding {title="NftMediaMeta"}]
+} [@@deriving encoding {title="NftMediaMeta"; def_title}]
 
 let assoc : type t. t Json_encoding.encoding -> (string * t) list Json_encoding.encoding =
   fun t ->
@@ -221,7 +221,7 @@ let assoc : type t. t Json_encoding.encoding -> (string * t) list Json_encoding.
 type nft_media = {
   nft_media_url : (string * string) list ; [@encoding assoc Json_encoding.string]
   nft_media_meta : (string * meta) list [@encoding assoc meta_enc];
-} [@@deriving encoding {title="NftMedia"}]
+} [@@deriving encoding {title="NftMedia"; def_title}]
 
 type nft_item_meta = {
   nft_item_meta_name : string;
@@ -229,7 +229,7 @@ type nft_item_meta = {
   nft_item_meta_attributes : nft_item_attribute list option; [@opt]
   nft_item_meta_image : string option; [@opt]
   nft_item_meta_animation : string option; [@opt]
-} [@@deriving encoding {title="NftItemMeta"}]
+} [@@deriving encoding {title="NftItemMeta"; def_title}]
 
 type nft_item = {
   nft_item_id : string ;
@@ -244,53 +244,53 @@ type nft_item = {
   nft_item_pending : item_transfer list option; [@opt]
   nft_item_deleted : bool option; [@opt]
   nft_item_meta : nft_item_meta option; [@opt]
-} [@@deriving encoding {camel; title="NftItem"}]
+} [@@deriving encoding {camel; title="NftItem"; def_title}]
 
 type nft_items = {
   nft_items_total : int64; [@encoding A.uint53]
   nft_items_continuation : string option; [@opt]
   nft_items_items : nft_item list;
-} [@@deriving encoding {title="NftItems"}]
+} [@@deriving encoding {title="NftItems"; def_title}]
 
 type nft_activity_filter_all_type =
   | ALLTRANSFER
   | ALLMINT
   | ALLBURN
-[@@deriving encoding {enum; title="NftActivityFilterAllYype"}]
+[@@deriving encoding {enum; title="NftActivityFilterAllType"; def_title}]
 
 type nft_activity_filter_user_type =
   | USERTRANSFER_FROM
   | USERTRANSFER_TO
   | USERMINT
   | USERBURN
-[@@deriving encoding {enum; title="NftActivityFilterUserType"}]
+[@@deriving encoding {enum; title="NftActivityFilterUserType"; def_title}]
 
 type nft_activity_by_user = {
   nft_activity_by_user_types : nft_activity_filter_user_type list ;
   nft_activity_by_user_users : A.address list
-} [@@deriving encoding {title="NftActivityByUser"}]
+} [@@deriving encoding {title="NftActivityByUser"; def_title}]
 
 type nft_activity_by_item = {
   nft_activity_by_item_types : nft_activity_filter_all_type list;
   nft_activity_by_item_contract : A.address;
   nft_activity_by_item_token_id : A.big_integer;
-} [@@deriving encoding {camel; title="NftActivityByItem"}]
+} [@@deriving encoding {camel; title="NftActivityByItem"; def_title}]
 
 type nft_activity_by_collection = {
   nft_activity_by_collection_types : nft_activity_filter_all_type list;
   nft_activity_by_collection_contract : A.address;
-} [@@deriving encoding {title="NftActivityByCollection"}]
+} [@@deriving encoding {title="NftActivityByCollection"; def_title}]
 
 type nft_activity_filter =
   | ActivityFilterAll of
-      (nft_activity_filter_all_type list [@wrap "types"]) [@kind "all"] [@kind_label "@type"] [@title "NftActivityFilterAll"]
+      (nft_activity_filter_all_type list [@wrap "types"]) [@kind "all"] [@kind_label "@type"] [@title "NftActivityFilterAll"] [@def_title]
   | ActivityFilterByUser of
-      nft_activity_by_user [@kind "by_user"] [@kind_label "@type"] [@title "NftActivityFilterByUser"]
+      nft_activity_by_user [@kind "by_user"] [@kind_label "@type"] [@title "NftActivityFilterByUser"] [@def_title]
   | ActivityFilterByItem of
-      nft_activity_by_item [@kind "by_item"] [@kind_label "@type"]  [@title "NftActivityFilterByItem"]
+      nft_activity_by_item [@kind "by_item"] [@kind_label "@type"]  [@title "NftActivityFilterByItem"] [@def_title]
   | ActivityFilterByCollection of
-      nft_activity_by_collection [@kind "by_collection"] [@kind_label "@type"] [@title "NftActivityFilterByCollection"]
-[@@deriving encoding {title="NftActivityFilter"}]
+      nft_activity_by_collection [@kind "by_collection"] [@kind_label "@type"] [@title "NftActivityFilterByCollection"] [@def_title]
+[@@deriving encoding {title="NftActivityFilter"; def_title}]
 
 type nft_activity_elt = {
   nft_activity_owner : A.address;
@@ -300,24 +300,24 @@ type nft_activity_elt = {
   nft_activity_transaction_hash : A.word ;
   nft_activity_block_hash : A.word ;
   nft_activity_block_number : A.block_number ;
-} [@@deriving encoding {camel; title="NftActivityElt"}]
+} [@@deriving encoding {camel; title="NftActivityElt"; def_title}]
 
 type nft_activity_type =
-  | NftActivityMint of nft_activity_elt [@kind "mint"] [@kind_label "@type"] [@title "Mint"]
-  | NftActivityBurn of nft_activity_elt [@kind "burn"] [@kind_label "@type"] [@title "Burn"]
-  | NftActivityTransfer of {elt: nft_activity_elt; from: A.address} [@kind "transfer"] [@kind_label "@type"] [@title "Transfer"]
-[@@deriving encoding {title="NftActivityType"}]
+  | NftActivityMint of nft_activity_elt [@kind "mint"] [@kind_label "@type"] [@title "Mint"] [@def_title]
+  | NftActivityBurn of nft_activity_elt [@kind "burn"] [@kind_label "@type"] [@title "Burn"] [@def_title]
+  | NftActivityTransfer of {elt: nft_activity_elt; from: A.address} [@kind "transfer"] [@kind_label "@type"] [@title "Transfer"] [@def_title]
+[@@deriving encoding {title="NftActivityType"; def_title}]
 
 type nft_activity = {
   nft_activity_id : string ;
   nft_activity_date : A.date ;
   nft_activity_type : nft_activity_type ;
-} [@@deriving encoding {title="NftActivity"}]
+} [@@deriving encoding {title="NftActivity"; def_title}]
 
 type nft_activities = {
   nft_activities_continuation : string option ; [@opt]
   nft_activities_items : nft_activity_type list
-} [@@deriving encoding {title="NftActivities"}]
+} [@@deriving encoding {title="NftActivities"; def_title}]
 
 type item_history_elt = {
   item_history_owner : A.address option; [@opt]
@@ -325,18 +325,18 @@ type item_history_elt = {
   item_history_token_id : A.big_integer;
   item_history_value : A.big_integer option; [@opt]
   item_history_date : A.date;
-} [@@deriving encoding {camel; title="ItemHistoryElt"}]
+} [@@deriving encoding {camel; title="ItemHistoryElt"; def_title}]
 
 type item_history_transfer = {
   iht_owner: A.address option ; [@opt]
   iht_value : A.address option ; [@opt]
   iht_from : A.address ;
-} [@@deriving encoding {title="ItemHistoryTransfer"}]
+} [@@deriving encoding {title="ItemHistoryTransfer"; def_title}]
 
 type item_history =
-  | IHRoyalty of (part list [@wrap "royalties"]) [@kind_label "type"] [@kind "ROYALTY"] [@title "ItemRoyalty"]
-  | IHTransfer of item_history_transfer [@kind_label "type"] [@kind "TRANSFER"] [@title "ItemTransfer"]
-[@@deriving encoding {title="ItemHistory"}]
+  | IHRoyalty of (part list [@wrap "royalties"]) [@kind_label "type"] [@kind "ROYALTY"] [@title "ItemRoyalty"] [@def_title]
+  | IHTransfer of item_history_transfer [@kind_label "type"] [@kind "TRANSFER"] [@title "ItemTransfer"] [@def_title]
+[@@deriving encoding {title="ItemHistory"; def_title}]
 
 type nft_ownership = {
   nft_ownership_id : string ;
@@ -348,24 +348,24 @@ type nft_ownership = {
   nft_ownership_lazy_value : A.big_integer ;
   nft_ownership_date : A.date ;
   nft_ownership_pending : item_history list;
-} [@@deriving encoding {camel; title="NftOwnership"}]
+} [@@deriving encoding {camel; title="NftOwnership"; def_title}]
 
 type nft_ownerships = {
   nft_ownerships_total : int64 ; [@encoding A.uint53]
   nft_ownerships_continuation : string option ; [@opt]
   nft_ownerships_ownerships : nft_ownership list ;
-} [@@deriving encoding {title="NftOwnerShips"}]
+} [@@deriving encoding {title="NftOwnerShips"; def_title}]
 
 type nft_signature = {
   nft_signature_r : A.bytes_str ;
   nft_signature_s : A.edsig ;
   nft_signature_v : A.edsig ;
-} [@@deriving encoding {title="NftSignature"}]
+} [@@deriving encoding {title="NftSignature"; def_title}]
 
 type nft_token_id = {
   nft_token_id : A.big_integer ; [@key "tokenId"]
   nft_token_id_signature : nft_signature option; [@key "signature"] [@opt]
-} [@@deriving encoding {title="NftTokenId"}]
+} [@@deriving encoding {title="NftTokenId"; def_title}]
 
 type nft_collection_feature =
   | NCFAPPROVE_FOR_ALL
@@ -374,11 +374,11 @@ type nft_collection_feature =
   | NCFMINT_WITH_ADDRESS
   | NCFSECONDARY_SALE_FEES
   | NCFMINT_AND_TRANSFER
-[@@deriving encoding {enum; title="NftCollectionFeature"}]
+[@@deriving encoding {enum; title="NftCollectionFeature"; def_title}]
 
 type nft_collection_type =
   | CTFA_2 [@key "FA_2"]
-[@@deriving encoding {enum; title="NftCollectionType"}]
+[@@deriving encoding {enum; title="NftCollectionType"; def_title}]
 
 type nft_collection = {
   nft_collection_id : A.address ;
@@ -389,47 +389,29 @@ type nft_collection = {
   nft_collection_features : nft_collection_feature list ;
   nft_collection_supports_lazy_mint: bool ;
   nft_collection_minters: A.address list option; [@opt]
-} [@@deriving encoding {title="NftCollection"}]
+} [@@deriving encoding {title="NftCollection"; def_title}]
 
 type nft_collections = {
   nft_collections_total : int64 ; [@encoding A.uint53]
   nft_collections_continuation : string option ; [@opt]
   nft_collections_collections : nft_collection list ;
-} [@@deriving encoding {title="NftCollections"}]
-
-(* type asset_type_lazy_nft = {
- *   asset_type_lazy_nft_contract : A.address ;
- *   asset_type_lazy_nft_token_id : A.big_integer ;
- *   asset_type_lazy_nft_uri : string ;
- *   asset_type_lazy_nft_creators : part list ;
- *   asset_type_lazy_nft_royalties : part list ;
- *   asset_type_lazy_nft_signature : A.edsig ;
- * } [@@deriving encoding {camel}] *)
+} [@@deriving encoding {title="NftCollections"; def_title}]
 
 type asset_fa2 = {
   asset_fa2_contract : A.address ;
   asset_fa2_token_id : A.big_integer ;
-} [@@deriving encoding {camel; title="AssetTypeFA2"}]
+} [@@deriving encoding {camel; title="FA_2AssetType"; def_title}]
 
 type asset_type =
-  | ATXTZ [@kind_label "assetClass"] [@kind "XTZ"] [@title "XTZAssetType"]
-  | ATFA_1_2 of (A.address [@wrap "contract"]) [@kind_label "assetClass"] [@kind "FA_1_2"] [@title "FA_1_2AssetType"]
-  | ATFA_2 of asset_fa2 [@kind_label "assetClass"] [@kind "FA_2"] [@title "FA_2AssetType"]
-  (* | ATETH [@kind_label "assetClass"] [@kind "ETH"]
-   * | ATERC721 of asset_type_nft [@kind_label "assetClass"] [@kind "ERC721"] *)
-  (* | ATETH [@kind "assetClass"] [@kind_label "ETH"]
-   * | ATFLOW [@kind "assetClass"] [@kind_label "FLOW"]
-   * | ATERC20 of (A.address [@wrap "contract"])[@kind "assetClass"] [@kind_label "ERC20"]
-   * | ATERC721 of asset_type_nft [@kind "assetClass"] [@kind_label "ERC721"]
-   * | ATERC1155 of asset_type_nft [@kind "assetClass"] [@kind_label "ERC1155"]
-   * | ATERC721_LAZY of asset_type_lazy_nft [@kind "assetClass"] [@kind_label "ERC721_LAZY"]
-   * | ATERC1155_LAZY of asset_type_lazy_nft [@kind "assetClass"] [@kind_label "ERC1155_LAZY"] *)
-[@@deriving encoding {title="AssetType"}]
+  | ATXTZ [@kind_label "assetClass"] [@kind "XTZ"] [@title "XTZAssetType"] [@def_title]
+  | ATFA_1_2 of (A.address [@wrap "contract"]) [@kind_label "assetClass"] [@kind "FA_1_2"] [@title "FA_1_2AssetType"] [@def_title]
+  | ATFA_2 of asset_fa2 [@kind_label "assetClass"]
+[@@deriving encoding {title="AssetType"; def_title}]
 
 type asset = {
   asset_type : asset_type [@key "assetType"] ;
   asset_value : A.big_integer [@key "value"] ;
-} [@@deriving encoding {title="Asset"} ]
+} [@@deriving encoding {title="Asset"; def_title} ]
 
 type order_form_elt = {
   order_form_elt_maker : A.edpk ;
@@ -440,7 +422,7 @@ type order_form_elt = {
   order_form_elt_start : A.date_int64 option ; [@opt]
   order_form_elt_end : A.date_int64 option ; [@opt]
   order_form_elt_signature : A.edsig ;
-} [@@deriving encoding {title="OrderFormElt"}]
+} [@@deriving encoding {title="OrderFormElt"; def_title}]
 
 (* type order_open_sea_v1_data_v1_fee_method =
  *   | OSPROTOCOL_FEE
@@ -490,13 +472,13 @@ type order_rarible_v2_data_v1 = {
   order_rarible_v2_data_v1_data_type : string ;
   order_rarible_v2_data_v1_payouts : part list ;
   order_rarible_v2_data_v1_origin_fees : part list ;
-} [@@deriving encoding {camel; title="OrderRaribleV2DataV1"}]
+} [@@deriving encoding {camel; title="OrderRaribleV2DataV1"; def_title}]
 
 type order_form = {
   order_form_data: order_rarible_v2_data_v1;
   order_form_elt: order_form_elt [@merge];
   order_form_type: unit [@encoding Json_encoding.constant "RARIBLE_V2"]
-} [@@deriving encoding {title="OrderForm"}]
+} [@@deriving encoding {title="OrderForm"; def_title}]
 
 type order_exchange_history_elt = {
   order_exchange_history_elt_hash : A.word ;
@@ -504,12 +486,12 @@ type order_exchange_history_elt = {
   order_exchange_history_elt_take : asset option ; [@opt]
   order_exchange_history_elt_date : A.date ;
   order_exchange_history_elt_maker : A.edpk option ; [@opt]
-} [@@deriving encoding {title="OrderExchangeHistoryElt"}]
+} [@@deriving encoding {title="OrderExchangeHistoryElt"; def_title}]
 
 type order_side =
   | OSLEFT
   | OSRIGHT
-[@@deriving encoding {enum; title="OrderSide"}]
+[@@deriving encoding {enum; title="OrderSide"; def_title}]
 
 type order_side_match = {
   order_side_match_elt : order_exchange_history_elt [@merge];
@@ -521,18 +503,18 @@ type order_side_match = {
   order_side_match_take_usd : A.big_decimal option ; [@opt]
   order_side_match_make_price_usd : A.big_decimal option ; [@opt]
   order_side_match_take_price_usd : A.big_decimal option ; [@opt]
-} [@@deriving encoding {camel; title="OrderSideMatch"}]
+} [@@deriving encoding {camel; title="OrderSideMatch"; def_title}]
 
 type order_exchange_history =
-  | OrderCancel of order_exchange_history_elt [@kind_label "type"] [@kind "CANCEL"] [@title "OrderCancel"]
-  | OrderSideMatch of order_side_match [@kind_label "type"] [@kind "ORDER_SIDE_MATCH"] [@title "OrderSideMatch"]
-[@@deriving encoding {title="OrderExchangeHistory"}]
+  | OrderCancel of order_exchange_history_elt [@kind_label "type"] [@kind "CANCEL"] [@title "OrderCancel"] [@def_title]
+  | OrderSideMatch of order_side_match [@kind_label "type"] [@kind "ORDER_SIDE_MATCH"]
+[@@deriving encoding {title="OrderExchangeHistory"; def_title}]
 
 type order_price_history_record = {
   order_price_history_record_date : A.date ;
   order_price_history_record_make_value : A.big_decimal ;
   order_price_history_record_take_value : A.big_decimal ;
-} [@@deriving encoding {camel; title="OrderPriceHistoryRecord"}]
+} [@@deriving encoding {camel; title="OrderPriceHistoryRecord"; def_title}]
 
 type order_status =
   | OACTIVE
@@ -540,7 +522,7 @@ type order_status =
   | OHISTORICAL
   | INACTIVE
   | CANCELLED
-[@@deriving encoding {enum; title="OrderStatus"}]
+[@@deriving encoding {enum; title="OrderStatus"; def_title}]
 
 type order_elt = {
   order_elt_maker : A.edpk;
@@ -563,13 +545,13 @@ type order_elt = {
   order_elt_take_price_usd: A.big_decimal;
   order_elt_price_history: order_price_history_record list ; [@dft []]
   order_elt_status : order_status option; [@opt]
-} [@@deriving encoding {camel; title="OrderElt"}]
+} [@@deriving encoding {camel; title="OrderElt"; def_title}]
 
 type order = {
   order_data: order_rarible_v2_data_v1;
   order_elt: order_elt [@merge];
   order_type: unit [@encoding Json_encoding.constant "RARIBLE_V2"]
-} [@@deriving encoding {title="Order"}]
+} [@@deriving encoding {title="Order"; def_title}]
 
 (* type prepare_order_tx_form = {
  *   prepare_order_tx_form_maker : A.edpk ;
@@ -599,21 +581,22 @@ type order = {
 type orders_pagination = {
   orders_pagination_orders : order list ;
   orders_pagination_contination : string option ; [@opt]
-} [@@deriving encoding {title="OrderPagination"}]
+} [@@deriving encoding {title="OrderPagination"; def_title}]
 
 type aggregation_data = {
   aggregation_data_address : A.address ;
   aggregation_data_sum : A.big_decimal ;
   aggregation_data_count : int64 ; [@encoding A.uint53]
-} [@@deriving encoding {title="AggregationData"}]
+} [@@deriving encoding {title="AggregationData"; def_title}]
 
-type aggregation_datas = aggregation_data list [@@deriving encoding {title="AggregationDatas"}]
+type aggregation_datas = aggregation_data list
+[@@deriving encoding {title="AggregationDatas"; def_title}]
 
 type order_activity_filter_all_type =
   | OALLBID
   | OALLLIST
   | OALLMATCH
-[@@deriving encoding {enum; title="OrderActivityFilterAllType"}]
+[@@deriving encoding {enum; title="OrderActivityFilterAllType"; def_title}]
 
 type order_activity_filter_user_type = [
   | `MAKE_BID
@@ -621,57 +604,57 @@ type order_activity_filter_user_type = [
   | `LIST
   | `BUY
   | `SELL ] [@enum]
-[@@deriving encoding {title="OrderActivityFilterUserType"}]
+[@@deriving encoding {title="OrderActivityFilterUserType"; def_title}]
 
 type order_activity_by_user = {
   order_activity_by_user_types : order_activity_filter_user_type list ;
   order_activity_by_user_users : A.address list
-} [@@deriving encoding {title="OrderActivityByUser"}]
+} [@@deriving encoding {title="OrderActivityByUser"; def_title}]
 
 type order_activity_by_item = {
   order_activity_by_item_types : order_activity_filter_all_type list;
   order_activity_by_item_contract : A.address;
   order_activity_by_item_token_id : A.big_integer;
-} [@@deriving encoding {camel; title="OrderActivityByItem"}]
+} [@@deriving encoding {camel; title="OrderActivityByItem"; def_title}]
 
 type order_activity_by_collection = {
   order_activity_by_collection_types : order_activity_filter_all_type list;
   order_activity_by_collection_contract : A.address;
-} [@@deriving encoding {title="OrderActivityByCollection"}]
+} [@@deriving encoding {title="OrderActivityByCollection"; def_title}]
 
 type order_activity_filter =
   | OrderActivityFilterAll of
-      (order_activity_filter_all_type list [@wrap "types"]) [@kind "all"] [@kind_label "@type"] [@title "OrderActivityFilterAll"]
+      (order_activity_filter_all_type list [@wrap "types"]) [@kind "all"] [@kind_label "@type"] [@title "OrderActivityFilterAll"] [@def_title]
   | OrderActivityFilterByUser of
-      order_activity_by_user [@kind "by_user"] [@kind_label "@type"] [@title "OrderActivityFilterByUser"]
+      order_activity_by_user [@kind "by_user"] [@kind_label "@type"] [@title "OrderActivityFilterByUser"] [@def_title]
   | OrderActivityFilterByItem of
-      order_activity_by_item [@kind "by_item"] [@kind_label "@type"] [@title "OrderActivityFilterByItem"]
+      order_activity_by_item [@kind "by_item"] [@kind_label "@type"] [@title "OrderActivityFilterByItem"] [@def_title]
   | OrderActivityFilterByCollection of
-      order_activity_by_collection [@kind "by_collection"] [@kind_label "@type"] [@title "OrderActivityFilterByCollection"]
-[@@deriving encoding {title="OrderActivityFilter"}]
+      order_activity_by_collection [@kind "by_collection"] [@kind_label "@type"] [@title "OrderActivityFilterByCollection"] [@def_title]
+[@@deriving encoding {title="OrderActivityFilter"; def_title}]
 
 type order_activity_source =
   | SourceRARIBLE
   | SourceOPEN_SEA
-[@@deriving encoding {enum; title="OrderActivitySource"}]
+[@@deriving encoding {enum; title="OrderActivitySource"; def_title}]
 
 type order_activity_elt = {
   order_activity_elt_id : string ;
   order_activity_elt_date : A.date ;
   order_activity_elt_source : order_activity_source ;
-} [@@deriving encoding {title="OrderActivityElt"}]
+} [@@deriving encoding {title="OrderActivityElt"; def_title}]
 
 type order_activity_side_type =
   | STSELL
   | STBID
-[@@deriving encoding {enum; title="OrderActivitySideType"}]
+[@@deriving encoding {enum; title="OrderActivitySideType"; def_title}]
 
 type order_activity_match_side = {
   order_activity_match_side_maker : A.edpk ;
   order_activity_match_side_hash : A.word ;
   order_activity_match_side_asset : asset ;
   order_activity_match_side_type : order_activity_side_type ;
-} [@@deriving encoding {title="OrderActivitySideMatch"}]
+} [@@deriving encoding {title="OrderActivitySideMatch"; def_title}]
 
 type order_activity_match = {
   order_activity_match_left: order_activity_match_side ;
@@ -682,7 +665,7 @@ type order_activity_match = {
   order_activity_match_block_hash: A.word ;
   order_activity_match_block_number: A.block_number ;
   order_activity_match_log_index: int ;
-} [@@deriving encoding {camel; title="OrderActivityMatch"}]
+} [@@deriving encoding {camel; title="OrderActivityMatch"; def_title}]
 
 type order_activity_bid = {
   order_activity_bid_hash : A.word ;
@@ -691,7 +674,7 @@ type order_activity_bid = {
   order_activity_bid_take : asset ;
   order_activity_bid_price : A.big_decimal ;
   order_activity_bid_price_usd : A.big_decimal option ; [@opt]
-} [@@deriving encoding {camel; title="OrderActivityBid"}]
+} [@@deriving encoding {camel; title="OrderActivityBid"; def_title}]
 
 type order_activity_cancel_bid = {
   order_activity_cancel_bid_hash : A.word ;
@@ -702,27 +685,27 @@ type order_activity_cancel_bid = {
   order_activity_cancel_bid_block_hash : A.word ;
   order_activity_cancel_bid_block_number : A.block_number ;
   order_activity_cancel_bid_log_index : int ;
-} [@@deriving encoding {camel; title="OrderActivityCancelBid"}]
+} [@@deriving encoding {camel; title="OrderActivityCancelBid"; def_title}]
 
 type order_activity_type =
-  | OrderActivityMatch of order_activity_match [@kind "match"] [@kind_label "@type"] [@title "OrderActivityMatch"]
-  | OrderActivityList of order_activity_bid [@kind "list"] [@kind_label "@type"] [@title "OrderActivityList"]
-  | OrderActivityBid of order_activity_bid [@kind "bid"] [@kind_label "@type"] [@title "OrderActivityBid"]
-  | OrderActivityCancelBid of order_activity_cancel_bid [@kind "cancel_bid"] [@kind_label "@type"] [@title "OrderActivityCancelBid"]
-  | OrderActivityCancelList of order_activity_cancel_bid [@kind "cancel_list"] [@kind_label "@type"] [@title "OrderActivityCancelList"]
-[@@deriving encoding {title="OrderActivityType"}]
+  | OrderActivityMatch of order_activity_match [@kind "match"] [@kind_label "@type"]
+  | OrderActivityList of order_activity_bid [@kind "list"] [@kind_label "@type"] [@title "OrderActivityList"] [@def_title]
+  | OrderActivityBid of order_activity_bid [@kind "bid"] [@kind_label "@type"]
+  | OrderActivityCancelBid of order_activity_cancel_bid [@kind "cancel_bid"] [@kind_label "@type"]
+  | OrderActivityCancelList of order_activity_cancel_bid [@kind "cancel_list"] [@kind_label "@type"] [@title "OrderActivityCancelList"] [@def_title]
+[@@deriving encoding {title="OrderActivityType"; def_title}]
 
 type order_activity = {
   order_activity_id : string ;
   order_activity_date : A.date ;
   order_activity_source : string ;
   order_activity_type : order_activity_type ;
-} [@@deriving encoding {title="OrderActivity"}]
+} [@@deriving encoding {title="OrderActivity"; def_title}]
 
 type order_activities = {
   order_activities_items : order_activity_type list [@title "OrderActivitiesItems"];
   order_activities_continuation : string option ; [@opt]
-} [@@deriving encoding {title="OrderAcvities"}]
+} [@@deriving encoding {title="OrderActivities"; def_title}]
 
 type order_bid_status =
   | BSACTIVE
@@ -730,7 +713,7 @@ type order_bid_status =
   | BSHISTORICAL
   | BSINACTIVE
   | BSCANCELLED
-[@@deriving encoding {enum; title="OrderBidStatus"}]
+[@@deriving encoding {enum; title="OrderBidStatus"; def_title}]
 
 type order_bid_elt = {
   order_bid_elt_order_hash : A.word ;
@@ -748,18 +731,18 @@ type order_bid_elt = {
   order_bid_elt_salt : A.big_integer ;
   order_bid_elt_signature : A.base58 ;
   order_bid_elt_created_at : A.date;
-} [@@deriving encoding {camel; title="OrderBidElt"}]
+} [@@deriving encoding {camel; title="OrderBidElt"; def_title}]
 
 type order_bid = {
   order_bid_data: order_rarible_v2_data_v1;
   order_bid_elt: order_bid_elt [@merge];
   order_bid_type: unit [@encoding Json_encoding.constant "RARIBLE_V2"]
-} [@@deriving encoding {title="OrderBid"}]
+} [@@deriving encoding {title="OrderBid"; def_title}]
 
 type order_bids_pagination = {
   order_bids_pagination_items : order_bid list ;
   order_bids_pagination_continuation : string option ; [@opt]
-} [@@deriving encoding {title="OrderBidsPagination"}]
+} [@@deriving encoding {title="OrderBidsPagination"; def_title}]
 
 (* type signature_form = {
  *   signature_form_signature : A.base58 option ; [@opt]
@@ -773,44 +756,44 @@ type order_event = {
   order_event_order_id : string ;
   order_event_order : order ;
   order_event_type : string ;
-} [@@deriving encoding {camel; title="OrderEvent"}]
+} [@@deriving encoding {camel; title="OrderEvent"; def_title}]
 
 type nft_deleted_item = {
   nft_deleted_item_id : string ;
   nft_deleted_item_token : A.address ;
   nft_deleted_item_token_id : A.big_integer ;
-} [@@deriving encoding {camel; title="NftDeletedItem"}]
+} [@@deriving encoding {camel; title="NftDeletedItem"; def_title}]
 
 type nft_event =
-  | NftItemUpdateEvent of nft_item [@kind "UPDATE"] [@kind_label "type"] [@title "NftItemUpdateEvent"]
-  | NftItemDeleteEvent of nft_deleted_item [@kind "DELETE"] [@kind_label "type"] [@title "NftItemDeleteEvent"]
- [@@deriving encoding {title="NftEvent"}]
+  | NftItemUpdateEvent of nft_item [@kind "UPDATE"] [@kind_label "type"] [@title "NftItemUpdateEvent"] [@def_title]
+  | NftItemDeleteEvent of nft_deleted_item [@kind "DELETE"] [@kind_label "type"] [@title "NftItemDeleteEvent"] [@def_title]
+ [@@deriving encoding {title="NftEvent"; def_title}]
 
 type nft_item_event = {
   nft_item_event_event_id : string ;
   nft_item_event_item_id : string ;
   nft_item_event_item : nft_event ;
-} [@@deriving encoding {camel; title="NftItemEvent"}]
+} [@@deriving encoding {camel; title="NftItemEvent"; def_title}]
 
 type nft_deleted_ownership = {
   nft_deleted_ownership_id : string ;
   nft_deleted_ownership_token : A.address ;
   nft_deleted_ownership_token_id : A.big_integer ;
   nft_deleted_ownership_owner : A.address ;
-} [@@deriving encoding {camel; title="NftDeletedOwnerShip"}]
+} [@@deriving encoding {camel; title="NftDeletedOwnerShip"; def_title}]
 
 type ownership_event =
   | NftOwnershipUpdateEvent of
       nft_ownership [@kind "UPDATE"] [@kind_label "type"]
   | NftOwnershipDeleteEvent of
       nft_deleted_ownership [@kind "DELETE"] [@kind_label "type"]
-[@@deriving encoding {title="OwnerShipEvent"}]
+[@@deriving encoding {title="OwnerShipEvent"; def_title}]
 
 type nft_ownership_event = {
   nft_ownership_event_event_id : string ;
   nft_ownership_event_ownership_id : string ;
   nft_ownership_event_ownership : ownership_event ; [@merge]
-} [@@deriving encoding {camel; title="NftOwnerShipEvent"}]
+} [@@deriving encoding {camel; title="NftOwnerShipEvent"; def_title}]
 
 
 (** Interaction with Tezos contract *)

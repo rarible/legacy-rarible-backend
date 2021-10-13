@@ -34,7 +34,7 @@ deps:
 	@opam pin add -n -y digestif.dev git+https://github.com/maxtori/digestif.git#keccak-256
 	@opam pin add -n -y hacl.dev git+https://gitlab.com/maxtori/ocaml-hacl.git
 	@opam pin add -n -y json-data-encoding.dev git+https://gitlab.com/maxtori/json-data-encoding.git#schema-fix
-	@opam pin add -n -y ppx_deriving_encoding.dev git+https://gitlab.com/o-labs/ppx_deriving_encoding.git
+	@opam pin add -n -y ppx_deriving_encoding.dev git+https://gitlab.com/maxtori/ppx_deriving_encoding.git#rarible
 	@opam pin add -n -y ppx_deriving_jsoo.dev git+https://gitlab.com/o-labs/ppx_deriving_jsoo.git
 	@opam pin add -n -y --ignore-pin-depends tzfunc.~dev git+https://gitlab.com/functori/tzfunc.git
 	@opam pin add -n -y --ignore-pin-depends crawlori.~dev git+https://gitlab.com/functori/crawlori.git
