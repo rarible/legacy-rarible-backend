@@ -279,7 +279,7 @@ let order_form_from_items ?(salt=0) collection item1 item2 =
   let start_date = None in
   let end_date = None in
   let data_type = "V1" in
-  let payouts = [ { part_account = Tzfunc.Crypto.pk_to_pkh maker_pk; part_value = "10000" } ] in
+  let payouts = [] in
   let origin_fees = [] in
   let$ to_sign =
     hash_order_form
@@ -298,7 +298,7 @@ let sell_order_form_from_item ?(salt=0) collection item1 take =
   let start_date = None in
   let end_date = None in
   let data_type = "V1" in
-  let payouts = [ { part_account = Tzfunc.Crypto.pk_to_pkh maker_pk; part_value = "10000" } ] in
+  let payouts = [] in
   let origin_fees = [] in
   let$ to_sign =
     hash_order_form
@@ -316,7 +316,7 @@ let buy_order_form_from_item ?(salt=0) collection item1 (maker_pk, maker_sk) mak
   let start_date = None in
   let end_date = None in
   let data_type = "V1" in
-  let payouts = [ { part_account = Tzfunc.Crypto.pk_to_pkh maker_pk; part_value = "10000" } ] in
+  let payouts = [] in
   let origin_fees = [] in
   let$ to_sign =
     hash_order_form
@@ -923,7 +923,7 @@ let create_exchange () =
     let filename = "contracts/arl/exchangeV2.arl" in
     let storage = Script.storage_exchange ~admin:admin ~receiver ~fee:300L in
     let alias_new = generate_alias "exchange" in
-    deploy ~burn_cap:4.67575 filename storage alias_source alias_new ;
+    deploy ~burn_cap:42.1 filename storage alias_source alias_new ;
     alias_new, (alias_admin, sk_admin), alias_receiver
 
 let set_validator validator source contract =
@@ -1094,29 +1094,16 @@ let mich_order order =
     ~payouts:order.order_data.order_rarible_v2_data_v1_payouts
     ~origin_fees:order.order_data.order_rarible_v2_data_v1_origin_fees
 
-let payouts order =
-  let payouts = match order.order_data.order_rarible_v2_data_v1_payouts with
-    | [] ->
-      let tz1 = Tzfunc.Crypto.pk_to_pkh order.order_elt.order_elt_maker in
-      let part = { part_account = tz1 ; part_value = "10000" } in
-      [ part ]
-    | payouts -> payouts in
-  let data = { order.order_data with order_rarible_v2_data_v1_payouts = payouts } in
-  { order with order_data = data }
-
 let match_orders ?amount ~source ~contract order_left order_right =
   let open Tzfunc.Crypto in
   let pk =
     Pk.b58enc @@
     Sk.to_public_key @@
     (Sk.b58dec @@ snd source) in
-  (* TODO : remove this, it should be on chain ? *)
-  let order_left = payouts order_left in
-  let order_right = payouts order_right in
-  match mich_order order_left with
+  match flat_order order_left with
   | Error err -> Lwt.fail_with @@ Printf.sprintf "mich order %s" @@ string_of_error err
   | Ok m_left ->
-    match mich_order order_right with
+    match flat_order order_right with
     | Error err -> Lwt.fail_with @@ Printf.sprintf "mich order %s" @@ string_of_error err
     | Ok m_right ->
       let signature_left =
@@ -1126,8 +1113,7 @@ let match_orders ?amount ~source ~contract order_left order_right =
       let mich = prim `Pair ~args:[m_left; signature_left; m_right; signature_right] in
       call
         ?amount
-        (* ~gas_limit:(Z.of_int (1040000 - 1))
-         * ~local_forge:false *)
+        ~local_forge:false
         ~entrypoint:"matchOrders"
         ~base:(EzAPI.BASE !endpoint)
         ~get_pk:(fun () -> Lwt.return_ok pk)
@@ -1142,13 +1128,12 @@ let cancel_order ~source ~contract order =
     Pk.b58enc @@
     Sk.to_public_key @@
     (Sk.b58dec @@ snd source) in
-  (* TODO : remove this, it should be on chain ? *)
-  let order = payouts order in
   match flat_order order with
   | Error err -> Lwt.fail_with @@ Printf.sprintf "mich order %s" @@ string_of_error err
   | Ok m ->
     call
-      ~entrypoint:"cancelOrder"
+      ~local_forge:false
+      ~entrypoint:"cancel"
       ~base:(EzAPI.BASE !endpoint)
       ~get_pk:(fun () -> Lwt.return_ok pk)
       ~source:(fst source)
@@ -2265,7 +2250,7 @@ let cancel_order () =
   let (source1, amount1, token_id1, royalties1, metadata1) = item1 in
   check_item (contract, (source1, string_of_int amount1, token_id1, royalties1, metadata1))
   >>= fun () ->
-  let>? order = sell_nft_for_tezos contract item1 1 in
+  let>? order = sell_nft_for_tezos ~salt:1 contract item1 1 in
   (* TODO : check order *)
   begin cancel_order ~source:source1 ~contract:ex_kt1 order >>= function
     | Error err ->
