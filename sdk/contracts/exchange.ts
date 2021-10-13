@@ -2340,17 +2340,7 @@ export const exchange_code : any =
                            [    ]
                          ]
                       },
-                      {  "prim": "DIG",
-                         "args": [
-                           {  "int": "1"  }
-                         ]
-                      },
                       {  "prim": "DUP"  },
-                      {  "prim": "DUG",
-                         "args": [
-                           {  "int": "2"  }
-                         ]
-                      },
                       {  "prim": "DIP",
                          "args": [
                            {  "int": "1"  },
@@ -14893,6 +14883,39 @@ export const exchange_code : any =
                                          {  "int": "23"  }
                                        ]
                                     },
+                                    {  "prim": "PUSH",
+                                       "args": [
+                                         {  "prim": "nat"  },
+                                         {  "int": "0"  }
+                                       ]
+                                    },
+                                    {  "prim": "DIG",
+                                       "args": [
+                                         {  "int": "24"  }
+                                       ]
+                                    },
+                                    {  "prim": "DUP"  },
+                                    {  "prim": "DUG",
+                                       "args": [
+                                         {  "int": "25"  }
+                                       ]
+                                    },
+                                    {  "prim": "SIZE"  },
+                                    {  "prim": "COMPARE"  },
+                                    {  "prim": "GT"  },
+                                    {  "prim": "NOT"  },
+                                    {  "prim": "IF",
+                                       "args": [
+                                         [  {  "prim": "PUSH",
+                                               "args": [
+                                                 {  "prim": "string"  },
+                                                 {  "string": "no operation to send"  }
+                                               ]
+                                         },
+                                         {  "prim": "FAILWITH"  }  ],
+                                         [    ]
+                                       ]
+                                    },
                                     {  "prim": "DROP",
                                        "args": [
                                          {  "int": "16"  }
@@ -15423,7 +15446,7 @@ export const exchange_code : any =
      ]
   }  ]
 
-export function exchange_storage(owner : string, defaultFeeReceiver: string, protocolFee: bigint) : any {
+export function exchange_storage(owner: string, defaultFeeReceiver: string, protocolFee: bigint) : any {
   return {  "prim": "Pair",
             "args": [
               {  "string": owner  },
