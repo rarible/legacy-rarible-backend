@@ -1136,6 +1136,26 @@ let match_orders ?amount ~source ~contract order_left order_right =
         ~sign:(Tzfunc.Node.sign ~edsk:(snd source))
         mich
 
+let cancel_order ~source ~contract order =
+  let open Tzfunc.Crypto in
+  let pk =
+    Pk.b58enc @@
+    Sk.to_public_key @@
+    (Sk.b58dec @@ snd source) in
+  (* TODO : remove this, it should be on chain ? *)
+  let order = payouts order in
+  match flat_order order with
+  | Error err -> Lwt.fail_with @@ Printf.sprintf "mich order %s" @@ string_of_error err
+  | Ok m ->
+    call
+      ~entrypoint:"cancelOrder"
+      ~base:(EzAPI.BASE !endpoint)
+      ~get_pk:(fun () -> Lwt.return_ok pk)
+      ~source:(fst source)
+      ~contract
+      ~sign:(Tzfunc.Node.sign ~edsk:(snd source))
+      m
+
 let random_mint collections =
   let _alias_collection, kt1, admin, _owner =
     List.nth collections (Random.int @@ List.length collections) in
@@ -1863,7 +1883,12 @@ let reset_db () =
 
 let start_api kafka_config =
   let prog = "./_bin/api" in
-  let args = [| prog ; "--kafka-config" ; kafka_config |] in
+  let args =
+    [ prog ] @
+    match kafka_config with
+    | None -> []
+    | Some f ->  [ "--kafka-config" ; f ] in
+  let args = Array.of_list args in
   let stdout, fn_out, stderr, fn_err = create_descr2 "api" in
   let pid = create_process ~stdout ~stderr prog args in
   Printf.eprintf "API STARTED (out %s, err %s)\n%!" fn_out fn_err ;
@@ -1902,14 +1927,18 @@ let make_config admin_wallet validator exchange_v2 royalties ft_fa1 ft_fa2
     let c = open_out temp_fn in
     output_string c json ;
     close_out c ;
-    let kafka_config = { kafka_broker; kafka_username; kafka_password; } in
-    let kafka_temp_fn = Filename.temp_file "kafka_config" "" in
-    let kafka_json = EzEncoding.construct Rtypes.kafka_config_enc kafka_config in
-    Printf.eprintf "Crawler kafka config:\n%s\n\n%!" kafka_json ;
-    let c = open_out kafka_temp_fn in
-    output_string c kafka_json ;
-    close_out c ;
-    Lwt.return (temp_fn, kafka_temp_fn)
+    if kafka_broker = "" || kafka_username = "" then
+      Lwt.return (temp_fn, None)
+    else
+      let kafka_config = { kafka_broker; kafka_username; kafka_password; } in
+      let kafka_temp_fn = Filename.temp_file "kafka_config" "" in
+      let kafka_json = EzEncoding.construct Rtypes.kafka_config_enc kafka_config in
+      Printf.eprintf "Crawler kafka config:\n%s\n\n%!" kafka_json ;
+      let c = open_out kafka_temp_fn in
+      output_string c kafka_json ;
+      close_out c ;
+      Lwt.return (temp_fn, Some kafka_temp_fn)
+
 
 let start_crawler admin_wallet validator exchange_v2 royalties ft_fa1 ft_fa2
     kafka_broker kafka_username kafka_password =
@@ -1917,7 +1946,12 @@ let start_crawler admin_wallet validator exchange_v2 royalties ft_fa1 ft_fa2
     admin_wallet validator exchange_v2 royalties ft_fa1 ft_fa2
     kafka_broker kafka_username kafka_password  >>= fun (config, kafka_config) ->
   let prog = "./_bin/crawler" in
-  let args = [| prog ; config ; "--kafka-config" ; kafka_config |] in
+  let args =
+    [ prog ; config ] @
+    match kafka_config with
+    | None -> []
+    | Some f ->  [ "--kafka-config" ; f ] in
+  let args = Array.of_list args in
   let stdout, fn_out, stderr, fn_err = create_descr2 "crawler" in
   let pid = create_process ~stdout ~stderr prog args in
   Printf.eprintf "CRAWLER STARTED (out %S err %S)\n%!" fn_out fn_err ;
@@ -2009,7 +2043,7 @@ let wait_next_block () =
   | Ok level ->
     aux level
 
-let test_1 () =
+let match_orders_nft () =
   reset_db () ;
   let r_alias, _r_source = create_royalties () in
   let r_kt1 = find_kt1 r_alias in
@@ -2070,7 +2104,7 @@ let test_1 () =
   begin match !crawler_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
   Lwt.return_ok ()
 
-let test_2 () =
+let match_orders_tezos () =
   reset_db () ;
   let r_alias, _r_source = create_royalties () in
   let r_kt1 = find_kt1 r_alias in
@@ -2202,6 +2236,53 @@ let fill_orders () =
   begin match !crawler_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
   Lwt.return_ok ()
 
+let cancel_order () =
+  reset_db () ;
+  let r_alias, _r_source = create_royalties () in
+  let r_kt1 = find_kt1 r_alias in
+  Printf.eprintf "New royalties %s\n%!" r_kt1 ;
+  let ex_alias, ex_admin, _ex_receiver = create_exchange () in
+  let ex_kt1 = find_kt1 ex_alias in
+  Printf.eprintf "New exchange %s\n%!" ex_kt1 ;
+  let v_alias, _v_source = create_validator ~exchange:ex_kt1 ~royalties:r_kt1 in
+  let v_kt1 = find_kt1 v_alias in
+  Printf.eprintf "New validator %s\n%!" v_kt1 ;
+  start_crawler "" v_kt1 ex_kt1 r_kt1 [] [] "" "" "" >>= fun (cpid, kafka_config) ->
+  api_pid := Some (start_api kafka_config) ;
+  crawler_pid := Some cpid ;
+  set_validator v_kt1 ex_admin ex_kt1 >>= fun () ->
+  Printf.eprintf "Waiting 6sec to let crawler catch up...\n%!" ;
+  Lwt_unix.sleep 6. >>= fun () ->
+  let (admin, source, contract, royalties, uri) = create_collection ~royalties:r_kt1 () in
+  let> (admin, contract, source, _royalties) =
+    deploy_collection admin source contract royalties uri in
+  let>? () = check_collection admin contract source in
+  Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
+  Lwt_unix.sleep 6. >>= fun () ->
+  let>? item1 = mint_one_with_token_id_from_api ~source ~contract () in
+  Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
+  Lwt_unix.sleep 6. >>= fun () ->
+  let (source1, amount1, token_id1, royalties1, metadata1) = item1 in
+  check_item (contract, (source1, string_of_int amount1, token_id1, royalties1, metadata1))
+  >>= fun () ->
+  let>? order = sell_nft_for_tezos contract item1 1 in
+  (* TODO : check order *)
+  begin cancel_order ~source:source1 ~contract:ex_kt1 order >>= function
+    | Error err ->
+      Printf.eprintf "cancel_order error %s" @@ Tzfunc.Rp.string_of_error err ;
+      Lwt.return_unit
+  | Ok op_hash ->
+      Printf.eprintf "HASH = %s\n%!" op_hash ;
+      Printf.eprintf "Waiting next block...\n%!" ;
+      wait_next_block () >>= fun () ->
+      Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
+      Lwt_unix.sleep 6.
+      (* check_orders *)
+  end >>= fun () ->
+  begin match !api_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
+  begin match !crawler_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
+  Lwt.return_ok ()
+
 (** main *)
 
 let actions = [
@@ -2216,8 +2297,10 @@ let actions = [
   ["transfer_nft <contract_alias> <token_id> <dest>"], "transfer a nft" ;
   ["transfer_multi <contract_alias> <token_id> <dest> <amount>"], "transfer amount nft" ;
   ["run_test"], "will run some test (orig, mint, burn and trasnfer (will erase rarible db)";
-  ["test_1"], "create sell orders then exchange the nfts (will erase rarible db)" ;
-  ["test_2"], "create sell orders then buy the nft (will erase rarible db)" ;
+  ["match_order_nft_bid"], "create sell orders then exchange the nfts (will erase rarible db)" ;
+  ["match_order_tezos_bid"], "create sell orders then buy the nft for one tezos (will erase rarible db)" ;
+  ["cancel_order"], "create sell orders then cancel it (will erase rarible db)" ;
+  ["fill_orders"], "make random sell/bid orders (will erase rarible db)";
 ]
 
 let usage =
@@ -2258,10 +2341,10 @@ let main () =
             begin match !api_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
             begin match !crawler_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
             Lwt.return_unit))
-    | [ "test_1" ] ->
+    | [ "match_order_nft_bid" ] ->
       Lwt_main.run (
         Lwt.catch (fun () ->
-            test_1 () >>= function
+            match_orders_nft () >>= function
             | Ok _ -> Lwt.return_unit
             | Error err ->
               Lwt.fail_with @@
@@ -2272,10 +2355,10 @@ let main () =
              begin match !api_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
              begin match !crawler_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
              Lwt.return_unit))
-    | [ "test_2" ] ->
+    | [ "match_order_tezos_bid" ] ->
       Lwt_main.run (
         Lwt.catch (fun () ->
-            test_2 () >>= function
+            match_orders_tezos () >>= function
             | Ok _ -> Lwt.return_unit
             | Error err ->
               Lwt.fail_with @@
@@ -2286,10 +2369,24 @@ let main () =
              begin match !api_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
              begin match !crawler_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
              Lwt.return_unit))
-    | [ "fill_orders_db" ] ->
+    | [ "fill_orders" ] ->
       Lwt_main.run (
         Lwt.catch (fun () ->
             fill_orders () >>= function
+            | Ok _ -> Lwt.return_unit
+            | Error err ->
+              Lwt.fail_with @@
+              EzReq_lwt.string_of_error
+                (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err)
+          (fun exn ->
+             Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
+             begin match !api_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
+             begin match !crawler_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
+             Lwt.return_unit))
+    | [ "cancel_order" ] ->
+      Lwt_main.run (
+        Lwt.catch (fun () ->
+            cancel_order () >>= function
             | Ok _ -> Lwt.return_unit
             | Error err ->
               Lwt.fail_with @@

@@ -303,6 +303,53 @@ let order_type =
     ]
   ]
 
+let flat_order_type
+    ~maker ~make ~taker ~take ~salt
+    ~start_date ~end_date ~data_type ~payouts ~origin_fees =
+  let open Tzfunc.Forge in
+  let maker = option_mich (fun s -> Mstring s) (Some maker) in
+  let$ make = asset_mich make in
+  let taker = option_mich (fun s -> Mstring s) taker in
+  let$ take = asset_mich take in
+  let sdate = option_mich (fun c -> Mstring (Proto.A.cal_to_str c)) start_date in
+  let edate = option_mich (fun c -> Mstring (Proto.A.cal_to_str c)) end_date in
+  let$ data_type = pack (prim `string) (Mstring data_type) in
+  let$ data = pack order_data_type
+      (prim `Pair ~args:[
+          Mseq (List.map (fun p -> prim `Pair ~args:[
+              Mstring p.part_account;
+              Mint (Z.of_string p.part_value) ]) payouts);
+          Mseq (List.map (fun p -> prim `Pair ~args:[
+              Mstring p.part_account;
+              Mint (Z.of_string p.part_value) ]) origin_fees);
+        ]) in
+  Ok
+    (prim `Pair ~args:[
+        maker;
+        make;
+        taker;
+        take;
+        Mint (Z.of_string salt);
+        sdate;
+        edate;
+        Mbytes (Tzfunc.Crypto.hex_of_raw @@ keccak data_type);
+        Mbytes (Tzfunc.Crypto.hex_of_raw data);
+      ])
+
+let flat_order order =
+  let maker = order.order_elt.order_elt_maker in
+  let make = order.order_elt.order_elt_make in
+  let taker = order.order_elt.order_elt_taker in
+  let take = order.order_elt.order_elt_take in
+  let salt = order.order_elt.order_elt_salt in
+  let start_date = order.order_elt.order_elt_start in
+  let end_date = order.order_elt.order_elt_end in
+  flat_order_type
+    ~maker ~make ~taker ~take ~salt ~start_date ~end_date
+    ~data_type:"V1"
+    ~payouts:order.order_data.order_rarible_v2_data_v1_payouts
+    ~origin_fees:order.order_data.order_rarible_v2_data_v1_origin_fees
+
 let mich_order_form
     ~maker ~make ~taker ~take ~salt ~start_date ~end_date ~data_type ~payouts ~origin_fees =
   let open Tzfunc.Forge in
