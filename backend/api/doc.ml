@@ -44,4 +44,9 @@ let docs = List.map (fun (n, t, d) -> (n, (t, d, None, None))) @@ [
 
     (* Order Bid controller *)
     "get_bids_by_item", "getBidsByItem", "get Bid by item" ;
+
+    (* Order Signature controller *)
+    "validate", "validate", "Validate a message" ;
+
+
   ]
