@@ -1627,6 +1627,69 @@ components:
       required:
       - items
       additionalProperties: false
+    OrderActivityBid:
+      type: object
+      properties:
+        '@type':
+          type: string
+          enum:
+          - bid
+        hash:
+          $ref: '#/components/schemas/Word'
+        maker:
+          $ref: '#/components/schemas/edpk'
+        make:
+          $ref: '#/components/schemas/Asset'
+        take:
+          $ref: '#/components/schemas/Asset'
+        price:
+          $ref: '#/components/schemas/BigDecimal'
+        priceUsd:
+          $ref: '#/components/schemas/BigDecimal'
+      required:
+      - price
+      - take
+      - make
+      - maker
+      - hash
+      - '@type'
+      additionalProperties: false
+    OrderActivityCancelBid:
+      type: object
+      properties:
+        '@type':
+          type: string
+          enum:
+          - cancel_bid
+        hash:
+          $ref: '#/components/schemas/Word'
+        maker:
+          $ref: '#/components/schemas/edpk'
+        make:
+          $ref: '#/components/schemas/AssetType'
+        take:
+          $ref: '#/components/schemas/AssetType'
+        transactionHash:
+          $ref: '#/components/schemas/Word'
+        blockHash:
+          $ref: '#/components/schemas/Word'
+        blockNumber:
+          $ref: '#/components/schemas/BlockNumber'
+        logIndex:
+          type: integer
+          minimum: -1073741824
+          maximum: 1073741823
+      required:
+      - logIndex
+      - blockNumber
+      - blockHash
+      - transactionHash
+      - take
+      - make
+      - maker
+      - hash
+      - '@type'
+      additionalProperties: false
     OrderActivityCancelList:
       type: object
       properties:
@@ -1784,6 +1847,41 @@ components:
       - hash
       - '@type'
       additionalProperties: false
+    OrderActivityMatch:
+      type: object
+      properties:
+        '@type':
+          type: string
+          enum:
+          - match
+        left:
+          $ref: '#/components/schemas/OrderActivitySideMatch'
+        right:
+          $ref: '#/components/schemas/OrderActivitySideMatch'
+        price:
+          $ref: '#/components/schemas/BigDecimal'
+        priceUsd:
+          $ref: '#/components/schemas/BigDecimal'
+        transactionHash:
+          $ref: '#/components/schemas/Word'
+        blockHash:
+          $ref: '#/components/schemas/Word'
+        blockNumber:
+          $ref: '#/components/schemas/BlockNumber'
+        logIndex:
+          type: integer
+          minimum: -1073741824
+          maximum: 1073741823
+      required:
+      - logIndex
+      - blockNumber
+      - blockHash
+      - transactionHash
+      - price
+      - right
+      - left
+      - '@type'
+      additionalProperties: false
     OrderActivitySideMatch:
       type: object
       properties:
@@ -1808,102 +1906,10 @@ components:
       - BID
     OrderActivityType:
       oneOf:
-      - type: object
-        properties:
-          '@type':
-            type: string
-            enum:
-            - match
-          left:
-            $ref: '#/components/schemas/OrderActivitySideMatch'
-          right:
-            $ref: '#/components/schemas/OrderActivitySideMatch'
-          price:
-            $ref: '#/components/schemas/BigDecimal'
-          priceUsd:
-            $ref: '#/components/schemas/BigDecimal'
-          transactionHash:
-            $ref: '#/components/schemas/Word'
-          blockHash:
-            $ref: '#/components/schemas/Word'
-          blockNumber:
-            $ref: '#/components/schemas/BlockNumber'
-          logIndex:
-            type: integer
-            minimum: -1073741824
-            maximum: 1073741823
-        required:
-        - logIndex
-        - blockNumber
-        - blockHash
-        - transactionHash
-        - price
-        - right
-        - left
-        - '@type'
-        additionalProperties: false
+      - $ref: '#/components/schemas/OrderActivityMatch'
       - $ref: '#/components/schemas/OrderActivityList'
-      - type: object
-        properties:
-          '@type':
-            type: string
-            enum:
-            - bid
-          hash:
-            $ref: '#/components/schemas/Word'
-          maker:
-            $ref: '#/components/schemas/edpk'
-          make:
-            $ref: '#/components/schemas/Asset'
-          take:
-            $ref: '#/components/schemas/Asset'
-          price:
-            $ref: '#/components/schemas/BigDecimal'
-          priceUsd:
-            $ref: '#/components/schemas/BigDecimal'
-        required:
-        - price
-        - take
-        - make
-        - maker
-        - hash
-        - '@type'
-        additionalProperties: false
-      - type: object
-        properties:
-          '@type':
-            type: string
-            enum:
-            - cancel_bid
-          hash:
-            $ref: '#/components/schemas/Word'
-          maker:
-            $ref: '#/components/schemas/edpk'
-          make:
-            $ref: '#/components/schemas/AssetType'
-          take:
-            $ref: '#/components/schemas/AssetType'
-          transactionHash:
-            $ref: '#/components/schemas/Word'
-          blockHash:
-            $ref: '#/components/schemas/Word'
-          blockNumber:
-            $ref: '#/components/schemas/BlockNumber'
-          logIndex:
-            type: integer
-            minimum: -1073741824
-            maximum: 1073741823
-        required:
-        - logIndex
-        - blockNumber
-        - blockHash
-        - transactionHash
-        - take
-        - make
-        - maker
-        - hash
-        - '@type'
-        additionalProperties: false
+      - $ref: '#/components/schemas/OrderActivityBid'
+      - $ref: '#/components/schemas/OrderActivityCancelBid'
       - $ref: '#/components/schemas/OrderActivityCancelList'
     OrderCancel:
       type: object
@@ -1931,45 +1937,7 @@ components:
     OrderExchangeHistory:
       oneOf:
       - $ref: '#/components/schemas/OrderCancel'
-      - type: object
-        properties:
-          type:
-            type: string
-            enum:
-            - ORDER_SIDE_MATCH
-          hash:
-            $ref: '#/components/schemas/Word'
-          make:
-            $ref: '#/components/schemas/Asset'
-          take:
-            $ref: '#/components/schemas/Asset'
-          date:
-            type: string
-            format: date-time
-          maker:
-            $ref: '#/components/schemas/edpk'
-          side:
-            $ref: '#/components/schemas/OrderSide'
-          fill:
-            $ref: '#/components/schemas/BigInteger'
-          taker:
-            $ref: '#/components/schemas/Address'
-          counterHash:
-            $ref: '#/components/schemas/Word'
-          makeUsd:
-            $ref: '#/components/schemas/BigDecimal'
-          takeUsd:
-            $ref: '#/components/schemas/BigDecimal'
-          makePriceUsd:
-            $ref: '#/components/schemas/BigDecimal'
-          takePriceUsd:
-            $ref: '#/components/schemas/BigDecimal'
-        required:
-        - fill
-        - date
-        - hash
-        - type
-        additionalProperties: false
+      - $ref: '#/components/schemas/OrderSideMatch'
     OrderForm:
       type: object
       properties:
@@ -2058,6 +2026,46 @@ components:
       enum:
       - LEFT
       - RIGHT
+    OrderSideMatch:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+          - ORDER_SIDE_MATCH
+        hash:
+          $ref: '#/components/schemas/Word'
+        make:
+          $ref: '#/components/schemas/Asset'
+        take:
+          $ref: '#/components/schemas/Asset'
+        date:
+          type: string
+          format: date-time
+        maker:
+          $ref: '#/components/schemas/edpk'
+        side:
+          $ref: '#/components/schemas/OrderSide'
+        fill:
+          $ref: '#/components/schemas/BigInteger'
+        taker:
+          $ref: '#/components/schemas/Address'
+        counterHash:
+          $ref: '#/components/schemas/Word'
+        makeUsd:
+          $ref: '#/components/schemas/BigDecimal'
+        takeUsd:
+          $ref: '#/components/schemas/BigDecimal'
+        makePriceUsd:
+          $ref: '#/components/schemas/BigDecimal'
+        takePriceUsd:
+          $ref: '#/components/schemas/BigDecimal'
+      required:
+      - fill
+      - date
+      - hash
+      - type
+      additionalProperties: false
     OrderStatus:
       type: string
       enum:
