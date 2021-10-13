@@ -66,10 +66,10 @@ arl:
 	@dune build contracts/arl
 
 openapi:
-	@cp -f _build/default/backend/api/openapi.json public/api
+	@cp -f _build/default/backend/api/openapi.yaml public/api
 
 kafka_openapi:
-	@cp -f _build/default/backend/api/kafka_openapi.json public/api
+	@cp -f _build/default/backend/api/kafka_openapi.yaml public/kafka
 
 typedoc:
 	@npx typedoc --tsconfig sdk/tsconfig.json --options sdk/typedoc.json
