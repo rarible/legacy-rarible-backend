@@ -22,12 +22,12 @@
 
 (rule
  (deps openapi.exe)
- (targets openapi.json)
+ (targets openapi.yaml)
  (action (with-stdout-to %{targets}
-          (run %{project_root}/backend/api/openapi.exe --title "Tezos Rarible API" --version "0.1"))))
+          (run %{project_root}/backend/api/openapi.exe --title "Tezos Rarible API" --version "0.1" --yaml))))
 
 (rule
  (deps kafka_openapi.exe)
- (targets kafka_openapi.json)
+ (targets kafka_openapi.yaml)
  (action (with-stdout-to %{targets}
-          (run %{project_root}/backend/api/kafka_openapi.exe --title "Tezos Rarible Kafka Types" --version "0.1" -o "kafka_openapi.json"))))
+          (run %{project_root}/backend/api/kafka_openapi.exe --title "Tezos Rarible Kafka Types" --version "0.1" -o "kafka_openapi" --yaml))))
