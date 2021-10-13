@@ -171,7 +171,7 @@ function parse(iorder : order) : DataV1 {
        if (length(dataOrder.payouts) = 0) then (
          res := payoutSet(addr_maker, dataOrder);
        );
-    return dataOrder
+    return res
     end
     | none -> fail("unable to unpack DataV1")
     end
@@ -415,7 +415,8 @@ entry doTransfers(
           ops3 := [mkoperation(a, e, Unit)]
         )
       );
-      operations := ops1.concat(concat(ops2, ops3))
+      operations := ops1.concat(concat(ops2, ops3));
+      dorequire(operations.length() > 0, "no operation to send")
     }
 }
 
