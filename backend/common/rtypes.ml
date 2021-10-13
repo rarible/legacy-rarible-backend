@@ -507,7 +507,7 @@ type order_side_match = {
 
 type order_exchange_history =
   | OrderCancel of order_exchange_history_elt [@kind_label "type"] [@kind "CANCEL"] [@title "OrderCancel"] [@def_title]
-  | OrderSideMatch of order_side_match [@kind_label "type"] [@kind "ORDER_SIDE_MATCH"]
+  | OrderSideMatch of order_side_match [@kind_label "type"] [@kind "ORDER_SIDE_MATCH"] [@title "OrderSideMatch"] [@def_title]
 [@@deriving encoding {title="OrderExchangeHistory"; def_title}]
 
 type order_price_history_record = {
@@ -688,10 +688,10 @@ type order_activity_cancel_bid = {
 } [@@deriving encoding {camel; title="OrderActivityCancelBid"; def_title}]
 
 type order_activity_type =
-  | OrderActivityMatch of order_activity_match [@kind "match"] [@kind_label "@type"]
+  | OrderActivityMatch of order_activity_match [@kind "match"] [@kind_label "@type"] [@title "OrderActivityMatch"] [@def_title]
   | OrderActivityList of order_activity_bid [@kind "list"] [@kind_label "@type"] [@title "OrderActivityList"] [@def_title]
-  | OrderActivityBid of order_activity_bid [@kind "bid"] [@kind_label "@type"]
-  | OrderActivityCancelBid of order_activity_cancel_bid [@kind "cancel_bid"] [@kind_label "@type"]
+  | OrderActivityBid of order_activity_bid [@kind "bid"] [@kind_label "@type"] [@title "OrderActivityBid"] [@def_title]
+  | OrderActivityCancelBid of order_activity_cancel_bid [@kind "cancel_bid"] [@kind_label "@type"] [@title "OrderActivityCancelBid"] [@def_title]
   | OrderActivityCancelList of order_activity_cancel_bid [@kind "cancel_list"] [@kind_label "@type"] [@title "OrderActivityCancelList"] [@def_title]
 [@@deriving encoding {title="OrderActivityType"; def_title}]
 
