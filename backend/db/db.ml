@@ -568,8 +568,8 @@ let mk_nft_item_meta r =
   | None -> None
   | Some nft_item_meta_name ->
     let nft_item_meta_attributes = Option.bind r#attributes mk_nft_attributes in
-    let nft_item_meta_image = Option.bind r#image mk_nft_media in
-    let nft_item_meta_animation = Option.bind r#animation mk_nft_media in
+    let nft_item_meta_image = r#image in
+    let nft_item_meta_animation = r#animation in
     Some {
       nft_item_meta_name;
       nft_item_meta_description = r#description;
@@ -1385,8 +1385,8 @@ let token_metadata_enc =
     (dft "creators" (list any_ezjson_value) [])
     (opt "description" string)
     (opt "attributes" any_ezjson_value)
-    (opt "image" any_ezjson_value)
-    (opt "animation" any_ezjson_value)
+    (opt "image" string)
+    (opt "animation" string)
 
 let token_metadata_update dbh ~main ~contract ~block ~level ~tsp ~token_id meta =
   if main then
@@ -1394,8 +1394,6 @@ let token_metadata_update dbh ~main ~contract ~block ~level ~tsp ~token_id meta 
       try
         let n, c, d, at, i, an = EzEncoding.destruct token_metadata_enc meta in
         let at = Option.map (EzEncoding.construct Json_encoding.any_ezjson_value) at in
-        let i = Option.map (EzEncoding.construct Json_encoding.any_ezjson_value) i in
-        let an = Option.map (EzEncoding.construct Json_encoding.any_ezjson_value) an in
         let c = EzEncoding.construct Json_encoding.(list any_ezjson_value) c in
         Some n, Some c, d, at, i, an
       with _ -> None, None, None, None, None, None in

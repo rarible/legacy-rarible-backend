@@ -61,8 +61,8 @@ let upgrade_1_to_2 dbh version =
       creators jsonb not null default '{}',
       description varchar,
       attributes jsonb,
-      image jsonb,
-      animation jsonb,
+      image varchar,
+      animation varchar,
       primary key (contract, owner, token_id))|};
 
     {|create table accounts(

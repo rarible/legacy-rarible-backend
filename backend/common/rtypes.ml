@@ -227,8 +227,8 @@ type nft_item_meta = {
   nft_item_meta_name : string;
   nft_item_meta_description : string option; [@opt]
   nft_item_meta_attributes : nft_item_attribute list option; [@opt]
-  nft_item_meta_image : nft_media option; [@opt]
-  nft_item_meta_animation : nft_media option; [@opt]
+  nft_item_meta_image : string option; [@opt]
+  nft_item_meta_animation : string option; [@opt]
 } [@@deriving encoding {title="NftItemMeta"}]
 
 type nft_item = {
