@@ -3,23 +3,97 @@ open Rtypes
 
 let (let$) = Result.bind
 
+let prim ?(args=[]) ?(annots=[]) prim = Mprim {prim; args; annots}
+let pair ?annots args = prim ?annots ~args `pair
+let list ?annots arg = prim ?annots ~args:[arg] `list
+
 let rec flatten = function
   | Mprim { prim = `Pair; args; annots } ->
     let args = List.fold_left (fun acc x -> match flatten x with
         | Mprim { prim = `Pair; args; _ } -> acc @ args
         | _ -> acc @ [ x ]) [] args in
     let args = List.map flatten args in
-    Mprim { prim = `Pair; args; annots }
+    prim `Pair ~args ~annots
   | Mprim { prim = `pair; args; annots } ->
     let args = List.fold_left (fun acc x -> match flatten x with
         | Mprim { prim = `pair; args; _ } -> acc @ args
         | _ -> acc @ [ x ]) [] args in
     let args = List.map flatten args in
-    Mprim { prim = `pair; args; annots }
-  | Mprim {prim; args; annots} ->
-    Mprim {prim; args = List.map flatten args; annots}
+    prim `pair ~args ~annots
+  | Mprim {prim=p; args; annots} ->
+    prim p ~args:(List.map flatten args) ~annots
   | Mseq l -> Mseq (List.map flatten l)
   | m -> m
+
+let res_map f l =
+  let rec aux acc = function
+    | [] -> Ok (List.rev acc)
+    | t :: q -> match f t with
+      | Ok x -> aux (x :: acc) q
+      | Error e -> Error e in
+  aux [] l
+
+let parse_typed t m : (typed_micheline list, [> `unexpected_michelson_type of micheline * micheline]) result =
+  let rec aux acc t m = match t, m with
+    | Mprim { prim=`list; args=[t]; _ }, Mseq l
+    | Mprim { prim=`set; args=[t]; _ }, Mseq l ->
+      Result.map (fun l -> acc @ [ `seq l ]) @@
+      res_map (fun x -> aux [] t x) l
+    | Mprim { prim=`map; args=[k; v]; _ }, Mseq l
+    | Mprim { prim=`big_map; args=[k; v]; _ }, Mseq l ->
+      Result.map (fun l -> acc @ [ `assoc l ]) @@
+      res_map (function
+          | Mprim { prim = `Elt; args= [m1; m2]; _ } ->
+            begin match aux [] k m1, aux [] v m2 with
+              | Ok x1, Ok x2 -> Ok (x1, x2)
+              | Error e, _ | _, Error e -> Error e
+            end
+          | m -> Error (`unexpected_michelson_type (k, m))) l
+    | Mprim { prim = `string; _ }, Mstring s -> Ok (acc @ [ `string s ])
+    | Mprim { prim = `key; _ }, Mstring s -> Ok (acc @ [ `key s ])
+    | Mprim { prim = `key_hash; _ }, Mstring s -> Ok (acc @ [ `key_hash s ])
+    | Mprim { prim = `address; _ }, Mstring s -> Ok (acc @ [ `address s ])
+    | Mprim { prim = `signature; _ }, Mstring s -> Ok (acc @ [ `signature s ])
+    | Mprim { prim = `timestamp; _}, Mstring s -> Ok (acc @ [ `timestamp (Proto.A.cal_of_str s) ])
+    | Mprim { prim = `nat; _ }, Mint i -> Ok (acc @ [ `nat i ])
+    | Mprim { prim = `int; _ }, Mint i -> Ok (acc @ [ `int i ])
+    | Mprim { prim = `mutez; _ }, Mint i -> Ok (acc @ [ `mutez i ])
+    | Mprim { prim = `timestamp; _ }, Mint i ->
+      Ok (acc @ [ `timestamp (CalendarLib.Calendar.from_unixfloat (Z.to_float i)) ])
+    | Mprim { prim = `bytes; _ }, Mbytes b -> Ok (acc @ [ `bytes b ])
+    | Mprim { prim = `key; _ }, Mbytes b ->
+      Ok (acc @ [ `key Tzfunc.Crypto.Pk.(b58enc @@ T.mk @@ Tzfunc.Crypto.hex_to_raw b) ])
+    | Mprim { prim = `key_hash; _ }, Mbytes b ->
+      Ok (acc @ [ `key_hash Tzfunc.Crypto.Pkh.(b58enc @@ T.mk @@ Tzfunc.Crypto.hex_to_raw b) ])
+    | Mprim { prim = `address; _ }, Mbytes b ->
+      Result.map (fun (s, _) -> acc @ [ `address s ]) @@
+      Tzfunc.Binary.Reader.(contract {s=Tzfunc.Crypto.hex_to_raw b; offset=0})
+    | Mprim { prim = `signature; _ }, Mbytes b ->
+      Result.map (fun (s, _) -> acc @ [ `signature s ]) @@
+      Tzfunc.Binary.Reader.(signature {s=Tzfunc.Crypto.hex_to_raw b; offset=0})
+    | Mprim { prim=`option; _ }, Mprim { prim=`None; args=[]; _} -> Ok ( acc @ [ `none ] )
+    | Mprim { prim=`unit; _ }, Mprim { prim=`Unit; args=[]; _} -> Ok ( acc @ [ `unit ] )
+    | Mprim { prim=`bool; _}, Mprim { prim=`True; args=[]; _} -> Ok ( acc @ [ `true_ ] )
+    | Mprim { prim=`bool; _}, Mprim { prim=`False; args=[]; _} -> Ok ( acc @ [ `false_ ] )
+    | Mprim { prim=`option; args=[t]; _ }, Mprim { prim = `Some; args=[m]; _} ->
+      Result.map (fun x -> acc @ [ `some x ]) @@ aux [] t m
+    | Mprim { prim=`or_; args=[l; _r]; _ }, Mprim { prim = `Left; args=[m]; _} ->
+      Result.map (fun x -> acc @ [ `left x ]) @@ aux [] l m
+    | Mprim { prim=`or_; args=[_l; r]; _ }, Mprim { prim = `Right; args=[m]; _} ->
+      Result.map (fun x -> acc @ [ `right x ]) @@ aux [] r m
+    | Mprim { prim = `pair; args=[]; _ }, Mseq [] -> Ok acc
+    | Mprim { prim = `pair; args=t1 :: t; _ }, Mprim { prim=`Pair; args=m1 :: m; _ }
+    | Mprim { prim = `pair; args=t1 :: t; _ }, Mseq (m1 :: m) ->
+      begin match aux acc t1 m1 with
+        | Error e -> Error e
+        | Ok acc -> aux acc (Mprim { prim = `pair; args=t; annots=[] }) (Mseq m)
+      end
+    | Mprim { prim = `operation; _ }, _ -> Ok (acc @ [ `operation ])
+    | Mprim { prim = `contract; _ }, _ -> Ok (acc @ [ `contract ])
+    | Mprim { prim = `lambda; _ }, _ -> Ok (acc @ [ `lambda ])
+    | t, m ->
+      Error (`unexpected_michelson_type (t, m)) in
+  aux [] t m
 
 let rec list_entrypoints acc = function
   | Mprim { prim = `or_; args = l ; _ } ->
@@ -66,10 +140,6 @@ let match_entrypoints l = function
           | None -> false
           | Some _ -> aux q in
       aux l
-
-let prim ?(args=[]) ?(annots=[]) prim = Mprim {prim; args; annots}
-let pair ?annots args = prim ?annots ~args `pair
-let list ?annots arg = prim ?annots ~args:[arg] `list
 
 let fa2_entrypoints = [
   pair ~annots:["%balance_of"] [
@@ -143,33 +213,11 @@ let string_of_asset_type = function
   | ATXTZ -> "XTZ"
   | ATFA_1_2 _ -> "FA_1_2"
   | ATFA_2 _ -> "FA_2"
-  (* | ATETH -> "ETH"
-   * | ATERC721 _ -> "ERC721" *)
-
-(* fun AssetType.hash(type: AssetType): Word = keccak256(Tuples.assetTypeHashType().encode(Tuple3.apply(
- *     TYPE_HASH.bytes(),
- *     type.type.bytes(),
- *     keccak256(type.data).bytes()
- * ))) *)
-
-(* fun hashKey(maker: Address, makeAssetType: AssetType, takeAssetType: AssetType, salt: BigInteger): Word =
- *     keccak256(
- *         Tuples.orderKeyHashType().encode(
- *             Tuple4(
- *                 maker,
- *                 AssetType.hash(makeAssetType).bytes(),
- *                 AssetType.hash(takeAssetType).bytes(),
- *                 salt
- *             )
- *         )
- *     ) *)
 
 let asset_class_mich = function
   | ATXTZ -> prim `Left ~args:[prim `Unit]
   | ATFA_1_2 _ -> prim `Right ~args:[prim `Left ~args:[ prim `Unit ]]
   | ATFA_2 _ -> prim `Right ~args:[prim `Right ~args:[ prim `Left ~args:[ prim `Unit ] ]]
-  (* | ATETH -> assert false
-   * | ATERC721 _ -> assert false *)
 
 let asset_class_type =
   (prim `or_ ~args:[prim `unit; prim `or_ ~args:[prim `unit; prim `or_ ~args:[
@@ -181,9 +229,6 @@ let asset_data = function
   | ATFA_2 { asset_fa2_contract; asset_fa2_token_id } ->
     Tzfunc.Forge.pack (prim `pair ~args:[ prim `address; prim `nat ])
       (prim `Pair ~args:[ Mstring asset_fa2_contract; Mint (Z.of_string asset_fa2_token_id) ])
-  (* | ATETH -> assert false
-   * | ATERC721 _ -> assert false *)
-
 
 let asset_type_mich a =
   let$ data = asset_data a in
@@ -485,13 +530,9 @@ let order_bid_status_to_string l =
   List.map (fun t ->
       EzEncoding.construct order_bid_status_enc t) l
 
-let sign ~edsk ~bytes =
-  let open Tzfunc.Crypto in
-  let sk = Hacl.Sign.unsafe_sk_of_bytes (Bigstring.of_string @@ (Sk.b58dec edsk :> string)) in
-  let msg = Bigstring.of_string @@ (Crypto.Blake2b_32.hash [bytes] :> string) in
-  let signature = Bigstring.create 64 in
-  Hacl.Sign.sign ~sk ~msg ~signature;
-  Base58.encode ~prefix:Prefix.ed25519_signature @@ Tzfunc.Raw.mk (Bigstring.to_string signature)
+let sign ?(watermark=Tzfunc.Raw.mk "") ~edsk bytes =
+  let b = Forge.sign_exn ~watermark ~sk:(Crypto.Sk.b58dec edsk) bytes in
+  Tzfunc.Crypto.(Base58.encode ~prefix:Prefix.ed25519_signature b)
 
 let check ~edpk ~signature ~bytes =
   let open Tzfunc.Crypto in
@@ -527,3 +568,27 @@ let mk_ownership_event token token_id owner event = {
   nft_ownership_event_ownership_id = Printf.sprintf "%s:%Ld:%s" token token_id owner ;
   nft_ownership_event_ownership = event ;
 }
+
+let flat_order_type =
+  pair [
+    prim `option ~args:[prim `key];
+    asset_type;
+    prim `option ~args:[prim `key];
+    asset_type;
+    prim `nat;
+    prim `option ~args:[ prim `timestamp ];
+    prim `option ~args:[ prim `timestamp ];
+    prim `bytes;
+    prim `bytes;
+  ]
+
+let do_transfers_type =
+  pair [
+    asset_type_type;
+    asset_type_type;
+    pair [ prim `nat; prim `nat ];
+    flat_order_type;
+    flat_order_type;
+    prim `nat;
+    prim `list ~args:[ pair [prim `address; prim `nat] ]
+  ]

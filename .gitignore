@@ -10,3 +10,4 @@
 /sdk/www/*.js
 /sdk/www/*.js.*
 /deployment/crawler_config.json
+/test

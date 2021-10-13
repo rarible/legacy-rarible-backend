@@ -257,7 +257,7 @@ let generate_order () =
   let$ to_sign =
     hash_order_form
       maker_pk make taker take salt start_date end_date data_type payouts origin_fees in
-  let signature = sign ~edsk:maker_sk ~bytes:to_sign in
+  let signature = sign ~edsk:maker_sk to_sign in
   let order_form =
     mk_order_form
       maker_pk taker make take salt start_date end_date signature data_type payouts origin_fees in
@@ -284,7 +284,7 @@ let order_form_from_items ?(salt=0) collection item1 item2 =
   let$ to_sign =
     hash_order_form
       maker_pk make taker take salt start_date end_date data_type payouts origin_fees in
-  let signature = sign ~edsk:maker_sk ~bytes:to_sign in
+  let signature = sign ~edsk:maker_sk to_sign in
   let order_form =
     mk_order_form
       maker_pk taker make take salt start_date end_date signature data_type payouts origin_fees in
@@ -303,7 +303,7 @@ let sell_order_form_from_item ?(salt=0) collection item1 take =
   let$ to_sign =
     hash_order_form
       maker_pk make taker take salt start_date end_date data_type payouts origin_fees in
-  let signature = sign ~edsk:maker_sk ~bytes:to_sign in
+  let signature = sign ~edsk:maker_sk to_sign in
   let order_form =
     mk_order_form
       maker_pk taker make take salt start_date end_date signature data_type payouts origin_fees in
@@ -321,7 +321,7 @@ let buy_order_form_from_item ?(salt=0) collection item1 (maker_pk, maker_sk) mak
   let$ to_sign =
     hash_order_form
       maker_pk make taker take salt start_date end_date data_type payouts origin_fees in
-  let signature = sign ~edsk:maker_sk ~bytes:to_sign in
+  let signature = sign ~edsk:maker_sk to_sign in
   let order_form =
     mk_order_form
       maker_pk taker make take salt start_date end_date signature data_type payouts origin_fees in

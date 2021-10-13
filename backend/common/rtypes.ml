@@ -883,3 +883,28 @@ type exchange_param =
       {left: Tzfunc.H.t; left_maker : string option; left_asset: asset ;
        right: Tzfunc.H.t ; right_maker: string option; right_asset: asset ;
        fill_make_value: int64; fill_take_value: int64}
+
+type typed_micheline = [
+  | `address of string
+  | `assoc of (typed_micheline list * typed_micheline list) list
+  | `bytes of (Proto.hex [@encoding Proto.hex_enc.Proto.Encoding.json])
+  | `contract
+  | `false_
+  | `int of z
+  | `key of string
+  | `key_hash of string
+  | `lambda
+  | `left of typed_micheline list
+  | `mutez of z
+  | `nat of z
+  | `none
+  | `operation
+  | `right of typed_micheline list
+  | `seq of typed_micheline list list
+  | `signature of string
+  | `some of typed_micheline list
+  | `string of string
+  | `timestamp of (Proto.A.timestamp [@encoding Proto.A.timestamp_enc.Proto.Encoding.json])
+  | `true_
+  | `unit
+] [@@deriving encoding {recursive}]
