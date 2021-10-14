@@ -332,57 +332,51 @@ let buy_order_form_from_item ?(salt=0) collection item1 (maker_pk, maker_sk) mak
       maker_pk taker make take salt start_date end_date signature data_type payouts origin_fees in
   Ok order_form
 
+let handle_ezreq_result = function
+  | Ok x -> Ok x
+  | Error (EzReq_lwt_S.UnknownError {msg; _}) ->
+    Error (`UNKNOWN (match msg with None -> "" | Some s -> s))
+  | Error (EzReq_lwt_S.KnownError {error; _}) -> Error error
+
 let call_upsert_order order_form =
   let url = EzAPI.BASE !api in
-  EzReq_lwt.post0
-    ~input:order_form
-    url
-    Api.upsert_order_s
+  let|> r = EzReq_lwt.post0 ~input:order_form url Api.upsert_order_s in
+  handle_ezreq_result r
 
 let call_generate_token_id collection =
   let url = EzAPI.BASE !api in
-  EzReq_lwt.get1
-    url
-    Api.generate_nft_token_id_s
-    collection
+  let|> r = EzReq_lwt.get1 url Api.generate_nft_token_id_s collection in
+  handle_ezreq_result r
 
 let call_get_nft_collection_by_id collection =
   let url = EzAPI.BASE !api in
-  EzReq_lwt.get1
-    url
-    Api.get_nft_collection_by_id_s
-    collection
+  let|> r = EzReq_lwt.get1 url Api.get_nft_collection_by_id_s collection in
+  handle_ezreq_result r
 
 let call_search_nft_collections_by_owner owner =
   let open EzAPI in
-  let url = EzAPI.BASE !api in
+  let url = BASE !api in
   let rec aux ?continuation acc =
     let params = match continuation with
       | None -> [ Api.owner_param , S owner ]
       | Some c -> [ Api.owner_param , S owner ; Api.continuation_param, S c ] in
-    EzReq_lwt.get0
-      url
-      ~params
-      Api.search_nft_collections_by_owner_s
-      >>=? fun collections ->
-      match collections.nft_collections_continuation with
-      | None -> Lwt.return_ok @@ collections.nft_collections_collections @ acc
-      | Some continuation ->
-        aux ~continuation (collections.nft_collections_collections @ acc) in
+    let> r = EzReq_lwt.get0 url ~params Api.search_nft_collections_by_owner_s in
+    let>? collections = Lwt.return @@ handle_ezreq_result r in
+    match collections.nft_collections_continuation with
+    | None -> Lwt.return_ok @@ collections.nft_collections_collections @ acc
+    | Some continuation ->
+      aux ~continuation (collections.nft_collections_collections @ acc) in
   aux []
 
 let call_search_nft_all_collections () =
   let open EzAPI in
-  let url = EzAPI.BASE !api in
+  let url = BASE !api in
   let rec aux ?continuation acc =
     let params = match continuation with
       | None -> []
       | Some c -> [ Api.continuation_param, S c ] in
-    EzReq_lwt.get0
-      url
-      ~params
-       Api.search_nft_all_collections_s
-    >>=? fun collections ->
+    let> r = EzReq_lwt.get0 url ~params Api.search_nft_all_collections_s in
+    let>? collections = Lwt.return @@ handle_ezreq_result r in
     match collections.nft_collections_continuation with
     | None -> Lwt.return_ok @@ collections.nft_collections_collections @ acc
     | Some continuation ->
@@ -391,10 +385,10 @@ let call_search_nft_all_collections () =
 
 let call_get_nft_item_by_id collection tid =
   let url = EzAPI.BASE !api in
-  EzReq_lwt.get1
-    url
-    Api.get_nft_item_by_id_s
-    (Printf.sprintf "%s:%s" collection tid)(*  >>= fun res ->
+  let|> r = EzReq_lwt.get1 url Api.get_nft_item_by_id_s
+      (Printf.sprintf "%s:%s" collection tid) in
+  handle_ezreq_result r
+  (*  >>= fun res ->
    * begin match res with
    *   | Ok item ->
    *     Printf.eprintf "%s\n%!" @@ EzEncoding.construct nft_item_enc item ;
@@ -404,15 +398,13 @@ let call_get_nft_item_by_id collection tid =
 
 let call_get_nft_items_by_owner owner =
   let open EzAPI in
-  let url = EzAPI.BASE !api in
+  let url = BASE !api in
   let rec aux ?continuation acc =
     let params = match continuation with
       | None -> [ Api.owner_param , S owner ]
       | Some c -> [ Api.owner_param , S owner ; Api.continuation_param, S c ] in
-    EzReq_lwt.get0
-      url
-      ~params
-      Api.get_nft_items_by_owner_s >>=? fun items ->
+    let> r = EzReq_lwt.get0 url ~params Api.get_nft_items_by_owner_s in
+    let>? items = Lwt.return @@ handle_ezreq_result r in
     match items.nft_items_continuation with
     | None -> Lwt.return_ok @@ items.nft_items_items @ acc
     | Some continuation ->
@@ -421,15 +413,13 @@ let call_get_nft_items_by_owner owner =
 
 let call_get_nft_items_by_collection collection =
   let open EzAPI in
-  let url = EzAPI.BASE !api in
+  let url = BASE !api in
   let rec aux ?continuation acc =
     let params = match continuation with
       | None -> [ Api.collection_param , S collection ]
       | Some c -> [ Api.collection_param , S collection ; Api.continuation_param, S c ] in
-    EzReq_lwt.get0
-      url
-      ~params
-      Api.get_nft_items_by_collection_s >>=? fun items ->
+    let> r = EzReq_lwt.get0 url ~params Api.get_nft_items_by_collection_s in
+    let>? items = Lwt.return @@ handle_ezreq_result r in
     match items.nft_items_continuation with
     | None -> Lwt.return_ok @@ items.nft_items_items @ acc
     | Some continuation ->
@@ -438,15 +428,13 @@ let call_get_nft_items_by_collection collection =
 
 let call_get_nft_all_items () =
   let open EzAPI in
-  let url = EzAPI.BASE !api in
+  let url = BASE !api in
   let rec aux ?continuation acc =
     let params = match continuation with
       | None -> [ ]
       | Some c -> [ Api.continuation_param, S c ] in
-    EzReq_lwt.get0
-      url
-      ~params
-      Api.get_nft_all_items_s >>=? fun items ->
+    let> r = EzReq_lwt.get0 url ~params Api.get_nft_all_items_s in
+    let>? items = Lwt.return @@ handle_ezreq_result r in
     match items.nft_items_continuation with
     | None -> Lwt.return_ok @@ items.nft_items_items @ acc
     | Some continuation ->
@@ -455,23 +443,20 @@ let call_get_nft_all_items () =
 
 let call_get_nft_ownership_by_id collection tid owner  =
   let url = EzAPI.BASE !api in
-  EzReq_lwt.get1
-    url
-    Api.get_nft_ownership_by_id_s
-    (Printf.sprintf "%s:%s:%s" collection tid owner)
+  let|> r = EzReq_lwt.get1 url Api.get_nft_ownership_by_id_s
+      (Printf.sprintf "%s:%s:%s" collection tid owner) in
+  handle_ezreq_result r
 
 let call_get_nft_ownerships_by_item contract tid =
   let open EzAPI in
-  let url = EzAPI.BASE !api in
+  let url = BASE !api in
   let params = [ Api.contract_param, S contract ; Api.token_id_param, S tid  ] in
   let rec aux ?continuation acc =
     let params = match continuation with
       | None -> params
       | Some c -> params @ [ Api.continuation_param, S c ] in
-    EzReq_lwt.get0
-      url
-      ~params
-      Api.get_nft_ownerships_by_item_s >>=? fun ownerships ->
+    let> r = EzReq_lwt.get0 url ~params Api.get_nft_ownerships_by_item_s in
+    let>? ownerships = Lwt.return @@ handle_ezreq_result r in
     match ownerships.nft_ownerships_continuation with
     | None -> Lwt.return_ok @@ ownerships.nft_ownerships_ownerships @ acc
     | Some continuation ->
@@ -480,15 +465,13 @@ let call_get_nft_ownerships_by_item contract tid =
 
 let call_get_nft_all_ownerships () =
   let open EzAPI in
-  let url = EzAPI.BASE !api in
+  let url = BASE !api in
   let rec aux ?continuation acc =
     let params = match continuation with
       | None -> [ ]
       | Some c -> [ Api.continuation_param, S c ] in
-    EzReq_lwt.get0
-      url
-      ~params
-      Api.get_nft_all_ownerships_s >>=? fun ownerships ->
+    let> r = EzReq_lwt.get0 url ~params Api.get_nft_all_ownerships_s in
+    let>? ownerships = Lwt.return @@ handle_ezreq_result r in
     match ownerships.nft_ownerships_continuation with
     | None -> Lwt.return_ok @@ ownerships.nft_ownerships_ownerships @ acc
     | Some continuation ->
@@ -498,16 +481,13 @@ let call_get_nft_all_ownerships () =
 let call_get_activities filter =
   (* Format.eprintf "%s\n%!" (EzEncoding.construct nft_activity_filter_enc filter) ; *)
   let open EzAPI in
-  let url = EzAPI.BASE !api in
+  let url = BASE !api in
   let rec aux ?continuation acc =
     let params = match continuation with
       | None -> [ ]
       | Some c -> [ Api.continuation_param, S c ] in
-    EzReq_lwt.post0
-      ~input:filter
-      ~params
-      url
-      Api.get_nft_activities_s >>=? fun activities ->
+    let> r = EzReq_lwt.post0 ~input:filter ~params url Api.get_nft_activities_s in
+    let>? activities = Lwt.return @@ handle_ezreq_result r in
     match activities.nft_activities_continuation with
     | None -> Lwt.return_ok @@ activities.nft_activities_items @ acc
     | Some continuation ->
@@ -605,10 +585,8 @@ let upsert_order () =
 
 let call_get_order hash =
   let url = EzAPI.BASE !api in
-  EzReq_lwt.get1
-    url
-    Api.get_order_by_hash_s
-    hash
+  let|> r = EzReq_lwt.get1 url Api.get_order_by_hash_s hash in
+  handle_ezreq_result r
 
 (* let update_order_make_value hash make_value =
  *   Db.get_order hash >|= function
@@ -1272,9 +1250,8 @@ let check_item ?strict (kt1, (owner, amount, tid, royalties, metadata)) =
     else
       Printf.eprintf "[KO] API: get_nft_item_by_id (no matching nft_item)\n%!"
   | Error err ->
-    Printf.eprintf
-      "[KO] API: get_nft_item_by_id (error : %s)\n%!" @@
-    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+    Printf.eprintf "[KO] API: get_nft_item_by_id (error : %s)\n%!" @@
+    Api.Errors.string_of_error err
   end >>= fun () ->
   call_get_nft_items_by_owner owner >|= begin function
   | Ok nft_items ->
@@ -1283,9 +1260,8 @@ let check_item ?strict (kt1, (owner, amount, tid, royalties, metadata)) =
     else
       Printf.eprintf "[KO] API: get_nft_items_by_owner (no matching nft_item)\n%!"
   | Error err ->
-    Printf.eprintf
-      "[KO] API: get_nft_items_by_owner (error : %s)\n%!" @@
-    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+    Printf.eprintf "[KO] API: get_nft_items_by_owner (error : %s)\n%!" @@
+    Api.Errors.string_of_error err
   end >>= fun () ->
   call_get_nft_items_by_collection kt1 >|= begin function
   | Ok nft_items ->
@@ -1294,9 +1270,8 @@ let check_item ?strict (kt1, (owner, amount, tid, royalties, metadata)) =
     else
       Printf.eprintf "[KO] API: get_nft_items_by_collection (no matching nft_item)\n%!"
   | Error err ->
-    Printf.eprintf
-      "[KO] API: get_nft_items_by_owner (error : %s)\n%!" @@
-    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+    Printf.eprintf "[KO] API: get_nft_items_by_owner (error : %s)\n%!" @@
+    Api.Errors.string_of_error err
   end >>= fun () ->
   call_get_nft_all_items () >|= begin function
   | Ok nft_items ->
@@ -1305,9 +1280,8 @@ let check_item ?strict (kt1, (owner, amount, tid, royalties, metadata)) =
     else
       Printf.eprintf "[KO] API: get_nft_all_items (no matching nft_item)\n%!"
   | Error err ->
-    Printf.eprintf
-      "[KO] API: get_nft_all_items (error : %s)\n%!" @@
-    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+    Printf.eprintf "[KO] API: get_nft_all_items (error : %s)\n%!" @@
+    Api.Errors.string_of_error err
   end >>= fun () ->
   call_get_nft_ownership_by_id kt1 tid owner >|= begin function
   | Ok nft_ownership ->
@@ -1316,9 +1290,8 @@ let check_item ?strict (kt1, (owner, amount, tid, royalties, metadata)) =
     else
       Printf.eprintf "[KO] API: get_nft_ownership_by_id (no matching nft_item)\n%!"
   | Error err ->
-    Printf.eprintf
-      "[KO] API: get_nft_ownership_by_id (error : %s)\n%!" @@
-    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+    Printf.eprintf "[KO] API: get_nft_ownership_by_id (error : %s)\n%!" @@
+    Api.Errors.string_of_error err
   end >>= fun () ->
   call_get_nft_ownerships_by_item kt1 tid >|= begin function
   | Ok nft_ownerships ->
@@ -1327,9 +1300,8 @@ let check_item ?strict (kt1, (owner, amount, tid, royalties, metadata)) =
     else
       Printf.eprintf "[KO] API: get_nft_ownerships_by_item (no matching nft_ownership)\n%!"
   | Error err ->
-    Printf.eprintf
-      "[KO] API: get_nft_ownerships_by_item (error : %s)\n%!" @@
-    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+    Printf.eprintf "[KO] API: get_nft_ownerships_by_item (error : %s)\n%!" @@
+    Api.Errors.string_of_error err
   end >>= fun () ->
   call_get_nft_all_ownerships () >|= begin function
   | Ok nft_ownerships ->
@@ -1338,9 +1310,8 @@ let check_item ?strict (kt1, (owner, amount, tid, royalties, metadata)) =
     else
       Printf.eprintf "[KO] API: get_nft_all_ownerships (no matching nft_ownership)\n%!"
   | Error err ->
-    Printf.eprintf
-      "[KO] API: get_nft_all_ownerships (error : %s)\n%!" @@
-    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+    Printf.eprintf "[KO] API: get_nft_all_ownerships (error : %s)\n%!" @@
+    Api.Errors.string_of_error err
   end
   (* get_nft_item_meta_by_id ;
    * get_nft_items_by_creator ; *)
@@ -1371,9 +1342,8 @@ let check_mint_activity (kt1, (owner, amount, tid, _royalties, _metadata)) =
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_item_mint (no matching mint activity)\n%!"
   | Error err ->
-    Printf.eprintf
-      "[KO] API: get_nft_activities_by_item_mint (error : %s)\n%!" @@
-    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+    Printf.eprintf "[KO] API: get_nft_activities_by_item_mint (error : %s)\n%!" @@
+    Api.Errors.string_of_error err
   end >>= fun () ->
   call_get_nft_activities_by_user_mint owner >|= begin function
   | Ok nft_activities ->
@@ -1382,9 +1352,8 @@ let check_mint_activity (kt1, (owner, amount, tid, _royalties, _metadata)) =
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_user_mint (no matching mint activity)\n%!"
   | Error err ->
-    Printf.eprintf
-      "[KO] API: get_nft_activities_by_user_mint (error : %s)\n%!" @@
-    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+    Printf.eprintf "[KO] API: get_nft_activities_by_user_mint (error : %s)\n%!" @@
+    Api.Errors.string_of_error err
   end >>= fun () ->
   call_get_nft_activities_by_collection_mint kt1 >|= begin function
   | Ok nft_activities ->
@@ -1394,9 +1363,8 @@ let check_mint_activity (kt1, (owner, amount, tid, _royalties, _metadata)) =
       Printf.eprintf
         "[KO] API: get_nft_activities_by_collection_mint (no matching mint activity)\n%!"
   | Error err ->
-    Printf.eprintf
-      "[KO] API: get_nft_activities_by_collection_mint (error : %s)\n%!" @@
-    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+    Printf.eprintf "[KO] API: get_nft_activities_by_collection_mint (error : %s)\n%!" @@
+    Api.Errors.string_of_error err
   end >>= fun () ->
   call_get_nft_all_activities_mint () >|= begin function
   | Ok nft_activities ->
@@ -1405,9 +1373,8 @@ let check_mint_activity (kt1, (owner, amount, tid, _royalties, _metadata)) =
     else
       Printf.eprintf "[KO] API: get_nft_all_activities_mint (no matching mint activity)\n%!"
   | Error err ->
-    Printf.eprintf
-      "[KO] API: get_nft_all_activities_mint (error : %s)\n%!" @@
-    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+    Printf.eprintf "[KO] API: get_nft_all_activities_mint (error : %s)\n%!" @@
+    Api.Errors.string_of_error err
   end >>= fun () ->
 
   (* ALL ACTIVITIES *)
@@ -1418,9 +1385,8 @@ let check_mint_activity (kt1, (owner, amount, tid, _royalties, _metadata)) =
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_item_all (no matching mint activity)\n%!"
   | Error err ->
-    Printf.eprintf
-      "[KO] API: get_nft_activities_by_item_all (error : %s)\n%!" @@
-    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+    Printf.eprintf "[KO] API: get_nft_activities_by_item_all (error : %s)\n%!" @@
+    Api.Errors.string_of_error err
   end >>= fun () ->
   call_get_nft_activities_by_user_all owner >|= begin function
   | Ok nft_activities ->
@@ -1429,9 +1395,8 @@ let check_mint_activity (kt1, (owner, amount, tid, _royalties, _metadata)) =
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_user_all (no matching mint activity)\n%!"
   | Error err ->
-    Printf.eprintf
-      "[KO] API: get_nft_activities_by_user_all (error : %s)\n%!" @@
-    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+    Printf.eprintf "[KO] API: get_nft_activities_by_user_all (error : %s)\n%!" @@
+    Api.Errors.string_of_error err
   end >>= fun () ->
   call_get_nft_activities_by_collection_all kt1 >|= begin function
   | Ok nft_activities ->
@@ -1440,9 +1405,8 @@ let check_mint_activity (kt1, (owner, amount, tid, _royalties, _metadata)) =
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_collection_all (no matching mint activity)\n%!"
   | Error err ->
-    Printf.eprintf
-      "[KO] API: get_nft_activities_by_collection_all (error : %s)\n%!" @@
-    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+    Printf.eprintf "[KO] API: get_nft_activities_by_collection_all (error : %s)\n%!" @@
+    Api.Errors.string_of_error err
   end >>= fun () ->
   call_get_nft_all_activities_all () >|= begin function
   | Ok nft_activities ->
@@ -1451,9 +1415,8 @@ let check_mint_activity (kt1, (owner, amount, tid, _royalties, _metadata)) =
     else
       Printf.eprintf "[KO] API: get_nft_all_activities_all (no matching mint activity)\n%!"
   | Error err ->
-    Printf.eprintf
-      "[KO] API: get_nft_all_activities_all (error : %s)\n%!" @@
-    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+    Printf.eprintf "[KO] API: get_nft_all_activities_all (error : %s)\n%!" @@
+    Api.Errors.string_of_error err
   end >>= fun () ->
 
   (* BURN ONLY ACTIVITIES *)
@@ -1464,9 +1427,8 @@ let check_mint_activity (kt1, (owner, amount, tid, _royalties, _metadata)) =
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_item_burn (matching mint activity)\n%!"
   | Error err ->
-    Printf.eprintf
-      "[KO] API: get_nft_activities_by_item_burn (error : %s)\n%!" @@
-    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+    Printf.eprintf "[KO] API: get_nft_activities_by_item_burn (error : %s)\n%!" @@
+    Api.Errors.string_of_error err
   end >>= fun () ->
   call_get_nft_activities_by_user_burn owner >|= begin function
   | Ok nft_activities ->
@@ -1475,9 +1437,8 @@ let check_mint_activity (kt1, (owner, amount, tid, _royalties, _metadata)) =
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_user_burn (matching mint activity)\n%!"
   | Error err ->
-    Printf.eprintf
-      "[KO] API: get_nft_activities_by_user_burn (error : %s)\n%!" @@
-    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+    Printf.eprintf "[KO] API: get_nft_activities_by_user_burn (error : %s)\n%!" @@
+    Api.Errors.string_of_error err
   end >>= fun () ->
   call_get_nft_activities_by_collection_burn kt1 >|= begin function
   | Ok nft_activities ->
@@ -1486,9 +1447,8 @@ let check_mint_activity (kt1, (owner, amount, tid, _royalties, _metadata)) =
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_collection_burn (matching mint activity)\n%!"
   | Error err ->
-    Printf.eprintf
-      "[KO] API: get_nft_activities_by_collection_burn (error : %s)\n%!" @@
-    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+    Printf.eprintf "[KO] API: get_nft_activities_by_collection_burn (error : %s)\n%!" @@
+    Api.Errors.string_of_error err
   end >>= fun () ->
   call_get_nft_all_activities_burn () >|= begin function
   | Ok nft_activities ->
@@ -1497,9 +1457,8 @@ let check_mint_activity (kt1, (owner, amount, tid, _royalties, _metadata)) =
     else
       Printf.eprintf "[KO] API: get_nft_all_activities_burn (matching mint activity)\n%!"
   | Error err ->
-    Printf.eprintf
-      "[KO] API: get_nft_all_activities_burn (error : %s)\n%!" @@
-    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+    Printf.eprintf "[KO] API: get_nft_all_activities_burn (error : %s)\n%!" @@
+    Api.Errors.string_of_error err
   end >>= fun () ->
 
   (* TRANSFER ONLY ACTIVITIES *)
@@ -1510,9 +1469,8 @@ let check_mint_activity (kt1, (owner, amount, tid, _royalties, _metadata)) =
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_item_transfer (matching mint activity)\n%!"
   | Error err ->
-    Printf.eprintf
-      "[KO] API: get_nft_activities_by_item_transfer (error : %s)\n%!" @@
-    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+    Printf.eprintf "[KO] API: get_nft_activities_by_item_transfer (error : %s)\n%!" @@
+    Api.Errors.string_of_error err
   end >>= fun () ->
   call_get_nft_activities_by_user_transfer owner >|= begin function
   | Ok nft_activities ->
@@ -1521,9 +1479,8 @@ let check_mint_activity (kt1, (owner, amount, tid, _royalties, _metadata)) =
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_user_transfer (matching mint activity)\n%!"
   | Error err ->
-    Printf.eprintf
-      "[KO] API: get_nft_activities_by_user_transfer (error : %s)\n%!" @@
-    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+    Printf.eprintf "[KO] API: get_nft_activities_by_user_transfer (error : %s)\n%!" @@
+    Api.Errors.string_of_error err
   end >>= fun () ->
   call_get_nft_activities_by_collection_transfer kt1 >|= begin function
   | Ok nft_activities ->
@@ -1533,9 +1490,8 @@ let check_mint_activity (kt1, (owner, amount, tid, _royalties, _metadata)) =
       Printf.eprintf
         "[KO] API: get_nft_activities_by_collection_transfer (matching mint activity)\n%!"
   | Error err ->
-    Printf.eprintf
-      "[KO] API: get_nft_activities_by_collection_transfer (error : %s)\n%!" @@
-    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+    Printf.eprintf "[KO] API: get_nft_activities_by_collection_transfer (error : %s)\n%!" @@
+    Api.Errors.string_of_error err
   end >>= fun () ->
   call_get_nft_all_activities_transfer () >|= begin function
   | Ok nft_activities ->
@@ -1544,9 +1500,8 @@ let check_mint_activity (kt1, (owner, amount, tid, _royalties, _metadata)) =
     else
       Printf.eprintf "[KO] API: get_nft_all_activities_transfer (matching mint activity)\n%!"
   | Error err ->
-    Printf.eprintf
-      "[KO] API: get_nft_all_activities_transfer (error : %s)\n%!" @@
-    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+    Printf.eprintf "[KO] API: get_nft_all_activities_transfer (error : %s)\n%!" @@
+    Api.Errors.string_of_error err
   end
 
 let check_transfer_activity ?(from=false) (kt1, (owner, amount, tid, _royalties, _metadata)) =
@@ -1566,9 +1521,8 @@ let check_transfer_activity ?(from=false) (kt1, (owner, amount, tid, _royalties,
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_item_mint (matching transfer activity)\n%!"
   | Error err ->
-    Printf.eprintf
-      "[KO] API: get_nft_activities_by_item_mint (error : %s)\n%!" @@
-    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+    Printf.eprintf "[KO] API: get_nft_activities_by_item_mint (error : %s)\n%!" @@
+    Api.Errors.string_of_error err
   end >>= fun () ->
   call_get_nft_activities_by_user_mint owner >|= begin function
   | Ok nft_activities ->
@@ -1577,9 +1531,8 @@ let check_transfer_activity ?(from=false) (kt1, (owner, amount, tid, _royalties,
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_user_mint (matching transfer activity)\n%!"
   | Error err ->
-    Printf.eprintf
-      "[KO] API: get_nft_activities_by_user_mint (error : %s)\n%!" @@
-    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+    Printf.eprintf "[KO] API: get_nft_activities_by_user_mint (error : %s)\n%!" @@
+    Api.Errors.string_of_error err
   end >>= fun () ->
   call_get_nft_activities_by_collection_mint kt1 >|= begin function
   | Ok nft_activities ->
@@ -1589,9 +1542,8 @@ let check_transfer_activity ?(from=false) (kt1, (owner, amount, tid, _royalties,
       Printf.eprintf
         "[KO] API: get_nft_activities_by_collection_mint (matching transfer activity)\n%!"
   | Error err ->
-    Printf.eprintf
-      "[KO] API: get_nft_activities_by_collection_mint (error : %s)\n%!" @@
-    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+    Printf.eprintf "[KO] API: get_nft_activities_by_collection_mint (error : %s)\n%!" @@
+    Api.Errors.string_of_error err
   end >>= fun () ->
   call_get_nft_all_activities_mint () >|= begin function
   | Ok nft_activities ->
@@ -1600,9 +1552,8 @@ let check_transfer_activity ?(from=false) (kt1, (owner, amount, tid, _royalties,
     else
       Printf.eprintf "[KO] API: get_nft_all_activities_mint (matching transfer activity)\n%!"
   | Error err ->
-    Printf.eprintf
-      "[KO] API: get_nft_all_activities_mint (error : %s)\n%!" @@
-    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+    Printf.eprintf "[KO] API: get_nft_all_activities_mint (error : %s)\n%!" @@
+    Api.Errors.string_of_error err
   end >>= fun () ->
 
   (* ALL ACTIVITIES *)
@@ -1613,9 +1564,8 @@ let check_transfer_activity ?(from=false) (kt1, (owner, amount, tid, _royalties,
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_item_all (no matching transfer activity)\n%!"
   | Error err ->
-    Printf.eprintf
-      "[KO] API: get_nft_activities_by_item_all (error : %s)\n%!" @@
-    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+    Printf.eprintf "[KO] API: get_nft_activities_by_item_all (error : %s)\n%!" @@
+    Api.Errors.string_of_error err
   end >>= fun () ->
   call_get_nft_activities_by_user_all owner >|= begin function
   | Ok nft_activities ->
@@ -1624,9 +1574,8 @@ let check_transfer_activity ?(from=false) (kt1, (owner, amount, tid, _royalties,
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_user_all (no matching transfer activity)\n%!"
   | Error err ->
-    Printf.eprintf
-      "[KO] API: get_nft_activities_by_user_all (error : %s)\n%!" @@
-    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+    Printf.eprintf "[KO] API: get_nft_activities_by_user_all (error : %s)\n%!" @@
+    Api.Errors.string_of_error err
   end >>= fun () ->
   call_get_nft_activities_by_collection_all kt1 >|= begin function
   | Ok nft_activities ->
@@ -1635,9 +1584,8 @@ let check_transfer_activity ?(from=false) (kt1, (owner, amount, tid, _royalties,
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_collection_all (no matching transfer activity)\n%!"
   | Error err ->
-    Printf.eprintf
-      "[KO] API: get_nft_activities_by_collection_all (error : %s)\n%!" @@
-    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+    Printf.eprintf "[KO] API: get_nft_activities_by_collection_all (error : %s)\n%!" @@
+    Api.Errors.string_of_error err
   end >>= fun () ->
   call_get_nft_all_activities_all () >|= begin function
   | Ok nft_activities ->
@@ -1646,9 +1594,8 @@ let check_transfer_activity ?(from=false) (kt1, (owner, amount, tid, _royalties,
     else
       Printf.eprintf "[KO] API: get_nft_all_activities_all (no matching transfer activity)\n%!"
   | Error err ->
-    Printf.eprintf
-      "[KO] API: get_nft_all_activities_all (error : %s)\n%!" @@
-    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+    Printf.eprintf "[KO] API: get_nft_all_activities_all (error : %s)\n%!" @@
+    Api.Errors.string_of_error err
   end >>= fun () ->
 
   (* BURN ONLY ACTIVITIES *)
@@ -1659,9 +1606,8 @@ let check_transfer_activity ?(from=false) (kt1, (owner, amount, tid, _royalties,
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_item_burn (matching transfer activity)\n%!"
   | Error err ->
-    Printf.eprintf
-      "[KO] API: get_nft_activities_by_item_burn (error : %s)\n%!" @@
-    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+    Printf.eprintf "[KO] API: get_nft_activities_by_item_burn (error : %s)\n%!" @@
+    Api.Errors.string_of_error err
   end >>= fun () ->
   call_get_nft_activities_by_user_burn owner >|= begin function
   | Ok nft_activities ->
@@ -1670,9 +1616,8 @@ let check_transfer_activity ?(from=false) (kt1, (owner, amount, tid, _royalties,
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_user_burn (matching transfer activity)\n%!"
   | Error err ->
-    Printf.eprintf
-      "[KO] API: get_nft_activities_by_user_burn (error : %s)\n%!" @@
-    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+    Printf.eprintf "[KO] API: get_nft_activities_by_user_burn (error : %s)\n%!" @@
+    Api.Errors.string_of_error err
   end >>= fun () ->
   call_get_nft_activities_by_collection_burn kt1 >|= begin function
   | Ok nft_activities ->
@@ -1681,9 +1626,8 @@ let check_transfer_activity ?(from=false) (kt1, (owner, amount, tid, _royalties,
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_collection_burn (matching transfer activity)\n%!"
   | Error err ->
-    Printf.eprintf
-      "[KO] API: get_nft_activities_by_collection_burn (error : %s)\n%!" @@
-    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+    Printf.eprintf "[KO] API: get_nft_activities_by_collection_burn (error : %s)\n%!" @@
+    Api.Errors.string_of_error err
   end >>= fun () ->
   call_get_nft_all_activities_burn () >|= begin function
   | Ok nft_activities ->
@@ -1692,9 +1636,8 @@ let check_transfer_activity ?(from=false) (kt1, (owner, amount, tid, _royalties,
     else
       Printf.eprintf "[KO] API: get_nft_all_activities_burn (matching transfer activity)\n%!"
   | Error err ->
-    Printf.eprintf
-      "[KO] API: get_nft_all_activities_burn (error : %s)\n%!" @@
-    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+    Printf.eprintf "[KO] API: get_nft_all_activities_burn (error : %s)\n%!" @@
+    Api.Errors.string_of_error err
   end >>= fun () ->
 
   (* TRANSFER ONLY ACTIVITIES *)
@@ -1705,9 +1648,8 @@ let check_transfer_activity ?(from=false) (kt1, (owner, amount, tid, _royalties,
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_item_transfer (no matching transfer activity)\n%!"
   | Error err ->
-    Printf.eprintf
-      "[KO] API: get_nft_activities_by_item_transfer (error : %s)\n%!" @@
-    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+    Printf.eprintf "[KO] API: get_nft_activities_by_item_transfer (error : %s)\n%!" @@
+    Api.Errors.string_of_error err
   end >>= fun () ->
   call_get_nft_activities_by_user_transfer owner >|= begin function
   | Ok nft_activities ->
@@ -1716,9 +1658,8 @@ let check_transfer_activity ?(from=false) (kt1, (owner, amount, tid, _royalties,
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_user_transfer (no matching transfer activity)\n%!"
   | Error err ->
-    Printf.eprintf
-      "[KO] API: get_nft_activities_by_user_transfer (error : %s)\n%!" @@
-    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+    Printf.eprintf "[KO] API: get_nft_activities_by_user_transfer (error : %s)\n%!" @@
+    Api.Errors.string_of_error err
   end >>= fun () ->
   call_get_nft_activities_by_collection_transfer kt1 >|= begin function
   | Ok nft_activities ->
@@ -1728,9 +1669,8 @@ let check_transfer_activity ?(from=false) (kt1, (owner, amount, tid, _royalties,
       Printf.eprintf
         "[KO] API: get_nft_activities_by_collection_transfer (no matching transfer activity)\n%!"
   | Error err ->
-    Printf.eprintf
-      "[KO] API: get_nft_activities_by_collection_transfer (error : %s)\n%!" @@
-    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+    Printf.eprintf "[KO] API: get_nft_activities_by_collection_transfer (error : %s)\n%!" @@
+    Api.Errors.string_of_error err
   end >>= fun () ->
   call_get_nft_all_activities_transfer () >|= begin function
   | Ok nft_activities ->
@@ -1739,9 +1679,8 @@ let check_transfer_activity ?(from=false) (kt1, (owner, amount, tid, _royalties,
     else
       Printf.eprintf "[KO] API: get_nft_all_activities_transfer (no matching transfer activity)\n%!"
   | Error err ->
-    Printf.eprintf
-      "[KO] API: get_nft_all_activities_transfer (error : %s)\n%!" @@
-    EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+    Printf.eprintf "[KO] API: get_nft_all_activities_transfer (error : %s)\n%!" @@
+    Api.Errors.string_of_error err
   end
 
 let mint_check_random collections =
@@ -1866,10 +1805,8 @@ let deploy_check_random_collections ?royalties ?(max=10) () =
       | Ok _ -> Lwt.return_unit
       | Error err ->
         Lwt.return @@
-        Printf.eprintf
-          "[KO] API: check_collection (error : %s)\n%!" @@
-        EzReq_lwt.string_of_error (fun r ->
-            Some (EzEncoding.construct rarible_error_500_enc r)) err)
+        Printf.eprintf "[KO] API: check_collection (error : %s)\n%!" @@
+        Api.Errors.string_of_error err)
     res >>= fun () ->
   Lwt.return new_collections
 
@@ -1974,13 +1911,12 @@ let random_test () =
     | Error err ->
       Lwt.return @@
       Printf.eprintf "mint error %s" @@
-      EzReq_lwt.string_of_error (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err
+      Api.Errors.string_of_error err
     | Ok items ->
       transfers_check_random ~max:1 items >|= begin function
         | Error err ->
           Printf.eprintf "burn error %s" @@
-          EzReq_lwt.string_of_error (fun r ->
-              Some (EzEncoding.construct rarible_error_500_enc r)) err
+          Api.Errors.string_of_error err
         | Ok _items -> ()
       end
   end >>= fun () ->
@@ -2316,9 +2252,7 @@ let main () =
   | [ "call_upsert_order" ] ->
     Lwt_main.run (upsert_order () >>= function
       | Ok _ -> Lwt.return_unit
-      | Error err -> Lwt.fail_with @@
-        EzReq_lwt.string_of_error
-          (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err)
+      | Error err -> Lwt.fail_with @@ Api.Errors.string_of_error err)
     (* | "update_order_make_value" :: hash :: make_value :: [] ->
      *   Lwt_main.run (update_order_make_value hash make_value)
      * | "update_order_take_value" :: hash :: take_value :: [] ->
@@ -2347,9 +2281,7 @@ let main () =
             match_orders_nft () >>= function
             | Ok _ -> Lwt.return_unit
             | Error err ->
-              Lwt.fail_with @@
-              EzReq_lwt.string_of_error
-                (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err)
+              Lwt.fail_with @@ Api.Errors.string_of_error err)
           (fun exn ->
              Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
              begin match !api_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
@@ -2361,9 +2293,7 @@ let main () =
             match_orders_tezos () >>= function
             | Ok _ -> Lwt.return_unit
             | Error err ->
-              Lwt.fail_with @@
-              EzReq_lwt.string_of_error
-                (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err)
+              Lwt.fail_with @@ Api.Errors.string_of_error err)
           (fun exn ->
              Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
              begin match !api_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
@@ -2375,9 +2305,7 @@ let main () =
             fill_orders () >>= function
             | Ok _ -> Lwt.return_unit
             | Error err ->
-              Lwt.fail_with @@
-              EzReq_lwt.string_of_error
-                (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err)
+              Lwt.fail_with @@ Api.Errors.string_of_error err)
           (fun exn ->
              Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
              begin match !api_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
@@ -2389,9 +2317,7 @@ let main () =
             cancel_order () >>= function
             | Ok _ -> Lwt.return_unit
             | Error err ->
-              Lwt.fail_with @@
-              EzReq_lwt.string_of_error
-                (fun r -> Some (EzEncoding.construct rarible_error_500_enc r)) err)
+              Lwt.fail_with @@ Api.Errors.string_of_error err)
           (fun exn ->
              Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
              begin match !api_pid with None -> () | Some pid -> Unix.kill pid 9 end ;

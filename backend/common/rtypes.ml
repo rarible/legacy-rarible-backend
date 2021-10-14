@@ -64,62 +64,6 @@ type part = {
   part_value : A.uint32 ;
 } [@@deriving encoding {title="Part"; def_title} ]
 
-
-type rarible_error_500_code =
-  | UNKNOWN
-  | VALIDATION
-  (* currency-controller *)
-  | FIRST_TEMPLATE_OBJECT_NOT_FOUND
-  | SECOND_TEMPLATE_OBJECT_NOT_FOUND
-  (* nft-controllers *)
-  | BAD_REQUEST
-  | TOKEN_PROPERTIES_EXTRACT
-  | INCORRECT_LAZY_NFT
-  (* order-controllers *)
-  | INVALID_ARGUMENT
-  | ABSENCE_OF_REQUIRED_FIELD
-  | UNLOCKABLE_API_ERROR
-  | NFT_API_ERROR
-  | ORDER_API_ERROR
-  | UNEXPECTED_API_ERROR
-[@@deriving encoding {enum}]
-
-type rarible_error_500 = {
-  rarible_error_500_status : int;
-  rarible_error_500_message : string;
-  rarible_error_500_code : rarible_error_500_code;
-} [@@deriving encoding {title="Error500"; def_title}]
-
-type rarible_error_404_status =
-  (* erc20-controllers *)
-  | TOKEN_NOT_FOUND
-  | BALANCE_NOT_FOUND
-  (* nft-controllers *)
-  | ITEM_NOT_FOUND
-  | LAZY_ITEM_NOT_FOUND
-  | TOKEN_URI_NOT_FOUND
-  | OWNERSHIP_NOT_FOUND
-  | COLLECTION_NOT_FOUND
-[@@deriving encoding {enum}]
-
-type rarible_error_404 = {
-  rarible_error_404_status : int;
-  rarible_error_404_message : string;
-  rarible_error_404_code : rarible_error_404_status;
-} [@@deriving encoding {title="Error404"; def_title}]
-
-type rarible_error_400_status =
-  (* lock-controller *)
-  | LOCK_EXISTS
-  | OWNERSHIP_ERROR
-[@@deriving encoding {enum}]
-
-type rarible_error_400 = {
-  rarible_error_400_status : int;
-  rarible_error_400_message : string;
-  rarible_error_400_code : rarible_error_400_status;
-} [@@deriving encoding {title="Error400"; def_title}]
-
 type create_transaction_request = {
   req_hash : string;
   req_from : A.address;
@@ -245,6 +189,7 @@ type nft_item = {
   nft_item_owners : A.address list;
   nft_item_royalties : part list;
   nft_item_date : A.date;
+  nft_item_minted_at : A.date;
   nft_item_pending : item_transfer list option; [@opt]
   nft_item_deleted : bool option; [@opt]
   nft_item_meta : nft_item_meta option; [@opt]

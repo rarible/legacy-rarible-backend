@@ -329,6 +329,9 @@ components:
         date:
           type: string
           format: date-time
+        mintedAt:
+          type: string
+          format: date-time
         pending:
           type: array
           items:
@@ -338,6 +341,7 @@ components:
         meta:
           $ref: '#/components/schemas/NftItemMeta'
       required:
+      - mintedAt
       - date
       - royalties
       - owners
@@ -860,7 +864,7 @@ components:
           $ref: '#/components/schemas/Address'
         value:
           type: integer
-          minimum: -2147483648
+          minimum: 0
           maximum: 2147483647
       required:
       - value

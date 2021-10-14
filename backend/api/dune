@@ -1,7 +1,7 @@
 (library
  (name api)
  (modules api errors)
- (preprocess (pps ez_api.ppx))
+ (preprocess (pps ppx_deriving_encoding ez_api.ppx_err_case ez_api.ppx))
  (libraries db let rtypes ez_api.server))
 
 (executable

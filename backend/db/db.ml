@@ -586,6 +586,7 @@ let mk_nft_item ?dbh ?include_meta obj =
     nft_item_owners = owners ;
     nft_item_royalties = [] ;
     nft_item_date = obj#last ;
+    nft_item_minted_at = obj#tsp ;
     nft_item_pending = None ;
     nft_item_deleted = if obj#supply > 0L then Some false else Some true ;
     nft_item_meta = meta ;
@@ -600,7 +601,7 @@ let get_nft_item_by_id ?dbh ?include_meta contract token_id =
   let>? l = [%pgsql.object dbh
       "select concat(contract, ':', token_id) as id, contract, token_id, \
        last, amount, supply, metadata, name, creators, description, attributes, \
-       image, animation \
+       image, animation, tsp \
        from tokens where \
        main and contract = $contract and token_id = $token_id"] in
   match l with
@@ -1459,7 +1460,7 @@ let get_nft_items_by_owner ?dbh ?include_meta ?continuation ?(size=50) owner =
   let>? l = [%pgsql.object dbh
       "select concat(contract, ':', token_id) as id, contract, token_id, \
        last, amount, supply, metadata, name, creators, description, attributes, \
-       image, animation from tokens where \
+       image, animation, tsp from tokens where \
        main and owner = $owner and amount <> 0 and \
        ($no_continuation or \
        (last = $ts and concat(contract, ':', token_id) > $id) or \
@@ -1496,7 +1497,7 @@ let get_nft_items_by_creator ?dbh ?include_meta ?continuation ?(size=50) creator
   let>? l = [%pgsql.object dbh
       "select concat(contract, ':', token_id) as id, contract, token_id, \
        last, amount, supply, metadata, name, creators, description, attributes, \
-       image, animation \
+       image, animation, tsp \
        from tokens, \
        jsonb_to_recordset((metadata -> 'creators')) as creators(account varchar, value int) \
        where creators.account = $creator and name is not null and \
@@ -1536,7 +1537,7 @@ let get_nft_items_by_collection ?dbh ?include_meta ?continuation ?(size=50) cont
   let>? l = [%pgsql.object dbh
       "select concat(contract, ':', token_id) as id, contract, token_id, \
        last, amount, supply, metadata, name, creators, description, attributes, \
-       image, animation \
+       image, animation, tsp \
        from tokens where \
        main and contract = $contract and amount <> 0 and name is not null and \
        ($no_continuation or \
@@ -1599,7 +1600,7 @@ let get_nft_all_items
   let>? l = [%pgsql.object dbh
       "select concat(contract, ':', token_id) as id, contract, token_id, \
        last, amount, supply, metadata, name, creators, description, attributes, \
-       image, animation \
+       image, animation, tsp \
        from tokens where \
        main and \
        (supply > 0 and amount <> 0 or (not $no_show_deleted and $show_deleted_v)) and \
