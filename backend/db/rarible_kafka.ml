@@ -53,8 +53,8 @@ let create topic =
   let topic = Kafka.new_topic producer topic [] in
   Lwt.return topic
 
-let kafka_produce ?(partition=0) topic message =
-  Kafka_lwt.produce topic partition message
+let kafka_produce ?(partition=0) ?key topic message =
+  Kafka_lwt.produce ?key topic partition message
 
 (** Producer *)
 let produce_item_event item_event =
@@ -68,7 +68,7 @@ let produce_item_event item_event =
       | Some t -> Lwt.return t
     end >>= fun t ->
     EzEncoding.construct Rtypes.nft_item_event_enc item_event
-    |> kafka_produce t
+    |> kafka_produce ~key:item_event.Rtypes.nft_item_event_item_id t
   | None -> Lwt.return ()
 
 let produce_ownership_event ownership_event =
@@ -82,7 +82,7 @@ let produce_ownership_event ownership_event =
       | Some t -> Lwt.return t
     end >>= fun t ->
     EzEncoding.construct Rtypes.nft_ownership_event_enc ownership_event
-    |> kafka_produce t
+    |> kafka_produce ~key:ownership_event.Rtypes.nft_ownership_event_event_id t
   | _ -> Lwt.return ()
 
 let produce_order_event order_event =
@@ -96,7 +96,7 @@ let produce_order_event order_event =
       | Some t -> Lwt.return t
     end >>= fun t ->
     EzEncoding.construct Rtypes.order_event_enc order_event
-    |> kafka_produce t
+    |> kafka_produce ~key:order_event.Rtypes.order_event_order_id t
   | _ -> Lwt.return ()
 
 let produce_nft_activity activity =
@@ -110,7 +110,7 @@ let produce_nft_activity activity =
       | Some t -> Lwt.return t
     end >>= fun t ->
     EzEncoding.construct Rtypes.nft_activity_enc activity
-    |> kafka_produce t
+    |> kafka_produce ~key:activity.Rtypes.nft_activity_id t
   | None -> Lwt.return ()
 
 let produce_order_activity activity =
@@ -124,7 +124,7 @@ let produce_order_activity activity =
       | Some t -> Lwt.return t
     end >>= fun t ->
     EzEncoding.construct Rtypes.order_activity_enc activity
-    |> kafka_produce t
+    |> kafka_produce ~key:activity.Rtypes.order_activity_id t
   | None -> Lwt.return ()
 
 let produce_test msg =
