@@ -421,7 +421,7 @@ let asset_enc =
     (fun a -> match a.asset_type with
        | ATXTZ | ATFA_1_2 _ ->
          let dec = Z.(rem (of_string a.asset_value) factor) in
-         let dec_str = if dec = Z.zero then "" else "." ^ Z.to_string dec in
+         let dec_str = if dec = Z.zero then "" else Format.sprintf ".%06d" (Z.to_int dec) in
          let num = Z.(to_string @@ div (of_string a.asset_value) factor) in
          { a with asset_value = Format.sprintf "%s%s" num dec_str }
        | _ -> a)
