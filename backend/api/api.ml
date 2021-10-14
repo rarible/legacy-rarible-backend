@@ -15,10 +15,6 @@ module Errors = Errors
  *          "45461654b86e856686e7a2e9a9213b29f8dc32a731046e0c2f1aa01e4eaa991e41ebc67535fac14c333ad5b0d0d821ef518edc9ed08ad7efc0af572620c045ce1c") in
  *   Format.eprintf "XX %S\n%!" s *)
 
-let (let$>) r f = match r with
-  | Error e -> Lwt.return_error (invalid_argument (string_of_error e))
-  | Ok x -> f x
-
 let nft_section = EzAPI.Doc.{section_name = "nft-activity-controller"; section_docs = []}
 let ownerships_section = EzAPI.Doc.{section_name = "nft-ownership-controller"; section_docs = []}
 let items_section = EzAPI.Doc.{section_name = "nft-item-controller"; section_docs = []}
@@ -83,7 +79,7 @@ let ownership_id_arg = EzAPI.Arg.string "ownershipId"
 
 
 let mk_invalid_argument param msg =
-  Error (invalid_argument (Printf.sprintf "%s %s" param.EzAPI.Param.param_id msg))
+  Error (`INVALID_ARGUMENT (Printf.sprintf "%s %s" param.EzAPI.Param.param_id msg))
 
 let get_origin_param req =
   let open Tzfunc.Crypto in
@@ -227,9 +223,9 @@ let parse_item_id s =
       ignore @@ Base58.decode ~prefix:Prefix.contract_public_key_hash c ;
       Ok (c, Int64.(to_string @@ of_string tid))
     | _ ->
-      Error (invalid_argument "itemId must be in format contract:token_id")
+      Error (`INVALID_ARGUMENT "itemId must be in format contract:token_id")
   with _ ->
-    Error (invalid_argument "itemId must be in format contract:token_id")
+    Error (`INVALID_ARGUMENT "itemId must be in format contract:token_id")
 
 let get_continuation_items_param req =
   match EzAPI.Req.find_param continuation_param req with
@@ -269,7 +265,7 @@ let parse_collection_id s =
     ignore @@ Base58.decode ~prefix:Prefix.contract_public_key_hash s ;
     Ok s
   with _ ->
-    Error (invalid_argument  "collection must be a tezos smart contract address")
+    Error (`INVALID_ARGUMENT "collection must be a tezos smart contract address")
 
 let get_continuation_collections_param req =
   match EzAPI.Req.find_param continuation_param req with
@@ -292,9 +288,9 @@ let parse_ownership_id s =
       ignore @@ Base58.decode ~prefix:Prefix.contract_public_key_hash owner ;
       Ok (c, Int64.(to_string @@ of_string tid), owner)
     | _ ->
-      Error (invalid_argument "itemId must be in format contract:token_id:owner")
+      Error (`INVALID_ARGUMENT "itemId must be in format contract:token_id:owner")
   with _ ->
-    Error (invalid_argument "itemId must be in format contract:token_id:owner")
+    Error (`INVALID_ARGUMENT "itemId must be in format contract:token_id:owner")
 
 let get_continuation_ownerships_param req =
   match EzAPI.Req.find_param continuation_param req with
@@ -455,6 +451,7 @@ let get_currency_param req =
  *    errors=[rarible_error_500]}] *)
 
 (* nft-activity-controller *)
+
 let get_nft_activities req input =
   match get_size_param req with
   | Error err -> return @@ Error err
@@ -465,14 +462,14 @@ let get_nft_activities req input =
       Db.get_nft_activities ?continuation ?size input >>= function
       | Error db_err ->
         let str = Crawlori.Rp.string_of_error db_err in
-        return (Error (unexpected_api_error str))
+        return (Error (`UNEXPECTED_API_ERROR str))
       | Ok res -> return_ok res
 [@@post
   {path="/v0.1/nft/activities/search";
    params=[size_param;continuation_param];
    input=nft_activity_filter_enc;
    output=nft_activities_enc;
-   errors=[rarible_error_500];
+   errors=[invalid_argument_case; unexpected_api_error_case];
    name="search_activities";
    section=nft_section}]
 
@@ -484,12 +481,12 @@ let get_nft_ownership_by_id (_, ownership_id) () =
     Db.get_nft_ownership_by_id contract token_id owner >>= function
     | Error db_err ->
       let str = Crawlori.Rp.string_of_error db_err in
-      return (Error (unexpected_api_error str))
+      return (Error (`UNEXPECTED_API_ERROR str))
     | Ok res -> return_ok res
 [@@get
   {path="/v0.1/ownerships/{ownership_id_arg}";
    output=nft_ownership_enc;
-   errors=[rarible_error_500];
+   errors=[invalid_argument_case; unexpected_api_error_case];
    name="ownerships";
    section=ownerships_section}]
 
@@ -509,13 +506,13 @@ let get_nft_ownerships_by_item req () =
           Db.get_nft_ownerships_by_item ?continuation ?size contract token_id >>= function
           | Error db_err ->
             let str = Crawlori.Rp.string_of_error db_err in
-            return (Error (unexpected_api_error str))
+            return (Error (`UNEXPECTED_API_ERROR str))
           | Ok res -> return_ok res
 [@@get
   {path="/v0.1/ownerships/byItem";
    params=[contract_param;token_id_param;size_param;continuation_param];
    output=nft_ownerships_enc;
-   errors=[rarible_error_500];
+   errors=[invalid_argument_case; unexpected_api_error_case];
    name="ownerships_by_item";
    section=ownerships_section}]
 
@@ -529,13 +526,13 @@ let get_nft_all_ownerships req () =
       Db.get_nft_all_ownerships ?continuation ?size () >>= function
       | Error db_err ->
         let str = Crawlori.Rp.string_of_error db_err in
-        return (Error (unexpected_api_error str))
+        return (Error (`UNEXPECTED_API_ERROR str))
       | Ok res -> return_ok res
 [@@get
   {path="/v0.1/ownerships/all";
    params=[size_param;continuation_param];
    output=nft_ownerships_enc;
-   errors=[rarible_error_500];
+   errors=[invalid_argument_case; unexpected_api_error_case];
    name="ownerships_all";
    section=ownerships_section}]
 
@@ -547,12 +544,12 @@ let get_nft_item_meta_by_id (_req, item_id) () =
     Db.get_nft_item_meta_by_id contract token_id >>= function
     | Error db_err ->
       let str = Crawlori.Rp.string_of_error db_err in
-      return (Error (unexpected_api_error str))
+      return (Error (`UNEXPECTED_API_ERROR str))
     | Ok res -> return_ok res
 [@@get
   {path="/v0.1/items/{item_id_arg}/meta";
    output=nft_item_meta_enc;
-   errors=[rarible_error_500];
+   errors=[invalid_argument_case; unexpected_api_error_case];
    name="items_meta";
    section=items_section
   }]
@@ -567,13 +564,13 @@ let get_nft_item_by_id (req, item_id) () =
       Db.get_nft_item_by_id ?include_meta contract token_id >>= function
       | Error db_err ->
         let str = Crawlori.Rp.string_of_error db_err in
-        return (Error (unexpected_api_error str))
+        return (Error (`UNEXPECTED_API_ERROR str))
       | Ok res -> return_ok res
 [@@get
   {path="/v0.1/items/{item_id_arg}";
    params=[include_meta_param];
    output=nft_item_enc;
-   errors=[rarible_error_500];
+   errors=[invalid_argument_case; unexpected_api_error_case];
    name="items_by_id";
    section=items_section}]
 
@@ -593,13 +590,13 @@ let get_nft_items_by_owner req () =
           Db.get_nft_items_by_owner ?include_meta ?continuation ?size owner >>= function
           | Error db_err ->
             let str = Crawlori.Rp.string_of_error db_err in
-            return (Error (unexpected_api_error str))
+            return (Error (`UNEXPECTED_API_ERROR str))
           | Ok res -> return_ok res
 [@@get
   {path="/v0.1/items/byOwner";
    params=[owner_param;include_meta_param;size_param;continuation_param];
    output=nft_items_enc;
-   errors=[rarible_error_500];
+   errors=[invalid_argument_case; unexpected_api_error_case];
    name="items_by_owner";
    section=items_section}]
 
@@ -619,13 +616,13 @@ let get_nft_items_by_creator req () =
           Db.get_nft_items_by_creator ?include_meta ?continuation ?size creator >>= function
           | Error db_err ->
             let str = Crawlori.Rp.string_of_error db_err in
-            return (Error (unexpected_api_error str))
+            return (Error (`UNEXPECTED_API_ERROR str))
           | Ok res -> return_ok res
 [@@get
   {path="/v0.1/items/byCreator";
    params=[creator_param;include_meta_param;size_param;continuation_param];
    output=nft_items_enc;
-   errors=[rarible_error_500];
+   errors=[invalid_argument_case; unexpected_api_error_case];
    name="items_by_creator";
    section=items_section}]
 
@@ -645,13 +642,13 @@ let get_nft_items_by_collection req () =
           Db.get_nft_items_by_collection ?include_meta ?continuation ?size collection >>= function
           | Error db_err ->
             let str = Crawlori.Rp.string_of_error db_err in
-            return (Error (unexpected_api_error str))
+            return (Error (`UNEXPECTED_API_ERROR str))
           | Ok res -> return_ok res
 [@@get
   {path="/v0.1/items/byCollection";
    params=[collection_param;include_meta_param;size_param;continuation_param];
    output=nft_items_enc;
-   errors=[rarible_error_500];
+   errors=[invalid_argument_case; unexpected_api_error_case];
    name="items_by_collection";
    section=items_section}]
 
@@ -684,14 +681,14 @@ let get_nft_all_items req () =
                 () >>= function
               | Error db_err ->
                 let str = Crawlori.Rp.string_of_error db_err in
-                return (Error (unexpected_api_error str))
+                return (Error (`UNEXPECTED_API_ERROR str))
               | Ok res -> return_ok res
 [@@get
   {path="/v0.1/items/all";
    params=[last_updated_from_param;last_updated_to_param;show_deleted_param;
            include_meta_param;size_param;continuation_param];
    output=nft_items_enc;
-   errors=[rarible_error_500]}]
+   errors=[invalid_argument_case; unexpected_api_error_case]}]
 
 (* nft-collection-controller *)
 let generate_nft_token_id (_req, collection) () =
@@ -701,12 +698,12 @@ let generate_nft_token_id (_req, collection) () =
     Db.generate_nft_token_id collection >>= function
     | Error db_err ->
       let str = Crawlori.Rp.string_of_error db_err in
-      return (Error (unexpected_api_error str))
+      return (Error (`UNEXPECTED_API_ERROR str))
     | Ok res -> return_ok res
 [@@get
   {path="/v0.1/collections/{collection_arg}/generate_token_id";
    output=nft_token_id_enc;
-   errors=[rarible_error_500];
+   errors=[invalid_argument_case; unexpected_api_error_case];
    name="collections_generate_id";
    section=collections_section}]
 
@@ -717,12 +714,12 @@ let get_nft_collection_by_id (_req, collection) () =
     Db.get_nft_collection_by_id collection >>= function
     | Error db_err ->
       let str = Crawlori.Rp.string_of_error db_err in
-      return (Error (unexpected_api_error str))
+      return (Error (`UNEXPECTED_API_ERROR str))
     | Ok res -> return_ok res
 [@@get
   {path="/v0.1/collections/{collection_arg}";
    output=nft_collection_enc;
-   errors=[rarible_error_500];
+   errors=[invalid_argument_case; unexpected_api_error_case];
    name="collections_by_id";
    section=collections_section}]
 
@@ -739,13 +736,13 @@ let search_nft_collections_by_owner req () =
         Db.search_nft_collections_by_owner ?continuation ?size owner >>= function
         | Error db_err ->
           let str = Crawlori.Rp.string_of_error db_err in
-          return (Error (unexpected_api_error str))
+          return (Error (`UNEXPECTED_API_ERROR str))
         | Ok res -> return_ok res
 [@@get
   {path="/v0.1/collections/byOwner";
    params=[owner_param;size_param;continuation_param];
    output=nft_collections_enc;
-   errors=[rarible_error_500];
+   errors=[invalid_argument_case; unexpected_api_error_case];
    name="collections_by_owner";
    section=collections_section}]
 
@@ -759,13 +756,13 @@ let search_nft_all_collections req () =
       Db.get_nft_all_collections ?continuation ?size () >>= function
       | Error db_err ->
         let str = Crawlori.Rp.string_of_error db_err in
-        return (Error (unexpected_api_error str))
+        return (Error (`UNEXPECTED_API_ERROR str))
       | Ok res -> return_ok res
 [@@get
   {path="/v0.1/collections/all";
    params=[size_param;continuation_param];
    output=nft_collections_enc;
-   errors=[rarible_error_500];
+   errors=[invalid_argument_case; unexpected_api_error_case];
    name="collections_all";
    section=collections_section}]
 
@@ -786,7 +783,9 @@ let validate_signature order =
     let d = order.order_data in
     d.order_rarible_v2_data_v1_data_type, d.order_rarible_v2_data_v1_payouts,
     d.order_rarible_v2_data_v1_origin_fees in
-  let$> msg = hash_order_form order_elt.order_elt_maker order_elt.order_elt_make
+  let$ msg =
+    Result.map_error (fun e -> `VALIDATION (Let.string_of_error e)) @@
+    hash_order_form order_elt.order_elt_maker order_elt.order_elt_make
       order_elt.order_elt_taker order_elt.order_elt_take
       order_elt.order_elt_salt order_elt.order_elt_start order_elt.order_elt_end
       data_type payouts origin_fees in
@@ -795,14 +794,13 @@ let validate_signature order =
   let edpk = order_elt.order_elt_maker in
   Format.eprintf "validate_signature1\n%!";
   match Tzfunc.Crypto.Ed25519.verify ~edpk ~edsig ~bytes:msg with
-  | Ok true -> Lwt.return_ok ()
-  | _ -> Lwt.return_error (invalid_argument "Incorrect signature")
+  | Ok true -> Ok ()
+  | _ -> Error (`INVALID_ARGUMENT "Incorrect signature")
 
 let validate_order order =
   Format.eprintf "validate_order\n%!";
   (* No need to check form.data as other combinations are not accepted by the input encoding *)
-  validate_signature order >>=? fun () ->
-  Lwt.return_ok ()
+  validate_signature order
 
 let validate existing update =
   let existing_make_value = existing.order_elt.order_elt_make.asset_value in
@@ -810,27 +808,27 @@ let validate existing update =
   let existing_take_value = existing.order_elt.order_elt_take.asset_value in
   let update_take_value = update.order_elt.order_elt_take.asset_value in
   if existing.order_elt.order_elt_cancelled then
-    Lwt.return (Error (invalid_argument "Order is cancelled"))
+    Lwt.return (Error (`INVALID_ARGUMENT "Order is cancelled"))
   else if existing.order_data <> update.order_data then
-    Lwt.return (Error (invalid_argument "Invalide update data"))
+    Lwt.return (Error (`INVALID_ARGUMENT "Invalide update data"))
   else if existing.order_elt.order_elt_start <>
           update.order_elt.order_elt_start then
-    Lwt.return (Error (invalid_argument "Invalide update start date"))
+    Lwt.return (Error (`INVALID_ARGUMENT "Invalide update start date"))
   else if existing.order_elt.order_elt_end <>
           update.order_elt.order_elt_end then
-    Lwt.return (Error (invalid_argument "Invalide update end date"))
+    Lwt.return (Error (`INVALID_ARGUMENT "Invalide update end date"))
   else if existing.order_elt.order_elt_taker <>
           update.order_elt.order_elt_taker then
-    Lwt.return (Error (invalid_argument "Invalide update taker"))
+    Lwt.return (Error (`INVALID_ARGUMENT "Invalide update taker"))
   else if update_make_value < existing_make_value then
-    Lwt.return (Error (invalid_argument "Invalide update can't decrease make asset value"))
+    Lwt.return (Error (`INVALID_ARGUMENT "Invalide update can't decrease make asset value"))
   else
     let new_max_take =
       Z.(div
            (mul (of_string update_make_value) (of_string existing_take_value))
            (of_string existing_make_value)) in
     if new_max_take < Z.of_string update_take_value then
-      Lwt.return (Error (invalid_argument "Invalide update new max take"))
+      Lwt.return (Error (`INVALID_ARGUMENT "Invalide update new max take"))
     else Lwt.return_ok ()
 
 let get_existing_order hash_key_order =
@@ -840,15 +838,15 @@ let get_existing_order hash_key_order =
 let upsert_order _req input =
   Format.eprintf "upsert_order\n%!";
   match order_from_order_form input with
-  | Error err -> return (Error (unexpected_api_error @@ string_of_error err))
+  | Error err -> return (Error (`UNEXPECTED_API_ERROR (Let.string_of_error err)))
   | Ok order ->
-    validate_order order >>= function
-    | Error err -> return (Error err)
+    match validate_order order with
+    | Error e -> return (Error e)
     | Ok () ->
       get_existing_order order.order_elt.order_elt_hash >>= function
       | Error db_err ->
         let str = Crawlori.Rp.string_of_error db_err in
-        return (Error (unexpected_api_error str))
+        return (Error (`UNEXPECTED_API_ERROR str))
       | Ok existing_order ->
         begin match existing_order with
           | None -> Lwt.return @@ Ok order
@@ -885,14 +883,14 @@ let upsert_order _req input =
           Db.upsert_order order >>= function
           | Error db_err ->
             let str = Crawlori.Rp.string_of_error db_err in
-            return (Error (unexpected_api_error str))
+            return (Error (`UNEXPECTED_API_ERROR str))
           | Ok () ->
             Db.get_order order.order_elt.order_elt_hash >>= function
             | Error db_err ->
               let str = Crawlori.Rp.string_of_error db_err in
-              return (Error (unexpected_api_error str))
+              return (Error (`UNEXPECTED_API_ERROR str))
             | Ok None ->
-              return (Error (unexpected_api_error "order not registered"))
+              return (Error (`UNEXPECTED_API_ERROR "order not registered"))
             | Ok Some (order) ->
               return_ok order
 (* kafkta.push order *)
@@ -900,7 +898,7 @@ let upsert_order _req input =
   {path="/v0.1/orders";
    input=order_form_enc;
    output=order_enc;
-   errors=[rarible_error_500];
+   errors=[invalid_argument_case; unexpected_api_error_case; validation_case];
    name="orders_upsert";
    section=orders_section}]
 
@@ -919,27 +917,27 @@ let get_orders_all req () =
         Db.get_orders_all ?origin ?continuation ?size () >>= function
         | Error db_err ->
           let str = Crawlori.Rp.string_of_error db_err in
-          return (Error (unexpected_api_error str))
+          return (Error (`UNEXPECTED_API_ERROR str))
         | Ok res -> return_ok res
 [@@get
   {path="/v0.1/orders/all";
    params=[origin_param;size_param;continuation_param];
    output=orders_pagination_enc;
-   errors=[rarible_error_500];
+   errors=[invalid_argument_case; unexpected_api_error_case];
    name="orders_all";
    section=orders_section}]
 
 let get_order_by_hash (_req, hash) () =
   Db.get_order hash >>= function
   | Ok (Some order) -> return_ok order
-  | Ok None -> return (Error (invalid_argument "No order with this hash"))
+  | Ok None -> return (Error (`INVALID_ARGUMENT "No order with this hash"))
   | Error db_err ->
     let str = Crawlori.Rp.string_of_error db_err in
-    return (Error (unexpected_api_error str))
+    return (Error (`UNEXPECTED_API_ERROR str))
 [@@get
   {path="/v0.1/orders/{hash_arg}";
    output=order_enc;
-   errors=[rarible_error_500];
+   errors=[invalid_argument_case; unexpected_api_error_case];
    name="orders_by_hash";
    section=orders_section}]
 
@@ -977,13 +975,13 @@ let get_sell_orders_by_maker req () =
           Db.get_sell_orders_by_maker ?origin ?continuation ?size maker >>= function
           | Error db_err ->
             let str = Crawlori.Rp.string_of_error db_err in
-            return (Error (unexpected_api_error str))
+            return (Error (`UNEXPECTED_API_ERROR str))
           | Ok res -> return_ok res
 [@@get
   {path="/v0.1/orders/sell/byMaker";
    params=[maker_param;origin_param;size_param;continuation_param];
    output=orders_pagination_enc;
-   errors=[rarible_error_500];
+   errors=[invalid_argument_case; unexpected_api_error_case];
    name="orders_by_maker";
    section=orders_section}]
 
@@ -1015,14 +1013,14 @@ let get_sell_orders_by_item req () =
                 ?origin ?continuation ?size ?maker ?currency contract token_id >>= function
               | Error db_err ->
                 let str = Crawlori.Rp.string_of_error db_err in
-                return (Error (unexpected_api_error str))
+                return (Error (`UNEXPECTED_API_ERROR str))
               | Ok res -> return_ok res
 [@@get
   {path="/v0.1/orders/sell/byItem";
    params=[contract_param;token_id_param;maker_param;origin_param;
            size_param;continuation_param];
    output=orders_pagination_enc;
-   errors=[rarible_error_500];
+   errors=[invalid_argument_case; unexpected_api_error_case];
    name="orders_sell_by_item";
    section=orders_section}]
 
@@ -1045,13 +1043,13 @@ let get_sell_orders_by_collection req () =
             ?origin ?continuation ?size collection >>= function
           | Error db_err ->
             let str = Crawlori.Rp.string_of_error db_err in
-            return (Error (unexpected_api_error str))
+            return (Error (`UNEXPECTED_API_ERROR str))
           | Ok res -> return_ok res
 [@@get
   {path="/v0.1/orders/sell/byCollection";
    params=[collection_param;origin_param;size_param;continuation_param];
    output=orders_pagination_enc;
-   errors=[rarible_error_500];
+   errors=[invalid_argument_case; unexpected_api_error_case];
    name="orders_sell_by_collection";
    section=orders_section}]
 
@@ -1070,13 +1068,13 @@ let get_sell_orders req () =
         Db.get_sell_orders ?origin ?continuation ?size () >>= function
         | Error db_err ->
           let str = Crawlori.Rp.string_of_error db_err in
-          return (Error (unexpected_api_error str))
+          return (Error (`UNEXPECTED_API_ERROR str))
         | Ok res -> return_ok res
 [@@get
   {path="/v0.1/orders/sell";
    params=[origin_param;size_param;continuation_param];
    output=orders_pagination_enc;
-   errors=[rarible_error_500];
+   errors=[invalid_argument_case; unexpected_api_error_case];
    name="orders_sell";
    section=orders_section}]
 
@@ -1098,13 +1096,13 @@ let get_order_bids_by_maker req () =
           Db.get_bid_orders_by_maker ?origin ?continuation ?size maker >>= function
           | Error db_err ->
             let str = Crawlori.Rp.string_of_error db_err in
-            return (Error (unexpected_api_error str))
+            return (Error (`UNEXPECTED_API_ERROR str))
           | Ok res -> return_ok res
 [@@get
   {path="/v0.1/orders/bids/byMaker";
    params=[maker_param;origin_param;size_param;continuation_param];
    output=orders_pagination_enc;
-   errors=[rarible_error_500];
+   errors=[invalid_argument_case; unexpected_api_error_case];
    name="orders_bids_by_maker";
    section=orders_section}]
 
@@ -1136,14 +1134,14 @@ let get_order_bids_by_item req () =
                   ?origin ?continuation ?size ?maker ?currency contract token_id >>= function
                 | Error db_err ->
                   let str = Crawlori.Rp.string_of_error db_err in
-                  return (Error (unexpected_api_error str))
+                  return (Error (`UNEXPECTED_API_ERROR str))
                 | Ok res -> return_ok res
 [@@get
   {path="/v0.1/orders/bids/byItem";
    params=[contract_param;token_id_param;maker_param;origin_param;
            size_param;continuation_param];
    output=orders_pagination_enc;
-   errors=[rarible_error_500];
+   errors=[invalid_argument_case; unexpected_api_error_case];
    name="orders_bids_by_item";
    section=orders_section}]
 
@@ -1158,7 +1156,7 @@ let get_order_activities req input =
       Db.get_order_activities ?continuation ?size input >>= function
       | Error db_err ->
         let str = Crawlori.Rp.string_of_error db_err in
-        return (Error (unexpected_api_error str))
+        return (Error (`UNEXPECTED_API_ERROR str))
       | Ok res -> return_ok res
 [@@post
   {path="/v0.1/order/activities/search";
@@ -1166,20 +1164,20 @@ let get_order_activities req input =
    name="get_order_activities";
    input=order_activity_filter_enc;
    output=order_activities_enc;
-   errors=[rarible_error_500];
+   errors=[invalid_argument_case; unexpected_api_error_case];
    section=order_activities_section}]
 
 let validate _req input =
   match Tzfunc.Crypto.Ed25519.verify ~edpk:input.svf_signer ~edsig:input.svf_signature
           ~bytes:(Tzfunc.Raw.mk input.svf_message) with
   | Ok b -> return_ok b
-  | Error e -> return (Error (invalid_argument (string_of_error e)))
+  | Error e -> return (Error (`INVALID_ARGUMENT (Let.string_of_error e)))
 [@@post
   {path="/v0.1/order/signature/validate";
    name="validate";
    input=signature_validation_form_enc;
    output=Json_encoding.bool;
-   errors=[rarible_error_500];
+   errors=[invalid_argument_case; unexpected_api_error_case];
    section=signature_section}]
 
 

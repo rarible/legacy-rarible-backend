@@ -34,7 +34,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error500'
+                oneOf:
+                - $ref: '#/components/schemas/UNEXPECTED_API_ERROR'
+                - $ref: '#/components/schemas/INVALID_ARGUMENT'
         "200":
           description: OK
           content:
@@ -61,7 +63,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error500'
+                oneOf:
+                - $ref: '#/components/schemas/UNEXPECTED_API_ERROR'
+                - $ref: '#/components/schemas/INVALID_ARGUMENT'
         "200":
           description: OK
           content:
@@ -105,7 +109,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error500'
+                oneOf:
+                - $ref: '#/components/schemas/UNEXPECTED_API_ERROR'
+                - $ref: '#/components/schemas/INVALID_ARGUMENT'
         "200":
           description: OK
           content:
@@ -139,7 +145,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error500'
+                oneOf:
+                - $ref: '#/components/schemas/UNEXPECTED_API_ERROR'
+                - $ref: '#/components/schemas/INVALID_ARGUMENT'
         "200":
           description: OK
           content:
@@ -166,7 +174,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error500'
+                oneOf:
+                - $ref: '#/components/schemas/UNEXPECTED_API_ERROR'
+                - $ref: '#/components/schemas/INVALID_ARGUMENT'
         "200":
           description: OK
           content:
@@ -198,7 +208,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error500'
+                oneOf:
+                - $ref: '#/components/schemas/UNEXPECTED_API_ERROR'
+                - $ref: '#/components/schemas/INVALID_ARGUMENT'
         "200":
           description: OK
           content:
@@ -242,7 +254,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error500'
+                oneOf:
+                - $ref: '#/components/schemas/UNEXPECTED_API_ERROR'
+                - $ref: '#/components/schemas/INVALID_ARGUMENT'
         "200":
           description: OK
           content:
@@ -286,7 +300,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error500'
+                oneOf:
+                - $ref: '#/components/schemas/UNEXPECTED_API_ERROR'
+                - $ref: '#/components/schemas/INVALID_ARGUMENT'
         "200":
           description: OK
           content:
@@ -330,7 +346,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error500'
+                oneOf:
+                - $ref: '#/components/schemas/UNEXPECTED_API_ERROR'
+                - $ref: '#/components/schemas/INVALID_ARGUMENT'
         "200":
           description: OK
           content:
@@ -357,7 +375,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error500'
+                oneOf:
+                - $ref: '#/components/schemas/UNEXPECTED_API_ERROR'
+                - $ref: '#/components/schemas/INVALID_ARGUMENT'
         "200":
           description: OK
           content:
@@ -384,7 +404,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error500'
+                oneOf:
+                - $ref: '#/components/schemas/UNEXPECTED_API_ERROR'
+                - $ref: '#/components/schemas/INVALID_ARGUMENT'
         "200":
           description: OK
           content:
@@ -423,7 +445,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error500'
+                oneOf:
+                - $ref: '#/components/schemas/UNEXPECTED_API_ERROR'
+                - $ref: '#/components/schemas/INVALID_ARGUMENT'
         "200":
           description: OK
           content:
@@ -457,7 +481,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error500'
+                oneOf:
+                - $ref: '#/components/schemas/UNEXPECTED_API_ERROR'
+                - $ref: '#/components/schemas/INVALID_ARGUMENT'
         "200":
           description: OK
           content:
@@ -484,7 +510,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error500'
+                oneOf:
+                - $ref: '#/components/schemas/VALIDATION'
+                - $ref: '#/components/schemas/UNEXPECTED_API_ERROR'
+                - $ref: '#/components/schemas/INVALID_ARGUMENT'
         "200":
           description: OK
           content:
@@ -523,7 +552,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error500'
+                oneOf:
+                - $ref: '#/components/schemas/UNEXPECTED_API_ERROR'
+                - $ref: '#/components/schemas/INVALID_ARGUMENT'
         "200":
           description: OK
           content:
@@ -550,7 +581,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error500'
+                oneOf:
+                - $ref: '#/components/schemas/UNEXPECTED_API_ERROR'
+                - $ref: '#/components/schemas/INVALID_ARGUMENT'
         "200":
           description: OK
           content:
@@ -594,7 +627,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error500'
+                oneOf:
+                - $ref: '#/components/schemas/UNEXPECTED_API_ERROR'
+                - $ref: '#/components/schemas/INVALID_ARGUMENT'
         "200":
           description: OK
           content:
@@ -648,7 +683,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error500'
+                oneOf:
+                - $ref: '#/components/schemas/UNEXPECTED_API_ERROR'
+                - $ref: '#/components/schemas/INVALID_ARGUMENT'
         "200":
           description: OK
           content:
@@ -692,7 +729,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error500'
+                oneOf:
+                - $ref: '#/components/schemas/UNEXPECTED_API_ERROR'
+                - $ref: '#/components/schemas/INVALID_ARGUMENT'
         "200":
           description: OK
           content:
@@ -731,7 +770,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error500'
+                oneOf:
+                - $ref: '#/components/schemas/UNEXPECTED_API_ERROR'
+                - $ref: '#/components/schemas/INVALID_ARGUMENT'
         "200":
           description: OK
           content:
@@ -775,7 +816,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error500'
+                oneOf:
+                - $ref: '#/components/schemas/UNEXPECTED_API_ERROR'
+                - $ref: '#/components/schemas/INVALID_ARGUMENT'
         "200":
           description: OK
           content:
@@ -829,7 +872,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error500'
+                oneOf:
+                - $ref: '#/components/schemas/UNEXPECTED_API_ERROR'
+                - $ref: '#/components/schemas/INVALID_ARGUMENT'
         "200":
           description: OK
           content:
@@ -868,7 +913,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error500'
+                oneOf:
+                - $ref: '#/components/schemas/UNEXPECTED_API_ERROR'
+                - $ref: '#/components/schemas/INVALID_ARGUMENT'
         "200":
           description: OK
           content:
@@ -895,7 +942,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error500'
+                oneOf:
+                - $ref: '#/components/schemas/UNEXPECTED_API_ERROR'
+                - $ref: '#/components/schemas/INVALID_ARGUMENT'
         "200":
           description: OK
           content:
@@ -966,36 +1015,6 @@ components:
       type: string
     Edsig:
       type: string
-    Error500:
-      type: object
-      properties:
-        status:
-          type: integer
-          minimum: -1073741824
-          maximum: 1073741823
-        message:
-          type: string
-        code:
-          type: string
-          enum:
-          - UNKNOWN
-          - VALIDATION
-          - FIRST_TEMPLATE_OBJECT_NOT_FOUND
-          - SECOND_TEMPLATE_OBJECT_NOT_FOUND
-          - BAD_REQUEST
-          - TOKEN_PROPERTIES_EXTRACT
-          - INCORRECT_LAZY_NFT
-          - INVALID_ARGUMENT
-          - ABSENCE_OF_REQUIRED_FIELD
-          - UNLOCKABLE_API_ERROR
-          - NFT_API_ERROR
-          - ORDER_API_ERROR
-          - UNEXPECTED_API_ERROR
-      required:
-      - code
-      - message
-      - status
-      additionalProperties: false
     FA_1_2AssetType:
       type: object
       properties:
@@ -1024,6 +1043,19 @@ components:
       - tokenId
       - contract
       - assetClass
+      additionalProperties: false
+    INVALID_ARGUMENT:
+      type: object
+      properties:
+        code:
+          type: string
+          enum:
+          - INVALID_ARGUMENT
+        message:
+          type: string
+      required:
+      - message
+      - code
       additionalProperties: false
     ItemHistory:
       oneOf:
@@ -1329,6 +1361,9 @@ components:
         date:
           type: string
           format: date-time
+        mintedAt:
+          type: string
+          format: date-time
         pending:
           type: array
           items:
@@ -1338,6 +1373,7 @@ components:
         meta:
           $ref: '#/components/schemas/NftItemMeta'
       required:
+      - mintedAt
       - date
       - royalties
       - owners
@@ -1998,7 +2034,7 @@ components:
           $ref: '#/components/schemas/Address'
         value:
           type: integer
-          minimum: -2147483648
+          minimum: 0
           maximum: 2147483647
       required:
       - value
@@ -2033,6 +2069,32 @@ components:
       - from
       - elt
       - '@type'
+      additionalProperties: false
+    UNEXPECTED_API_ERROR:
+      type: object
+      properties:
+        code:
+          type: string
+          enum:
+          - UNEXPECTED_API_ERROR
+        message:
+          type: string
+      required:
+      - message
+      - code
+      additionalProperties: false
+    VALIDATION:
+      type: object
+      properties:
+        code:
+          type: string
+          enum:
+          - VALIDATION
+        message:
+          type: string
+      required:
+      - message
+      - code
       additionalProperties: false
     Word:
       type: string
