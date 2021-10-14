@@ -141,6 +141,11 @@ let rec sys_command ?(verbose=0) ?(retry=0) c =
   else
     code, out_temp_fn, err_temp_fn
 
+let pk_to_pkh_exn pk =
+  match Tzfunc.Crypto.pk_to_pkh pk with
+  | Error _ -> assert false
+  | Ok pkh -> pkh
+
 let generate_option f =
   if Random.bool () then
     Some (f ())
@@ -154,7 +159,7 @@ let rec generate_address ?(diff=None) () = match diff with
     List.nth accounts (Random.int accounts_len)
   | Some a ->
     let (_, pk, _) as r = List.nth accounts (Random.int accounts_len) in
-    let tz1 = Tzfunc.Crypto.pk_to_pkh pk in
+    let tz1 = pk_to_pkh_exn pk in
     if a = tz1 then generate_address ~diff ()
     else r
 
@@ -194,7 +199,7 @@ let generate_token_id () = string_of_int @@ generate_amount ~max:1_000_000 ()
 
 let generate_part () =
   let part_account = generate_origin () in
-  let part_value = string_of_int @@ (Random.int 50) * 100 in
+  let part_value = Int32.mul (Random.int32 50l) 100l in
   { part_account ; part_value }
 
 let generate_parts () =
@@ -219,7 +224,7 @@ let generate_royalties () =
         aux ((addr_pk, v + old) :: (List.remove_assoc addr_pk royalties))
       with Not_found ->
         (addr_pk, v) :: royalties in
-  List.map (fun (addr, v) -> Tzfunc.Crypto.pk_to_pkh addr, Int64.of_int v) @@ aux []
+  List.map (fun (addr, v) -> pk_to_pkh_exn addr, Int64.of_int v) @@ aux []
 
 let mk_order_form
     maker taker make take salt start_date end_date signature data_type payouts origin_fees =
@@ -257,7 +262,7 @@ let generate_order () =
   let$ to_sign =
     hash_order_form
       maker_pk make taker take salt start_date end_date data_type payouts origin_fees in
-  let signature = sign ~edsk:maker_sk to_sign in
+  let$ signature = Tzfunc.Crypto.Ed25519.sign ~edsk:maker_sk to_sign in
   let order_form =
     mk_order_form
       maker_pk taker make take salt start_date end_date signature data_type payouts origin_fees in
@@ -284,7 +289,7 @@ let order_form_from_items ?(salt=0) collection item1 item2 =
   let$ to_sign =
     hash_order_form
       maker_pk make taker take salt start_date end_date data_type payouts origin_fees in
-  let signature = sign ~edsk:maker_sk to_sign in
+  let$ signature = Tzfunc.Crypto.Ed25519.sign ~edsk:maker_sk to_sign in
   let order_form =
     mk_order_form
       maker_pk taker make take salt start_date end_date signature data_type payouts origin_fees in
@@ -303,7 +308,7 @@ let sell_order_form_from_item ?(salt=0) collection item1 take =
   let$ to_sign =
     hash_order_form
       maker_pk make taker take salt start_date end_date data_type payouts origin_fees in
-  let signature = sign ~edsk:maker_sk to_sign in
+  let$ signature = Tzfunc.Crypto.Ed25519.sign ~edsk:maker_sk to_sign in
   let order_form =
     mk_order_form
       maker_pk taker make take salt start_date end_date signature data_type payouts origin_fees in
@@ -321,7 +326,7 @@ let buy_order_form_from_item ?(salt=0) collection item1 (maker_pk, maker_sk) mak
   let$ to_sign =
     hash_order_form
       maker_pk make taker take salt start_date end_date data_type payouts origin_fees in
-  let signature = sign ~edsk:maker_sk to_sign in
+  let$ signature = Tzfunc.Crypto.Ed25519.sign ~edsk:maker_sk to_sign in
   let order_form =
     mk_order_form
       maker_pk taker make take salt start_date end_date signature data_type payouts origin_fees in
@@ -814,7 +819,7 @@ let create_collection ?(royalties=pick_royalties ()) () =
   let alias_admin, pk_admin, sk_admin = generate_address () in
   may_import_key alias_admin sk_admin ;
   let alias_source, _pk_source, sk_source = generate_address () in
-  let admin = Tzfunc.Crypto.pk_to_pkh pk_admin in
+  let admin = pk_to_pkh_exn pk_admin in
   may_import_key alias_source sk_source ;
   let name = Filename.basename @@ Filename.temp_file "collection" "name" in
   let symbol =
@@ -876,7 +881,7 @@ let deploy_collection admin alias_source alias_new royalties uri =
 let create_royalties () =
   Printf.eprintf "Creating new royalties\n%!" ;
   let alias_admin, pk_admin, sk_admin = generate_address () in
-  let admin = Tzfunc.Crypto.pk_to_pkh pk_admin in
+  let admin = pk_to_pkh_exn pk_admin in
   if !js then
     let kt1 = Script_js.deploy_royalties ~endpoint:!endpoint (admin, sk_admin) in
     kt1, alias_admin
@@ -908,13 +913,13 @@ let create_validator ~exchange ~royalties =
 let create_exchange () =
   Printf.eprintf "Creating new exchange\n%!" ;
   let alias_admin, pk_admin, sk_admin = generate_address () in
-  let admin = Tzfunc.Crypto.pk_to_pkh pk_admin in
+  let admin = pk_to_pkh_exn pk_admin in
   may_import_key alias_admin sk_admin ;
   let alias_source, _pk_source, sk_source = generate_address () in
   may_import_key alias_source sk_source ;
   let alias_receiver, pk_receiver, sk_receiver = generate_address () in
   may_import_key alias_receiver sk_receiver ;
-  let receiver = Tzfunc.Crypto.pk_to_pkh pk_receiver in
+  let receiver = pk_to_pkh_exn pk_receiver in
   if !js then
     let kt1_exchange = Script_js.deploy_exchange ~endpoint:!endpoint ~owner:admin
         ~receiver ~fee:300L sk_source in
@@ -987,7 +992,7 @@ let transfer_tokens id amount source contract new_owner =
 let mint_with_random_token_id ~source ~contract =
   Printf.eprintf "mint_with_random_token_id for %s on %s\n%!" (fst source) contract ;
   let _owner_alias, owner_pk, owner_sk = generate_address () in
-  let owner =  Tzfunc.Crypto.pk_to_pkh owner_pk in
+  let owner =  pk_to_pkh_exn owner_pk in
   let tid = generate_token_id () in
   let amount = string_of_int @@ generate_amount ~max:10 () in
   let royalties = generate_royalties () in
@@ -998,7 +1003,7 @@ let mint_with_random_token_id ~source ~contract =
 let mint_one_with_token_id_from_api ?diff ~source ~contract () =
   Printf.eprintf "mint_one_with_token_id_from_api for %s on %s\n%!" (fst source) contract ;
   let _owner_alias, owner_pk, owner_sk = generate_address ?diff () in
-  let owner =  Tzfunc.Crypto.pk_to_pkh owner_pk in
+  let owner =  pk_to_pkh_exn owner_pk in
   let amount = string_of_int 1 in
   let royalties = generate_royalties () in
   let name = Filename.basename @@ Filename.temp_file "item" "name" in
@@ -1011,7 +1016,7 @@ let mint_one_with_token_id_from_api ?diff ~source ~contract () =
 let mint_with_token_id_from_api ~source ~contract =
   Printf.eprintf "mint_with_token_id_from_api for %s on %s\n%!" (fst source) contract ;
   let _owner_alias, owner_pk, owner_sk = generate_address () in
-  let owner =  Tzfunc.Crypto.pk_to_pkh owner_pk in
+  let owner =  pk_to_pkh_exn owner_pk in
   let amount = string_of_int @@ generate_amount ~max:10 () in
   let royalties = generate_royalties () in
   let metadata = [] in
@@ -1045,7 +1050,7 @@ let burn ~source ~contract tid max_amount =
 let transfer ~source ~contract tid max_amount =
   let full = Random.bool () in
   let _alias, pk, sk = generate_address ~diff:(Some (fst source)) () in
-  let new_owner =  Tzfunc.Crypto.pk_to_pkh pk in
+  let new_owner = pk_to_pkh_exn pk in
   let new_owner_amount =
     if full then max_amount else generate_amount ~max:max_amount () + 1 in
   let|> () = transfer_with_token_id ~source ~contract tid (string_of_int new_owner_amount) new_owner in
@@ -1096,38 +1101,46 @@ let mich_order order =
 
 let match_orders ?amount ~source ~contract order_left order_right =
   let open Tzfunc.Crypto in
-  let pk =
-    Pk.b58enc @@
-    Sk.to_public_key @@
-    (Sk.b58dec @@ snd source) in
-  match flat_order order_left with
-  | Error err -> Lwt.fail_with @@ Printf.sprintf "mich order %s" @@ string_of_error err
-  | Ok m_left ->
-    match flat_order order_right with
+  let r =
+    Result.bind (Sk.b58dec @@ snd source) @@ fun sk ->
+    Result.bind (Sk.to_public_key sk) @@ fun pk ->
+    Ok (sk, Pk.b58enc ~curve:`ed25519 pk) in
+  match r with
+  | Error _ -> assert false
+  | Ok (sk, edpk) ->
+    match flat_order order_left with
     | Error err -> Lwt.fail_with @@ Printf.sprintf "mich order %s" @@ string_of_error err
-    | Ok m_right ->
-      let signature_left =
-        prim `Some ~args:[Proto.Mstring order_left.order_elt.order_elt_signature] in
-      let signature_right =
-        prim `Some ~args:[Proto.Mstring order_right.order_elt.order_elt_signature] in
-      let mich = prim `Pair ~args:[m_left; signature_left; m_right; signature_right] in
-      call
-        ?amount
-        ~local_forge:false
-        ~entrypoint:"matchOrders"
-        ~base:(EzAPI.BASE !endpoint)
-        ~get_pk:(fun () -> Lwt.return_ok pk)
-        ~source:(fst source)
-        ~contract
-        ~sign:(Tzfunc.Node.sign ~edsk:(snd source))
-        mich
+    | Ok m_left ->
+      match flat_order order_right with
+      | Error err -> Lwt.fail_with @@ Printf.sprintf "mich order %s" @@ string_of_error err
+      | Ok m_right ->
+        let signature_left =
+          prim `Some ~args:[Proto.Mstring order_left.order_elt.order_elt_signature] in
+        let signature_right =
+          prim `Some ~args:[Proto.Mstring order_right.order_elt.order_elt_signature] in
+        let mich = prim `Pair ~args:[m_left; signature_left; m_right; signature_right] in
+        call
+          ?amount
+          ~local_forge:false
+          ~entrypoint:"matchOrders"
+          ~base:(EzAPI.BASE !endpoint)
+          ~get_pk:(fun () -> Lwt.return_ok edpk)
+          ~source:(fst source)
+          ~contract
+          ~sign:(fun b -> match Ed25519.sign_bytes ~watermark:Watermark.generic ~sk b with
+              | Error e -> Lwt.return_error e
+              | Ok b -> Lwt.return_ok (b :> Raw.t))
+          mich
 
 let cancel_order ~source ~contract order =
   let open Tzfunc.Crypto in
-  let pk =
-    Pk.b58enc @@
-    Sk.to_public_key @@
-    (Sk.b58dec @@ snd source) in
+  let r =
+    Result.bind (Sk.b58dec @@ snd source) @@ fun sk ->
+    Result.bind (Sk.to_public_key sk) @@ fun pk ->
+    Ok (sk, Pk.b58enc ~curve:`ed25519 pk) in
+  match r with
+  | Error _ -> assert false
+  | Ok (sk, edpk) ->
   match flat_order order with
   | Error err -> Lwt.fail_with @@ Printf.sprintf "mich order %s" @@ string_of_error err
   | Ok m ->
@@ -1135,10 +1148,12 @@ let cancel_order ~source ~contract order =
       ~local_forge:false
       ~entrypoint:"cancel"
       ~base:(EzAPI.BASE !endpoint)
-      ~get_pk:(fun () -> Lwt.return_ok pk)
+      ~get_pk:(fun () -> Lwt.return_ok edpk)
       ~source:(fst source)
       ~contract
-      ~sign:(Tzfunc.Node.sign ~edsk:(snd source))
+      ~sign:(fun b -> match Ed25519.sign_bytes ~watermark:Watermark.generic ~sk b with
+          | Error e -> Lwt.return_error e
+          | Ok b -> Lwt.return_ok (b :> Raw.t))
       m
 
 let random_mint collections =
@@ -1177,7 +1192,7 @@ let check_royalties item_royalties royalties =
   List.for_all (fun p ->
       try
         let v = List.assoc p.part_account royalties in
-        v = Int64.of_string p.part_value
+        v = Int64.of_int32 p.part_value
       with Not_found ->
   false) item_royalties
 
@@ -2122,7 +2137,7 @@ let match_orders_tezos () =
   let>? order1 = sell_nft_for_tezos ~salt:1 contract item1 1 in
   (* TODO : check order *)
   let _source2_alias, source2_pk, source2_sk = generate_address ~diff:(Some (fst source1)) () in
-  let source2 = Tzfunc.Crypto.pk_to_pkh source2_pk, source2_sk in
+  let source2 = pk_to_pkh_exn source2_pk, source2_sk in
   let>? order2 = buy_nft_for_tezos contract (source2_pk, source2_sk) item1 1 in
   (* TODO : check order *)
   begin match_orders ~amount:1L ~source:source2 ~contract:ex_kt1 order2 order1 >>= function
@@ -2188,7 +2203,7 @@ let fill_orders_db r_kt1 ex_kt1 =
   let>? _buy1_1 = buy_nft_for_tezos contract (source2_pk, source2_sk) item1 1 in
   Lwt_unix.sleep 1. >>= fun () ->
   let _source3_alias, source3_pk, source3_sk =
-    generate_address ~diff:(Some (Tzfunc.Crypto.pk_to_pkh source2_pk)) () in
+    generate_address ~diff:(Some (pk_to_pkh_exn source2_pk)) () in
   let>? _buy1_2 = buy_nft_for_tezos contract (source3_pk, source3_sk) item1 1 in
   Lwt_unix.sleep 1. >>= fun () ->
   let>? _buy4 = buy_nft_for_tezos contract (source2_pk, source2_sk) item4 1 in

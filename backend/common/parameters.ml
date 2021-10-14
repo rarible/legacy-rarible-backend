@@ -23,9 +23,9 @@ let parse_update_operators m =
       let$ op_operator = parse_address operator in
       begin match add with
         | `Left->
-          aux ({op_owner; op_operator; op_token_id = Z.to_int64 id; op_add=true} :: acc) t
+          aux ({op_owner; op_operator; op_token_id = Z.to_string id; op_add=true} :: acc) t
         | `Right ->
-          aux ({op_owner; op_operator; op_token_id = Z.to_int64 id; op_add=false} :: acc) t
+          aux ({op_owner; op_operator; op_token_id = Z.to_string id; op_add=false} :: acc) t
         | _ -> unexpected_michelson
       end
     | _ -> unexpected_michelson in
@@ -60,7 +60,7 @@ let parse_transfer m =
         Mint amount;
       ]; _} :: t ->
       let$ tr_destination = parse_address destination in
-      aux_to ({tr_destination; tr_token_id = Z.to_int64 id; tr_amount = Z.to_int64 amount} :: acc) t
+      aux_to ({tr_destination; tr_token_id = Z.to_string id; tr_amount = Z.to_int64 amount} :: acc) t
     | _ -> unexpected_michelson in
   let rec aux_from acc = function
     | [] -> Ok acc
@@ -90,7 +90,7 @@ let parse_mint = function
         | Mprim { prim = `Elt; args = [ Mstring s; Mint i ]; _ } -> Some (s, Z.to_int64 i)
         | _ -> None) royalties in
     Ok (Mint_tokens {
-        mi_op = { tk_op = { tk_token_id = Z.to_int64 id; tk_amount = Z.to_int64 amount };
+        mi_op = { tk_op = { tk_token_id = Z.to_string id; tk_amount = Z.to_int64 amount };
                   tk_owner };
         mi_royalties; mi_meta })
   | _ -> unexpected_michelson
@@ -99,7 +99,7 @@ let parse_burn = function
   | Mprim {prim = `Pair; args = [Mint id; owner; Mint amount]; _ } ->
     let$ tk_owner = parse_address owner in
     Ok (Burn_tokens { tk_owner; tk_op = {
-        tk_token_id = Z.to_int64 id; tk_amount = Z.to_int64 amount } })
+        tk_token_id = Z.to_string id; tk_amount = Z.to_int64 amount } })
   | _ -> unexpected_michelson
 
 let parse_metadata_uri = function
@@ -112,7 +112,7 @@ let parse_token_metadata = function
         | Mprim { prim = `Elt; args = [ Mstring k; Mstring v ]; _ } ->
           Some (k, v)
         | _ -> None) l in
-    Ok (Token_metadata (Z.to_int64 id, l))
+    Ok (Token_metadata (Z.to_string id, l))
   | _ -> unexpected_michelson
 
 let rec parse_fa2 e p =
@@ -169,7 +169,7 @@ let parse_set_royalties m = match m with
                 | _ -> None
               end
             | _ -> None) l in
-        Ok {roy_contract; roy_token_id = Z.to_int64 id; roy_royalties}
+        Ok {roy_contract; roy_token_id = Z.to_string id; roy_royalties}
       | _ -> unexpected_michelson
     end
   | _ -> unexpected_michelson

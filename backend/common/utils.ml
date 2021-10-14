@@ -62,9 +62,11 @@ let parse_typed t m : (typed_micheline list, [> `unexpected_michelson_type of mi
       Ok (acc @ [ `timestamp (CalendarLib.Calendar.from_unixfloat (Z.to_float i)) ])
     | Mprim { prim = `bytes; _ }, Mbytes b -> Ok (acc @ [ `bytes b ])
     | Mprim { prim = `key; _ }, Mbytes b ->
-      Ok (acc @ [ `key Tzfunc.Crypto.Pk.(b58enc @@ T.mk @@ Tzfunc.Crypto.hex_to_raw b) ])
+      Result.map (fun (s, _) -> acc @ [ `key s ]) @@
+      Tzfunc.Binary.Reader.(pk {s=Tzfunc.Crypto.hex_to_raw b; offset=0})
     | Mprim { prim = `key_hash; _ }, Mbytes b ->
-      Ok (acc @ [ `key_hash Tzfunc.Crypto.Pkh.(b58enc @@ T.mk @@ Tzfunc.Crypto.hex_to_raw b) ])
+      Result.map (fun (s, _) -> acc @ [ `key s ]) @@
+      Tzfunc.Binary.Reader.(pkh {s=Tzfunc.Crypto.hex_to_raw b; offset=0})
     | Mprim { prim = `address; _ }, Mbytes b ->
       Result.map (fun (s, _) -> acc @ [ `address s ]) @@
       Tzfunc.Binary.Reader.(contract {s=Tzfunc.Crypto.hex_to_raw b; offset=0})
@@ -318,10 +320,10 @@ let flat_order_type
       (prim `Pair ~args:[
           Mseq (List.map (fun p -> prim `Pair ~args:[
               Mstring p.part_account;
-              Mint (Z.of_string p.part_value) ]) payouts);
+              Mint (Z.of_int32 p.part_value) ]) payouts);
           Mseq (List.map (fun p -> prim `Pair ~args:[
               Mstring p.part_account;
-              Mint (Z.of_string p.part_value) ]) origin_fees);
+              Mint (Z.of_int32 p.part_value) ]) origin_fees);
         ]) in
   Ok
     (prim `Pair ~args:[
@@ -358,10 +360,10 @@ let mich_order_form
       (prim `Pair ~args:[
           Mseq (List.map (fun p -> prim `Pair ~args:[
               Mstring p.part_account;
-              Mint (Z.of_string p.part_value) ]) payouts);
+              Mint (Z.of_int32 p.part_value) ]) payouts);
           Mseq (List.map (fun p -> prim `Pair ~args:[
               Mstring p.part_account;
-              Mint (Z.of_string p.part_value) ]) origin_fees);
+              Mint (Z.of_int32 p.part_value) ]) origin_fees);
         ]) in
   let$ asset_make = asset_mich make in
   let$ asset_take = asset_mich take in
@@ -416,7 +418,7 @@ let calculate_remaining make_value take_value fill cancelled =
     make, take
 
 let calculate_fee data protocol_commission =
-  List.fold_left (fun acc p -> Int64.(add acc (of_string p.part_value)))
+  List.fold_left (fun acc p -> Int64.(add acc (of_int32 p.part_value)))
     protocol_commission
     data.order_rarible_v2_data_v1_origin_fees
 
@@ -472,8 +474,6 @@ let order_elt_from_order_form_elt elt =
     order_elt_pending = Some [];
     order_elt_hash = (hash :> string);
     order_elt_make_balance = None;
-    order_elt_make_price_usd = "0";
-    order_elt_take_price_usd = "0";
     order_elt_price_history = [];
     order_elt_status = None
   }
@@ -577,25 +577,11 @@ let order_bid_status_to_string l =
   List.map (fun t ->
       EzEncoding.construct order_bid_status_enc t) l
 
-let sign ?(watermark=Tzfunc.Raw.mk "") ~edsk bytes =
-  let b = Forge.sign_exn ~watermark ~sk:(Crypto.Sk.b58dec edsk) bytes in
-  Tzfunc.Crypto.(Base58.encode ~prefix:Prefix.ed25519_signature b)
-
-let check ~edpk ~signature ~bytes =
-  let open Tzfunc.Crypto in
-  let pk = Hacl.Sign.unsafe_pk_of_bytes (Bigstring.of_string @@ (Pk.b58dec edpk :> string)) in
-  let msg = Bigstring.of_string (Crypto.Blake2b_32.hash [bytes] :> string) in
-  let signature = Bigstring.of_string @@ (Base58.decode ~prefix:Prefix.ed25519_signature signature :> string) in
-  Hacl.Sign.verify ~pk ~msg ~signature
-
 let short ?(len=8) h =
   if String.length h > len then String.sub h 0 len else h
 
 let to_parts l =
-  List.map (fun (part_account, v) -> {
-        part_account ;
-        part_value = Int32.to_string v
-      }) l
+  List.map (fun (part_account, part_value) -> { part_account; part_value }) l
 
 let mk_order_event order = {
   order_event_event_id = Hex.show @@ Hex.of_bigstring @@ Hacl.Rand.gen 128 ;

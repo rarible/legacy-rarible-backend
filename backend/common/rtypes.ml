@@ -35,8 +35,8 @@ module A = struct
   type big_decimal = string [@@deriving encoding {title="BigDecimal"; def_title}]
 
   type base58 = string [@@deriving encoding {title="Base58"; def_title}]
-  type edsig = string [@@deriving encoding {title="edsig"; def_title}]
-  type edpk = string [@@deriving encoding {title="edpk"; def_title}]
+  type edsig = string [@@deriving encoding {title="Edsig"; def_title}]
+  type edpk = string [@@deriving encoding {title="Edpk"; def_title}]
 
   (* TODO : data format 2017-07-21T17:32:28Z *)
   let date_schema = Json_schema.(
@@ -57,7 +57,7 @@ end
 
 type part = {
   part_account : A.address;
-  part_value : A.big_integer ;
+  part_value : int32 ;
 } [@@deriving encoding {title="Part"; def_title} ]
 
 
@@ -354,7 +354,7 @@ type nft_ownerships = {
   nft_ownerships_total : int64 ; [@encoding A.uint53]
   nft_ownerships_continuation : string option ; [@opt]
   nft_ownerships_ownerships : nft_ownership list ;
-} [@@deriving encoding {title="NftOwnerShips"; def_title}]
+} [@@deriving encoding {title="NftOwnerships"; def_title}]
 
 type nft_signature = {
   nft_signature_r : A.bytes_str ;
@@ -405,13 +405,35 @@ type asset_fa2 = {
 type asset_type =
   | ATXTZ [@kind_label "assetClass"] [@kind "XTZ"] [@title "XTZAssetType"] [@def_title]
   | ATFA_1_2 of (A.address [@wrap "contract"]) [@kind_label "assetClass"] [@kind "FA_1_2"] [@title "FA_1_2AssetType"] [@def_title]
-  | ATFA_2 of asset_fa2 [@kind_label "assetClass"]
+  | ATFA_2 of asset_fa2 [@kind_label "assetClass"] [@kind "FA_2"] [@title "FA_2AssetType"] [@def_title]
 [@@deriving encoding {title="AssetType"; def_title}]
 
 type asset = {
   asset_type : asset_type [@key "assetType"] ;
-  asset_value : A.big_integer [@key "value"] ;
+  asset_value : A.big_decimal [@key "value"] ;
 } [@@deriving encoding {title="Asset"; def_title} ]
+
+let asset_enc =
+  (* todo different factor for fa12 *)
+  let factor = Z.of_int 1000000 in
+  let open Json_encoding in
+  conv
+    (fun a -> match a.asset_type with
+       | ATXTZ | ATFA_1_2 _ ->
+         let dec = Z.(rem (of_string a.asset_value) factor) in
+         let dec_str = if dec = Z.zero then "" else "." ^ Z.to_string dec in
+         let num = Z.(to_string @@ div (of_string a.asset_value) factor) in
+         { a with asset_value = Format.sprintf "%s%s" num dec_str }
+       | _ -> a)
+    (fun a -> match a.asset_type with
+       | ATFA_2 _ -> a
+       | _ ->
+         let asset_value = match String.split_on_char '.' a.asset_value with
+           | [ num ] -> Z.(to_string @@ mul factor (of_string num))
+           | [ num; dec ] -> Z.(to_string @@ add (mul factor (of_string num)) (of_string dec))
+           | _ -> failwith "not a big_decimal" in
+         { a with asset_value })
+    asset_enc
 
 type order_form_elt = {
   order_form_elt_maker : A.edpk ;
@@ -499,10 +521,6 @@ type order_side_match = {
   order_side_match_fill : A.big_integer ;
   order_side_match_taker : A.address option ; [@opt]
   order_side_match_counter_hash : A.word option ; [@opt]
-  order_side_match_make_usd : A.big_decimal option ; [@opt]
-  order_side_match_take_usd : A.big_decimal option ; [@opt]
-  order_side_match_make_price_usd : A.big_decimal option ; [@opt]
-  order_side_match_take_price_usd : A.big_decimal option ; [@opt]
 } [@@deriving encoding {camel; title="OrderSideMatch"; def_title}]
 
 type order_exchange_history =
@@ -541,8 +559,6 @@ type order_elt = {
   order_elt_pending: order_exchange_history list option ; [@opt]
   order_elt_hash: A.word;
   order_elt_make_balance: A.big_integer option; [@opt]
-  order_elt_make_price_usd: A.big_decimal;
-  order_elt_take_price_usd: A.big_decimal;
   order_elt_price_history: order_price_history_record list ; [@dft []]
   order_elt_status : order_status option; [@opt]
 } [@@deriving encoding {camel; title="OrderElt"; def_title}]
@@ -660,7 +676,6 @@ type order_activity_match = {
   order_activity_match_left: order_activity_match_side ;
   order_activity_match_right: order_activity_match_side ;
   order_activity_match_price: A.big_decimal ;
-  order_activity_match_price_usd: A.big_decimal option ; [@opt]
   order_activity_match_transaction_hash: A.word ;
   order_activity_match_block_hash: A.word ;
   order_activity_match_block_number: A.block_number ;
@@ -673,7 +688,6 @@ type order_activity_bid = {
   order_activity_bid_make : asset ;
   order_activity_bid_take : asset ;
   order_activity_bid_price : A.big_decimal ;
-  order_activity_bid_price_usd : A.big_decimal option ; [@opt]
 } [@@deriving encoding {camel; title="OrderActivityBid"; def_title}]
 
 type order_activity_cancel_bid = {
@@ -723,8 +737,6 @@ type order_bid_elt = {
   order_bid_elt_make : asset ;
   order_bid_elt_take : asset ;
   order_bid_elt_make_balance : A.big_integer option ;
-  order_bid_elt_make_price_usd : A.big_decimal option ; [@opt]
-  order_bid_elt_take_price_usd : A.big_decimal option ; [@opt]
   order_bid_elt_fill : A.big_integer ;
   order_bid_elt_make_stock : A.big_integer ;
   order_bid_elt_cancelled : bool ;
@@ -770,7 +782,7 @@ type nft_ownership_event = {
   nft_ownership_event_ownership_id : string ;
   nft_ownership_event_type : [ `UPDATE | `DELETE ] ; [@enum]
   nft_ownership_event_ownership : nft_ownership ;
-} [@@deriving encoding {camel; title="NftOwnerShipEvent"; def_title}]
+} [@@deriving encoding {camel; title="NftOwnershipEvent"; def_title}]
 
 type signature_validation_form = {
   svf_signer: A.edpk;
@@ -782,7 +794,7 @@ type signature_validation_form = {
 
 type transfer_destination = {
   tr_destination: string;
-  tr_token_id: int64;
+  tr_token_id: string;
   tr_amount: int64;
 } [@@deriving encoding]
 
@@ -794,7 +806,7 @@ type transfer = {
 type operator_update = {
   op_owner: string;
   op_operator: string;
-  op_token_id: int64;
+  op_token_id: string;
   op_add: bool;
 } [@@deriving encoding]
 
@@ -805,7 +817,7 @@ type token_royalties = ((string * int64) list [@assoc])
 [@@deriving encoding]
 
 type token_op = {
-  tk_token_id: int64;
+  tk_token_id: string;
   tk_amount: int64;
 } [@@deriving encoding]
 
@@ -821,7 +833,7 @@ type mint = {
 } [@@deriving encoding]
 
 type account_token = {
-  at_token_id : int64;
+  at_token_id : string;
   at_contract : string;
   at_amount : int64;
 } [@@deriving encoding]
@@ -833,12 +845,12 @@ type nft_param =
   | Mint_tokens of mint
   | Burn_tokens of token_op_owner
   | Metadata_uri of string
-  | Token_metadata of (int64 * (string * string) list)
+  | Token_metadata of (string * (string * string) list)
 [@@deriving encoding]
 
 type set_royalties = {
   roy_contract: string;
-  roy_token_id: int64;
+  roy_token_id: string;
   roy_royalties: token_royalties;
 } [@@deriving encoding]
 

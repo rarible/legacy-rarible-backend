@@ -34,7 +34,7 @@ let upgrade_1_to_2 dbh version =
       last_level int not null,
       last timestamp not null,
       tokens_number bigint not null default 0,
-      next_token_id bigint not null default 0,
+      next_token_id varchar not null default 0,
       ledger_id bigint not null default 0,
       metadata jsonb not null default '{}',
       name varchar,
@@ -42,7 +42,7 @@ let upgrade_1_to_2 dbh version =
 
     {|create table tokens(
       contract varchar not null,
-      token_id bigint not null,
+      token_id varchar not null,
       block varchar not null,
       level int not null,
       tsp timestamp not null,
@@ -98,7 +98,7 @@ let upgrade_1_to_2 dbh version =
       operator varchar,
       add boolean,
       contract varchar not null,
-      token_id bigint,
+      token_id varchar,
       amount bigint,
       metadata jsonb,
       royalties jsonb,
@@ -110,19 +110,17 @@ let upgrade_1_to_2 dbh version =
       make_asset_type_class varchar not null,
       make_asset_type_contract varchar,
       make_asset_type_token_id varchar,
-      make_asset_value bigint not null,
+      make_asset_value varchar not null,
       take_asset_type_class varchar not null,
       take_asset_type_contract varchar,
       take_asset_type_token_id varchar,
-      take_asset_value bigint not null,
+      take_asset_value varchar not null,
       start_date timestamp,
       end_date timestamp,
       salt varchar not null,
       signature varchar not null,
       created_at timestamp not null,
       last_update_at timestamp not null,
-      make_price_usd float not null,
-      take_price_usd float not null,
       hash varchar primary key)|};
 
     {|create table origin_fees(
@@ -138,8 +136,8 @@ let upgrade_1_to_2 dbh version =
 
     {|create table order_price_history(
       date timestamp not null,
-      make_value bigint not null,
-      take_value bigint not null,
+      make_value varchar not null,
+      take_value varchar not null,
       hash varchar not null references orders(hash) on delete cascade)|};
 
     {|create table nft_activities(
@@ -150,7 +148,7 @@ let upgrade_1_to_2 dbh version =
       main boolean not null default false,
       date timestamp not null,
       contract varchar not null,
-      token_id bigint not null,
+      token_id varchar not null,
       owner varchar not null,
       amount bigint not null,
       tr_from varchar,

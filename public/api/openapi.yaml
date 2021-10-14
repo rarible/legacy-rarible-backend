@@ -15,7 +15,9 @@ paths:
         in: query
         required: false
         schema:
-          type: number
+          type: integer
+          minimum: 0
+          maximum: 9007199254740992
       - name: continuation
         in: query
         required: false
@@ -89,7 +91,9 @@ paths:
         in: query
         required: false
         schema:
-          type: number
+          type: integer
+          minimum: 0
+          maximum: 9007199254740992
       - name: continuation
         in: query
         required: false
@@ -107,7 +111,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/NftOwnerShips'
+                $ref: '#/components/schemas/NftOwnerships'
       security: []
   /v0.1/ownerships/all:
     description: Get NFT all ownerships
@@ -121,7 +125,9 @@ paths:
         in: query
         required: false
         schema:
-          type: number
+          type: integer
+          minimum: 0
+          maximum: 9007199254740992
       - name: continuation
         in: query
         required: false
@@ -139,7 +145,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/NftOwnerShips'
+                $ref: '#/components/schemas/NftOwnerships'
       security: []
   /v0.1/items/{itemId}/meta:
     description: Get NFT item by meta id
@@ -222,7 +228,9 @@ paths:
         in: query
         required: false
         schema:
-          type: number
+          type: integer
+          minimum: 0
+          maximum: 9007199254740992
       - name: continuation
         in: query
         required: false
@@ -264,7 +272,9 @@ paths:
         in: query
         required: false
         schema:
-          type: number
+          type: integer
+          minimum: 0
+          maximum: 9007199254740992
       - name: continuation
         in: query
         required: false
@@ -306,7 +316,9 @@ paths:
         in: query
         required: false
         schema:
-          type: number
+          type: integer
+          minimum: 0
+          maximum: 9007199254740992
       - name: continuation
         in: query
         required: false
@@ -397,7 +409,9 @@ paths:
         in: query
         required: false
         schema:
-          type: number
+          type: integer
+          minimum: 0
+          maximum: 9007199254740992
       - name: continuation
         in: query
         required: false
@@ -429,7 +443,9 @@ paths:
         in: query
         required: false
         schema:
-          type: number
+          type: integer
+          minimum: 0
+          maximum: 9007199254740992
       - name: continuation
         in: query
         required: false
@@ -493,7 +509,9 @@ paths:
         in: query
         required: false
         schema:
-          type: number
+          type: integer
+          minimum: 0
+          maximum: 9007199254740992
       - name: continuation
         in: query
         required: false
@@ -552,7 +570,7 @@ paths:
         in: query
         required: false
         schema:
-          $ref: '#/components/schemas/edpk'
+          $ref: '#/components/schemas/Edpk'
       - name: origin
         in: query
         required: false
@@ -562,7 +580,9 @@ paths:
         in: query
         required: false
         schema:
-          type: number
+          type: integer
+          minimum: 0
+          maximum: 9007199254740992
       - name: continuation
         in: query
         required: false
@@ -604,7 +624,7 @@ paths:
         in: query
         required: false
         schema:
-          $ref: '#/components/schemas/edpk'
+          $ref: '#/components/schemas/Edpk'
       - name: origin
         in: query
         required: false
@@ -614,7 +634,9 @@ paths:
         in: query
         required: false
         schema:
-          type: number
+          type: integer
+          minimum: 0
+          maximum: 9007199254740992
       - name: continuation
         in: query
         required: false
@@ -656,7 +678,9 @@ paths:
         in: query
         required: false
         schema:
-          type: number
+          type: integer
+          minimum: 0
+          maximum: 9007199254740992
       - name: continuation
         in: query
         required: false
@@ -693,7 +717,9 @@ paths:
         in: query
         required: false
         schema:
-          type: number
+          type: integer
+          minimum: 0
+          maximum: 9007199254740992
       - name: continuation
         in: query
         required: false
@@ -725,7 +751,7 @@ paths:
         in: query
         required: false
         schema:
-          $ref: '#/components/schemas/edpk'
+          $ref: '#/components/schemas/Edpk'
       - name: origin
         in: query
         required: false
@@ -735,7 +761,9 @@ paths:
         in: query
         required: false
         schema:
-          type: number
+          type: integer
+          minimum: 0
+          maximum: 9007199254740992
       - name: continuation
         in: query
         required: false
@@ -777,7 +805,7 @@ paths:
         in: query
         required: false
         schema:
-          $ref: '#/components/schemas/edpk'
+          $ref: '#/components/schemas/Edpk'
       - name: origin
         in: query
         required: false
@@ -787,7 +815,9 @@ paths:
         in: query
         required: false
         schema:
-          type: number
+          type: integer
+          minimum: 0
+          maximum: 9007199254740992
       - name: continuation
         in: query
         required: false
@@ -819,7 +849,9 @@ paths:
         in: query
         required: false
         schema:
-          type: number
+          type: integer
+          minimum: 0
+          maximum: 9007199254740992
       - name: continuation
         in: query
         required: false
@@ -843,117 +875,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/OrderActivities'
-      security: []
-  /v0.1/aggregations/nftSellByMaker:
-    description: Aggregate Nft Sell orders by maker
-    get:
-      tags:
-      - order-aggregation-controller
-      description: Aggregate Nft Sell orders by maker
-      operationId: aggregate_nft_sell_by_maker
-      parameters:
-      - name: startDate
-        in: query
-        required: true
-        schema:
-          type: number
-      - name: endDate
-        in: query
-        required: true
-        schema:
-          type: number
-      - name: size
-        in: query
-        required: false
-        schema:
-          type: number
-      responses:
-        "500":
-          description: Internal Server Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error500'
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AggregationDatas'
-      security: []
-  /v0.1/aggregations/nftPurchaseByTaker:
-    summary: aggregate_nft_sell_by_taker
-    get:
-      tags:
-      - order-aggregation-controller
-      summary: aggregate_nft_sell_by_taker
-      operationId: aggregate_nft_sell_by_taker
-      parameters:
-      - name: startDate
-        in: query
-        required: true
-        schema:
-          type: number
-      - name: endDate
-        in: query
-        required: true
-        schema:
-          type: number
-      - name: size
-        in: query
-        required: false
-        schema:
-          type: number
-      responses:
-        "500":
-          description: Internal Server Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error500'
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AggregationDatas'
-      security: []
-  /v0.1/aggregations/nftPurchaseByCollection:
-    summary: aggregate_nft_sell_by_collection
-    get:
-      tags:
-      - order-aggregation-controller
-      summary: aggregate_nft_sell_by_collection
-      operationId: aggregate_nft_sell_by_collection
-      parameters:
-      - name: startDate
-        in: query
-        required: true
-        schema:
-          type: number
-      - name: endDate
-        in: query
-        required: true
-        schema:
-          type: number
-      - name: size
-        in: query
-        required: false
-        schema:
-          type: number
-      responses:
-        "500":
-          description: Internal Server Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error500'
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AggregationDatas'
       security: []
   /v0.1/order/signature/validate:
     description: Validate a message
@@ -986,33 +907,13 @@ components:
   schemas:
     Address:
       type: string
-    AggregationData:
-      type: object
-      properties:
-        address:
-          $ref: '#/components/schemas/Address'
-        sum:
-          $ref: '#/components/schemas/BigDecimal'
-        count:
-          type: integer
-          minimum: 0
-          maximum: 9007199254740992
-      required:
-      - count
-      - sum
-      - address
-      additionalProperties: false
-    AggregationDatas:
-      type: array
-      items:
-        $ref: '#/components/schemas/AggregationData'
     Asset:
       type: object
       properties:
         assetType:
           $ref: '#/components/schemas/AssetType'
         value:
-          $ref: '#/components/schemas/BigInteger'
+          $ref: '#/components/schemas/BigDecimal'
       required:
       - value
       - assetType
@@ -1061,6 +962,10 @@ components:
       - owner
       - '@type'
       additionalProperties: false
+    Edpk:
+      type: string
+    Edsig:
+      type: string
     Error500:
       type: object
       properties:
@@ -1107,6 +1012,10 @@ components:
     FA_2AssetType:
       type: object
       properties:
+        assetClass:
+          type: string
+          enum:
+          - FA_2
         contract:
           $ref: '#/components/schemas/Address'
         tokenId:
@@ -1114,6 +1023,7 @@ components:
       required:
       - tokenId
       - contract
+      - assetClass
       additionalProperties: false
     ItemHistory:
       oneOf:
@@ -1487,23 +1397,6 @@ components:
       - items
       - total
       additionalProperties: false
-    NftOwnerShips:
-      type: object
-      properties:
-        total:
-          type: integer
-          minimum: 0
-          maximum: 9007199254740992
-        continuation:
-          type: string
-        ownerships:
-          type: array
-          items:
-            $ref: '#/components/schemas/NftOwnership'
-      required:
-      - ownerships
-      - total
-      additionalProperties: false
     NftOwnership:
       type: object
       properties:
@@ -1541,15 +1434,32 @@ components:
       - contract
       - id
       additionalProperties: false
+    NftOwnerships:
+      type: object
+      properties:
+        total:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740992
+        continuation:
+          type: string
+        ownerships:
+          type: array
+          items:
+            $ref: '#/components/schemas/NftOwnership'
+      required:
+      - ownerships
+      - total
+      additionalProperties: false
     NftSignature:
       type: object
       properties:
         r:
           type: string
         s:
-          $ref: '#/components/schemas/edsig'
+          $ref: '#/components/schemas/Edsig'
         v:
-          $ref: '#/components/schemas/edsig'
+          $ref: '#/components/schemas/Edsig'
       required:
       - v
       - s
@@ -1571,9 +1481,9 @@ components:
         data:
           $ref: '#/components/schemas/OrderRaribleV2DataV1'
         maker:
-          $ref: '#/components/schemas/edpk'
+          $ref: '#/components/schemas/Edpk'
         taker:
-          $ref: '#/components/schemas/edpk'
+          $ref: '#/components/schemas/Edpk'
         make:
           $ref: '#/components/schemas/Asset'
         take:
@@ -1595,7 +1505,7 @@ components:
         salt:
           $ref: '#/components/schemas/Word'
         signature:
-          $ref: '#/components/schemas/edsig'
+          $ref: '#/components/schemas/Edsig'
         createdAt:
           type: string
           format: date-time
@@ -1610,10 +1520,6 @@ components:
           $ref: '#/components/schemas/Word'
         makeBalance:
           $ref: '#/components/schemas/BigInteger'
-        makePriceUsd:
-          $ref: '#/components/schemas/BigDecimal'
-        takePriceUsd:
-          $ref: '#/components/schemas/BigDecimal'
         priceHistory:
           type: array
           items:
@@ -1626,8 +1532,6 @@ components:
           - RARIBLE_V2
       required:
       - type
-      - takePriceUsd
-      - makePriceUsd
       - hash
       - lastUpdateAt
       - createdAt
@@ -1664,14 +1568,12 @@ components:
         hash:
           $ref: '#/components/schemas/Word'
         maker:
-          $ref: '#/components/schemas/edpk'
+          $ref: '#/components/schemas/Edpk'
         make:
           $ref: '#/components/schemas/Asset'
         take:
           $ref: '#/components/schemas/Asset'
         price:
-          $ref: '#/components/schemas/BigDecimal'
-        priceUsd:
           $ref: '#/components/schemas/BigDecimal'
       required:
       - price
@@ -1691,7 +1593,7 @@ components:
         hash:
           $ref: '#/components/schemas/Word'
         maker:
-          $ref: '#/components/schemas/edpk'
+          $ref: '#/components/schemas/Edpk'
         make:
           $ref: '#/components/schemas/AssetType'
         take:
@@ -1727,7 +1629,7 @@ components:
         hash:
           $ref: '#/components/schemas/Word'
         maker:
-          $ref: '#/components/schemas/edpk'
+          $ref: '#/components/schemas/Edpk'
         make:
           $ref: '#/components/schemas/AssetType'
         take:
@@ -1857,14 +1759,12 @@ components:
         hash:
           $ref: '#/components/schemas/Word'
         maker:
-          $ref: '#/components/schemas/edpk'
+          $ref: '#/components/schemas/Edpk'
         make:
           $ref: '#/components/schemas/Asset'
         take:
           $ref: '#/components/schemas/Asset'
         price:
-          $ref: '#/components/schemas/BigDecimal'
-        priceUsd:
           $ref: '#/components/schemas/BigDecimal'
       required:
       - price
@@ -1886,8 +1786,6 @@ components:
         right:
           $ref: '#/components/schemas/OrderActivitySideMatch'
         price:
-          $ref: '#/components/schemas/BigDecimal'
-        priceUsd:
           $ref: '#/components/schemas/BigDecimal'
         transactionHash:
           $ref: '#/components/schemas/Word'
@@ -1913,7 +1811,7 @@ components:
       type: object
       properties:
         maker:
-          $ref: '#/components/schemas/edpk'
+          $ref: '#/components/schemas/Edpk'
         hash:
           $ref: '#/components/schemas/Word'
         asset:
@@ -1955,7 +1853,7 @@ components:
           type: string
           format: date-time
         maker:
-          $ref: '#/components/schemas/edpk'
+          $ref: '#/components/schemas/Edpk'
       required:
       - date
       - hash
@@ -1971,9 +1869,9 @@ components:
         data:
           $ref: '#/components/schemas/OrderRaribleV2DataV1'
         maker:
-          $ref: '#/components/schemas/edpk'
+          $ref: '#/components/schemas/Edpk'
         taker:
-          $ref: '#/components/schemas/edpk'
+          $ref: '#/components/schemas/Edpk'
         make:
           $ref: '#/components/schemas/Asset'
         take:
@@ -1989,7 +1887,7 @@ components:
           minimum: 0
           maximum: 9007199254740992
         signature:
-          $ref: '#/components/schemas/edsig'
+          $ref: '#/components/schemas/Edsig'
         type:
           type: string
           enum:
@@ -2070,7 +1968,7 @@ components:
           type: string
           format: date-time
         maker:
-          $ref: '#/components/schemas/edpk'
+          $ref: '#/components/schemas/Edpk'
         side:
           $ref: '#/components/schemas/OrderSide'
         fill:
@@ -2079,14 +1977,6 @@ components:
           $ref: '#/components/schemas/Address'
         counterHash:
           $ref: '#/components/schemas/Word'
-        makeUsd:
-          $ref: '#/components/schemas/BigDecimal'
-        takeUsd:
-          $ref: '#/components/schemas/BigDecimal'
-        makePriceUsd:
-          $ref: '#/components/schemas/BigDecimal'
-        takePriceUsd:
-          $ref: '#/components/schemas/BigDecimal'
       required:
       - fill
       - date
@@ -2107,7 +1997,9 @@ components:
         account:
           $ref: '#/components/schemas/Address'
         value:
-          $ref: '#/components/schemas/BigInteger'
+          type: integer
+          minimum: -2147483648
+          maximum: 2147483647
       required:
       - value
       - account
@@ -2116,11 +2008,11 @@ components:
       type: object
       properties:
         signer:
-          $ref: '#/components/schemas/edpk'
+          $ref: '#/components/schemas/Edpk'
         message:
           type: string
         signature:
-          $ref: '#/components/schemas/edsig'
+          $ref: '#/components/schemas/Edsig'
       required:
       - signature
       - message
@@ -2154,8 +2046,4 @@ components:
       required:
       - assetClass
       additionalProperties: false
-    edpk:
-      type: string
-    edsig:
-      type: string
   securitySchemes: {}
