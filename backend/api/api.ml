@@ -4,6 +4,8 @@ open Let
 open Utils
 open Errors
 
+module Errors = Errors
+
 (* let _ =
  *   let s =
  *     Tzfunc.Crypto.Base58.encode
@@ -52,7 +54,7 @@ let address_param = pstring ~enc:A.address_enc "address"
 (* TODO : int64 ?*)
 let at_param = pint "at"
 let continuation_param = pstring "continuation"
-let size_param = pint "size"
+let size_param = pint ~enc:A.uint53 "size"
 let contract_param = pstring ~enc:A.address_enc "contract"
 (* TODO : big_integer *)
 let token_id_param = pstring ~enc:A.big_integer_enc "tokenId"
@@ -66,10 +68,9 @@ let last_updated_to_param = pstring "lastUpdateTo"
 let origin_param = pstring "origin"
 (* TODO : ALL | RARIBLE | OPEN_SEA *)
 let platform_param = pstring "platform"
-let fee_param = pint "fee"
 let maker_param = pstring ~enc:A.edpk_enc "maker"
-let start_date_param = pint ~required:true "startDate"
-let end_date_param = pint ~required:true "endDate"
+let start_date_param = pint ~required:true ~enc:A.uint53 "startDate"
+let end_date_param = pint ~required:true ~enc:A.uint53 "endDate"
 (* TODO : ALL | RARIBLE | OPEN_SEA *)
 let source_param = pstring "source"
 let status_param = pstring "status"
@@ -379,8 +380,7 @@ let get_continuation_price_param req =
       let l = String.split_on_char '_' s in
       match l with
       | ts :: h :: [] ->
-        let f = (float_of_string ts) in
-        Ok (Some (f, h))
+        Ok (Some (ts, h))
       | _ ->
         mk_invalid_argument continuation_param "must be in format PRICE_HASH"
     with _ ->
@@ -791,13 +791,12 @@ let validate_signature order =
       order_elt.order_elt_salt order_elt.order_elt_start order_elt.order_elt_end
       data_type payouts origin_fees in
   Format.eprintf "validate_signature\n%!";
-  let signature = order_elt.order_elt_signature in
+  let edsig = order_elt.order_elt_signature in
   let edpk = order_elt.order_elt_maker in
   Format.eprintf "validate_signature1\n%!";
-  if check ~edpk ~signature ~bytes:msg then
-    Lwt.return_ok ()
-  else
-    Lwt.return_error (invalid_argument "Incorrect signature")
+  match Tzfunc.Crypto.Ed25519.verify ~edpk ~edsig ~bytes:msg with
+  | Ok true -> Lwt.return_ok ()
+  | _ -> Lwt.return_error (invalid_argument "Incorrect signature")
 
 let validate_order order =
   Format.eprintf "validate_order\n%!";
@@ -1148,88 +1147,6 @@ let get_order_bids_by_item req () =
    name="orders_bids_by_item";
    section=orders_section}]
 
-(* order-aggregation-controller *)
-let aggregate_nft_sell_by_maker req () =
-  (* let _source = EzAPI.Req.find_param source_param req in *)
-  match get_required_start_date_param req with
-  | Error err -> return @@ Error err
-  | Ok start_date ->
-    match get_required_end_date_param req with
-    | Error err -> return @@ Error err
-    | Ok end_date ->
-      match get_size_param req with
-      | Error err -> return @@ Error err
-      | Ok size ->
-        if start_date >= end_date then
-          return (Error (invalid_argument "startDate must be greater the endDate"))
-        else
-          Db.aggregate_nft_sell_by_maker ?size start_date end_date >>= function
-          | Error db_err ->
-            let str = Crawlori.Rp.string_of_error db_err in
-            return (Error (unexpected_api_error str))
-          | Ok res -> return_ok res
-[@@get
-  {path="/v0.1/aggregations/nftSellByMaker";
-   params=[start_date_param;end_date_param;size_param];
-   output=aggregation_datas_enc;
-   errors=[rarible_error_500];
-   name="aggregate_nft_sell_by_maker";
-   section=aggregation_section}]
-
-let aggregate_nft_purchase_by_taker req () =
-  (* let _source = EzAPI.Req.find_param source_param req in *)
-  match get_required_start_date_param req with
-  | Error err -> return @@ Error err
-  | Ok start_date ->
-    match get_required_end_date_param req with
-    | Error err -> return @@ Error err
-    | Ok end_date ->
-      match get_size_param req with
-      | Error err -> return @@ Error err
-      | Ok size ->
-        if start_date >= end_date then
-          return (Error (invalid_argument "startDate must be greater the endDate"))
-        else
-          Db.aggregate_nft_sell_by_taker ?size start_date end_date >>= function
-          | Error db_err ->
-            let str = Crawlori.Rp.string_of_error db_err in
-            return (Error (unexpected_api_error str))
-          | Ok res -> return_ok res
-[@@get
-  {path="/v0.1/aggregations/nftPurchaseByTaker";
-   output=aggregation_datas_enc;
-   params=[start_date_param;end_date_param;size_param];
-   errors=[rarible_error_500];
-   name="aggregate_nft_sell_by_taker";
-   section=aggregation_section}]
-
-let aggregate_nft_purchase_buy_collection req () =
-  (* let _source = EzAPI.Req.find_param source_param req in *)
-  match get_required_start_date_param req with
-  | Error err -> return @@ Error err
-  | Ok start_date ->
-    match get_required_end_date_param req with
-    | Error err -> return @@ Error err
-    | Ok end_date ->
-      match get_size_param req with
-      | Error err -> return @@ Error err
-      | Ok size ->
-        if start_date >= end_date then
-          return (Error (invalid_argument "startDate must be greater the endDate"))
-        else
-          Db.aggregate_nft_sell_by_collection ?size start_date end_date >>= function
-          | Error db_err ->
-            let str = Crawlori.Rp.string_of_error db_err in
-            return (Error (unexpected_api_error str))
-          | Ok res -> return_ok res
-[@@get
-  {path="/v0.1/aggregations/nftPurchaseByCollection";
-   params=[start_date_param;end_date_param;size_param];
-   output=aggregation_datas_enc;
-   errors=[rarible_error_500];
-   name="aggregate_nft_sell_by_collection";
-   section=aggregation_section}]
-
 (* order-activity-controller *)
 let get_order_activities req input =
   match get_size_param req with
@@ -1253,8 +1170,10 @@ let get_order_activities req input =
    section=order_activities_section}]
 
 let validate _req input =
-  return_ok @@
-  check ~edpk:input.svf_signer ~signature:input.svf_signature ~bytes:(Tzfunc.Raw.mk input.svf_message)
+  match Tzfunc.Crypto.Ed25519.verify ~edpk:input.svf_signer ~edsig:input.svf_signature
+          ~bytes:(Tzfunc.Raw.mk input.svf_message) with
+  | Ok b -> return_ok b
+  | Error e -> return (Error (invalid_argument (string_of_error e)))
 [@@post
   {path="/v0.1/order/signature/validate";
    name="validate";

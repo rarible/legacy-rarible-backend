@@ -49,7 +49,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/NftOwnerShipEvent'
+                $ref: '#/components/schemas/NftOwnershipEvent'
       security: []
   /kafka/nft_activity:
     summary: kafka_nft_activity
@@ -93,7 +93,7 @@ components:
         assetType:
           $ref: '#/components/schemas/AssetType'
         value:
-          $ref: '#/components/schemas/BigInteger'
+          $ref: '#/components/schemas/BigDecimal'
       required:
       - value
       - assetType
@@ -142,6 +142,10 @@ components:
       - owner
       - '@type'
       additionalProperties: false
+    Edpk:
+      type: string
+    Edsig:
+      type: string
     FA_1_2AssetType:
       type: object
       properties:
@@ -158,6 +162,10 @@ components:
     FA_2AssetType:
       type: object
       properties:
+        assetClass:
+          type: string
+          enum:
+          - FA_2
         contract:
           $ref: '#/components/schemas/Address'
         tokenId:
@@ -165,6 +173,7 @@ components:
       required:
       - tokenId
       - contract
+      - assetClass
       additionalProperties: false
     ItemHistory:
       oneOf:
@@ -391,26 +400,6 @@ components:
       required:
       - name
       additionalProperties: false
-    NftOwnerShipEvent:
-      type: object
-      properties:
-        eventId:
-          type: string
-        ownershipId:
-          type: string
-        type:
-          type: string
-          enum:
-          - UPDATE
-          - DELETE
-        ownership:
-          $ref: '#/components/schemas/NftOwnership'
-      required:
-      - ownership
-      - type
-      - ownershipId
-      - eventId
-      additionalProperties: false
     NftOwnership:
       type: object
       properties:
@@ -448,15 +437,35 @@ components:
       - contract
       - id
       additionalProperties: false
+    NftOwnershipEvent:
+      type: object
+      properties:
+        eventId:
+          type: string
+        ownershipId:
+          type: string
+        type:
+          type: string
+          enum:
+          - UPDATE
+          - DELETE
+        ownership:
+          $ref: '#/components/schemas/NftOwnership'
+      required:
+      - ownership
+      - type
+      - ownershipId
+      - eventId
+      additionalProperties: false
     Order:
       type: object
       properties:
         data:
           $ref: '#/components/schemas/OrderRaribleV2DataV1'
         maker:
-          $ref: '#/components/schemas/edpk'
+          $ref: '#/components/schemas/Edpk'
         taker:
-          $ref: '#/components/schemas/edpk'
+          $ref: '#/components/schemas/Edpk'
         make:
           $ref: '#/components/schemas/Asset'
         take:
@@ -478,7 +487,7 @@ components:
         salt:
           $ref: '#/components/schemas/Word'
         signature:
-          $ref: '#/components/schemas/edsig'
+          $ref: '#/components/schemas/Edsig'
         createdAt:
           type: string
           format: date-time
@@ -493,10 +502,6 @@ components:
           $ref: '#/components/schemas/Word'
         makeBalance:
           $ref: '#/components/schemas/BigInteger'
-        makePriceUsd:
-          $ref: '#/components/schemas/BigDecimal'
-        takePriceUsd:
-          $ref: '#/components/schemas/BigDecimal'
         priceHistory:
           type: array
           items:
@@ -509,8 +514,6 @@ components:
           - RARIBLE_V2
       required:
       - type
-      - takePriceUsd
-      - makePriceUsd
       - hash
       - lastUpdateAt
       - createdAt
@@ -552,14 +555,12 @@ components:
         hash:
           $ref: '#/components/schemas/Word'
         maker:
-          $ref: '#/components/schemas/edpk'
+          $ref: '#/components/schemas/Edpk'
         make:
           $ref: '#/components/schemas/Asset'
         take:
           $ref: '#/components/schemas/Asset'
         price:
-          $ref: '#/components/schemas/BigDecimal'
-        priceUsd:
           $ref: '#/components/schemas/BigDecimal'
       required:
       - price
@@ -579,7 +580,7 @@ components:
         hash:
           $ref: '#/components/schemas/Word'
         maker:
-          $ref: '#/components/schemas/edpk'
+          $ref: '#/components/schemas/Edpk'
         make:
           $ref: '#/components/schemas/AssetType'
         take:
@@ -615,7 +616,7 @@ components:
         hash:
           $ref: '#/components/schemas/Word'
         maker:
-          $ref: '#/components/schemas/edpk'
+          $ref: '#/components/schemas/Edpk'
         make:
           $ref: '#/components/schemas/AssetType'
         take:
@@ -651,14 +652,12 @@ components:
         hash:
           $ref: '#/components/schemas/Word'
         maker:
-          $ref: '#/components/schemas/edpk'
+          $ref: '#/components/schemas/Edpk'
         make:
           $ref: '#/components/schemas/Asset'
         take:
           $ref: '#/components/schemas/Asset'
         price:
-          $ref: '#/components/schemas/BigDecimal'
-        priceUsd:
           $ref: '#/components/schemas/BigDecimal'
       required:
       - price
@@ -680,8 +679,6 @@ components:
         right:
           $ref: '#/components/schemas/OrderActivitySideMatch'
         price:
-          $ref: '#/components/schemas/BigDecimal'
-        priceUsd:
           $ref: '#/components/schemas/BigDecimal'
         transactionHash:
           $ref: '#/components/schemas/Word'
@@ -707,7 +704,7 @@ components:
       type: object
       properties:
         maker:
-          $ref: '#/components/schemas/edpk'
+          $ref: '#/components/schemas/Edpk'
         hash:
           $ref: '#/components/schemas/Word'
         asset:
@@ -749,7 +746,7 @@ components:
           type: string
           format: date-time
         maker:
-          $ref: '#/components/schemas/edpk'
+          $ref: '#/components/schemas/Edpk'
       required:
       - date
       - hash
@@ -833,7 +830,7 @@ components:
           type: string
           format: date-time
         maker:
-          $ref: '#/components/schemas/edpk'
+          $ref: '#/components/schemas/Edpk'
         side:
           $ref: '#/components/schemas/OrderSide'
         fill:
@@ -842,14 +839,6 @@ components:
           $ref: '#/components/schemas/Address'
         counterHash:
           $ref: '#/components/schemas/Word'
-        makeUsd:
-          $ref: '#/components/schemas/BigDecimal'
-        takeUsd:
-          $ref: '#/components/schemas/BigDecimal'
-        makePriceUsd:
-          $ref: '#/components/schemas/BigDecimal'
-        takePriceUsd:
-          $ref: '#/components/schemas/BigDecimal'
       required:
       - fill
       - date
@@ -870,7 +859,9 @@ components:
         account:
           $ref: '#/components/schemas/Address'
         value:
-          $ref: '#/components/schemas/BigInteger'
+          type: integer
+          minimum: -2147483648
+          maximum: 2147483647
       required:
       - value
       - account
@@ -903,8 +894,4 @@ components:
       required:
       - assetClass
       additionalProperties: false
-    edpk:
-      type: string
-    edsig:
-      type: string
   securitySchemes: {}
