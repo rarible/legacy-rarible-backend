@@ -73,6 +73,7 @@ let end_date_param = pint ~required:true "endDate"
 (* TODO : ALL | RARIBLE | OPEN_SEA *)
 let source_param = pstring "source"
 let status_param = pstring "status"
+let currency_param = pstring "currencyId"
 
 let hash_arg = EzAPI.Arg.string "hash"
 let item_id_arg = EzAPI.Arg.string "itemId"
@@ -384,6 +385,27 @@ let get_continuation_price_param req =
         mk_invalid_argument continuation_param "must be in format PRICE_HASH"
     with _ ->
       mk_invalid_argument continuation_param "must be in format PRICE_HASH"
+
+let get_currency_param req =
+  let open Tzfunc.Crypto in
+  match EzAPI.Req.find_param currency_param req with
+  | None -> Ok None
+  | Some "XTZ" -> Ok (Some ATXTZ)
+  | Some str ->
+    begin
+      try
+        match String.split_on_char ':' str with
+        | "FA_1_2" :: contract :: [] ->
+          ignore @@ Base58.decode ~prefix:Prefix.contract_public_key_hash contract ;
+          Ok (Some (ATFA_1_2 contract))
+        | "FA_2" :: contract :: token_id :: [] ->
+          ignore @@ Base58.decode ~prefix:Prefix.contract_public_key_hash contract ;
+          Ok (Some (ATFA_2 { asset_fa2_contract = contract ; asset_fa2_token_id = token_id }))
+        | _ ->
+          mk_invalid_argument currency_param "must be XTZ, FA_1_2:ADDRESS or FA_2:ADDRESS:TOKENID"
+      with _ ->
+        mk_invalid_argument currency_param "must be XTZ, FA_1_2:ADDRESS or FA_2:ADDRESS:TOKENID"
+    end
 
 (* (\* gateway-controller *\)
  * let create_gateway_pending_transactions _req _input =
@@ -981,6 +1003,9 @@ let get_sell_orders_by_item req () =
         match get_origin_param req with
         | Error err -> return @@ Error err
         | Ok origin ->
+          match get_currency_param req with
+          | Error err -> return @@ Error err
+          | Ok currency ->
           match get_size_param req with
           | Error err -> return @@ Error err
           | Ok size ->
@@ -988,7 +1013,7 @@ let get_sell_orders_by_item req () =
             | Error err -> return @@ Error err
             | Ok continuation ->
               Db.get_sell_orders_by_item
-                ?origin ?continuation ?size ?maker contract token_id >>= function
+                ?origin ?continuation ?size ?maker ?currency contract token_id >>= function
               | Error db_err ->
                 let str = Crawlori.Rp.string_of_error db_err in
                 return (Error (unexpected_api_error str))
@@ -1099,18 +1124,21 @@ let get_order_bids_by_item req () =
         match get_origin_param req with
         | Error err -> return @@ Error err
         | Ok origin ->
-          match get_size_param req with
+          match get_currency_param req with
           | Error err -> return @@ Error err
-          | Ok size ->
-            match get_continuation_price_param req with
+          | Ok currency ->
+            match get_size_param req with
             | Error err -> return @@ Error err
-            | Ok continuation ->
-              Db.get_bid_orders_by_item
-                ?origin ?continuation ?size ?maker contract token_id >>= function
-              | Error db_err ->
-                let str = Crawlori.Rp.string_of_error db_err in
-                return (Error (unexpected_api_error str))
-              | Ok res -> return_ok res
+            | Ok size ->
+              match get_continuation_price_param req with
+              | Error err -> return @@ Error err
+              | Ok continuation ->
+                Db.get_bid_orders_by_item
+                  ?origin ?continuation ?size ?maker ?currency contract token_id >>= function
+                | Error db_err ->
+                  let str = Crawlori.Rp.string_of_error db_err in
+                  return (Error (unexpected_api_error str))
+                | Ok res -> return_ok res
 [@@get
   {path="/v0.1/orders/bids/byItem";
    params=[contract_param;token_id_param;maker_param;origin_param;

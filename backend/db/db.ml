@@ -2187,7 +2187,8 @@ let get_sell_orders_by_maker ?dbh ?origin ?continuation ?(size=50) maker =
  *     List.filter_map (fun x -> x) @@
  *     List.mapi (fun i order -> if i < Int64.to_int size then Some order else None) acc *)
 
-let rec get_sell_orders_by_item_aux ?dbh ?origin ?continuation ?maker ~size contract token_id acc =
+let rec get_sell_orders_by_item_aux
+    ?dbh ?origin ?continuation ?maker ?currency ~size contract token_id acc =
   Format.eprintf "get_orders_all_aux %s %s %Ld %s %s %d@."
     (match origin with None -> "None" | Some s -> s)
     (match continuation with
@@ -2201,6 +2202,17 @@ let rec get_sell_orders_by_item_aux ?dbh ?origin ?continuation ?maker ~size cont
     continuation = None,
     (match continuation with None -> 0., "" | Some (ts, h) -> (ts, h)) in
   let no_maker, maker_v = maker = None, (match maker with None -> "" | Some m -> m) in
+  let no_currency = currency = None in
+  let currency_tezos = currency = Some ATXTZ in
+  let currency_fa1_2, currency_fa1_2_contract =
+    (match currency with Some (ATFA_1_2 _) -> true | _ -> false),
+    match currency with Some ATFA_1_2 c -> c | _ -> ""  in
+  let currency_fa2, (currency_fa2_contract, currency_fa2_token_id) =
+    (match currency with Some (ATFA_2 _) -> true | _ -> false),
+    match currency with
+    | Some ATFA_2 {asset_fa2_contract ; asset_fa2_token_id } ->
+      asset_fa2_contract, asset_fa2_token_id
+    | _ -> "", ""  in
   let len = Int64.of_int @@ List.length acc in
   if len < size  then
     use dbh @@ fun dbh ->
@@ -2209,6 +2221,15 @@ let rec get_sell_orders_by_item_aux ?dbh ?origin ?continuation ?maker ~size cont
                    where make_asset_type_contract = $contract and \
                    make_asset_type_token_id = $token_id and \
                    ($no_maker or maker = $maker_v) and \
+                   ($no_currency or \
+                   ($currency_tezos and take_asset_type_class = 'XTZ') or \
+                   ($currency_fa1_2 and \
+                   take_asset_type_class = 'FA1_2' and \
+                   take_asset_type_contract = $currency_fa1_2_contract) or \
+                   ($currency_fa2 and \
+                   take_asset_type_class = 'FA_2' and \
+                   take_asset_type_contract = $currency_fa2_contract and \
+                   take_asset_type_token_id = $currency_fa2_token_id)) and \
                    ($no_continuation or \
                    (make_price_usd > $p) or \
                    (make_price_usd = $p and hash < $h)) \
@@ -2233,7 +2254,8 @@ let rec get_sell_orders_by_item_aux ?dbh ?origin ?continuation ?maker ~size cont
     List.filter_map (fun x -> x) @@
     List.mapi (fun i order -> if i < Int64.to_int size then Some order else None) acc
 
-let get_sell_orders_by_item ?dbh ?origin ?continuation ?(size=50) ?maker contract token_id =
+let get_sell_orders_by_item
+    ?dbh ?origin ?continuation ?(size=50) ?maker ?currency contract token_id =
   Format.eprintf "get_sell_orders_by_item %s %s %d@."
     (match origin with None -> "None" | Some s -> s)
     (match continuation with
@@ -2242,7 +2264,8 @@ let get_sell_orders_by_item ?dbh ?origin ?continuation ?(size=50) ?maker contrac
     size ;
   let size = Int64.of_int size in
   let>? orders =
-    get_sell_orders_by_item_aux ?dbh ?origin ?continuation ?maker ~size contract token_id [] in
+    get_sell_orders_by_item_aux
+      ?dbh ?origin ?continuation ?maker ?currency ~size contract token_id [] in
   let len = Int64.of_int @@ List.length orders in
   let orders_pagination_contination =
     if len = 0L || len < size then None
@@ -2489,7 +2512,8 @@ let get_bid_orders_by_maker ?dbh ?origin ?continuation ?(size=50) maker =
  *   Lwt.return_ok
  *     { orders_pagination_orders = orders ; orders_pagination_contination } *)
 
-let rec get_bid_orders_by_item_aux ?dbh ?origin ?continuation ?maker ~size contract token_id acc =
+let rec get_bid_orders_by_item_aux
+    ?dbh ?origin ?continuation ?maker ?currency ~size contract token_id acc =
   Format.eprintf "get_bid_orders_by_item_aux %s %s %Ld %s %s %d@."
     (match origin with None -> "None" | Some s -> s)
     (match continuation with
@@ -2503,6 +2527,17 @@ let rec get_bid_orders_by_item_aux ?dbh ?origin ?continuation ?maker ~size contr
     continuation = None,
     (match continuation with None -> 0., "" | Some (ts, h) -> (ts, h)) in
   let no_maker, maker_v = maker = None, (match maker with None -> "" | Some m -> m) in
+  let no_currency = currency = None in
+  let currency_tezos = currency = Some ATXTZ in
+  let currency_fa1_2, currency_fa1_2_contract =
+    (match currency with Some (ATFA_1_2 _) -> true | _ -> false),
+    match currency with Some ATFA_1_2 c -> c | _ -> ""  in
+  let currency_fa2, (currency_fa2_contract, currency_fa2_token_id) =
+    (match currency with Some (ATFA_2 _) -> true | _ -> false),
+    match currency with
+    | Some ATFA_2 {asset_fa2_contract ; asset_fa2_token_id } ->
+      asset_fa2_contract, asset_fa2_token_id
+    | _ -> "", ""  in
   let len = Int64.of_int @@ List.length acc in
   if len < size  then
     use dbh @@ fun dbh ->
@@ -2511,6 +2546,15 @@ let rec get_bid_orders_by_item_aux ?dbh ?origin ?continuation ?maker ~size contr
                    where take_asset_type_contract = $contract and \
                    take_asset_type_token_id = $token_id and \
                    ($no_maker or maker = $maker_v) and \
+                   ($no_currency or \
+                   ($currency_tezos and take_asset_type_class = 'XTZ') or \
+                   ($currency_fa1_2 and \
+                   take_asset_type_class = 'FA1_2' and \
+                   take_asset_type_contract = $currency_fa1_2_contract) or \
+                   ($currency_fa2 and \
+                   take_asset_type_class = 'FA_2' and \
+                   take_asset_type_contract = $currency_fa2_contract and \
+                   take_asset_type_token_id = $currency_fa2_token_id)) and \
                    ($no_continuation or \
                    (take_price_usd < $p) or \
                    (take_price_usd = $p and hash < $h)) \
@@ -2535,7 +2579,8 @@ let rec get_bid_orders_by_item_aux ?dbh ?origin ?continuation ?maker ~size contr
     List.filter_map (fun x -> x) @@
     List.mapi (fun i order -> if i < Int64.to_int size then Some order else None) acc
 
-let get_bid_orders_by_item ?dbh ?origin ?continuation ?(size=50) ?maker contract token_id =
+let get_bid_orders_by_item
+    ?dbh ?origin ?continuation ?(size=50) ?maker ?currency contract token_id =
   Format.eprintf "get_bid_orders_by_item %s %s %d@."
     (match origin with None -> "None" | Some s -> s)
     (match continuation with
@@ -2544,7 +2589,8 @@ let get_bid_orders_by_item ?dbh ?origin ?continuation ?(size=50) ?maker contract
     size ;
   let size = Int64.of_int size in
   let>? orders =
-    get_bid_orders_by_item_aux ?dbh ?origin ?continuation ?maker ~size contract token_id [] in
+    get_bid_orders_by_item_aux
+      ?dbh ?origin ?continuation ?maker ?currency ~size contract token_id [] in
   let len = Int64.of_int @@ List.length orders in
   let orders_pagination_contination =
     if len = 0L || len < size then None
