@@ -21,6 +21,10 @@ module A = struct
   let uint53 =
     Json_encoding.ranged_int53 ~minimum:0L ~maximum:(Int64.shift_left 1L 53) "uint53"
 
+  type uint32 = int32
+  let uint32_enc =
+    Json_encoding.ranged_int32 ~minimum:0l ~maximum:Int32.max_int "uint32"
+
   type big_integer = string [@@deriving encoding {title="BigInteger"; def_title}]
 
   (* TODO : B58CHECK ? *)
@@ -57,7 +61,7 @@ end
 
 type part = {
   part_account : A.address;
-  part_value : int32 ;
+  part_value : A.uint32 ;
 } [@@deriving encoding {title="Part"; def_title} ]
 
 
