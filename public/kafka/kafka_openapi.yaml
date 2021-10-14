@@ -292,82 +292,9 @@ components:
       - $ref: '#/components/schemas/Mint'
       - $ref: '#/components/schemas/Burn'
       - $ref: '#/components/schemas/Transfer'
-    NftEvent:
-      oneOf:
-      - $ref: '#/components/schemas/NftItemUpdateEvent'
-      - $ref: '#/components/schemas/NftItemDeleteEvent'
-    NftItemAttribute:
+    NftItem:
       type: object
       properties:
-        key:
-          type: string
-        value:
-          type: string
-        type:
-          type: string
-        format:
-          type: string
-      required:
-      - key
-      additionalProperties: false
-    NftItemDeleteEvent:
-      type: object
-      properties:
-        type:
-          type: string
-          enum:
-          - DELETE
-        id:
-          type: string
-        token:
-          $ref: '#/components/schemas/Address'
-        tokenId:
-          $ref: '#/components/schemas/BigInteger'
-      required:
-      - tokenId
-      - token
-      - id
-      - type
-      additionalProperties: false
-    NftItemEvent:
-      type: object
-      properties:
-        eventId:
-          type: string
-        itemId:
-          type: string
-        item:
-          $ref: '#/components/schemas/NftEvent'
-      required:
-      - item
-      - itemId
-      - eventId
-      additionalProperties: false
-    NftItemMeta:
-      type: object
-      properties:
-        name:
-          type: string
-        description:
-          type: string
-        attributes:
-          type: array
-          items:
-            $ref: '#/components/schemas/NftItemAttribute'
-        image:
-          type: string
-        animation:
-          type: string
-      required:
-      - name
-      additionalProperties: false
-    NftItemUpdateEvent:
-      type: object
-      properties:
-        type:
-          type: string
-          enum:
-          - UPDATE
         id:
           type: string
         contract:
@@ -411,84 +338,116 @@ components:
       - tokenId
       - contract
       - id
+      additionalProperties: false
+    NftItemAttribute:
+      type: object
+      properties:
+        key:
+          type: string
+        value:
+          type: string
+        type:
+          type: string
+        format:
+          type: string
+      required:
+      - key
+      additionalProperties: false
+    NftItemEvent:
+      type: object
+      properties:
+        eventId:
+          type: string
+        itemId:
+          type: string
+        type:
+          type: string
+          enum:
+          - UPDATE
+          - DELETE
+        item:
+          $ref: '#/components/schemas/NftItem'
+      required:
+      - item
       - type
+      - itemId
+      - eventId
+      additionalProperties: false
+    NftItemMeta:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        attributes:
+          type: array
+          items:
+            $ref: '#/components/schemas/NftItemAttribute'
+        image:
+          type: string
+        animation:
+          type: string
+      required:
+      - name
       additionalProperties: false
     NftOwnerShipEvent:
-      oneOf:
-      - type: object
-        properties:
-          eventId:
-            type: string
-          ownershipId:
-            type: string
-          type:
-            type: string
-            enum:
-            - UPDATE
-          id:
-            type: string
-          contract:
-            $ref: '#/components/schemas/Address'
-          tokenId:
-            $ref: '#/components/schemas/BigInteger'
-          owner:
-            $ref: '#/components/schemas/Address'
-          creators:
-            type: array
-            items:
-              $ref: '#/components/schemas/Part'
-          value:
-            $ref: '#/components/schemas/BigInteger'
-          lazyValue:
-            $ref: '#/components/schemas/BigInteger'
-          date:
-            type: string
-            format: date-time
-          pending:
-            type: array
-            items:
-              $ref: '#/components/schemas/ItemHistory'
-        required:
-        - pending
-        - date
-        - lazyValue
-        - value
-        - creators
-        - owner
-        - tokenId
-        - contract
-        - id
-        - type
-        - ownershipId
-        - eventId
-        additionalProperties: false
-      - type: object
-        properties:
-          eventId:
-            type: string
-          ownershipId:
-            type: string
-          type:
-            type: string
-            enum:
-            - DELETE
-          id:
-            type: string
-          token:
-            $ref: '#/components/schemas/Address'
-          tokenId:
-            $ref: '#/components/schemas/BigInteger'
-          owner:
-            $ref: '#/components/schemas/Address'
-        required:
-        - owner
-        - tokenId
-        - token
-        - id
-        - type
-        - ownershipId
-        - eventId
-        additionalProperties: false
+      type: object
+      properties:
+        eventId:
+          type: string
+        ownershipId:
+          type: string
+        type:
+          type: string
+          enum:
+          - UPDATE
+          - DELETE
+        ownership:
+          $ref: '#/components/schemas/NftOwnership'
+      required:
+      - ownership
+      - type
+      - ownershipId
+      - eventId
+      additionalProperties: false
+    NftOwnership:
+      type: object
+      properties:
+        id:
+          type: string
+        contract:
+          $ref: '#/components/schemas/Address'
+        tokenId:
+          $ref: '#/components/schemas/BigInteger'
+        owner:
+          $ref: '#/components/schemas/Address'
+        creators:
+          type: array
+          items:
+            $ref: '#/components/schemas/Part'
+        value:
+          $ref: '#/components/schemas/BigInteger'
+        lazyValue:
+          $ref: '#/components/schemas/BigInteger'
+        date:
+          type: string
+          format: date-time
+        pending:
+          type: array
+          items:
+            $ref: '#/components/schemas/ItemHistory'
+      required:
+      - pending
+      - date
+      - lazyValue
+      - value
+      - creators
+      - owner
+      - tokenId
+      - contract
+      - id
+      additionalProperties: false
     Order:
       type: object
       properties:
@@ -803,13 +762,15 @@ components:
           type: string
         orderId:
           type: string
-        order:
-          $ref: '#/components/schemas/Order'
         type:
           type: string
+          enum:
+          - UPDATE
+        order:
+          $ref: '#/components/schemas/Order'
       required:
-      - type
       - order
+      - type
       - orderId
       - eventId
       additionalProperties: false

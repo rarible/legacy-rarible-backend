@@ -459,7 +459,7 @@ let mk_nft_ownership obj =
     nft_ownership_pending = [] ;
   }
 
-let get_nft_ownership_by_id ?dbh contract token_id owner =
+let get_nft_ownership_by_id ?dbh ?(old=false) contract token_id owner =
   (* TODO : OWNERSHIP NOT FOUND *)
   Format.eprintf "get_nft_ownership_by_id %s %s %s@." contract token_id owner ;
   let id64 = Int64.of_string token_id in
@@ -470,7 +470,7 @@ let get_nft_ownership_by_id ?dbh contract token_id owner =
        name, creators, description, attributes, image, animation \
        from tokens where \
        main and contract = $contract and token_id = $id64 and \
-       owner = $owner and amount <> 0"] in
+       owner = $owner and (amount <> 0 or $old)"] in
   let>? obj = one l in
   let>? nft_ownership = mk_nft_ownership obj in
   Lwt.return_ok nft_ownership
@@ -635,56 +635,28 @@ let produce_order_event_hash dbh hash =
 let produce_nft_item_event dbh contract token_id =
   let>? item = get_nft_item_by_id ~dbh ~include_meta:true contract (Int64.to_string token_id) in
   if Int64.of_string item.nft_item_supply = 0L then
-    let deleted_item = {
-      nft_deleted_item_id = item.nft_item_id ;
-      nft_deleted_item_token = item.nft_item_contract ;
-      nft_deleted_item_token_id = item.nft_item_token_id ;
-    } in
-    Rarible_kafka.produce_item_event
-      (mk_item_event contract token_id (NftItemDeleteEvent deleted_item))
+    Rarible_kafka.produce_item_event (mk_delete_item_event item)
     >>= fun () ->
     Lwt.return_ok ()
   else
-    Rarible_kafka.produce_item_event
-      (mk_item_event contract token_id (NftItemUpdateEvent item))
+    Rarible_kafka.produce_item_event (mk_update_item_event item)
     >>= fun () ->
     Lwt.return_ok ()
 
 let produce_nft_ownership_update_event os =
-  let event =
-    if os.nft_ownership_value = "0" then
-      let deleted_os = {
-        nft_deleted_ownership_id = os.nft_ownership_id ;
-        nft_deleted_ownership_token = os.nft_ownership_contract ;
-        nft_deleted_ownership_token_id = os.nft_ownership_token_id ;
-        nft_deleted_ownership_owner = os. nft_ownership_owner ;
-      } in
-      NftOwnershipDeleteEvent deleted_os
-    else NftOwnershipUpdateEvent os in
-  Rarible_kafka.produce_ownership_event
-    (mk_ownership_event
-       os.nft_ownership_contract
-       (Int64.of_string os.nft_ownership_token_id)
-       os.nft_ownership_owner
-       event) >>= fun () ->
-  Lwt.return_ok ()
-
-let produce_nft_ownership_delete_event contract token_id owner =
-  let deleted_os = {
-    nft_deleted_ownership_id = Printf.sprintf "%s:%Ld:%s" contract token_id owner ;
-    nft_deleted_ownership_token = contract ;
-    nft_deleted_ownership_token_id = Int64.to_string token_id ;
-    nft_deleted_ownership_owner = owner ;
-  } in
-  let event = NftOwnershipDeleteEvent deleted_os in
-  Rarible_kafka.produce_ownership_event
-    (mk_ownership_event contract token_id owner event) >>= fun () ->
-  Lwt.return_ok ()
+  if os.nft_ownership_value = "0" then
+    Rarible_kafka.produce_ownership_event (mk_delete_ownership_event os)
+  else
+    Rarible_kafka.produce_ownership_event (mk_update_ownership_event os)
 
 let produce_nft_ownership_event dbh contract token_id owner =
-  get_nft_ownership_by_id ~dbh contract (Int64.to_string token_id) owner >>= function
-  | Ok os -> produce_nft_ownership_update_event os
-  | Error _ -> produce_nft_ownership_delete_event contract token_id owner
+  begin
+    get_nft_ownership_by_id
+      ~old:true ~dbh contract (Int64.to_string token_id) owner >>= function
+    | Ok os -> produce_nft_ownership_update_event os
+    | Error _ -> Lwt.return_unit
+  end >>= fun () ->
+  Lwt.return_ok ()
 
 let insert_fake ?dbh address =
   use dbh @@ fun dbh ->
