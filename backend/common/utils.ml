@@ -601,19 +601,35 @@ let mk_order_event order = {
   order_event_event_id = Hex.show @@ Hex.of_bigstring @@ Hacl.Rand.gen 128 ;
   order_event_order_id = order.order_elt.order_elt_hash ;
   order_event_order = order ;
-  order_event_type = "UPDATE" ;
+  order_event_type = () ;
 }
 
-let mk_item_event token token_id event = {
+let mk_update_item_event item = {
   nft_item_event_event_id = Hex.show @@ Hex.of_bigstring @@ Hacl.Rand.gen 128 ;
-  nft_item_event_item_id = Printf.sprintf "%s:%Ld" token token_id ;
-  nft_item_event_item = event ;
+  nft_item_event_item_id = item.nft_item_id ;
+  nft_item_event_type = `UPDATE ;
+  nft_item_event_item = item ;
 }
 
-let mk_ownership_event token token_id owner event = {
+let mk_delete_item_event item = {
+  nft_item_event_event_id = Hex.show @@ Hex.of_bigstring @@ Hacl.Rand.gen 128 ;
+  nft_item_event_item_id = item.nft_item_id ;
+  nft_item_event_type = `DELETE ;
+  nft_item_event_item = item ;
+}
+
+let mk_update_ownership_event os = {
   nft_ownership_event_event_id = Hex.show @@ Hex.of_bigstring @@ Hacl.Rand.gen 128 ;
-  nft_ownership_event_ownership_id = Printf.sprintf "%s:%Ld:%s" token token_id owner ;
-  nft_ownership_event_ownership = event ;
+  nft_ownership_event_ownership_id = os.nft_ownership_id ;
+  nft_ownership_event_type = `UPDATE ;
+  nft_ownership_event_ownership = os ;
+}
+
+let mk_delete_ownership_event os = {
+  nft_ownership_event_event_id = Hex.show @@ Hex.of_bigstring @@ Hacl.Rand.gen 128 ;
+  nft_ownership_event_ownership_id = os.nft_ownership_id ;
+  nft_ownership_event_type = `DELETE ;
+  nft_ownership_event_ownership = os ;
 }
 
 let flat_order_type =

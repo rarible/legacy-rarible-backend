@@ -754,45 +754,22 @@ type fee_side = FeeSideMake | FeeSideTake
 type order_event = {
   order_event_event_id : string ;
   order_event_order_id : string ;
+  order_event_type : unit ; [@encoding Json_encoding.constant "UPDATE"]
   order_event_order : order ;
-  order_event_type : string ;
 } [@@deriving encoding {camel; title="OrderEvent"; def_title}]
-
-type nft_deleted_item = {
-  nft_deleted_item_id : string ;
-  nft_deleted_item_token : A.address ;
-  nft_deleted_item_token_id : A.big_integer ;
-} [@@deriving encoding {camel; title="NftDeletedItem"; def_title}]
-
-type nft_event =
-  | NftItemUpdateEvent of nft_item [@kind "UPDATE"] [@kind_label "type"] [@title "NftItemUpdateEvent"] [@def_title]
-  | NftItemDeleteEvent of nft_deleted_item [@kind "DELETE"] [@kind_label "type"] [@title "NftItemDeleteEvent"] [@def_title]
- [@@deriving encoding {title="NftEvent"; def_title}]
 
 type nft_item_event = {
   nft_item_event_event_id : string ;
   nft_item_event_item_id : string ;
-  nft_item_event_item : nft_event ;
+  nft_item_event_type : [`UPDATE | `DELETE ] ; [@enum]
+  nft_item_event_item : nft_item ;
 } [@@deriving encoding {camel; title="NftItemEvent"; def_title}]
-
-type nft_deleted_ownership = {
-  nft_deleted_ownership_id : string ;
-  nft_deleted_ownership_token : A.address ;
-  nft_deleted_ownership_token_id : A.big_integer ;
-  nft_deleted_ownership_owner : A.address ;
-} [@@deriving encoding {camel; title="NftDeletedOwnerShip"; def_title}]
-
-type ownership_event =
-  | NftOwnershipUpdateEvent of
-      nft_ownership [@kind "UPDATE"] [@kind_label "type"]
-  | NftOwnershipDeleteEvent of
-      nft_deleted_ownership [@kind "DELETE"] [@kind_label "type"]
-[@@deriving encoding {title="OwnerShipEvent"; def_title}]
 
 type nft_ownership_event = {
   nft_ownership_event_event_id : string ;
   nft_ownership_event_ownership_id : string ;
-  nft_ownership_event_ownership : ownership_event ; [@merge]
+  nft_ownership_event_type : [ `UPDATE | `DELETE ] ; [@enum]
+  nft_ownership_event_ownership : nft_ownership ;
 } [@@deriving encoding {camel; title="NftOwnerShipEvent"; def_title}]
 
 type signature_validation_form = {
