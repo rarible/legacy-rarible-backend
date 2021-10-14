@@ -2003,22 +2003,20 @@ let rec get_orders_all_aux ?dbh ?origin ?continuation ~size acc =
   if len < size  then
     use dbh @@ fun dbh ->
     let>? l =
-      [%pgsql dbh "select hash from orders \
+      [%pgsql.object dbh "select hash, last_update_at from orders \
                    where \
                    ($no_continuation or \
                    (last_update_at < $ts) or \
                    (last_update_at = $ts and hash < $h)) \
                    order by last_update_at desc, hash desc limit $size"] in
-    map_rp (fun h -> get_order ~dbh h) l >>=? fun orders ->
+    let continuation = match List.rev l with
+      | [] -> None
+      | hd :: _ -> Some (hd#last_update_at, hd#hash) in
+    map_rp (fun r -> get_order ~dbh r#hash) l >>=? fun orders ->
     match orders with
     | [] -> Lwt.return_ok acc
     | _ ->
       let orders = List.filter_map (fun x -> x) orders in
-      let continuation = match List.rev orders with
-        | [] -> None
-        | hd :: _ ->
-          Some (hd.order_elt.order_elt_last_update_at,
-                hd.order_elt.order_elt_hash) in
       let orders = filter_orders ?origin orders in
       get_orders_all_aux ~dbh ?origin ?continuation ~size (acc @ orders)
   else
@@ -2061,23 +2059,21 @@ let rec get_sell_orders_by_maker_aux ?dbh ?origin ?continuation ~size ~maker acc
   if len < size  then
     use dbh @@ fun dbh ->
     let>? l =
-      [%pgsql dbh "select hash from orders \
+      [%pgsql.object dbh "select hash, last_update_at from orders \
                    where \
                    maker = $maker and \
                    ($no_continuation or \
                    (last_update_at < $ts) or \
                    (last_update_at = $ts and hash < $h)) \
                    order by last_update_at desc, hash desc limit $size"] in
-    map_rp (fun h -> get_order ~dbh h) l >>=? fun orders ->
+    let continuation = match List.rev l with
+      | [] -> None
+      | hd :: _ -> Some (hd#last_update_at, hd#hash) in
+    map_rp (fun r -> get_order ~dbh r#hash) l >>=? fun orders ->
     match orders with
     | [] -> Lwt.return_ok acc
     | _ ->
       let orders = List.filter_map (fun x -> x) orders in
-      let continuation = match List.rev orders with
-        | [] -> None
-        | hd :: _ ->
-          Some (hd.order_elt.order_elt_last_update_at,
-                hd.order_elt.order_elt_hash) in
       let orders = filter_orders ?origin orders in
       get_sell_orders_by_maker_aux ~dbh ?origin ?continuation ~size ~maker (acc @ orders)
   else
@@ -2173,7 +2169,7 @@ let rec get_sell_orders_by_item_aux
   if len < size  then
     use dbh @@ fun dbh ->
     let>? l =
-      [%pgsql dbh "select hash from orders \
+      [%pgsql.object dbh "select hash, make_asset_value from orders \
                    where make_asset_type_contract = $contract and \
                    make_asset_type_token_id = $token_id and \
                    ($no_maker or maker = $maker_v) and \
@@ -2190,16 +2186,14 @@ let rec get_sell_orders_by_item_aux
                    (make_asset_value > $p) or \
                    (make_asset_value = $p and hash < $h)) \
                    order by make_asset_value asc, hash desc limit $size"] in
-    map_rp (fun h -> get_order ~dbh h) l >>=? fun orders ->
+    let continuation = match List.rev l with
+      | [] -> None
+      | hd :: _ -> Some (hd#make_asset_value, hd#hash) in
+    map_rp (fun r -> get_order ~dbh r#hash) l >>=? fun orders ->
     match orders with
     | [] -> Lwt.return_ok acc
     | _ ->
       let orders = List.filter_map (fun x -> x) orders in
-      let continuation = match List.rev orders with
-        | [] -> None
-        | hd :: _ ->
-          Some (hd.order_elt.order_elt_make.asset_value,
-                hd.order_elt.order_elt_hash) in
       let orders = filter_orders ?origin orders in
       get_sell_orders_by_item_aux
         ~dbh ?origin ?continuation ?maker ~size contract token_id (acc @ orders)
@@ -2246,23 +2240,21 @@ let rec get_sell_orders_by_collection_aux ?dbh ?origin ?continuation ~size colle
   if len < size  then
     use dbh @@ fun dbh ->
     let>? l =
-      [%pgsql dbh "select hash from orders \
+      [%pgsql.object dbh "select hash, last_update_at from orders \
                    where make_asset_type_contract = $collection and \
                    make_asset_type_class = 'FA_2' and \
                    ($no_continuation or \
                    (last_update_at < $ts) or \
                    (last_update_at = $ts and hash < $h)) \
                    order by last_update_at desc, hash desc limit $size"] in
-    map_rp (fun h -> get_order ~dbh h) l >>=? fun orders ->
+    let continuation = match List.rev l with
+      | [] -> None
+      | hd :: _ -> Some (hd#last_update_at, hd#hash) in
+    map_rp (fun r -> get_order ~dbh r#hash) l >>=? fun orders ->
     match orders with
     | [] -> Lwt.return_ok acc
     | _ ->
       let orders = List.filter_map (fun x -> x) orders in
-      let continuation = match List.rev orders with
-        | [] -> None
-        | hd :: _ ->
-          Some (hd.order_elt.order_elt_last_update_at,
-                hd.order_elt.order_elt_hash) in
       let orders = filter_orders ?origin orders in
       get_sell_orders_by_collection_aux ~dbh ?origin ?continuation ~size collection (acc @ orders)
   else
@@ -2306,22 +2298,20 @@ let rec get_sell_orders_aux ?dbh ?origin ?continuation ~size acc =
   if len < size  then
     use dbh @@ fun dbh ->
     let>? l =
-      [%pgsql dbh "select hash from orders \
+      [%pgsql.object dbh "select hash, last_update_at from orders \
                    where make_asset_type_class = 'FA_2' and \
                    ($no_continuation or \
                    (last_update_at < $ts) or \
                    (last_update_at = $ts and hash < $h)) \
                    order by last_update_at desc, hash desc limit $size"] in
-    map_rp (fun h -> get_order ~dbh h) l >>=? fun orders ->
+    let continuation = match List.rev l with
+      | [] -> None
+      | hd :: _ -> Some (hd#last_update_at, hd#hash) in
+    map_rp (fun r -> get_order ~dbh r#hash) l >>=? fun orders ->
     match orders with
     | [] -> Lwt.return_ok acc
     | _ ->
       let orders = List.filter_map (fun x -> x) orders in
-      let continuation = match List.rev orders with
-        | [] -> None
-        | hd :: _ ->
-          Some (hd.order_elt.order_elt_last_update_at,
-                hd.order_elt.order_elt_hash) in
       let orders = filter_orders ?origin orders in
       get_sell_orders_aux ~dbh ?origin ?continuation ~size (acc @ orders)
   else
@@ -2364,7 +2354,7 @@ let rec get_bid_orders_by_maker_aux ?dbh ?origin ?continuation ~size ~maker acc 
   if len < size  then
     use dbh @@ fun dbh ->
     let>? l =
-      [%pgsql dbh "select hash from orders \
+      [%pgsql.object dbh "select hash, last_update_at from orders \
                    where \
                    maker = $maker and \
                    take_asset_type_class = 'FA_2' and \
@@ -2372,16 +2362,14 @@ let rec get_bid_orders_by_maker_aux ?dbh ?origin ?continuation ~size ~maker acc 
                    (last_update_at < $ts) or \
                    (last_update_at = $ts and hash < $h)) \
                    order by last_update_at desc, hash desc limit $size"] in
-    map_rp (fun h -> get_order ~dbh h) l >>=? fun orders ->
+    let continuation = match List.rev l with
+      | [] -> None
+      | hd :: _ -> Some (hd#last_update_at, hd#hash) in
+    map_rp (fun r -> get_order ~dbh r#hash) l >>=? fun orders ->
     match orders with
     | [] -> Lwt.return_ok acc
     | _ ->
       let orders = List.filter_map (fun x -> x) orders in
-      let continuation = match List.rev orders with
-        | [] -> None
-        | hd :: _ ->
-          Some (hd.order_elt.order_elt_last_update_at,
-                hd.order_elt.order_elt_hash) in
       let orders = filter_orders ?origin orders in
       get_bid_orders_by_maker_aux ~dbh ?origin ?continuation ~size ~maker (acc @ orders)
   else
@@ -2498,7 +2486,7 @@ let rec get_bid_orders_by_item_aux
   if len < size  then
     use dbh @@ fun dbh ->
     let>? l =
-      [%pgsql dbh "select hash from orders \
+      [%pgsql.object dbh "select hash, take_asset_value from orders \
                    where take_asset_type_contract = $contract and \
                    take_asset_type_token_id = $token_id and \
                    ($no_maker or maker = $maker_v) and \
@@ -2515,16 +2503,14 @@ let rec get_bid_orders_by_item_aux
                    (take_asset_value < $p) or \
                    (take_asset_value = $p and hash < $h)) \
                    order by take_asset_value desc, hash desc limit $size"] in
-    map_rp (fun h -> get_order ~dbh h) l >>=? fun orders ->
+    let continuation = match List.rev l with
+      | [] -> None
+      | hd :: _ -> Some (hd#take_asset_value, hd#hash) in
+    map_rp (fun r -> get_order ~dbh r#hash) l >>=? fun orders ->
     match orders with
     | [] -> Lwt.return_ok acc
     | _ ->
       let orders = List.filter_map (fun x -> x) orders in
-      let continuation = match List.rev orders with
-        | [] -> None
-        | hd :: _ ->
-          Some (hd.order_elt.order_elt_take.asset_value,
-                hd.order_elt.order_elt_hash) in
       let orders = filter_orders ?origin orders in
       get_bid_orders_by_item_aux
         ~dbh ?origin ?continuation ?maker ~size contract token_id (acc @ orders)
