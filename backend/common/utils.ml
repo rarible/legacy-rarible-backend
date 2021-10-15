@@ -256,9 +256,9 @@ let option_mich f = function
 let keccak (s : Tzfunc.Raw.t) =
   Tzfunc.Raw.mk @@ Digestif.KECCAK_256.(to_raw_string @@ digest_string (s :> string))
 
-let hash_key maker make_asset_type take_asset_type salt =
+let hash_key maker_edpk make_asset_type take_asset_type salt =
   let maker = Tzfunc.Forge.pack (prim `option ~args:[prim `key])
-      (option_mich (fun s -> Mstring s) maker) in
+      (option_mich (fun s -> Mstring s) maker_edpk) in
   let$ make_asset_type_mich = asset_type_mich make_asset_type in
   let$ make_asset_type =
     Tzfunc.Forge.pack asset_type_type make_asset_type_mich in
@@ -339,9 +339,9 @@ let flat_order_type
       ])
 
 let flat_order order =
-  let maker = order.order_elt.order_elt_maker in
+  let maker = order.order_elt.order_elt_maker_edpk in
   let make = order.order_elt.order_elt_make in
-  let taker = order.order_elt.order_elt_taker in
+  let taker = order.order_elt.order_elt_taker_edpk in
   let take = order.order_elt.order_elt_take in
   let salt = order.order_elt.order_elt_salt in
   let start_date = order.order_elt.order_elt_start in
@@ -452,14 +452,16 @@ let order_elt_from_order_form_elt elt =
   (* TODO *)
   let$ hash =
     hash_key
-      (Some elt.order_form_elt_maker)
+      (Some elt.order_form_elt_maker_edpk)
       make_asset.asset_type
       take_asset.asset_type
       elt.order_form_elt_salt in
   let now = CalendarLib.Calendar.now () in
   Ok {
     order_elt_maker = elt.order_form_elt_maker ;
+    order_elt_maker_edpk = elt.order_form_elt_maker_edpk ;
     order_elt_taker = elt.order_form_elt_taker;
+    order_elt_taker_edpk = elt.order_form_elt_taker_edpk;
     order_elt_make = make_asset;
     order_elt_take = take_asset;
     order_elt_fill = "0";
@@ -484,7 +486,9 @@ let order_from_order_form form =
 
 let order_form_elt_from_order_elt order_elt = {
   order_form_elt_maker = order_elt.order_elt_maker ;
+  order_form_elt_maker_edpk = order_elt.order_elt_maker_edpk ;
   order_form_elt_taker = order_elt.order_elt_taker ;
+  order_form_elt_taker_edpk = order_elt.order_elt_taker_edpk ;
   order_form_elt_make = order_elt.order_elt_make ;
   order_form_elt_take = order_elt.order_elt_take ;
   order_form_elt_salt = order_elt.order_elt_salt ;
@@ -641,3 +645,7 @@ let do_transfers_type =
     prim `nat;
     prim `list ~args:[ pair [prim `address; prim `nat] ]
   ]
+
+let pk_to_pkh_exn pk = match Tzfunc.Crypto.pk_to_pkh pk with
+  | Error _ -> failwith ("cannot hash edpk " ^ pk)
+  | Ok pkh -> pkh

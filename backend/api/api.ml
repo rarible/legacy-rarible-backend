@@ -61,10 +61,10 @@ let collection_param = pstring ~enc:A.address_enc "collection"
 let show_deleted_param = pbool "showDeleted"
 let last_updated_from_param = pstring "lastUpdateFrom"
 let last_updated_to_param = pstring "lastUpdateTo"
-let origin_param = pstring "origin"
+let origin_param = pstring ~enc:A.address_enc "origin"
 (* TODO : ALL | RARIBLE | OPEN_SEA *)
 let platform_param = pstring "platform"
-let maker_param = pstring ~enc:A.edpk_enc "maker"
+let maker_param = pstring ~enc:A.address_enc "maker"
 let start_date_param = pint ~required:true ~enc:A.uint53 "startDate"
 let end_date_param = pint ~required:true ~enc:A.uint53 "endDate"
 (* TODO : ALL | RARIBLE | OPEN_SEA *)
@@ -87,10 +87,10 @@ let get_origin_param req =
   | None -> Ok None
   | Some o ->
     try
-      ignore @@ Pk.b58dec o ;
+      ignore @@ Pkh.b58dec o ;
       Ok (Some o)
     with _ ->
-      mk_invalid_argument origin_param "must be an edpk"
+      mk_invalid_argument origin_param "must be an tz1"
 
 let get_size_param req =
   match EzAPI.Req.find_param size_param req with
@@ -124,10 +124,10 @@ let get_required_maker_param req =
   | None -> mk_invalid_argument maker_param "param is required"
   | Some o ->
     try
-      ignore @@ Pk.b58dec o ;
+      ignore @@ Pkh.b58dec o ;
       Ok o
     with _ ->
-      mk_invalid_argument maker_param "must be an epdk"
+      mk_invalid_argument maker_param "must be an tz1"
 
 let get_maker_param req =
   let open Tzfunc.Crypto in
@@ -135,10 +135,10 @@ let get_maker_param req =
   | None -> Ok None
   | Some o ->
     try
-      ignore @@ Pk.b58dec o ;
+      ignore @@ Pkh.b58dec o ;
       Ok (Some o)
     with _ ->
-      mk_invalid_argument maker_param "must be an epdk"
+      mk_invalid_argument maker_param "must be an tz1"
 
 let get_required_contract_param req =
   let open Tzfunc.Crypto in
@@ -785,13 +785,13 @@ let validate_signature order =
     d.order_rarible_v2_data_v1_origin_fees in
   let$ msg =
     Result.map_error (fun e -> `VALIDATION (Let.string_of_error e)) @@
-    hash_order_form order_elt.order_elt_maker order_elt.order_elt_make
-      order_elt.order_elt_taker order_elt.order_elt_take
+    hash_order_form order_elt.order_elt_maker_edpk order_elt.order_elt_make
+      order_elt.order_elt_taker_edpk order_elt.order_elt_take
       order_elt.order_elt_salt order_elt.order_elt_start order_elt.order_elt_end
       data_type payouts origin_fees in
   Format.eprintf "validate_signature\n%!";
   let edsig = order_elt.order_elt_signature in
-  let edpk = order_elt.order_elt_maker in
+  let edpk = order_elt.order_elt_maker_edpk in
   Format.eprintf "validate_signature1\n%!";
   match Tzfunc.Crypto.Ed25519.verify ~edpk ~edsig ~bytes:msg with
   | Ok true -> Ok ()

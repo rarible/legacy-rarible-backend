@@ -96,11 +96,11 @@ export function order_to_struct(order: OrderForm) : MichelsonData {
   let data = pack(data_to_struct(order.data), order_data_type)
   return {
     prim: "Pair", args: [
-      some_struct({string: order.maker}),
+      some_struct({string: order.maker_edpk}),
       { prim: "Pair", args: [
         asset_to_struct(order.make),
         { prim: "Pair", args: [
-          (order.taker) ? some_struct({string: order.taker}) : none_struct(),
+          (order.taker_edpk) ? some_struct({string: order.taker_edpk}) : none_struct(),
           { prim: "Pair", args: [
             asset_to_struct(order.take),
             { prim: "Pair", args: [
@@ -124,7 +124,7 @@ export async function sign_order(
 
 export async function order_key(
   order: OrderForm) : Promise<string> {
-  const maker = pack({string: order.maker}, { prim: "key" })
+  const maker = pack({string: order.maker_edpk}, { prim: "key" })
   const make_asset = keccak(pack(asset_type_to_struct(order.make.asset_type), asset_type_type))
   const take_asset = keccak(pack(asset_type_to_struct(order.take.asset_type), asset_type_type))
   const salt = pack({int: order.salt.toString()}, {prim:"nat"})

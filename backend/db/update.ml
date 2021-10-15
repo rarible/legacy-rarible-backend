@@ -106,7 +106,9 @@ let upgrade_1_to_2 dbh version =
 
     {|create table orders(
       maker varchar not null,
+      maker_edpk varchar not null,
       taker varchar,
+      taker_edpk varchar,
       make_asset_type_class varchar not null,
       make_asset_type_contract varchar,
       make_asset_type_token_id varchar,

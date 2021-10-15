@@ -12,15 +12,16 @@ export interface FillOrderRequest {
   payouts?: Array<Part>;
   origin_fees?: Array<Part>;
   infinite?: boolean;
+  edpk?: string
 }
 
-const zero_address = "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU"
+const zero_edpk = "edpk..."
 
 function get_make_asset(
   provider: Provider,
   order: OrderForm,
   amount: bigint) {
-  const inverted = invert_order(order, amount, zero_address)
+  const inverted = invert_order(order, amount, zero_edpk)
   const make_fee = get_make_fee(provider.config.fees, inverted)
   return add_fee(inverted.make, make_fee)
 }
@@ -55,7 +56,7 @@ export async function fill_order_arg(
     ? await approve_arg(provider, left.maker, left.make, request.infinite)
     : undefined
   const args = (arg_approve) ? [ arg_approve ] : []
-  const pk = await get_public_key(provider)
+  const pk = (request.edpk) ? request.edpk : await get_public_key(provider)
   if (!pk) throw new Error("cannot get public key")
   const right = {
     ...invert_order(left, request.amount, pk),

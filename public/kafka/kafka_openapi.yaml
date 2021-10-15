@@ -467,8 +467,12 @@ components:
         data:
           $ref: '#/components/schemas/OrderRaribleV2DataV1'
         maker:
+          $ref: '#/components/schemas/Address'
+        makerEdpk:
           $ref: '#/components/schemas/Edpk'
         taker:
+          $ref: '#/components/schemas/Address'
+        takerEdpk:
           $ref: '#/components/schemas/Edpk'
         make:
           $ref: '#/components/schemas/Asset'
@@ -528,6 +532,7 @@ components:
       - fill
       - take
       - make
+      - makerEdpk
       - maker
       - data
       additionalProperties: false
@@ -559,7 +564,7 @@ components:
         hash:
           $ref: '#/components/schemas/Word'
         maker:
-          $ref: '#/components/schemas/Edpk'
+          $ref: '#/components/schemas/Address'
         make:
           $ref: '#/components/schemas/Asset'
         take:
@@ -584,7 +589,7 @@ components:
         hash:
           $ref: '#/components/schemas/Word'
         maker:
-          $ref: '#/components/schemas/Edpk'
+          $ref: '#/components/schemas/Address'
         make:
           $ref: '#/components/schemas/AssetType'
         take:
@@ -620,7 +625,7 @@ components:
         hash:
           $ref: '#/components/schemas/Word'
         maker:
-          $ref: '#/components/schemas/Edpk'
+          $ref: '#/components/schemas/Address'
         make:
           $ref: '#/components/schemas/AssetType'
         take:
@@ -656,7 +661,7 @@ components:
         hash:
           $ref: '#/components/schemas/Word'
         maker:
-          $ref: '#/components/schemas/Edpk'
+          $ref: '#/components/schemas/Address'
         make:
           $ref: '#/components/schemas/Asset'
         take:
@@ -708,7 +713,7 @@ components:
       type: object
       properties:
         maker:
-          $ref: '#/components/schemas/Edpk'
+          $ref: '#/components/schemas/Address'
         hash:
           $ref: '#/components/schemas/Word'
         asset:
@@ -750,7 +755,7 @@ components:
           type: string
           format: date-time
         maker:
-          $ref: '#/components/schemas/Edpk'
+          $ref: '#/components/schemas/Address'
       required:
       - date
       - hash
@@ -834,7 +839,7 @@ components:
           type: string
           format: date-time
         maker:
-          $ref: '#/components/schemas/Edpk'
+          $ref: '#/components/schemas/Address'
         side:
           $ref: '#/components/schemas/OrderSide'
         fill:

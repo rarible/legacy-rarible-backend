@@ -5,6 +5,7 @@ import { upsert_order } from "./upsert-order"
 
 export type BidRequest = {
   maker: string
+  maker_edpk: string
   make_asset_type: XTZAssetType | FA12AssetType
   amount: bigint
   take_asset_type: ExtendedAssetType
@@ -19,6 +20,7 @@ export async function bid(
 ) {
   const order: OrderForm = {
     maker: request.maker,
+    maker_edpk: request.maker_edpk,
     make: {
       asset_type: request.make_asset_type,
       value: request.price * request.amount,

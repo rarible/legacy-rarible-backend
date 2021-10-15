@@ -1,4 +1,26 @@
 import { Asset, asset_to_json, asset_of_json } from "../common/base"
+const bs58check = require('bs58check')
+const blake = require('blakejs');
+
+const tz1_prefix =  new Uint8Array([6, 161, 159])
+const edpk_prefix =  new Uint8Array([13, 15, 37, 217])
+
+function b58enc(payload: Uint8Array, prefix: Uint8Array) {
+  const n = new Uint8Array(prefix.length + payload.length);
+  n.set(prefix);
+  n.set(payload, prefix.length);
+  return bs58check.encode(Buffer.from(n.buffer));
+}
+
+function b58dec(enc : string, prefix : Uint8Array) : Uint8Array {
+  return bs58check.decode(enc).slice(prefix.length)
+}
+
+export function pk_to_pkh(edpk: string) : string {
+  const pk_bytes = b58dec(edpk, edpk_prefix)
+  const hash = blake.blake2b(pk_bytes, null, 20)
+  return b58enc(hash, tz1_prefix)
+}
 
 export interface Part {
   account: string;
@@ -14,7 +36,9 @@ export interface OrderRaribleV2DataV1 {
 export declare type OrderForm = {
   type: "RARIBLE_V2";
   maker: string;
+  maker_edpk: string;
   taker?: string;
+  taker_edpk?: string;
   make: Asset;
   take: Asset;
   salt: bigint;
@@ -53,22 +77,26 @@ function data_of_json(d: any) : OrderRaribleV2DataV1 {
 }
 
 export function order_to_json(order: OrderForm) : any {
-  const { salt, make, take, data, ...rest } = order
+  const { salt, make, take, data, maker_edpk, taker_edpk, ...rest } = order
   return {
     salt: salt.toString(),
     make: asset_to_json(order.make),
     take: asset_to_json(order.take),
     data: data_to_json(data),
+    makerEdpk: maker_edpk,
+    takerEdpk: taker_edpk,
     ...rest }
 }
 
 export function order_of_json(order: any ) : OrderForm {
-  const { salt, make, take, data, ...rest } = order
+  const { salt, make, take, data, makerEdpk, takerEdpk, ...rest } = order
   return {
     salt: BigInt(salt),
     make: asset_of_json(order.make),
     take: asset_of_json(order.take),
     data: data_of_json(data),
+    maker_edpk: makerEdpk,
+    taker_edpk: takerEdpk,
     ...rest }
 }
 

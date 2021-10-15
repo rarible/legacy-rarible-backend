@@ -437,8 +437,8 @@ export default new Vue({
       elt.innerHTML = ''
       const p = (this.provider) ? this.provider : await provider(this.node, this.api_url)
       this.provider = p
-      const maker = this.upsert.maker || await get_public_key(p)
-      if (!maker) {
+      const maker_edpk = this.upsert.maker || await get_public_key(p)
+      if (!maker_edpk) {
         this.upsert.status = 'danger'
         this.upsert.result = "no maker given"
       } else {
@@ -447,7 +447,7 @@ export default new Vue({
         const make_value = parse_asset_value(this.upsert.make.asset_type, this.upsert.make.value)
         const take_value = parse_asset_value(this.upsert.take.asset_type, this.upsert.take.value)
         let payouts = parse_parts(this.upsert.payouts)
-        if (payouts.length == 0) payouts = [ { account: pk_to_pkh(maker), value: 10000n} ]
+        if (payouts.length == 0) payouts = [ { account: pk_to_pkh(maker_edpk), value: 10000n} ]
         const origin_fees = parse_parts(this.upsert.origin_fees)
         if (!make_asset_type) {
           this.upsert.status = 'danger'
@@ -458,8 +458,10 @@ export default new Vue({
         } else {
           const order : OrderForm = {
             type: "RARIBLE_V2",
-            maker,
-            taker: (this.upsert.maker) ? this.upsert.maker : undefined,
+            maker: pk_to_pkh(maker_edpk),
+            maker_edpk,
+            taker_edpk: (this.upsert.taker) ? this.upsert.taker : undefined,
+            taker: (this.upsert.taker) ? pk_to_pkh(this.upsert.taker) : undefined,
             make: { asset_type: make_asset_type, value: make_value },
             take: { asset_type: take_asset_type, value: take_value },
             salt: salt(),
@@ -488,17 +490,18 @@ export default new Vue({
       elt.innerHTML = ''
       const p = (this.provider) ? this.provider : await provider(this.node, this.api_url)
       this.provider = p
-      const maker = this.upsert.maker || await get_public_key(p)
-      if (!maker) {
+      const maker_edpk = this.upsert.maker || await get_public_key(p)
+      if (!maker_edpk) {
         this.sell.status = 'danger'
         this.sell.result = "no maker given"
       } else {
+        const maker = pk_to_pkh(maker_edpk)
         const make_asset_type = parse_asset_type(this.sell.make_asset_type) as ExtendedAssetType
         const take_asset_type = parse_asset_type(this.sell.take_asset_type) as XTZAssetType | FA12AssetType
         const amount = BigInt(this.sell.amount)
         const price = BigInt(this.sell.price * 1000000.)
         let payouts = parse_parts(this.sell.payouts)
-        if (payouts.length == 0) payouts = [ { account: pk_to_pkh(maker), value: 10000n} ]
+        if (payouts.length == 0) payouts = [ { account: maker, value: 10000n} ]
         const origin_fees = parse_parts(this.sell.origin_fees)
         if (!make_asset_type) {
           this.sell.status = 'danger'
@@ -511,6 +514,7 @@ export default new Vue({
           this.provider = p
           const request : SellRequest = {
             maker,
+            maker_edpk,
             make_asset_type,
             take_asset_type,
             amount,
@@ -538,11 +542,12 @@ export default new Vue({
       elt.innerHTML = ''
       const p = (this.provider) ? this.provider : await provider(this.node, this.api_url)
       this.provider = p
-      const maker = this.bid.maker || await get_public_key(p)
-      if (!maker) {
+      const maker_edpk = this.bid.maker || await get_public_key(p)
+      if (!maker_edpk) {
         this.bid.status = 'danger'
         this.bid.result = "no maker given"
       } else {
+        const maker = pk_to_pkh(maker_edpk)
         const make_asset_type = parse_asset_type(this.bid.make_asset_type) as XTZAssetType | FA12AssetType
         const take_asset_type = parse_asset_type(this.bid.take_asset_type) as ExtendedAssetType
         const amount = BigInt(this.bid.amount)
@@ -561,6 +566,7 @@ export default new Vue({
           this.provider = p
           const request : BidRequest = {
             maker,
+            maker_edpk,
             make_asset_type,
             take_asset_type,
             amount,

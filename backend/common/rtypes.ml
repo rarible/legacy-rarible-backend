@@ -383,15 +383,17 @@ let asset_enc =
     asset_enc
 
 type order_form_elt = {
-  order_form_elt_maker : A.edpk ;
-  order_form_elt_taker : A.edpk option ; [@opt]
+  order_form_elt_maker : A.address ;
+  order_form_elt_maker_edpk : A.edpk ;
+  order_form_elt_taker : A.address option ; [@opt]
+  order_form_elt_taker_edpk : A.edpk option ; [@opt]
   order_form_elt_make : asset ;
   order_form_elt_take : asset ;
   order_form_elt_salt : A.big_integer ;
   order_form_elt_start : A.date_int64 option ; [@opt]
   order_form_elt_end : A.date_int64 option ; [@opt]
   order_form_elt_signature : A.edsig ;
-} [@@deriving encoding {title="OrderFormElt"; def_title}]
+} [@@deriving encoding {title="OrderFormElt"; def_title; camel}]
 
 (* type order_open_sea_v1_data_v1_fee_method =
  *   | OSPROTOCOL_FEE
@@ -454,8 +456,8 @@ type order_exchange_history_elt = {
   order_exchange_history_elt_make : asset option; [@opt]
   order_exchange_history_elt_take : asset option ; [@opt]
   order_exchange_history_elt_date : A.date ;
-  order_exchange_history_elt_maker : A.edpk option ; [@opt]
-} [@@deriving encoding {title="OrderExchangeHistoryElt"; def_title}]
+  order_exchange_history_elt_maker : A.address option ; [@opt]
+} [@@deriving encoding {title="OrderExchangeHistoryElt"; def_title; camel}]
 
 type order_side =
   | OSLEFT
@@ -490,8 +492,10 @@ type order_status =
 [@@deriving encoding {enum; title="OrderStatus"; def_title}]
 
 type order_elt = {
-  order_elt_maker : A.edpk;
-  order_elt_taker: A.edpk option; [@opt]
+  order_elt_maker : A.address;
+  order_elt_maker_edpk : A.edpk;
+  order_elt_taker: A.address option; [@opt]
+  order_elt_taker_edpk: A.edpk option; [@opt]
   order_elt_make: asset;
   order_elt_take: asset;
   order_elt_fill: A.big_integer;
@@ -613,7 +617,7 @@ type order_activity_side_type =
 [@@deriving encoding {enum; title="OrderActivitySideType"; def_title}]
 
 type order_activity_match_side = {
-  order_activity_match_side_maker : A.edpk ;
+  order_activity_match_side_maker : A.address ;
   order_activity_match_side_hash : A.word ;
   order_activity_match_side_asset : asset ;
   order_activity_match_side_type : order_activity_side_type ;
@@ -631,7 +635,7 @@ type order_activity_match = {
 
 type order_activity_bid = {
   order_activity_bid_hash : A.word ;
-  order_activity_bid_maker : A.edpk ;
+  order_activity_bid_maker : A.address ;
   order_activity_bid_make : asset ;
   order_activity_bid_take : asset ;
   order_activity_bid_price : A.big_decimal ;
@@ -639,7 +643,7 @@ type order_activity_bid = {
 
 type order_activity_cancel_bid = {
   order_activity_cancel_bid_hash : A.word ;
-  order_activity_cancel_bid_maker : A.edpk ;
+  order_activity_cancel_bid_maker : A.address ;
   order_activity_cancel_bid_make : asset_type ;
   order_activity_cancel_bid_take : asset_type ;
   order_activity_cancel_bid_transaction_hash : A.word ;
@@ -679,8 +683,8 @@ type order_bid_status =
 type order_bid_elt = {
   order_bid_elt_order_hash : A.word ;
   order_bid_elt_status : order_bid_status ;
-  order_bid_elt_maker : A.edpk ;
-  order_bid_elt_taker : A.edpk option ; [@opt]
+  order_bid_elt_maker : A.address ;
+  order_bid_elt_taker : A.address option ; [@opt]
   order_bid_elt_make : asset ;
   order_bid_elt_take : asset ;
   order_bid_elt_make_balance : A.big_integer option ;

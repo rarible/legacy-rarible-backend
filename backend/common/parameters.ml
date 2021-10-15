@@ -257,17 +257,19 @@ let parse_do_transfers m =
       _right_taker; right_t_asset_class;  right_t_asset_data; _right_t_asset_value;
       `nat right_salt; _right_start; _right_end; _right_data_type; _right_data;
       _fee_side; _royalties ] ->
-    let$ left_maker = parse_option_key left_maker in
+    let$ left_maker_edpk = parse_option_key left_maker in
+    let left_maker = Option.map pk_to_pkh_exn left_maker_edpk in
     let$ left_mat = parse_asset_type left_m_asset_class left_m_asset_data in
     let$ left_tat = parse_asset_type left_t_asset_class left_t_asset_data in
     let left_salt = Z.to_string left_salt in
-    let$ left = Utils.hash_key left_maker left_mat left_tat left_salt in
+    let$ left = Utils.hash_key left_maker_edpk left_mat left_tat left_salt in
     let left_asset = { asset_type = left_mat ; asset_value = Z.to_string left_m_asset_value } in
-    let$ right_maker = parse_option_key right_maker in
+    let$ right_maker_edpk = parse_option_key right_maker in
+    let right_maker = Option.map pk_to_pkh_exn right_maker_edpk in
     let$ right_mat = parse_asset_type right_m_asset_class right_m_asset_data in
     let$ right_tat = parse_asset_type right_t_asset_class right_t_asset_data in
     let right_salt = Z.to_string right_salt in
-    let$ right = Utils.hash_key right_maker right_mat right_tat right_salt in
+    let$ right = Utils.hash_key right_maker_edpk right_mat right_tat right_salt in
     let right_asset = { asset_type = right_mat ; asset_value = Z.to_string right_m_asset_value } in
     let fill_make_value = Z.to_int64 fill_m_value in
     let fill_take_value = Z.to_int64 fill_t_value in

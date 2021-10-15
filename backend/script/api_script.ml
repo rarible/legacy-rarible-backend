@@ -167,7 +167,7 @@ let generate_maker () =
   generate_address ()
 
 let generate_taker () =
-  generate_option (fun () -> let _, pk, _ = generate_address () in pk)
+  generate_option generate_address
 
 let tezos_asset () = ATXTZ, Random.int64 10000000000L
 
@@ -227,10 +227,12 @@ let generate_royalties () =
   List.map (fun (addr, v) -> pk_to_pkh_exn addr, Int64.of_int v) @@ aux []
 
 let mk_order_form
-    maker taker make take salt start_date end_date signature data_type payouts origin_fees =
+    maker maker_edpk taker taker_edpk make take salt start_date end_date signature data_type payouts origin_fees =
   let elt = {
     order_form_elt_maker = maker ;
+    order_form_elt_maker_edpk = maker_edpk ;
     order_form_elt_taker = taker ;
+    order_form_elt_taker_edpk = taker_edpk ;
     order_form_elt_make = make ;
     order_form_elt_take = take ;
     order_form_elt_salt = salt ;
@@ -250,7 +252,10 @@ let mk_order_form
 
 let generate_order () =
   let _alias, maker_pk, maker_sk = generate_maker () in
-  let taker = generate_taker () in
+  let maker = pk_to_pkh_exn maker_pk in
+  let taker, taker_pk = match generate_taker () with
+    | None -> None, None
+    | Some (_, pk, _) -> Some (pk_to_pkh_exn pk), Some pk in
   let make = generate_asset () in
   let take = generate_asset () in
   let salt = generate_salt () in
@@ -261,11 +266,11 @@ let generate_order () =
   let origin_fees = generate_parts () in
   let$ to_sign =
     hash_order_form
-      maker_pk make taker take salt start_date end_date data_type payouts origin_fees in
+      maker_pk make taker_pk take salt start_date end_date data_type payouts origin_fees in
   let$ signature = Tzfunc.Crypto.Ed25519.sign ~edsk:maker_sk to_sign in
   let order_form =
     mk_order_form
-      maker_pk taker make take salt start_date end_date signature data_type payouts origin_fees in
+      maker maker_pk taker taker_pk make take salt start_date end_date signature data_type payouts origin_fees in
   Ok order_form
 
 let maker_from_item ((_owner, owner_sk), _am, _token_id, _royalties, _metadata) =
@@ -277,7 +282,8 @@ let asset_from_item collection ((_owner, _owner_sk), am, token_id, _royalties, _
 
 let order_form_from_items ?(salt=0) collection item1 item2 =
   let _maker, maker_pk, maker_sk = maker_from_item item1 in
-  let taker = None in
+  let maker = pk_to_pkh_exn maker_pk in
+  let taker, taker_pk = None, None in
   let make = asset_from_item collection item1 in
   let take = asset_from_item collection item2 in
   let salt = string_of_int salt in
@@ -288,16 +294,17 @@ let order_form_from_items ?(salt=0) collection item1 item2 =
   let origin_fees = [] in
   let$ to_sign =
     hash_order_form
-      maker_pk make taker take salt start_date end_date data_type payouts origin_fees in
+      maker_pk make taker_pk take salt start_date end_date data_type payouts origin_fees in
   let$ signature = Tzfunc.Crypto.Ed25519.sign ~edsk:maker_sk to_sign in
   let order_form =
     mk_order_form
-      maker_pk taker make take salt start_date end_date signature data_type payouts origin_fees in
+      maker maker_pk taker taker_pk make take salt start_date end_date signature data_type payouts origin_fees in
   Ok order_form
 
 let sell_order_form_from_item ?(salt=0) collection item1 take =
   let _maker, maker_pk, maker_sk = maker_from_item item1 in
-  let taker = None in
+  let maker = pk_to_pkh_exn maker_pk in
+  let taker, taker_pk = None, None in
   let make = asset_from_item collection item1 in
   let salt = string_of_int salt in
   let start_date = None in
@@ -307,15 +314,16 @@ let sell_order_form_from_item ?(salt=0) collection item1 take =
   let origin_fees = [] in
   let$ to_sign =
     hash_order_form
-      maker_pk make taker take salt start_date end_date data_type payouts origin_fees in
+      maker_pk make taker_pk take salt start_date end_date data_type payouts origin_fees in
   let$ signature = Tzfunc.Crypto.Ed25519.sign ~edsk:maker_sk to_sign in
   let order_form =
     mk_order_form
-      maker_pk taker make take salt start_date end_date signature data_type payouts origin_fees in
+      maker maker_pk taker taker_pk make take salt start_date end_date signature data_type payouts origin_fees in
   Ok order_form
 
 let buy_order_form_from_item ?(salt=0) collection item1 (maker_pk, maker_sk) make =
-  let taker = None in
+  let taker, taker_pk = None, None in
+  let maker = pk_to_pkh_exn maker_pk in
   let take = asset_from_item collection item1 in
   let salt = string_of_int salt in
   let start_date = None in
@@ -325,11 +333,11 @@ let buy_order_form_from_item ?(salt=0) collection item1 (maker_pk, maker_sk) mak
   let origin_fees = [] in
   let$ to_sign =
     hash_order_form
-      maker_pk make taker take salt start_date end_date data_type payouts origin_fees in
+      maker_pk make taker_pk take salt start_date end_date data_type payouts origin_fees in
   let$ signature = Tzfunc.Crypto.Ed25519.sign ~edsk:maker_sk to_sign in
   let order_form =
     mk_order_form
-      maker_pk taker make take salt start_date end_date signature data_type payouts origin_fees in
+      maker maker_pk taker taker_pk make take salt start_date end_date signature data_type payouts origin_fees in
   Ok order_form
 
 let handle_ezreq_result = function

@@ -351,8 +351,7 @@ let get_order_updates ?dbh obj make maker take data =
          where main and \
          (hash_left = $hash or hash_right = $hash) order by tsp"] in
     let fill = get_fill hash matches in
-    let>? owner = Lwt.return @@ Tzfunc.Crypto.pk_to_pkh maker in
-    let|>? make_balance = get_make_balance make owner in
+    let|>? make_balance = get_make_balance make maker in
     let cancelled = false in
     let make_stock = calculate_make_stock make take data fill make_balance cancelled in
     let last_update_at = match matches with hd :: _ -> hd#tsp | [] -> obj#created_at in
@@ -382,8 +381,10 @@ let mk_order ?dbh order_obj =
   let>? (fill, make_stock, cancelled, last_update_at, make_balance) =
     get_order_updates ?dbh order_obj order_elt_make order_obj#maker order_elt_take data in
   let order_elt = {
-    order_elt_maker = order_obj#maker ;
-    order_elt_taker = order_obj#taker ;
+    order_elt_maker = order_obj#maker;
+    order_elt_maker_edpk = order_obj#maker_edpk ;
+    order_elt_taker = order_obj#taker;
+    order_elt_taker_edpk = order_obj#taker_edpk ;
     order_elt_make ;
     order_elt_take ;
     order_elt_fill = Int64.to_string fill ;
@@ -412,7 +413,7 @@ let get_order ?dbh hash_key =
   Printf.eprintf "get_order %s\n%!" hash_key ;
   use dbh @@ fun dbh ->
   let>? l = [%pgsql.object dbh
-      "select maker, taker, \
+      "select maker, taker, maker_edpk, taker_edpk, \
        make_asset_type_class, make_asset_type_contract, make_asset_type_token_id, \
        make_asset_value, \
        take_asset_type_class, take_asset_type_contract, take_asset_type_token_id, \
@@ -2583,6 +2584,8 @@ let upsert_order ?dbh order =
   let order_data = order.order_data in
   let maker = order_elt.order_elt_maker in
   let taker = order_elt.order_elt_taker in
+  let maker_edpk = order_elt.order_elt_maker_edpk in
+  let taker_edpk = order_elt.order_elt_taker_edpk in
   let>? make_class, make_contract, make_token_id, make_asset_value =
     db_from_asset order_elt.order_elt_make in
   let>? take_class, take_contract, take_token_id, take_asset_value =
@@ -2598,13 +2601,13 @@ let upsert_order ?dbh order =
   let hash_key = order_elt.order_elt_hash in
   use dbh @@ fun dbh ->
   let>? () = [%pgsql dbh
-      "insert into orders(maker, taker, \
+      "insert into orders(maker, taker, maker_edpk, taker_edpk, \
        make_asset_type_class, make_asset_type_contract, make_asset_type_token_id, \
        make_asset_value, \
        take_asset_type_class, take_asset_type_contract, take_asset_type_token_id, \
        take_asset_value, \
        start_date, end_date, salt, signature, created_at, last_update_at, hash) \
-       values($maker, $?taker, \
+       values($maker, $?taker, $maker_edpk, $?taker_edpk, \
        $make_class, $?make_contract, $?make_token_id, $make_asset_value, \
        $take_class, $?take_contract, $?take_token_id, $take_asset_value, \
        $?start_date, $?end_date, $salt, $signature, $created_at, $last_update_at, $hash_key) \
