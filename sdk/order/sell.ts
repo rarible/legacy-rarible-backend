@@ -4,7 +4,8 @@ import { Part, OrderForm, salt } from "./utils"
 import { upsert_order } from "./upsert-order"
 
 export interface SellRequest {
-  maker: string
+  maker: string,
+  maker_edpk: string,
   make_asset_type: ExtendedAssetType
   amount: bigint
   take_asset_type: XTZAssetType | FA12AssetType
@@ -19,6 +20,7 @@ export async function sell(
 ) {
   const order: OrderForm = {
     maker: request.maker,
+    maker_edpk: request.maker_edpk,
     make: {
       asset_type: await check_asset_type(provider, request.make_asset_type),
       value: request.amount,

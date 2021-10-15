@@ -1,4 +1,4 @@
-import { OrderForm } from "./utils"
+import { OrderForm, pk_to_pkh } from "./utils"
 import { is_nft } from "./is-nft"
 
 function calculate_amounts(
@@ -14,7 +14,7 @@ function calculate_amounts(
 export function invert_order(
   order: OrderForm,
   amount: bigint,
-  maker: string,
+  maker_edpk: string,
   salt: bigint = 0n
 ): OrderForm {
   const [makeValue, takeValue] = calculate_amounts(
@@ -33,8 +33,10 @@ export function invert_order(
       ...order.make,
       value: takeValue,
     },
-    maker,
+    maker: pk_to_pkh(maker_edpk),
+    maker_edpk,
     taker: order.maker,
+    taker_edpk: order.maker_edpk,
     salt,
     signature: undefined,
   }
