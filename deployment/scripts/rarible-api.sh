@@ -5,7 +5,7 @@ CMD=api
 source $HOME/rarible-env.sh
 
 API=$WORKING_DIRECTORY/_bin/$CMD
-ARG=
+ARG="--kafka-config $KAFKA_CONFIG_FILE"
 
 rarible_api_start () {
     $ROTATE $LOGFILE
