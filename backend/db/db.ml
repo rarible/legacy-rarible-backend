@@ -423,7 +423,7 @@ let get_order ?dbh hash_key =
   | [] -> Lwt.return_ok None
   | _ ->
     one l >>=? fun r ->
-    mk_order r >>=? fun order ->
+    mk_order ~dbh r >>=? fun order ->
     Lwt.return_ok @@ Some order
 
 let get_nft_item_creators_from_metadata r =
