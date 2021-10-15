@@ -610,10 +610,6 @@ let get_nft_item_by_id ?dbh ?include_meta contract token_id =
     Lwt.return_ok nft_item
   | [] -> Lwt.return_error (`hook_error "nft_item not found")
 
-let produce_order_event order =
-  Rarible_kafka.produce_order_event (mk_order_event order) >>= fun () ->
-  Lwt.return_ok ()
-
 let produce_order_event_hash dbh hash =
   let>? order = get_order ~dbh hash in
   begin
@@ -2605,7 +2601,7 @@ let upsert_order ?dbh order =
     else Lwt.return_ok ()
   end >>=? fun () ->
   insert_payouts dbh payouts hash_key >>=? fun () ->
-  produce_order_event order
+  produce_order_event_hash dbh order.order_elt.order_elt_hash
 
 let mk_order_activity_continuation _obj =
   Printf.sprintf "TODO"
