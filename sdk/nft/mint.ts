@@ -29,9 +29,9 @@ function metadata_param(
 export async function get_next_token_id(
   provider: Provider,
   contract: string) : Promise<bigint> {
-  const r = await fetch(provider.api + '/' + contract + '/next_token_id')
+  const r = await fetch(provider.api + '/v0.1/collections/' + contract + '/generate_token_id')
   const json = await r.json()
-  return BigInt(JSON.stringify(json))
+  return BigInt(JSON.stringify(json.tokenId))
 }
 
 export function metadata_arg(

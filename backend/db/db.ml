@@ -1882,10 +1882,10 @@ let generate_nft_token_id ?dbh contract =
   Format.eprintf "generate_nft_token_id %s@."
     contract ;
   use dbh @@ fun dbh ->
-  let>? r = [%pgsql dbh "select tokens_number from contracts where address = $contract"] in
+  let>? r = [%pgsql dbh "select next_token_id from contracts where address = $contract"] in
   match r with
   | [ i ] -> Lwt.return_ok {
-      nft_token_id = Int64.(to_string @@ succ i) ;
+      nft_token_id = i;
       nft_token_id_signature = None ;
     }
   | _ -> Lwt.return_error (`hook_error "no contracts entry for this contract")

@@ -71,6 +71,7 @@ export default new Vue({
     path: "home",
     transfer : {
       contract: '',
+      contract_custom: '',
       token_id: '',
       destination: '',
       amount: 1,
@@ -259,10 +260,11 @@ export default new Vue({
         if (!this.transfer.amount) this.transfer.amount = 1
         const p = (this.provider) ? this.provider : await provider(this.node, this.api_url)
         this.provider = p
+        const contract = (this.transfer.contract=="custom") ? this.transfer.contract_custom : this.transfer.contract
         const op = await transfer(
           p,
           { asset_class: "FA_2",
-            contract: this.transfer.contract,
+            contract: contract,
             token_id: BigInt(this.transfer.token_id) },
           this.transfer.destination,
           BigInt(this.transfer.amount))
