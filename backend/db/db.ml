@@ -982,9 +982,9 @@ let insert_cancel dbh op (hash : Tzfunc.H.t) =
        values(${op.bo_hash}, ${op.bo_index}, ${op.bo_block}, ${op.bo_level}, \
        ${op.bo_tsp}, $source, $hash) \
        on conflict do nothing"] >>=? fun () ->
-  produce_order_event_hash dbh hash >>=? fun () ->
   insert_order_activity_cancel
-    dbh op.bo_hash op.bo_block op.bo_index op.bo_level op.bo_tsp hash
+    dbh op.bo_hash op.bo_block op.bo_index op.bo_level op.bo_tsp hash >>=? fun () ->
+  produce_order_event_hash dbh hash
 
 let insert_do_transfers dbh op
     ~(left : Tzfunc.H.t) ~left_maker ~left_asset
@@ -1000,12 +1000,12 @@ let insert_do_transfers dbh op
        ${op.bo_tsp}, $source, $left, $right, \
        $fill_make_value, $fill_take_value) \
        on conflict do nothing"] >>=? fun () ->
-  produce_order_event_hash dbh left >>=? fun () ->
-  produce_order_event_hash dbh right >>=? fun () ->
   insert_order_activity_match
     dbh op.bo_hash op.bo_block op.bo_index op.bo_level op.bo_tsp
     left left_maker left_asset
-    right right_maker right_asset
+    right right_maker right_asset >>=? fun () ->
+  produce_order_event_hash dbh left >>=? fun () ->
+  produce_order_event_hash dbh right
 
 let insert_ft_fa2 dbh op tr txs =
   iter_rp (fun tx ->
