@@ -1232,8 +1232,6 @@ let contract_updates dbh main l =
           let tk = EzEncoding.destruct token_op_owner_enc json in
           let>? () =
             contract_updates_base dbh ~main ~contract ~block ~level ~tsp ~burn:false tk in
-          let>? () =
-            produce_nft_item_event dbh contract tk.tk_op.tk_token_id in
           produce_nft_ownership_event dbh contract tk.tk_op.tk_token_id tk.tk_owner
         | _, Some json, _ ->
           let tk = EzEncoding.destruct token_op_owner_enc json in
