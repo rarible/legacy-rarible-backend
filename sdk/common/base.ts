@@ -122,10 +122,19 @@ export function asset_to_json(a: Asset) : any {
 }
 
 export function asset_of_json(a: any) : Asset {
-  return {
-    asset_type : asset_type_of_json(a.assetType),
-    value: BigInt(a.value)
-  }
+  const factor = 1000000.
+    switch (a.assetType.assetClass) {
+      case "FA_2":
+        return {
+          asset_type : asset_type_of_json(a.assetType),
+          value: BigInt(a.value)
+        }
+      default:
+        return {
+          asset_type : asset_type_of_json(a.assetType),
+          value: BigInt(a.value * factor)
+        }
+    }
 }
 
 export function get_address(p: Provider) : Promise<string> {
