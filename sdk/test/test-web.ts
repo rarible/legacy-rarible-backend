@@ -57,7 +57,7 @@ async function provider(node: string, api:string) : Promise<Provider> {
   const tezos = await beacon_provider({node})
   const config = {
     exchange: "KT1XgQ52NeNdjo3jLpbsPBRfg8YhWoQ5LB7g",
-    fees: 0n
+    fees: 300n
   }
   return { tezos, api, config }
 }
