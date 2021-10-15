@@ -103,9 +103,13 @@ export function asset_type_of_json(a: any) : AssetType {
   }
 }
 
+export function mutez_to_tez(mu: bigint) : number {
+  const factor = 1000000n
+  return Number(mu / factor) + Number(mu % factor) / Number(factor)
+}
+
 export function asset_to_json(a: Asset) : any {
   // todo handle different decimal for FA_1_2
-  const factor = 1000000n
   switch (a.asset_type.asset_class) {
     case "FA_2":
       return {
@@ -113,7 +117,7 @@ export function asset_to_json(a: Asset) : any {
         value: a.value.toString()
       }
     default:
-      const value = Number(a.value / factor) + Number(a.value % factor) / Number(factor)
+      const value = mutez_to_tez(a.value)
       return {
         assetType : asset_type_to_json(a.asset_type),
         value: value.toString()
@@ -170,13 +174,13 @@ export async function send(
 ) : Promise<OperationResult> {
   if (arg.entrypoint && arg.parameter) {
     return provider.tezos.transfer({
-      amount: (arg.amount!=undefined) ? Number(arg.amount) : 0,
+      amount: (arg.amount!=undefined) ? mutez_to_tez(arg.amount) : 0,
       to: arg.destination,
       parameter: { entrypoint: arg.entrypoint, value: arg.parameter }
     })
   } else {
     return provider.tezos.transfer({
-      amount: (arg.amount!=undefined) ? Number(arg.amount) : 0,
+      amount: (arg.amount!=undefined) ? mutez_to_tez(arg.amount) : 0,
       to: arg.destination
     })
   }
@@ -189,13 +193,13 @@ export async function send_batch(
   const params = args.map(function(p) {
     if (p.entrypoint && p.parameter) {
       return {
-        amount: (p.amount!=undefined) ? Number(p.amount) : 0,
+        amount: (p.amount!=undefined) ? mutez_to_tez(p.amount) : 0,
         to: p.destination,
         parameter: { entrypoint: p.entrypoint, value: p.parameter }
       }
     } else {
       return {
-        amount: (p.amount!=undefined) ? Number(p.amount) : 0,
+        amount: (p.amount!=undefined) ? mutez_to_tez(p.amount) : 0,
         to: p.destination,
       }
     }
