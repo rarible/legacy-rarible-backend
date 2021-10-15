@@ -377,10 +377,8 @@ let asset_enc =
     (fun a -> match a.asset_type with
        | ATFA_2 _ -> a
        | _ ->
-         let asset_value = match String.split_on_char '.' a.asset_value with
-           | [ num ] -> Z.(to_string @@ mul factor (of_string num))
-           | [ num; dec ] -> Z.(to_string @@ add (mul factor (of_string num)) (of_string dec))
-           | _ -> failwith "not a big_decimal" in
+         let {Q.num; den} = Q.of_string a.asset_value in
+         let asset_value = Z.(to_string @@ mul (div factor den) num) in
          { a with asset_value })
     asset_enc
 
