@@ -610,31 +610,11 @@ let get_nft_item_by_id ?dbh ?include_meta contract token_id =
     Lwt.return_ok nft_item
   | [] -> Lwt.return_error (`hook_error "nft_item not found")
 
-let produce_order_event_hash ?fill ?balance dbh hash =
+let produce_order_event_hash dbh hash =
   let>? order = get_order ~dbh hash in
   begin
     match order with
     | Some order ->
-      let order = match fill with
-        | None -> order
-        | Some f ->
-          let f = Int64.to_int f in
-          { order with
-            order_elt =
-              { order.order_elt with
-                order_elt_fill =
-                  string_of_int @@
-                  (int_of_string order.order_elt.order_elt_fill) + f }} in
-      let order = match balance with
-        | None -> order
-        | Some b ->
-          let b = Int64.to_int b in
-          { order with
-            order_elt =
-              { order.order_elt with
-                order_elt_make_balance = match order.order_elt.order_elt_make_balance with
-                  | None -> Some (string_of_int b)
-                  | Some oldb -> Some (string_of_int @@ (int_of_string oldb) + b) }} in
       Rarible_kafka.produce_order_event (mk_order_event order)
     | None -> Lwt.return ()
   end >>= fun () ->
@@ -1003,8 +983,7 @@ let insert_cancel dbh op (hash : Tzfunc.H.t) =
        ${op.bo_tsp}, $source, $hash) \
        on conflict do nothing"] >>=? fun () ->
   insert_order_activity_cancel
-    dbh op.bo_hash op.bo_block op.bo_index op.bo_level op.bo_tsp hash >>=? fun () ->
-  produce_order_event_hash dbh hash
+    dbh op.bo_hash op.bo_block op.bo_index op.bo_level op.bo_tsp hash
 
 let insert_do_transfers dbh op
     ~(left : Tzfunc.H.t) ~left_maker ~left_asset
@@ -1023,9 +1002,7 @@ let insert_do_transfers dbh op
   insert_order_activity_match
     dbh op.bo_hash op.bo_block op.bo_index op.bo_level op.bo_tsp
     left left_maker left_asset
-    right right_maker right_asset >>=? fun () ->
-  produce_order_event_hash ~fill:fill_make_value ~balance:fill_take_value dbh left >>=? fun () ->
-  produce_order_event_hash ~fill:fill_take_value ~balance:fill_make_value dbh right
+    right right_maker right_asset
 
 let insert_ft_fa2 dbh op tr txs =
   iter_rp (fun tx ->
@@ -1418,6 +1395,22 @@ let ft_token_updates dbh main l =
           "update ft_tokens set balance = balance - $amount \
            where contract = ${r#contract} and account = ${r#source}"]) l
 
+let produce_cancel_events dbh main l =
+  iter_rp (fun r ->
+      if main then
+        match r#cancel with
+        | None -> Lwt.return_ok ()
+        | Some h ->
+          produce_order_event_hash dbh h
+      else Lwt.return_ok ())l
+
+let produce_match_events dbh main l =
+  iter_rp (fun r ->
+      if main then
+        let>? () = produce_order_event_hash dbh r#hash_left in
+        produce_order_event_hash dbh r#hash_right
+      else Lwt.return_ok ())l
+
 let set_main _config dbh {Hooks.m_main; m_hash} =
   let sort l = List.sort (fun r1 r2 ->
       if m_main then Int32.compare r1#index r2#index
@@ -1435,14 +1428,20 @@ let set_main _config dbh {Hooks.m_main; m_hash} =
     [%pgsql.object dbh
         "update contract_updates set main = $m_main where block = $m_hash returning *"] in
 
-  let>? () = [%pgsql dbh "update order_cancel set main = $m_main where block = $m_hash"] in
-  let>? () = [%pgsql dbh "update order_match set main = $m_main where block = $m_hash"] in
+  let>? cancels =
+    [%pgsql.object
+      dbh "update order_cancel set main = $m_main where block = $m_hash returning *"] in
+  let>? matches =
+    [%pgsql.object
+      dbh "update order_match set main = $m_main where block = $m_hash returning *"] in
   let>? ft_updates =
     [%pgsql.object dbh
         "update ft_token_updates set main = $m_main where block = $m_hash returning *"] in
   let>? () = contract_updates dbh m_main @@ sort c_updates in
   let>? () = token_updates dbh m_main @@ sort t_updates in
   let>? () = ft_token_updates dbh m_main @@ sort ft_updates in
+  let>? () = produce_cancel_events dbh m_main @@ sort cancels in
+  let>? () = produce_match_events dbh m_main @@ sort matches in
   Lwt.return_ok ()
 
 let get_level ?dbh () =
