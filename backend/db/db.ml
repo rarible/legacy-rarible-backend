@@ -610,11 +610,31 @@ let get_nft_item_by_id ?dbh ?include_meta contract token_id =
     Lwt.return_ok nft_item
   | [] -> Lwt.return_error (`hook_error "nft_item not found")
 
-let produce_order_event_hash dbh hash =
+let produce_order_event_hash ?fill ?balance dbh hash =
   let>? order = get_order ~dbh hash in
   begin
     match order with
     | Some order ->
+      let order = match fill with
+        | None -> order
+        | Some f ->
+          let f = Int64.to_int f in
+          { order with
+            order_elt =
+              { order.order_elt with
+                order_elt_fill =
+                  string_of_int @@
+                  (int_of_string order.order_elt.order_elt_fill) + f }} in
+      let order = match balance with
+        | None -> order
+        | Some b ->
+          let b = Int64.to_int b in
+          { order with
+            order_elt =
+              { order.order_elt with
+                order_elt_make_balance = match order.order_elt.order_elt_make_balance with
+                  | None -> Some (string_of_int b)
+                  | Some oldb -> Some (string_of_int @@ (int_of_string oldb) + b) }} in
       Rarible_kafka.produce_order_event (mk_order_event order)
     | None -> Lwt.return ()
   end >>= fun () ->
@@ -1004,8 +1024,8 @@ let insert_do_transfers dbh op
     dbh op.bo_hash op.bo_block op.bo_index op.bo_level op.bo_tsp
     left left_maker left_asset
     right right_maker right_asset >>=? fun () ->
-  produce_order_event_hash dbh left >>=? fun () ->
-  produce_order_event_hash dbh right
+  produce_order_event_hash ~fill:fill_make_value ~balance:fill_take_value dbh left >>=? fun () ->
+  produce_order_event_hash ~fill:fill_take_value ~balance:fill_make_value dbh right
 
 let insert_ft_fa2 dbh op tr txs =
   iter_rp (fun tx ->
