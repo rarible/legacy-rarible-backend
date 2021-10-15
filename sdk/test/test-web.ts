@@ -48,6 +48,11 @@ function parse_asset_type(r : RawAssetType) : AssetType | ExtendedAssetType | un
   } else return undefined
 }
 
+function parse_asset_value(r: RawAssetType, value: number) : bigint {
+  if (r.asset_class == 'XTZ' || r.asset_class == 'FA_1_2') return BigInt(value * 1000000.)
+  else return BigInt(value)
+}
+
 async function provider(node: string, api:string) : Promise<Provider> {
   const tezos = await beacon_provider({node})
   const config = {
@@ -437,8 +442,8 @@ export default new Vue({
       } else {
         const make_asset_type = parse_asset_type(this.upsert.make.asset_type) as AssetType
         const take_asset_type = parse_asset_type(this.upsert.take.asset_type) as AssetType
-        const make_value = BigInt(this.upsert.make.value)
-        const take_value = BigInt(this.upsert.take.value)
+        const make_value = parse_asset_value(this.upsert.make.asset_type, this.upsert.make.value)
+        const take_value = parse_asset_value(this.upsert.take.asset_type, this.upsert.take.value)
         let payouts = parse_parts(this.upsert.payouts)
         if (payouts.length == 0) payouts = [ { account: pk_to_pkh(maker), value: 10000n} ]
         const origin_fees = parse_parts(this.upsert.origin_fees)
@@ -489,7 +494,7 @@ export default new Vue({
         const make_asset_type = parse_asset_type(this.sell.make_asset_type) as ExtendedAssetType
         const take_asset_type = parse_asset_type(this.sell.take_asset_type) as XTZAssetType | FA12AssetType
         const amount = BigInt(this.sell.amount)
-        const price = BigInt(this.sell.price)
+        const price = BigInt(this.sell.price * 1000000.)
         let payouts = parse_parts(this.sell.payouts)
         if (payouts.length == 0) payouts = [ { account: pk_to_pkh(maker), value: 10000n} ]
         const origin_fees = parse_parts(this.sell.origin_fees)
@@ -539,7 +544,7 @@ export default new Vue({
         const make_asset_type = parse_asset_type(this.bid.make_asset_type) as XTZAssetType | FA12AssetType
         const take_asset_type = parse_asset_type(this.bid.take_asset_type) as ExtendedAssetType
         const amount = BigInt(this.bid.amount)
-        const price = BigInt(this.bid.price)
+        const price = BigInt(this.bid.price * 1000000.)
         let payouts = parse_parts(this.bid.payouts)
         if (payouts.length == 0) payouts = [ { account: pk_to_pkh(maker), value: 10000n} ]
         const origin_fees = parse_parts(this.bid.origin_fees)
