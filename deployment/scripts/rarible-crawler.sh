@@ -5,7 +5,9 @@ CMD=crawler
 source $HOME/rarible-env.sh
 
 CRAWLER=$WORKING_DIRECTORY/_bin/$CMD
-ARG=
+KAFKA_CONFIG=
+ARG="--kafka-config $KAFKA_CONFIG_FILE"
+
 
 rarible_crawler_start () {
     $ROTATE $LOGFILE

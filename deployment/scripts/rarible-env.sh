@@ -9,6 +9,7 @@ TEZOS_SRC=$HOME/tezos
 RPC_ADDR=127.0.0.1
 ROTATE=$HOME/rotate/bin/rotate
 CRAWLER_CONFIG_FILE=$WORKING_DIRECTORY/deployment/crawler_config.json
+KAFKA_CONFIG_FILE=$WORKING_DIRECTORY/deployment/kafka_config.json
 
 # Environment variable
 NAME=rarible-$CMD-$NETWORK
