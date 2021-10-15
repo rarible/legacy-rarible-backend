@@ -104,9 +104,20 @@ export function asset_type_of_json(a: any) : AssetType {
 }
 
 export function asset_to_json(a: Asset) : any {
-  return {
-    assetType : asset_type_to_json(a.asset_type),
-    value: a.value.toString()
+  // todo handle different decimal for FA_1_2
+  const factor = 1000000n
+  switch (a.asset_type.asset_class) {
+    case "FA_2":
+      return {
+        assetType : asset_type_to_json(a.asset_type),
+        value: a.value.toString()
+      }
+    default:
+      const value = Number(a.value / factor) + Number(a.value % factor) / Number(factor)
+      return {
+        assetType : asset_type_to_json(a.asset_type),
+        value: value.toString()
+      }
   }
 }
 
