@@ -323,7 +323,7 @@
                 {{ (data.item.make.asset_type.token_id==undefined) ? '--' : data.item.make.asset_type.token_id }}
               </template>
               <template #cell(make_value)="data">
-                {{ data.item.make.value  }}
+                {{ (data.item.make.asset_type.asset_class=='FA_2') ? data.item.make.value : Number(data.item.make.value / 1000000n) + Number(data.item.make.value % 1000000n) / Number(1000000n) }}
               </template>
               <template #cell(take_class)="data">
                 {{ data.item.take.asset_type.asset_class }}
@@ -335,7 +335,7 @@
                 {{ (data.item.take.asset_type.token_id==undefined) ? '--' : data.item.take.asset_type.token_id }}
               </template>
               <template #cell(take_value)="data">
-                {{ data.item.take.value  }}
+                {{ (data.item.take.asset_type.asset_class=='FA_2') ? data.item.take.value : Number(data.item.take.value / 1000000n) + Number(data.item.take.value % 1000000n) / Number(1000000n) }}
               </template>
             </b-table>
             <div v-if="fill.get_result!=''" class="text-center text-danger">{{ fill.get_result }}</div>
