@@ -319,7 +319,7 @@ export default new Vue({
         const op = await burn(
           p, { asset_class: "FA_2",
                contract: contract,
-               token_id: BigInt(this.burn.token_id) }, BigInt(this.transfer.amount))
+               token_id: BigInt(this.burn.token_id) }, BigInt(this.burn.amount))
         this.burn.result = `operation ${op.hash} injected`
         await op.confirmation()
         this.burn.status = 'success'
