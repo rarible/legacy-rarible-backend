@@ -49,7 +49,7 @@ function parse_asset_type(r : RawAssetType) : AssetType | ExtendedAssetType | un
 }
 
 function parse_asset_value(r: RawAssetType, value: number) : bigint {
-  if (r.asset_class == 'XTZ' || r.asset_class == 'FA_1_2') return BigInt(value * 1000000.)
+  if (r.asset_class == 'XTZ') return BigInt(value * 1000000.)
   else return BigInt(value)
 }
 

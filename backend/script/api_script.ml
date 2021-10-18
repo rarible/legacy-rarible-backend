@@ -19,6 +19,7 @@ let config = {
   royalties = "" ;
   ft_fa2 = [];
   ft_fa1 = [];
+  ft_lugh = [];
 }
 
 let api_pid = ref None
@@ -1843,7 +1844,7 @@ let get_head () =
   EzReq_lwt.get
     (EzAPI.URL "https://api.granadanet.tzkt.io/v1/blocks/count")
 
-let make_config admin_wallet validator exchange_v2 royalties ft_fa1 ft_fa2
+let make_config admin_wallet validator exchange_v2 royalties ft_fa1 ft_fa2 ft_lugh
   kafka_broker kafka_username kafka_password =
   let open Crawlori.Config in
   get_head () >>= function
@@ -1863,7 +1864,7 @@ let make_config admin_wallet validator exchange_v2 royalties ft_fa1 ft_fa2
       register_kinds = None ;
       allow_no_metadata = false ;
       extra = {
-        admin_wallet ; validator ; exchange_v2 ; royalties; ft_fa1; ft_fa2;
+        admin_wallet ; validator ; exchange_v2 ; royalties; ft_fa1; ft_fa2; ft_lugh
       } ;
     } in
     let temp_fn = Filename.temp_file "config" "" in
@@ -1885,10 +1886,10 @@ let make_config admin_wallet validator exchange_v2 royalties ft_fa1 ft_fa2
       Lwt.return (temp_fn, Some kafka_temp_fn)
 
 
-let start_crawler admin_wallet validator exchange_v2 royalties ft_fa1 ft_fa2
+let start_crawler admin_wallet validator exchange_v2 royalties ft_fa1 ft_fa2 ft_lugh
     kafka_broker kafka_username kafka_password =
   make_config
-    admin_wallet validator exchange_v2 royalties ft_fa1 ft_fa2
+    admin_wallet validator exchange_v2 royalties ft_fa1 ft_fa2 ft_lugh
     kafka_broker kafka_username kafka_password  >>= fun (config, kafka_config) ->
   let prog = "./_bin/crawler" in
   let args =
@@ -1908,7 +1909,7 @@ let random_test () =
   let r_alias, _r_source = create_royalties () in
   let r_kt1 = find_kt1 r_alias in
   Printf.eprintf "New royalties %s\n%!" r_kt1 ;
-  start_crawler "" validator exchange_v2 r_kt1 [] [] "" "" "" >>= fun (cpid, kafka_config) ->
+  start_crawler "" validator exchange_v2 r_kt1 [] [] [] "" "" "" >>= fun (cpid, kafka_config) ->
   api_pid := Some (start_api kafka_config) ;
   crawler_pid := Some cpid ;
   Printf.eprintf "Waiting 6sec to let crawler catch up...\n%!" ;
@@ -1998,7 +1999,7 @@ let match_orders_nft () =
   let v_alias, _v_source = create_validator ~exchange:ex_kt1 ~royalties:r_kt1 in
   let v_kt1 = find_kt1 v_alias in
   Printf.eprintf "New validator %s\n%!" v_kt1 ;
-  start_crawler "" v_kt1 ex_kt1 r_kt1 [] [] "" "" "" >>= fun (cpid, kafka_config) ->
+  start_crawler "" v_kt1 ex_kt1 r_kt1 [] [] [] "" "" "" >>= fun (cpid, kafka_config) ->
   api_pid := Some (start_api kafka_config) ;
   crawler_pid := Some cpid ;
   set_validator v_kt1 ex_admin ex_kt1 >>= fun () ->
@@ -2059,7 +2060,7 @@ let match_orders_tezos () =
   let v_alias, _v_source = create_validator ~exchange:ex_kt1 ~royalties:r_kt1 in
   let v_kt1 = find_kt1 v_alias in
   Printf.eprintf "New validator %s\n%!" v_kt1 ;
-  start_crawler "" v_kt1 ex_kt1 r_kt1 [] [] "" "" "" >>= fun (cpid, kafka_config) ->
+  start_crawler "" v_kt1 ex_kt1 r_kt1 [] [] [] "" "" "" >>= fun (cpid, kafka_config) ->
   api_pid := Some (start_api kafka_config) ;
   crawler_pid := Some cpid ;
   set_validator v_kt1 ex_admin ex_kt1 >>= fun () ->
@@ -2165,7 +2166,7 @@ let fill_orders () =
   let v_alias, _v_source = create_validator ~exchange:ex_kt1 ~royalties:r_kt1 in
   let v_kt1 = find_kt1 v_alias in
   Printf.eprintf "New validator %s\n%!" v_kt1 ;
-  start_crawler "" v_kt1 ex_kt1 r_kt1 [] [] "" "" "" >>= fun (cpid, kafka_config) ->
+  start_crawler "" v_kt1 ex_kt1 r_kt1 [] [] [] "" "" "" >>= fun (cpid, kafka_config) ->
   api_pid := Some (start_api kafka_config) ;
   crawler_pid := Some cpid ;
   set_validator v_kt1 ex_admin ex_kt1 >>= fun () ->
@@ -2191,7 +2192,7 @@ let cancel_order () =
   let v_alias, _v_source = create_validator ~exchange:ex_kt1 ~royalties:r_kt1 in
   let v_kt1 = find_kt1 v_alias in
   Printf.eprintf "New validator %s\n%!" v_kt1 ;
-  start_crawler "" v_kt1 ex_kt1 r_kt1 [] [] "" "" "" >>= fun (cpid, kafka_config) ->
+  start_crawler "" v_kt1 ex_kt1 r_kt1 [] [] [] "" "" "" >>= fun (cpid, kafka_config) ->
   api_pid := Some (start_api kafka_config) ;
   crawler_pid := Some cpid ;
   set_validator v_kt1 ex_admin ex_kt1 >>= fun () ->

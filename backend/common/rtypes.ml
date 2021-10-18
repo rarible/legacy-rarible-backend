@@ -9,6 +9,7 @@ type config = {
   royalties: string; [@dft ""]
   ft_fa2: string list; [@dft []]
   ft_fa1: string list; [@dft []]
+  ft_lugh: string list; [@dft []]
 } [@@deriving encoding]
 
 type kafka_config = {
@@ -368,18 +369,18 @@ let asset_enc =
   let open Json_encoding in
   conv
     (fun a -> match a.asset_type with
-       | ATXTZ | ATFA_1_2 _ ->
+       | ATXTZ ->
          let dec = Z.(rem (of_string a.asset_value) factor) in
          let dec_str = if dec = Z.zero then "" else Format.sprintf ".%06d" (Z.to_int dec) in
          let num = Z.(to_string @@ div (of_string a.asset_value) factor) in
          { a with asset_value = Format.sprintf "%s%s" num dec_str }
        | _ -> a)
     (fun a -> match a.asset_type with
-       | ATFA_2 _ -> a
-       | _ ->
+       | ATXTZ ->
          let {Q.num; den} = Q.of_string a.asset_value in
          let asset_value = Z.(to_string @@ mul (div factor den) num) in
-         { a with asset_value })
+         { a with asset_value }
+       | _ -> a)
     asset_enc
 
 type order_form_elt = {
@@ -797,6 +798,12 @@ type nft_param =
   | Burn_tokens of token_op_owner
   | Metadata_uri of string
   | Token_metadata of (string * (string * string) list)
+[@@deriving encoding]
+
+type ft_param =
+  | FT_transfers of transfer list
+  | FT_mint of { owner: string; amount: int64 }
+  | FT_burn of { owner: string; amount: int64 }
 [@@deriving encoding]
 
 type set_royalties = {

@@ -20,6 +20,7 @@ let upgrade_1_to_2 dbh version =
       fees_receiver jsonb[] not null default '{}',
       ft_fa2 varchar[] not null default '{}',
       ft_fa1 varchar[] not null default '{}',
+      ft_lugh varchar[] not null default '{}',
       protocol_fee bigint)|};
 
     {|create table contracts(
@@ -93,6 +94,7 @@ let upgrade_1_to_2 dbh version =
       level int not null,
       main boolean not null default false,
       tsp timestamp not null,
+      transfer_index int not null default 0,
       source varchar not null,
       destination varchar,
       operator varchar,
@@ -102,7 +104,7 @@ let upgrade_1_to_2 dbh version =
       amount bigint,
       metadata jsonb,
       royalties jsonb,
-      primary key (block, index))|};
+      primary key (block, index, transfer_index))|};
 
     {|create table orders(
       maker varchar not null,
@@ -205,11 +207,12 @@ let upgrade_1_to_2 dbh version =
       level int not null,
       main boolean not null default false,
       tsp timestamp not null,
-      source varchar not null,
-      destination varchar not null,
+      transfer_index int not null default 0,
+      source varchar,
+      destination varchar,
       contract varchar not null,
       amount bigint not null,
-      primary key (block, index))|};
+      primary key (block, index, transfer_index))|};
 
   ]
 

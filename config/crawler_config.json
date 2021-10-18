@@ -1,12 +1,10 @@
 {
   "nodes": [ "https://granadanet.smartpy.io" ],
-  "start": 462400,
+  "start": 572780,
   "db_kind": "pg",
   "step_forward": 30,
-  "accounts": [
-    "KT1MWv7oH8JJhxJJs8co21XiByBEAYx2QDjY"
-  ],
-  "validator": "KT1Vx7UddodXEVAjvgC2et267JqKSYX7WAr7",
-  "exchange_v2": "KT1C5kWbfzASApxCMHXFLbHuPtnRaJXE4WMu",
-  "royalties": "KT1BkQiZcEL8kvx66WZCnFBCCjhJHsQsScw7"
+  "validator": "KT1Mt95x8vgHuq1MZdz4gVvfywgPciD45NY7",
+  "exchange_v2": "KT1EQcS5wCy71c2VTCQFSEMSxgZwJyMjFyFH",
+  "royalties": "KT1KfUjQ9NSKAJ35AksHLBPLbjg4ZSLKjw1v",
+  "ft_lugh": [ "KT1HT3EbSPFA1MM2ZiMThB6P6Kky5jebNgAx" ]
 }

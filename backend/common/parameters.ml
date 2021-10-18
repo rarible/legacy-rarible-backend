@@ -334,10 +334,76 @@ let rec parse_exchange e p =
   | EPnamed "doTransfers", m -> parse_do_transfers m
   | _ -> unexpected_michelson
 
+let parse_ft_mint = function
+  | Mprim { prim = `Pair; args = [
+      owner;
+      Mint amount;
+      Mint id ]; _ } ->
+    if id = Z.zero then
+      let$ owner = parse_address owner in
+      Ok (FT_mint { owner; amount = Z.to_int64 amount})
+    else unexpected_michelson
+  | _ -> unexpected_michelson
 
-let parse_fa1 e p =
+let parse_ft_burn = function
+  | Mprim { prim = `Pair; args = [
+      owner;
+      Mint amount;
+      Mint id ]; _ } ->
+    if id = Z.zero then
+      let$ owner = parse_address owner in
+      Ok (FT_burn { owner; amount = Z.to_int64 amount })
+    else unexpected_michelson
+  | _ -> unexpected_michelson
+
+let parse_ft_fa1 e p =
   let p = flatten p in
   match e, p with
-  | EPnamed "transfer", Mprim { prim = `Pair; args = [ Mstring from; Mstring dst; Mint am ]; _} ->
-    Ok (from, dst, Z.to_int64 am)
+  | EPnamed "transfer", Mprim { prim = `Pair; args = [ from; dst; Mint am ]; _} ->
+    let$ tr_source = parse_address from in
+    let$ tr_destination = parse_address dst in
+    Ok (FT_transfers [ {tr_source; tr_txs = [{tr_destination; tr_amount = Z.to_int64 am; tr_token_id = "0"}] } ])
+  | EPnamed "mint", m -> parse_ft_mint m
+  | EPnamed "burn", m -> parse_ft_burn m
+  | _ -> unexpected_michelson
+
+let parse_ft_fa2 e p =
+  let p = flatten p in
+  match e, p with
+  | EPnamed "transfer", m ->
+    begin match parse_transfer m with
+      | Ok (Transfers l) ->
+        let filter trs =
+          List.filter_map (fun tr ->
+              let tr_txs = List.filter (fun tr -> tr.tr_token_id = "0") tr.tr_txs in
+              if tr_txs = [] then None else Some {tr with tr_txs}) trs in
+        Ok (FT_transfers (filter l))
+      | _ -> unexpected_michelson
+    end
+  | EPnamed "mint", m -> parse_ft_mint m
+  | EPnamed "burn", m -> parse_ft_burn m
+  | _ -> unexpected_michelson
+
+let parse_process_transfer_lugh = function
+  | Mseq [ Mprim { prim = `Pair; args=[Mint amount; source]; _ }; Mint fees;
+           destination; Mint id ] ->
+    if id = Z.zero  then
+      let$ tr_source = parse_address source in
+      let$ tr_destination = parse_address destination in
+      Ok (FT_transfers [
+          { tr_source; tr_txs = [
+                {tr_token_id = "0"; tr_amount = Z.to_int64 amount; tr_destination};
+                {tr_token_id = "0"; tr_amount = Z.to_int64 fees; tr_destination = ""}
+              ]
+          }
+        ])
+    else unexpected_michelson
+  | _ -> unexpected_michelson
+
+let parse_ft_lugh e m =
+  let m = flatten m in
+  match e with
+  | EPnamed "process_transfer" -> parse_process_transfer_lugh m
+  | EPnamed "mint" -> parse_ft_mint m
+  | EPnamed "burn" -> parse_ft_burn m
   | _ -> unexpected_michelson
