@@ -28,7 +28,7 @@ let get_extra_config ?dbh () =
   use dbh @@ fun dbh ->
   let>? r = [%pgsql.object dbh
       "select admin_wallet, exchange_v2_contract, royalties_contract, \
-       validator_contract, ft_fa2, ft_fa1 from state"] in
+       validator_contract, ft_fa2, ft_fa1, ft_lugh from state"] in
   match r with
   | [ r ] ->  Lwt.return_ok (Some {
       admin_wallet = r#admin_wallet;
@@ -37,6 +37,7 @@ let get_extra_config ?dbh () =
       validator = r#validator_contract;
       ft_fa2 = List.filter_map (fun x -> x) r#ft_fa2;
       ft_fa1 = List.filter_map (fun x -> x) r#ft_fa1;
+      ft_lugh = List.filter_map (fun x -> x) r#ft_lugh;
     })
   | [] -> Lwt.return_ok None
   | _ -> Lwt.return_error (`hook_error "wrong_state")
@@ -46,18 +47,19 @@ let update_extra_config ?dbh e =
   let>? r = [%pgsql.object dbh "select * from state"] in
   let ft_fa1 = List.map Option.some e.ft_fa1 in
   let ft_fa2 = List.map Option.some e.ft_fa2 in
+  let ft_lugh = List.map Option.some e.ft_lugh in
   match r with
   | [] ->
     [%pgsql dbh
         "insert into state(exchange_v2_contract, royalties_contract, \
-         validator_contract, ft_fa2, ft_fa1) \
+         validator_contract, ft_fa2, ft_fa1, ft_lugh) \
          values (${e.exchange_v2}, ${e.royalties}, ${e.validator}, \
-         $ft_fa2, $ft_fa1)"]
+         $ft_fa2, $ft_fa1, $ft_lugh)"]
   | _ ->
     [%pgsql dbh
         "update state set exchange_v2_contract = ${e.exchange_v2}, \
          royalties_contract = ${e.royalties}, validator_contract = ${e.validator}, \
-         ft_fa1 = $ft_fa1, ft_fa2 = $ft_fa2"]
+         ft_fa1 = $ft_fa1, ft_fa2 = $ft_fa2, ft_lugh = $ft_lugh"]
 
 (* Normalize here in case of ERC20 like asset *)
 let price left right =
@@ -773,8 +775,8 @@ let insert_burn dbh op tr m =
 
 let insert_transfer dbh op tr lt =
   let kt1 = tr.destination in
-  let|>? () = iter_rp (fun {tr_source; tr_txs} ->
-      let|>? () = iter_rp (fun {tr_destination; tr_token_id; tr_amount} ->
+  let|>? _ = fold_rp (fun transfer_index {tr_source; tr_txs} ->
+      fold_rp (fun transfer_index {tr_destination; tr_token_id; tr_amount} ->
           let>? () = [%pgsql dbh
               "insert into tokens(contract, token_id, block, level, tsp, \
                last_block, last_level, last, owner, amount, \
@@ -785,15 +787,15 @@ let insert_transfer dbh op tr lt =
           let>? () = insert_account dbh tr_destination ~block:op.bo_block ~level:op.bo_level ~tsp:op.bo_tsp in
           let>? () = [%pgsql dbh
               "insert into token_updates(transaction, index, block, level, tsp, \
-               source, destination, contract, token_id, amount) \
+               source, destination, contract, token_id, amount, transfer_index) \
                values(${op.bo_hash}, ${op.bo_index}, ${op.bo_block}, ${op.bo_level}, \
                ${op.bo_tsp}, $tr_source, $tr_destination, ${tr.destination}, \
-               $tr_token_id, $tr_amount) \
+               $tr_token_id, $tr_amount, $transfer_index) \
                on conflict do nothing"] in
-          insert_nft_activity_transfer
-            dbh op kt1 tr_source tr_destination tr_token_id tr_amount
-        ) tr_txs in
-      ()) lt in
+          let|>? () = insert_nft_activity_transfer
+              dbh op kt1 tr_source tr_destination tr_token_id tr_amount in
+          Int32.succ transfer_index
+        ) transfer_index tr_txs) 0l lt in
   ()
 
 let insert_update_operator dbh op tr lt =
@@ -1005,27 +1007,45 @@ let insert_do_transfers dbh op
     left left_maker left_asset
     right right_maker right_asset
 
-let insert_ft_fa2 dbh op tr txs =
-  iter_rp (fun tx ->
-      iter_rp (fun txd ->
-          [%pgsql dbh
+let insert_ft_transfers dbh op tr txs =
+  let|>? _ = fold_rp (fun transfer_index tx ->
+      fold_rp (fun transfer_index txd ->
+          let|>? () = [%pgsql dbh
               "insert into ft_token_updates(transaction, index, block, \
-               level, tsp, source, destination, contract, amount) \
+               level, tsp, source, destination, contract, amount, transfer_index) \
                values(${op.bo_hash}, ${op.bo_index}, ${op.bo_block}, ${op.bo_level}, \
                ${op.bo_tsp}, ${tx.tr_source}, ${txd.tr_destination}, \
-               ${tr.destination}, ${txd.tr_amount}) \
-               on conflict do nothing"]) tx.tr_txs) txs
+               ${tr.destination}, ${txd.tr_amount}, $transfer_index) \
+               on conflict do nothing"] in
+          Int32.succ transfer_index
+        ) transfer_index tx.tr_txs) 0l txs in
+  ()
 
-let insert_ft_fa1 dbh op tr (from, dst, amount) =
+let insert_ft_mint_burn dbh op ~contract ~burn ~owner ~amount =
+  let source, destination = if burn then Some owner, None else None, Some owner in
   [%pgsql dbh
       "insert into ft_token_updates(transaction, index, block, \
        level, tsp, source, destination, contract, amount) \
        values(${op.bo_hash}, ${op.bo_index}, ${op.bo_block}, ${op.bo_level}, \
-       ${op.bo_tsp}, $from, $dst, \
-       ${tr.destination}, $amount) \
+       ${op.bo_tsp}, $?source, $?destination, \
+       $contract, $amount) \
        on conflict do nothing"]
 
 let insert_transaction config dbh op tr =
+  let parse_ft = function
+    | Ok (FT_transfers t) ->
+      Format.printf "\027[0;35mFT transfer %s %ld %s\027[0m@."
+        (short op.bo_hash) op.bo_index (short tr.destination);
+      insert_ft_transfers dbh op tr t
+    | Ok (FT_mint {owner; amount; _}) ->
+      Format.printf "\027[0;35mFT mint %s %ld %s\027[0m@."
+        (short op.bo_hash) op.bo_index (short tr.destination);
+      insert_ft_mint_burn dbh op ~burn:false ~contract:tr.destination ~owner ~amount
+    | Ok (FT_burn {owner; amount; _}) ->
+      Format.printf "\027[0;35mFT burn %s %ld %s\027[0m@."
+        (short op.bo_hash) op.bo_index (short tr.destination);
+      insert_ft_mint_burn dbh op ~burn:true ~contract:tr.destination ~owner ~amount
+    | _ -> Lwt.return_ok () in
   match tr.parameters with
   | None | Some { value = Other _; _ } | Some { value = Bytes _; _ } -> Lwt.return_ok ()
   | Some {entrypoint; value = Micheline m} ->
@@ -1057,22 +1077,11 @@ let insert_transaction config dbh op tr =
           Lwt.return_ok ()
       end
     else if List.mem tr.destination config.Crawlori.Config.extra.ft_fa2 then
-      begin match Parameters.parse_fa2 entrypoint m with
-        | Ok (Transfers t) ->
-          Format.printf "\027[0;35mFT transfer %s %ld %s\027[0m@."
-            (short op.bo_hash) op.bo_index (short tr.destination);
-          insert_ft_fa2 dbh op tr t
-        | _ -> Lwt.return_ok ()
-      end
+      parse_ft @@ Parameters.parse_ft_fa2 entrypoint m
     else if List.mem tr.destination config.Crawlori.Config.extra.ft_fa1 then
-      begin match Parameters.parse_fa1 entrypoint m with
-        | Ok t ->
-          Format.printf "\027[0;35mFT transfer %s %ld %s\027[0m@."
-            (short op.bo_hash) op.bo_index (short tr.destination);
-          insert_ft_fa1 dbh op tr t
-        | _ -> Lwt.return_ok ()
-      end
-
+      parse_ft @@ Parameters.parse_ft_fa1 entrypoint m
+    else if List.mem tr.destination config.Crawlori.Config.extra.ft_lugh then
+      parse_ft @@ Parameters.parse_ft_lugh entrypoint m
     else (* nft *)
       begin match Parameters.parse_fa2 entrypoint m with
         | Ok (Mint_tokens m) ->
@@ -1387,12 +1396,25 @@ let token_updates dbh main l =
 let ft_token_updates dbh main l =
   iter_rp (fun r ->
       let amount = if main then r#amount else Int64.neg r#amount in
-      let>? () = [%pgsql dbh
-          "update ft_tokens set balance = balance + $amount \
-           where contract = ${r#contract} and account = ${r#destination}"] in
-      [%pgsql dbh
-          "update ft_tokens set balance = balance - $amount \
-           where contract = ${r#contract} and account = ${r#source}"]) l
+      let>? () = match r#destination with
+        | Some destination ->
+          let>? () = [%pgsql dbh
+            "insert into ft_tokens(contract, account, balance) \
+             values(${r#contract}, $destination, 0) on conflict do nothing"] in
+          [%pgsql dbh
+              "update ft_tokens set balance = balance + $amount \
+               where contract = ${r#contract} and account = $destination"]
+        | None -> Lwt.return_ok () in
+      match r#source with
+      | Some source ->
+        let>? () = [%pgsql dbh
+            "insert into ft_tokens(contract, account, balance) \
+             values(${r#contract}, $source, 0) on conflict do nothing"] in
+        [%pgsql dbh
+            "update ft_tokens set balance = balance - $amount \
+             where contract = ${r#contract} and account = $source"]
+      | None -> Lwt.return_ok ()
+    ) l
 
 let produce_cancel_events dbh main l =
   iter_rp (fun r ->

@@ -111,16 +111,16 @@ export function mutez_to_tez(mu: bigint) : number {
 export function asset_to_json(a: Asset) : any {
   // todo handle different decimal for FA_1_2
   switch (a.asset_type.asset_class) {
-    case "FA_2":
-      return {
-        assetType : asset_type_to_json(a.asset_type),
-        value: a.value.toString()
-      }
-    default:
+    case "XTZ":
       const value = mutez_to_tez(a.value)
       return {
         assetType : asset_type_to_json(a.asset_type),
         value: value.toString()
+      }
+    default:
+      return {
+        assetType : asset_type_to_json(a.asset_type),
+        value: a.value.toString()
       }
   }
 }
@@ -128,15 +128,15 @@ export function asset_to_json(a: Asset) : any {
 export function asset_of_json(a: any) : Asset {
   const factor = 1000000.
     switch (a.assetType.assetClass) {
-      case "FA_2":
+      case "XTZ":
         return {
           asset_type : asset_type_of_json(a.assetType),
-          value: BigInt(a.value)
+          value: BigInt(a.value * factor)
         }
       default:
         return {
           asset_type : asset_type_of_json(a.assetType),
-          value: BigInt(a.value * factor)
+          value: BigInt(a.value)
         }
     }
 }

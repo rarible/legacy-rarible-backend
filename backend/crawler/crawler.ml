@@ -9,7 +9,7 @@ let filename = ref None
 
 let dummy_extra = {
   admin_wallet = ""; exchange_v2 = ""; royalties = ""; validator = "";
-  ft_fa2 = []; ft_fa1 = [];
+  ft_fa2 = []; ft_fa1 = []; ft_lugh = [];
 }
 
 let rarible_contracts ?(db=dummy_extra) config =
@@ -24,12 +24,13 @@ let rarible_contracts ?(db=dummy_extra) config =
     let extra = if extra.validator = "" then { extra with validator = db.validator } else extra in
     let extra = if extra.ft_fa2 = [] then { extra with ft_fa2 = db.ft_fa2 } else extra in
     let extra = if extra.ft_fa1 = [] then { extra with ft_fa1 = db.ft_fa1 } else extra in
+    let extra = if extra.ft_lugh = [] then { extra with ft_lugh = db.ft_lugh } else extra in
     let s = match config.accounts with
       | None -> SSet.empty
       | Some s -> s in
     let s = SSet.add extra.exchange_v2 s in
     let s = SSet.add extra.validator s in
-    let s = List.fold_left (fun acc a -> SSet.add a acc) s (extra.ft_fa2 @ extra.ft_fa1) in
+    let s = List.fold_left (fun acc a -> SSet.add a acc) s (extra.ft_fa2 @ extra.ft_fa1 @ extra.ft_lugh) in
     Lwt.return_ok { config with accounts = Some s; extra }
 
 let fill_config config =
