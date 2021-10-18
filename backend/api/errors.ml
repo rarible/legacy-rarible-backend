@@ -33,3 +33,27 @@ type nonrec api_error = [
 
 let string_of_error (e : [> api_error ]) =
   EzEncoding.construct api_error_enc e
+
+let code_of_error : api_error -> int = function
+  | `UNKNOWN _ -> 500
+  | `VALIDATION _ -> 500
+  | `FIRST_TEMPLATE_OBJECT_NOT_FOUND _ -> 500
+  | `SECOND_TEMPLATE_OBJECT_NOT_FOUND _ -> 500
+  | `BAD_REQUEST _ -> 500
+  | `TOKEN_PROPERTIES_EXTRACT _ -> 500
+  | `INCORRECT_LAZY_NFT _ -> 500
+  | `INVALID_ARGUMENT _ -> 500
+  | `ABSENCE_OF_REQUIRED_FIELD _ -> 500
+  | `UNLOCKABLE_API_ERROR _ -> 500
+  | `NFT_API_ERROR _ -> 500
+  | `ORDER_API_ERROR _ -> 500
+  | `UNEXPECTED_API_ERROR _ -> 500
+  | `TOKEN_NOT_FOUND _ -> 404
+  | `BALANCE_NOT_FOUND _ -> 404
+  | `ITEM_NOT_FOUND _ -> 404
+  | `LAZY_ITEM_NOT_FOUND _ -> 404
+  | `TOKEN_URI_NOT_FOUND _ -> 404
+  | `OWNERSHIP_NOT_FOUND _ -> 404
+  | `COLLECTION_NOT_FOUND _ -> 404
+  | `LOCK_EXISTS _ -> 400
+  | `OWNERSHIP_ERROR _ -> 400

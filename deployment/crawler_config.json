@@ -1,6 +1,7 @@
 {
   "nodes": [ "https://granadanet.smartpy.io" ],
   "start": 542173,
+  "db_kind": "pg",
   "step_forward": 30,
   "validator": "KT1RtsevY6b6izV12QMxvVZviSTy4Mcu2apg",
   "exchange_v2": "KT1XgQ52NeNdjo3jLpbsPBRfg8YhWoQ5LB7g",

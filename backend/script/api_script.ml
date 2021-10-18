@@ -9,8 +9,10 @@ let api = ref "http://localhost:8080"
 let sdk = ref false
 let endpoint = ref "http://granada.tz.functori.com"
 
-let validator = "KT1Vx7UddodXEVAjvgC2et267JqKSYX7WAr7"
-let exchange_v2 = "KT1C5kWbfzASApxCMHXFLbHuPtnRaJXE4WMu"
+let validator = "KT1JrWXMuHp7nkX7j3trtxckVBiTyggDNnU1"
+let exchange_v2 = "KT1CfvTiEz9EVBLBLLYYFvRTwqyLsCvoZtWm"
+let royalties = "KT1JPYtEMv8PHXfmLoMuWRLsVykoEou5AqKG"
+let lugh_contract = "KT1HT3EbSPFA1MM2ZiMThB6P6Kky5jebNgAx"
 
 let config = {
   admin_wallet = "" ;
@@ -64,8 +66,7 @@ let origins = [
 let origins_len = List.length origins
 
 let royalties_contracts = [
-  "KT1EZBkhGkRDxP6N1opkN8ULvnssG7f3PWoH" ;
-  "KT1VCEefbNuB8iBuuu2tganKmMu4ex548ewG"
+  "KT1JPYtEMv8PHXfmLoMuWRLsVykoEou5AqKG"
 ]
 let royalties_contracts_len = List.length royalties_contracts
 
@@ -155,14 +156,18 @@ let generate_option f =
 let generate_origin () =
   List.nth origins (Random.int origins_len)
 
-let rec generate_address ?(diff=None) () = match diff with
+let rec generate_address ?alias ?(diff=None) () =
+  match alias with
+  | Some a -> by_alias a
   | None ->
-    List.nth accounts (Random.int accounts_len)
-  | Some a ->
-    let (_, pk, _) as r = List.nth accounts (Random.int accounts_len) in
-    let tz1 = pk_to_pkh_exn pk in
-    if a = tz1 then generate_address ~diff ()
-    else r
+    match diff with
+    | None ->
+      List.nth accounts (Random.int accounts_len)
+    | Some a ->
+      let (_, pk, _) as r = List.nth accounts (Random.int accounts_len) in
+      let tz1 = pk_to_pkh_exn pk in
+      if a = tz1 then generate_address ~diff ()
+      else r
 
 let generate_maker () =
   generate_address ()
@@ -801,9 +806,10 @@ let deploy ?verbose ?burn_cap filename storage source alias =
   if code <> 0 then
     failwith (Printf.sprintf "deploy failure : out %S err %S" out err)
 
-let create_collection ?(royalties=pick_royalties ()) () =
+let create_collection ?(royalties=pick_royalties ()) ?alias () =
   let alias_new = generate_alias "collection" in
-  let alias_admin, pk_admin, sk_admin = generate_address () in
+  let alias_admin, pk_admin, sk_admin =
+    match alias with None -> generate_address () | Some a -> by_alias a in
   may_import_key alias_admin sk_admin ;
   let alias_source, _pk_source, sk_source = generate_address () in
   let admin = pk_to_pkh_exn pk_admin in
@@ -858,6 +864,19 @@ let deploy_collection admin alias_source alias_new royalties uri =
   else
     let filename = "contracts/arl/fa2.arl" in
     let storage = Script.storage_fa2 ~admin:(fst admin) ~royalties in
+    deploy filename storage alias_source alias_new ;
+    Printf.eprintf "  deployed collection %s\n%!" alias_new ;
+    let kt1 = find_kt1 alias_new in
+    let> () = set_metadata_uri uri admin kt1 in
+    Printf.eprintf "  --> %s:%s\n%!" alias_new kt1 ;
+    Lwt.return (alias_new, kt1, admin, royalties)
+
+let deploy_ubi_collection admin alias_source alias_new royalties uri =
+  Printf.eprintf "Deploying new collection\n%!" ;
+  if !js then Lwt.fail_with "TODO"
+  else
+    let filename = "contracts/mich/ubi.tz" in
+    let storage = Script.storage_ubi (fst admin) in
     deploy filename storage alias_source alias_new ;
     Printf.eprintf "  deployed collection %s\n%!" alias_new ;
     let kt1 = find_kt1 alias_new in
@@ -929,6 +948,18 @@ let set_validator validator source contract =
       Printf.eprintf "set_validator failure (log %s err %s)\n%!" out err
     else Lwt.return_unit
 
+let set_royalties token_addr royalties source contract =
+  if !js then
+    Lwt.fail_with "TODO"
+  else
+    let cmd =
+      Script.set_royalties_aux ~endpoint:!endpoint token_addr royalties (fst source) contract in
+    let code, out, err = sys_command cmd in
+    if code <> 0 then
+      Lwt.return @@
+      Printf.eprintf "set_validator failure (log %s err %s)\n%!" out err
+    else Lwt.return_unit
+
 let update_operators_for_all operator source contract =
   Printf.eprintf "update_operators_for_all %s for %s on %s\n%!" operator (fst source) contract ;
   if !js then
@@ -943,12 +974,38 @@ let update_operators_for_all operator source contract =
       Printf.eprintf "update_operator_for_all failure (log %s err %s)\n%!" out err
     else Lwt.return_unit
 
+let update_operators token_id owner operator source contract =
+  Printf.eprintf "update_operators %s for %s on %s\n%!" operator (fst source) contract ;
+  if !js then
+    Lwt.fail_with "TODO"
+  else
+    let operator = Printf.sprintf "%Ld=%s+%s" token_id owner operator in
+    let cmd =
+      Script.update_operators_aux ~endpoint:!endpoint [ operator ] (fst source) contract in
+    let code, out, err = sys_command cmd in
+    if code <> 0 then
+      Lwt.return @@
+      Printf.eprintf "update_operator failure (log %s err %s)\n%!" out err
+    else Lwt.return_unit
+
 let mint_tokens id owner amount royalties source contract =
   if !js then
     Script_js.mint_tokens ~endpoint:!endpoint ~amount ~royalties ~contract ~source id
   else
     let cmd = Script.mint_tokens_aux ~endpoint:!endpoint id owner amount
         royalties (fst source) contract in
+    let code, out, err = sys_command cmd in
+    if code <> 0 then
+      Lwt.return @@
+      Printf.eprintf "mint failure (log %s err %s)\n%!" out err
+    else Lwt.return_unit
+
+let mint_ubi_tokens id owner source contract =
+  if !js then
+    Lwt.fail_with "TODO"
+  else
+    let cmd =
+      Script.mint_ubi_tokens_aux ~endpoint:!endpoint id owner (fst source) contract in
     let code, out, err = sys_command cmd in
     if code <> 0 then
       Lwt.return @@
@@ -987,9 +1044,10 @@ let mint_with_random_token_id ~source ~contract =
   mint_tokens tid owner amount royalties source contract >|= fun () ->
   ((owner, owner_sk), amount, tid, royalties, metadata)
 
-let mint_one_with_token_id_from_api ?diff ~source ~contract () =
+let mint_one_with_token_id_from_api ?diff ?alias ~source ~contract () =
   Printf.eprintf "mint_one_with_token_id_from_api for %s on %s\n%!" (fst source) contract ;
-  let _owner_alias, owner_pk, owner_sk = generate_address ?diff () in
+  let _owner_alias, owner_pk, owner_sk =
+    match alias with None -> generate_address ?diff () | Some a -> by_alias a in
   let owner =  pk_to_pkh_exn owner_pk in
   let amount = string_of_int 1 in
   let royalties = generate_royalties () in
@@ -997,7 +1055,19 @@ let mint_one_with_token_id_from_api ?diff ~source ~contract () =
   let metadata = [ Printf.sprintf "name=%s" name ] in
   let>? tid = call_generate_token_id contract in
   let> () = mint_tokens tid.nft_token_id owner amount royalties source contract in
-  let> () = set_token_metadata tid.nft_token_id metadata source contract in
+  (* let> () = set_token_metadata tid.nft_token_id metadata source contract in *)
+  Lwt.return_ok ((owner, owner_sk), 1, tid.nft_token_id, royalties, metadata)
+
+let mint_ubi_with_token_id_from_api ?diff ?alias ~source ~contract () =
+  Printf.eprintf "mint_one_with_token_id_from_api for %s on %s\n%!" (fst source) contract ;
+  let _owner_alias, owner_pk, owner_sk =
+    match alias with None -> generate_address ?diff () | Some a -> by_alias a in
+  let owner =  pk_to_pkh_exn owner_pk in
+  let name = Filename.basename @@ Filename.temp_file "item" "name" in
+  let metadata = [ Printf.sprintf "name=%s" name ] in
+  let>? tid = call_generate_token_id contract in
+  let> () = mint_ubi_tokens tid.nft_token_id owner source contract in
+  (* let> () = set_token_metadata tid.nft_token_id metadata source contract in *)
   Lwt.return_ok ((owner, owner_sk), 1, tid.nft_token_id, royalties, metadata)
 
 let mint_with_token_id_from_api ~source ~contract =
@@ -1058,7 +1128,6 @@ let forge_tr ?entrypoint ?fee ?gas_limit ?storage_limit ?counter
     ?amount ?remove_failed ?local_forge ~base ~get_pk ~source ~contract p =
   let op = make_tr ?entrypoint ?fee ?gas_limit ?storage_limit
       ?counter ?amount ~source ~contract p in
-  (* Printf.eprintf "OP %s\n%!" @@ EzEncoding.construct Tzfunc.Proto.manager_operation_enc.json op ; *)
   Tzfunc.Node.forge_manager_operations ?remove_failed ?local_forge ~base
     ~get_pk ~src:source [ op ]
 
@@ -1847,13 +1916,13 @@ let get_head () =
 let make_config admin_wallet validator exchange_v2 royalties ft_fa1 ft_fa2 ft_lugh
   kafka_broker kafka_username kafka_password =
   let open Crawlori.Config in
-  get_head () >>= function
-  | Error (code, str) ->
-    failwith (Printf.sprintf "get_head error %d %s" code (Option.value ~default:"" str))
-  | Ok level ->
+  (* get_head () >>= function
+   * | Error (code, str) ->
+   *   failwith (Printf.sprintf "get_head error %d %s" code (Option.value ~default:"" str))
+   * | Ok level -> *)
     let config = {
       nodes = [ "https://granadanet.smartpy.io" ] ;
-      start = Some Int32.(sub (of_string level) 30l)  ;
+      start =  Some 586460l ;
       db_kind = `pg ;
       step_forward = 30 ;
       accounts = None ;
@@ -1958,8 +2027,22 @@ let sell_nft_for_tezos ?(salt=0) collection item1 amount =
   | Error _err -> Lwt.fail_with "order_from"
   | Ok form -> call_upsert_order form
 
+let sell_nft_for_lugh ?(salt=0) collection item1 amount =
+  let lugh = ATFA_2 { asset_fa2_contract = lugh_contract ; asset_fa2_token_id = "0" } in
+  let take = { asset_type = lugh ; asset_value = string_of_int amount } in
+  match sell_order_form_from_item ~salt collection item1 take with
+  | Error _err -> Lwt.fail_with "order_from"
+  | Ok form -> call_upsert_order form
+
 let buy_nft_for_tezos ?(salt=0) collection maker item1 amount =
   let make = { asset_type = ATXTZ ; asset_value = string_of_int amount } in
+  match buy_order_form_from_item ~salt collection item1 maker make with
+  | Error _err -> Lwt.fail_with "order_from"
+  | Ok form -> call_upsert_order form
+
+let buy_nft_for_lugh ?(salt=0) collection maker item1 amount =
+  let lugh = ATFA_2 { asset_fa2_contract = lugh_contract ; asset_fa2_token_id = "0" } in
+  let make = { asset_type = lugh ; asset_value = string_of_int amount } in
   match buy_order_form_from_item ~salt collection item1 maker make with
   | Error _err -> Lwt.fail_with "order_from"
   | Ok form -> call_upsert_order form
@@ -2069,9 +2152,9 @@ let match_orders_tezos () =
   let (admin, source, contract, royalties, uri) = create_collection ~royalties:r_kt1 () in
   let> (admin, contract, source, _royalties) =
     deploy_collection admin source contract royalties uri in
-  let>? () = check_collection admin contract source in
   Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
   Lwt_unix.sleep 6. >>= fun () ->
+  let>? () = check_collection admin contract source in
   let>? item1 = mint_one_with_token_id_from_api ~source ~contract () in
   Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
   Lwt_unix.sleep 6. >>= fun () ->
@@ -2084,6 +2167,63 @@ let match_orders_tezos () =
   let _source2_alias, source2_pk, source2_sk = generate_address ~diff:(Some (fst source1)) () in
   let source2 = pk_to_pkh_exn source2_pk, source2_sk in
   let>? order2 = buy_nft_for_tezos contract (source2_pk, source2_sk) item1 1 in
+  (* TODO : check order *)
+  begin match_orders ~amount:1L ~source:source2 ~contract:ex_kt1 order2 order1 >>= function
+    | Error err ->
+      Printf.eprintf "match_orders error %s" @@ Tzfunc.Rp.string_of_error err ;
+      Lwt.return_unit
+  | Ok op_hash ->
+      Printf.eprintf "HASH = %s\n%!" op_hash ;
+      Printf.eprintf "Waiting next block...\n%!" ;
+      wait_next_block () >>= fun () ->
+      Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
+      Lwt_unix.sleep 6. >>= fun () ->
+      (* TODO : check_item not *)
+      check_item (contract, (source2, string_of_int amount1, token_id1, royalties1, metadata1))
+      (* check_orders *)
+  end >>= fun () ->
+  begin match !api_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
+  begin match !crawler_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
+  Lwt.return_ok ()
+
+let match_orders_lugh () =
+  reset_db () ;
+  let r_kt1 = royalties in
+  Printf.eprintf "Royalties %s\n%!" r_kt1 ;
+  let ex_kt1 = exchange_v2 in
+  Printf.eprintf "Exchange %s\n%!" ex_kt1 ;
+  let v_kt1 = validator in
+  Printf.eprintf "Validator %s\n%!" v_kt1 ;
+  start_crawler "" v_kt1 ex_kt1 r_kt1 [] [] [ "KT1HT3EbSPFA1MM2ZiMThB6P6Kky5jebNgAx" ] "" "" ""
+  >>= fun (cpid, kafka_config) ->
+  api_pid := Some (start_api kafka_config) ;
+  crawler_pid := Some cpid ;
+  Printf.eprintf "Waiting 30sec to let crawler catch up...\n%!" ;
+  Lwt_unix.sleep 30. >>= fun () ->
+  let contract =  "KT1KvxhtWWhEDQJjH6pENJA8HN5UjBLGHYSg" in
+  let _source_alias, source_pk, source_sk = by_alias "rarible1" in
+  let source = pk_to_pkh_exn source_pk, source_sk in
+  (* let (admin, source, contract, royalties, uri) =
+   *   create_collection ~royalties:r_kt1 () in
+   * let> (admin, contract, source, _royalties) =
+   *   deploy_ubi_collection admin source contract royalties uri in *)
+  Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
+  Lwt_unix.sleep 6. >>= fun () ->
+  (* let>? () = check_collection admin contract source in *)
+  let>? item1 = mint_ubi_with_token_id_from_api ~source ~contract () in
+  Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
+  Lwt_unix.sleep 6. >>= fun () ->
+  let (source1, amount1, token_id1, royalties1, metadata1) = item1 in
+  check_item (contract, (source1, string_of_int amount1, token_id1, royalties1, metadata1))
+  >>= fun () ->
+  let royalties = generate_royalties () in
+  let> () = set_royalties contract royalties source1 r_kt1 in
+  let> () = update_operators_for_all ex_kt1 source1 contract in
+  let>? order1 = sell_nft_for_lugh ~salt:1 contract item1 1 in
+  (* TODO : check order *)
+  let _source2_alias, source2_pk, source2_sk = generate_address ~alias:"rarible1" () in
+  let source2 = pk_to_pkh_exn source2_pk, source2_sk in
+  let>? order2 = buy_nft_for_lugh contract (source2_pk, source2_sk) item1 1 in
   (* TODO : check order *)
   begin match_orders ~amount:1L ~source:source2 ~contract:ex_kt1 order2 order1 >>= function
     | Error err ->
@@ -2300,6 +2440,18 @@ let main () =
       Lwt_main.run (
         Lwt.catch (fun () ->
             match_orders_tezos () >>= function
+            | Ok _ -> Lwt.return_unit
+            | Error err ->
+              Lwt.fail_with @@ Api.Errors.string_of_error err)
+          (fun exn ->
+             Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
+             begin match !api_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
+             begin match !crawler_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
+             Lwt.return_unit))
+    | [ "match_order_lugh_bid" ] ->
+      Lwt_main.run (
+        Lwt.catch (fun () ->
+            match_orders_lugh () >>= function
             | Ok _ -> Lwt.return_unit
             | Error err ->
               Lwt.fail_with @@ Api.Errors.string_of_error err)

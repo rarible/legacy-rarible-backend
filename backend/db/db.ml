@@ -429,15 +429,66 @@ let get_order ?dbh hash_key =
     mk_order ~dbh r >>=? fun order ->
     Lwt.return_ok @@ Some order
 
+let check_address a =
+  match Tzfunc.Crypto.Pkh.b58dec a with
+  | Ok _ -> true
+  | Error _ ->
+    try
+      let _ = Tzfunc.Crypto.(Base58.decode ~prefix:Prefix.contract_public_key_hash a) in
+      true
+    with _ -> false
+
+let filter_creators =
+  List.filter (fun {part_account; _} -> check_address part_account)
+
+let creators_enc =
+  let open Json_encoding in
+  union [
+    case (list part_enc)
+      (fun l -> Some (filter_creators l))
+      (fun l -> filter_creators l);
+    case (assoc int32)
+      (fun l -> Some (List.filter_map (fun {part_account; part_value} ->
+           if check_address part_account then Some (part_account, part_value) else None) l))
+      (fun l -> List.filter_map (fun (part_account, part_value) ->
+           if check_address part_account then Some { part_account; part_value} else None) l);
+    case (list string)
+      (fun l -> Some (List.filter_map (fun {part_account; _} ->
+           if check_address part_account then Some part_account else None) l))
+      (fun l ->
+         let n = Int32.of_int (List.length l) in
+         List.filter_map (fun part_account ->
+             if check_address part_account then
+               let part_value = if n = 0l then 0l else Int32.div 10000l n in
+               Some {part_account; part_value}
+             else None) l);
+  ]
+
+let token_metadata_aux_enc =
+  let open Json_encoding in
+  EzEncoding.ignore_enc @@
+  (obj4
+     (req "name" string)
+     (opt "displayUri" string)
+     (opt "description" string)
+     (dft "creators" (creators_enc) [])
+  )
+
 let get_nft_item_creators_from_metadata r =
-  try EzEncoding.destruct (Json_encoding.list part_enc) r#creators
-  with _ -> []
+  try
+    let l = EzEncoding.destruct (Json_encoding.list part_enc) r#creators in
+    List.filter (fun {part_account; _} -> check_address part_account) l
+  with _ ->
+  try
+    let _, _, _, creators = EzEncoding.destruct token_metadata_aux_enc r#metadata in
+    creators
+  with _ ->  []
 
 let get_nft_item_owners ?dbh contract token_id =
   use dbh @@ fun dbh ->
   [%pgsql dbh
       "select owner FROM tokens where main and \
-       amount <> 0 and contract = $contract and token_id = $token_id"]
+       amount > 0 and contract = $contract and token_id = $token_id"]
 
 let mk_nft_ownership obj =
   let creators = get_nft_item_creators_from_metadata obj in
@@ -465,7 +516,7 @@ let get_nft_ownership_by_id ?dbh ?(old=false) contract token_id owner =
        name, creators, description, attributes, image, animation \
        from tokens where \
        main and contract = $contract and token_id = $token_id and \
-       owner = $owner and (amount <> 0 or $old)"] in
+       owner = $owner and (amount > 0 or $old)"] in
   let>? obj = one l in
   let>? nft_ownership = mk_nft_ownership obj in
   Lwt.return_ok nft_ownership
@@ -558,19 +609,21 @@ let mk_nft_attributes json =
   try Some (EzEncoding.destruct (Json_encoding.list nft_item_attribute_enc) json)
   with _ -> None
 
-let mk_nft_item_meta r =
-  match r#name with
-  | None -> None
-  | Some nft_item_meta_name ->
-    let nft_item_meta_attributes = Option.bind r#attributes mk_nft_attributes in
-    let nft_item_meta_image = r#image in
-    let nft_item_meta_animation = r#animation in
-    Some {
-      nft_item_meta_name;
-      nft_item_meta_description = r#description;
-      nft_item_meta_attributes;
-      nft_item_meta_image;
-      nft_item_meta_animation }
+let mk_nft_item_meta r = match r#metadata with
+  | "{}" -> None
+  | _ ->
+    try
+      let (name, image, desc, _) =
+        EzEncoding.destruct token_metadata_aux_enc r#metadata in
+      Some {
+        nft_item_meta_name = name ;
+        nft_item_meta_description = desc ;
+        nft_item_meta_attributes = None ;
+        nft_item_meta_image = image ;
+        nft_item_meta_animation = None ;
+      }
+    with _ ->
+      None
 
 let mk_nft_item ?dbh ?include_meta obj =
   let creators = get_nft_item_creators_from_metadata obj in
@@ -742,6 +795,28 @@ let insert_nft_activity_transfer dbh op kt1 from owner token_id amount =
   } in
   insert_nft_activity dbh op.bo_tsp nft_activity
 
+let token_metadata_enc =
+  let open Json_encoding in
+  EzEncoding.ignore_enc @@
+  obj7
+    (req "name" string)
+    (dft "creators" (creators_enc) [])
+    (opt "description" string)
+    (opt "attributes" any_ezjson_value)
+    (opt "image" string)
+    (opt "displayUri" string)
+    (opt "animation" string)
+
+let get_metadata meta =
+  try
+    let n, c, d, at, i1, i2, an = EzEncoding.destruct token_metadata_enc meta in
+    let at = Option.map (EzEncoding.construct Json_encoding.any_ezjson_value) at in
+    let c = EzEncoding.construct creators_enc c in
+    let i = match i1, i2 with Some i, _ | _, Some i -> Some i | _ -> None in
+    Some n, Some c, d, at, i, an
+  with _ ->
+    None, None, None, None, None, None
+
 let insert_mint dbh op kt1 m =
   let meta = EzEncoding.construct token_metadata_enc m.mi_meta in
   let token_id = m.mi_op.tk_op.tk_token_id in
@@ -829,7 +904,7 @@ let insert_metadata_uri dbh op tr s =
        on conflict do nothing"]
 
 let insert_token_metadata dbh op tr (token_id, l) =
-  let meta = EzEncoding.construct token_metadata_enc l in
+  let meta = EzEncoding.construct Rtypes.token_metadata_enc l in
   let source = op.bo_op.source in
   let kt1 = tr.destination in
   [%pgsql dbh
@@ -1256,13 +1331,19 @@ let contract_updates dbh main l =
       Lwt.return_ok (SSet.add contract acc)) SSet.empty l in
   (* update contracts *)
   iter_rp (fun c ->
+      let>? l =
+        [%pgsql dbh
+            "select count(distinct token_id), max(token_id) from tokens where contract = $c"] in
+      let tokens_number, next_token_id = match l with
+        | [] | _ :: _ :: _ -> 0L, "0"
+        | [ tokens_number, last_token_id ] ->
+          Option.value ~default:0L tokens_number,
+          Option.fold ~none:"0" ~some:(fun id -> Z.(to_string @@ succ @@ of_string id)) last_token_id in
       [%pgsql dbh
-          "with tmp(count, last) as ( \
-           select count(distinct token_id), max(token_id) from tokens where contract = $c)
-           update contracts set \
-           tokens_number = tmp.count, \
-           next_token_id = coalesce((tmp.last::bigint + 1)::varchar, '0') \
-           from tmp where contracts.address = $c"]) (SSet.elements contracts)
+          "update contracts set \
+           tokens_number = $tokens_number, \
+           next_token_id = $next_token_id \
+           where address = $c"]) (SSet.elements contracts)
 
 let operator_updates dbh ?token_id ~operator ~add ~contract ~block ~level ~tsp ~source main =
   let no_token_id = Option.is_none token_id in
@@ -1337,26 +1418,9 @@ let transfer_updates dbh main ~contract ~block ~level ~tsp ~token_id ~source amo
        tokens = array_append(array_remove(tokens, $old_token_dst), $new_token_dst) \
        where address = $destination"]
 
-let token_metadata_enc =
-  let open Json_encoding in
-  EzEncoding.ignore_enc @@
-  obj6
-    (req "name" string)
-    (dft "creators" (list any_ezjson_value) [])
-    (opt "description" string)
-    (opt "attributes" any_ezjson_value)
-    (opt "image" string)
-    (opt "animation" string)
-
 let token_metadata_update dbh ~main ~contract ~block ~level ~tsp ~token_id meta =
   if main then
-    let name, creators, description, attributes, image, animation =
-      try
-        let n, c, d, at, i, an = EzEncoding.destruct token_metadata_enc meta in
-        let at = Option.map (EzEncoding.construct Json_encoding.any_ezjson_value) at in
-        let c = EzEncoding.construct Json_encoding.(list any_ezjson_value) c in
-        Some n, Some c, d, at, i, an
-      with _ -> None, None, None, None, None, None in
+    let name, creators, description, attributes, image, animation = get_metadata meta in
     let>? () =
       [%pgsql dbh
           "update tokens set metadata = $meta, \
@@ -1497,13 +1561,13 @@ let get_nft_items_by_owner ?dbh ?include_meta ?continuation ?(size=50) owner =
       "select concat(contract, ':', token_id) as id, contract, token_id, \
        last, amount, supply, metadata, name, creators, description, attributes, \
        image, animation, tsp from tokens where \
-       main and owner = $owner and amount <> 0 and \
+       main and owner = $owner and amount > 0 and \
        ($no_continuation or \
        (last = $ts and concat(contract, ':', token_id) > $id) or \
        (last < $ts)) \
        order by last desc, id asc limit $size64"] in
   let>? nft_items_total = [%pgsql dbh
-      "select count(owner) from tokens where main"] in
+      "select count(distinct (contract, token_id)) from tokens where main and owner = $owner and (amount > 0)"] in
   let>? nft_items_total = match nft_items_total with
     | [ None ] -> Lwt.return_ok 0L
     | [ Some i64 ] -> Lwt.return_ok i64
@@ -1536,14 +1600,16 @@ let get_nft_items_by_creator ?dbh ?include_meta ?continuation ?(size=50) creator
        image, animation, tsp \
        from tokens, \
        jsonb_to_recordset((metadata -> 'creators')) as creators(account varchar, value int) \
-       where creators.account = $creator and name is not null and \
-       main and amount <> 0 and \
+       where creators.account = $creator and \
+       main and amount > 0 and \
        ($no_continuation or \
        (last = $ts and concat(contract, ':', token_id) > $id) or \
        (last < $ts)) \
        order by last desc, id asc limit $size64"] in
   let>? nft_items_total = [%pgsql dbh
-      "select count(owner) from tokens where main"] in
+      "select count(distinct (token_id, contract, owner)) from tokens, \
+       jsonb_to_recordset((metadata -> 'creators')) as creators(account varchar, value int) \
+       where main and creators.account = $creator and amount > 0"] in
   let>? nft_items_total = match nft_items_total with
     | [ None ] -> Lwt.return_ok 0L
     | [ Some i64 ] -> Lwt.return_ok i64
@@ -1575,13 +1641,13 @@ let get_nft_items_by_collection ?dbh ?include_meta ?continuation ?(size=50) cont
        last, amount, supply, metadata, name, creators, description, attributes, \
        image, animation, tsp \
        from tokens where \
-       main and contract = $contract and amount <> 0 and name is not null and \
+       main and contract = $contract and amount <> 0 and \
        ($no_continuation or \
        (last = $ts and concat(contract, ':', token_id) > $id) or \
        (last < $ts)) \
        order by last desc, id asc limit $size64"] in
   let>? nft_items_total = [%pgsql dbh
-      "select count(owner) from tokens where main"] in
+      "select count(distinct (token_id, owner)) from tokens where main and contract = $contract and amount > 0"] in
   let>? nft_items_total = match nft_items_total with
     | [ None ] -> Lwt.return_ok 0L
     | [ Some i64 ] -> Lwt.return_ok i64
@@ -1601,11 +1667,13 @@ let get_nft_item_meta_by_id ?dbh contract token_id =
   let>? l = [%pgsql.object dbh
       "select metadata, name, creators, description, attributes, \
        image, animation from tokens \
-       where contract = $contract and token_id = $token_id and main and name is not null"] in
-  let>? r = one l in
-  match mk_nft_item_meta r with
-  | None -> Lwt.return_error (`hook_error "no_metadata")
-  | Some meta -> Lwt.return_ok meta
+       where contract = $contract and token_id = $token_id and main"] in
+  match l with
+  | [] -> Lwt.return_error (`hook_error ("nft_item not found " ^ contract ^ ":" ^ token_id))
+  | r :: _ ->
+    match mk_nft_item_meta r with
+    | None -> Lwt.return_error (`hook_error ("item without metadata " ^ contract ^ ":" ^ token_id))
+    | Some meta -> Lwt.return_ok meta
 
 let get_nft_all_items
     ?dbh ?last_updated_to ?last_updated_from ?show_deleted ?include_meta
@@ -1639,7 +1707,7 @@ let get_nft_all_items
        image, animation, tsp \
        from tokens where \
        main and \
-       (supply > 0 and amount <> 0 or (not $no_show_deleted and $show_deleted_v)) and \
+       (supply > 0 and amount > 0 or (not $no_show_deleted and $show_deleted_v)) and \
        ($no_last_updated_to or (last <= $last_updated_to_v)) and \
        ($no_last_updated_from or (last >= $last_updated_from_v)) and \
        ($no_continuation or \
@@ -1647,7 +1715,7 @@ let get_nft_all_items
        (last < $ts)) \
        order by last desc, id asc limit $size64"] in
   let>? nft_items_total = [%pgsql dbh
-      "select count(owner) from tokens where main"] in
+      "select count(distinct (owner, contract, token_id)) from tokens where main and (amount > 0)"] in
   let>? nft_items_total = match nft_items_total with
     | [ None ] -> Lwt.return_ok 0L
     | [ Some i64 ] -> Lwt.return_ok i64
@@ -1862,9 +1930,9 @@ let get_nft_ownerships_by_item ?dbh ?continuation ?(size=50) contract token_id =
        (last < $ts)) \
        order by last desc, id asc limit $size64"] in
   let>? nft_ownerships_total = [%pgsql dbh
-      "select count(owner) from tokens where \
+      "select count(distinct owner) from tokens where \
        main and contract = $contract and token_id = $token_id and \
-       amount <> 0"] in
+       amount > 0"] in
   let>? nft_ownerships_total = match nft_ownerships_total with
     | [ None ] -> Lwt.return_ok 0L
     | [ Some i64 ] -> Lwt.return_ok i64
@@ -1894,13 +1962,13 @@ let get_nft_all_ownerships ?dbh ?continuation ?(size=50) () =
        contract, token_id, owner, last, amount, supply, metadata, \
        name, creators, description, attributes, image, animation \
        from tokens where \
-       main and amount <> 0 and \
+       main and amount > 0 and \
        ($no_continuation or \
        (last = $ts and concat(contract, ':', token_id, ':', owner) > $id) or \
        (last < $ts)) \
        order by last desc, id asc limit $size64"] in
   let>? nft_ownerships_total = [%pgsql dbh
-      "select count(owner) from tokens where main and amount <> 0"] in
+      "select count(distinct owner) from tokens where main and amount > 0"] in
   let>? nft_ownerships_total = match nft_ownerships_total with
     | [ None ] -> Lwt.return_ok 0L
     | [ Some i64 ] -> Lwt.return_ok i64

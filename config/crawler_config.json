@@ -3,8 +3,9 @@
   "start": 572780,
   "db_kind": "pg",
   "step_forward": 30,
-  "validator": "KT1Mt95x8vgHuq1MZdz4gVvfywgPciD45NY7",
-  "exchange_v2": "KT1EQcS5wCy71c2VTCQFSEMSxgZwJyMjFyFH",
-  "royalties": "KT1KfUjQ9NSKAJ35AksHLBPLbjg4ZSLKjw1v",
+  "accounts": [ "KT1Caj4ZXbop5AswuH4RAv61rMVEeVdtFk4f" ],
+  "validator": "KT1JrWXMuHp7nkX7j3trtxckVBiTyggDNnU1",
+  "exchange_v2": "KT1CfvTiEz9EVBLBLLYYFvRTwqyLsCvoZtWm",
+  "royalties": "KT1JPYtEMv8PHXfmLoMuWRLsVykoEou5AqKG",
   "ft_lugh": [ "KT1HT3EbSPFA1MM2ZiMThB6P6Kky5jebNgAx" ]
 }

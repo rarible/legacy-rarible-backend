@@ -63,6 +63,9 @@ let storage_fa2 ~admin ~royalties =
   Format.sprintf {|(Pair %S (Pair %S (Pair {} (Pair {} (Pair {} (Pair {} {Elt "" 0x}))))))|}
     admin royalties
 
+let storage_ubi admin =
+  Format.sprintf "Pair %S (Some %S) None False {} {} {} {} {}" admin admin
+
 let storage_royalties ~admin =
   Format.sprintf "(Pair %S (Pair None (Pair {} {})))" admin
 
@@ -194,8 +197,16 @@ let mint_tokens ~id ~owner ~amount l =
   Format.sprintf "Pair %Ld %S %Ld {%s}" id owner amount
     (String.concat "; " @@ List.map (fun (ad, am) -> Format.sprintf "Pair %S %Ld" ad  am) l)
 
+let mint_ubi_tokens ~id ~owner =
+  Format.sprintf "Pair %S %Ld None" owner id
+
 let burn_tokens ~id ~owner ~amount =
   Format.sprintf "Pair %Ld %S %Ld" id owner amount
+
+let set_royalties token_addr l =
+  Format.sprintf "Pair %S None { %s }"
+    token_addr
+    (String.concat "; " @@ List.map (fun (ad, am) -> Format.sprintf "Pair %S %Ld" ad  am) l)
 
 let transfer l =
   Format.sprintf "{%s}" @@ String.concat "; " @@
@@ -243,6 +254,11 @@ let mint_tokens_aux ?endpoint id owner amount royalties source contract =
     mint_tokens ~id:(Int64.of_string id) ~owner ~amount:(Int64.of_string amount) royalties in
   call_aux ?endpoint ~entrypoint:"mint" ~param source contract
 
+let mint_ubi_tokens_aux ?endpoint id owner source contract =
+  let param =
+    mint_ubi_tokens ~id:(Int64.of_string id) ~owner in
+  call_aux ?endpoint ~entrypoint:"mint" ~param source contract
+
 let mint_tokens id owner amount l =
   let l = List.fold_left (fun acc s ->
       match String.split_on_char '=' s with
@@ -250,6 +266,10 @@ let mint_tokens id owner amount l =
       | _ -> acc) [] l in
   call ~entrypoint:"mint" @@
   mint_tokens ~id:(Int64.of_string id) ~owner ~amount:(Int64.of_string amount) l
+
+let set_royalties_aux ?endpoint token_addr l source contract =
+  let param = set_royalties token_addr l in
+  call_aux ?endpoint ~entrypoint:"setRoyalties" ~param source contract
 
 let burn_tokens_aux ?endpoint id amount source contract =
   let param =
@@ -286,6 +306,18 @@ let transfer l =
         end
       | _ -> (s, []) :: acc) [] l in
   call ~entrypoint:"transfer" @@ transfer (List.rev l)
+
+let update_operators_aux ?endpoint l source contract =
+  let l = List.map (fun s ->
+      let i = String.index s '=' in
+      let id = Int64.of_string (String.sub s 0 i) in
+      let s = String.sub s (i+1) (String.length s - i - 1) in
+      let add, i = match String.index_opt s '+' with
+        | Some i -> true, i
+        | None -> false, String.index s '-' in
+      id, String.sub s 0 i, String.sub s (i+1) (String.length s - i - 1), add) l in
+  let param = update_operators l in
+  call_aux ?endpoint ~entrypoint:"update_operators" ~param source contract
 
 let update_operators l =
   let l = List.map (fun s ->

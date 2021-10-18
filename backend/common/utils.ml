@@ -162,16 +162,6 @@ let fa2_entrypoints = [
 let fa2_ext_entrypoints = [
   list ~annots:["%update_operators_for_all"] @@
   prim `or_ ~args:[ prim `address; prim `address ];
-
-  pair ~annots:["%mint"] [
-    prim `nat; prim `address; prim `nat; list @@ pair [ prim `address; prim `nat ]
-  ];
-
-  pair ~annots:["%burn"] [ prim `nat; prim `address; prim `nat ];
-
-  pair ~annots:["%setMetadataToken"] [
-    prim `nat;
-    prim `map ~args:[ prim `string; prim `string ] ]
 ]
 
 let storage_fields = function
