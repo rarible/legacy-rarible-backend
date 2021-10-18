@@ -547,7 +547,7 @@ type order = {
 
 type orders_pagination = {
   orders_pagination_orders : order list ;
-  orders_pagination_contination : string option ; [@opt]
+  orders_pagination_continuation : string option ; [@opt]
 } [@@deriving encoding {title="OrderPagination"; def_title}]
 
 type aggregation_data = {

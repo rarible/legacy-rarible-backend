@@ -2051,12 +2051,12 @@ let get_orders_all ?dbh ?origin ?continuation ?(size=50) () =
   let size = Int64.of_int size in
   let>? orders = get_orders_all_aux ?dbh ?origin ?continuation ~size [] in
   let len = Int64.of_int @@ List.length orders in
-  let orders_pagination_contination =
+  let orders_pagination_continuation =
     if len = 0L || len < size then None
     else Some
         (mk_order_continuation @@ List.hd @@ List.rev orders) in
   Lwt.return_ok
-    { orders_pagination_orders = orders ; orders_pagination_contination }
+    { orders_pagination_orders = orders ; orders_pagination_continuation }
 
 let rec get_sell_orders_by_maker_aux ?dbh ?origin ?continuation ~size ~maker acc =
   Format.eprintf "get_sell_orders_by_maker_aux %s %s %Ld %s %d@."
@@ -2110,12 +2110,12 @@ let get_sell_orders_by_maker ?dbh ?origin ?continuation ?(size=50) maker =
   let size = Int64.of_int size in
   let>? orders = get_sell_orders_by_maker_aux ?dbh ?origin ?continuation ~size ~maker [] in
   let len = Int64.of_int @@ List.length orders in
-  let orders_pagination_contination =
+  let orders_pagination_continuation =
     if len = 0L || len < size then None
     else Some
         (mk_order_continuation @@ List.hd @@ List.rev orders) in
   Lwt.return_ok
-    { orders_pagination_orders = orders ; orders_pagination_contination }
+    { orders_pagination_orders = orders ; orders_pagination_continuation }
 
 (* let rec get_sell_orders_by_item_aux ?dbh ?origin ?continuation ?maker ~size contract token_id acc =
  *   let no_continuation, (p, h) =
@@ -2232,12 +2232,12 @@ let get_sell_orders_by_item
     get_sell_orders_by_item_aux
       ?dbh ?origin ?continuation ?maker ?currency ~size contract token_id [] in
   let len = Int64.of_int @@ List.length orders in
-  let orders_pagination_contination =
+  let orders_pagination_continuation =
     if len = 0L || len < size then None
     else Some
         (mk_order_continuation @@ List.hd @@ List.rev orders) in
   Lwt.return_ok
-    { orders_pagination_orders = orders ; orders_pagination_contination }
+    { orders_pagination_orders = orders ; orders_pagination_continuation }
 
 let rec get_sell_orders_by_collection_aux ?dbh ?origin ?continuation ~size collection acc =
   Format.eprintf "get_sell_orders_by_collection_aux %s %s %Ld %s %d@."
@@ -2291,12 +2291,12 @@ let get_sell_orders_by_collection ?dbh ?origin ?continuation ?(size=50) collecti
   let>? orders =
     get_sell_orders_by_collection_aux ?dbh ?origin ?continuation ~size collection [] in
   let len = Int64.of_int @@ List.length orders in
-  let orders_pagination_contination =
+  let orders_pagination_continuation =
     if len = 0L || len < size then None
     else Some
         (mk_order_continuation @@ List.hd @@ List.rev orders) in
   Lwt.return_ok
-    { orders_pagination_orders = orders ; orders_pagination_contination }
+    { orders_pagination_orders = orders ; orders_pagination_continuation }
 
 let rec get_sell_orders_aux ?dbh ?origin ?continuation ~size acc =
   Format.eprintf "get_sell_orders_aux %s %s %Ld %d@."
@@ -2346,12 +2346,12 @@ let get_sell_orders ?dbh ?origin ?continuation ?(size=50) () =
   let size = Int64.of_int size in
   let>? orders = get_sell_orders_aux ?dbh ?origin ?continuation ~size [] in
   let len = Int64.of_int @@ List.length orders in
-  let orders_pagination_contination =
+  let orders_pagination_continuation =
     if len = 0L || len < size then None
     else Some
         (mk_order_continuation @@ List.hd @@ List.rev orders) in
   Lwt.return_ok
-    { orders_pagination_orders = orders ; orders_pagination_contination }
+    { orders_pagination_orders = orders ; orders_pagination_continuation }
 
 let rec get_bid_orders_by_maker_aux ?dbh ?origin ?continuation ~size ~maker acc =
   Format.eprintf "get_bid_orders_by_maker_aux %s %s %Ld %s %d@."
@@ -2406,12 +2406,12 @@ let get_bid_orders_by_maker ?dbh ?origin ?continuation ?(size=50) maker =
   let size = Int64.of_int size in
   let>? orders = get_bid_orders_by_maker_aux ?dbh ?origin ?continuation ~size ~maker [] in
   let len = Int64.of_int @@ List.length orders in
-  let orders_pagination_contination =
+  let orders_pagination_continuation =
     if len = 0L || len < size then None
     else Some
         (mk_order_continuation @@ List.hd @@ List.rev orders) in
   Lwt.return_ok
-    { orders_pagination_orders = orders ; orders_pagination_contination }
+    { orders_pagination_orders = orders ; orders_pagination_continuation }
 
 (* let rec get_bid_orders_by_item_aux ?dbh ?origin ?continuation ?maker ~size contract token_id acc =
  *   let no_continuation, (p, h) =
@@ -2549,12 +2549,12 @@ let get_bid_orders_by_item
     get_bid_orders_by_item_aux
       ?dbh ?origin ?continuation ?maker ?currency ~size contract token_id [] in
   let len = Int64.of_int @@ List.length orders in
-  let orders_pagination_contination =
+  let orders_pagination_continuation =
     if len = 0L || len < size then None
     else Some
         (mk_order_continuation @@ List.hd @@ List.rev orders) in
   Lwt.return_ok
-    { orders_pagination_orders = orders ; orders_pagination_contination }
+    { orders_pagination_orders = orders ; orders_pagination_continuation }
 
 let insert_price_history dbh date make_value take_value hash_key =
   [%pgsql dbh
