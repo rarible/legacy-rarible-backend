@@ -1944,7 +1944,7 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Order'
-        contination:
+        continuation:
           type: string
       required:
       - orders
