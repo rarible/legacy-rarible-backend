@@ -15,7 +15,7 @@ export interface FillOrderRequest {
   edpk?: string
 }
 
-const zero_edpk = "edpk..."
+const zero_edpk = "edpkteDwHwoNPB18tKToFKeSCykvr1ExnoMV5nawTJy9Y9nLTfQ541"
 
 function get_make_asset(
   provider: Provider,
