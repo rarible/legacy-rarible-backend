@@ -94,9 +94,6 @@ let parse_mint = function
               mi_op = { tk_op = { tk_token_id = Z.to_string id; tk_amount = Z.to_int64 amount };
                         tk_owner };
               mi_royalties; mi_meta }))
-  | _ -> unexpected_michelson
-
-let parse_ubi_mint = function
   | Mprim { prim = `Pair; args = [ account; Mint id; uri ]; _ } ->
     let$ mi_account = parse_address account in
     let mi_token_id = Z.to_string id  in

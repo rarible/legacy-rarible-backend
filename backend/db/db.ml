@@ -446,13 +446,17 @@ let token_metadata_enc = EzEncoding.ignore_enc tzip21_token_metadata_enc
 let get_nft_item_creators_from_metadata r =
   try
     begin
-      match EzEncoding.destruct ext_creators_enc r#creators with
-      | CParts l -> l
-      | CAssoc l ->
-        List.map (fun (c, i) -> { part_account = c ; part_value = i }) l
-      | CTZIP12 l ->
-        let len = List.length l in
-        List.map (fun c -> { part_account = c ; part_value = Int32.of_int (10000 / len) }) l
+      match r#creators with
+      | Some c ->
+        begin match EzEncoding.destruct ext_creators_enc c with
+          | CParts l -> l
+          | CAssoc l ->
+            List.map (fun (c, i) -> { part_account = c ; part_value = i }) l
+          | CTZIP12 l ->
+            let len = List.length l in
+            List.map (fun c -> { part_account = c ; part_value = Int32.of_int (10000 / len) }) l
+        end
+      | None -> []
     end
   with _ -> []
 
@@ -791,7 +795,6 @@ let insert_mint dbh op kt1 m =
         EzReq_lwt.get (EzAPI.URL url) >>= function
         | Ok json ->
           let name, creators, description, attributes, image = get_metadata json in
-          Printf.eprintf "JSON %s\n%!" json ;
           [%pgsql dbh
               "insert into tokens(contract, token_id, block, level, tsp, \
                last_block, last_level, last, owner, \
@@ -1252,7 +1255,7 @@ let insert_block config dbh b =
     ) b.operations
 
 let contract_updates_base dbh ~main ~contract ~block ~level ~tsp ~burn
-    account token_id amount =
+    ~account ~token_id ~amount =
   let main_s = if main then 1L else -1L in
   let factor = if burn then Int64.neg main_s else main_s in
   let>? l_amount = [%pgsql dbh
@@ -1314,7 +1317,7 @@ let contract_updates dbh main l =
           let>? () =
             contract_updates_base
               dbh ~main ~contract ~block ~level ~tsp ~burn:false
-              token_id owner amount in
+              ~account:owner ~token_id ~amount in
           let>? () =
             if has_uri then
               (* Mint without metadata will produce this event on setMetadata call *)
@@ -1326,7 +1329,7 @@ let contract_updates dbh main l =
           let>? () =
             contract_updates_base
               dbh ~main ~contract ~block ~level ~tsp ~burn:true
-              tk.tk_owner tk.tk_op.tk_token_id tk.tk_op.tk_amount in
+              ~account:tk.tk_owner ~token_id:tk.tk_op.tk_token_id ~amount:tk.tk_op.tk_amount in
           let>? () =
             produce_nft_item_event dbh contract tk.tk_op.tk_token_id in
           produce_nft_ownership_event dbh contract tk.tk_op.tk_token_id tk.tk_owner
@@ -1380,7 +1383,7 @@ let transfer_updates dbh main ~contract ~block ~level ~tsp ~token_id ~source amo
          metadata = case when amount = 0 then $meta else metadata end, \
          name = case when amount = 0 then $?name else name end, \
          royalties = case when amount = 0 then $royalties else royalties end, \
-         creators = case when amount = 0 then $creators else creators end, \
+         creators = case when amount = 0 then $?creators else creators end, \
          description = case when amount = 0 then $?description else description end, \
          attributes = case when amount = 0 then $?attributes else attributes end, \
          image = case when amount = 0 then $?image else image end, \
