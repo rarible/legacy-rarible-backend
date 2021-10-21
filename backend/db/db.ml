@@ -441,48 +441,20 @@ let check_address a =
 let filter_creators =
   List.filter (fun {part_account; _} -> check_address part_account)
 
-let creators_enc =
-  let open Json_encoding in
-  union [
-    case (list part_enc)
-      (fun l -> Some (filter_creators l))
-      (fun l -> filter_creators l);
-    case (assoc int32)
-      (fun l -> Some (List.filter_map (fun {part_account; part_value} ->
-           if check_address part_account then Some (part_account, part_value) else None) l))
-      (fun l -> List.filter_map (fun (part_account, part_value) ->
-           if check_address part_account then Some { part_account; part_value} else None) l);
-    case (list string)
-      (fun l -> Some (List.filter_map (fun {part_account; _} ->
-           if check_address part_account then Some part_account else None) l))
-      (fun l ->
-         let n = Int32.of_int (List.length l) in
-         List.filter_map (fun part_account ->
-             if check_address part_account then
-               let part_value = if n = 0l then 0l else Int32.div 10000l n in
-               Some {part_account; part_value}
-             else None) l);
-  ]
-
-let token_metadata_aux_enc =
-  let open Json_encoding in
-  EzEncoding.ignore_enc @@
-  (obj4
-     (req "name" string)
-     (opt "displayUri" string)
-     (opt "description" string)
-     (dft "creators" (creators_enc) [])
-  )
+let token_metadata_enc = EzEncoding.ignore_enc tzip21_token_metadata_enc
 
 let get_nft_item_creators_from_metadata r =
   try
-    let l = EzEncoding.destruct (Json_encoding.list part_enc) r#creators in
-    List.filter (fun {part_account; _} -> check_address part_account) l
-  with _ ->
-  try
-    let _, _, _, creators = EzEncoding.destruct token_metadata_aux_enc r#metadata in
-    creators
-  with _ ->  []
+    begin
+      match EzEncoding.destruct ext_creators_enc r#creators with
+      | CParts l -> l
+      | CAssoc l ->
+        List.map (fun (c, i) -> { part_account = c ; part_value = i }) l
+      | CTZIP12 l ->
+        let len = List.length l in
+        List.map (fun c -> { part_account = c ; part_value = Int32.of_int (10000 / len) }) l
+    end
+  with _ -> []
 
 let get_nft_item_owners ?dbh contract token_id =
   use dbh @@ fun dbh ->
@@ -613,13 +585,14 @@ let mk_nft_item_meta r = match r#metadata with
   | "{}" -> None
   | _ ->
     try
-      let (name, image, desc, _) =
-        EzEncoding.destruct token_metadata_aux_enc r#metadata in
+      let meta = EzEncoding.destruct token_metadata_enc r#metadata in
       Some {
-        nft_item_meta_name = name ;
-        nft_item_meta_description = desc ;
-        nft_item_meta_attributes = None ;
-        nft_item_meta_image = image ;
+        nft_item_meta_name = Option.value ~default:"NO NAME" meta.tzip21_tm_name ;
+        nft_item_meta_description = meta.tzip21_tm_description ;
+        nft_item_meta_attributes =
+          Option.bind meta.tzip21_tm_attributes
+            (fun l -> Some (tzip21_attributes_to_rarible_attributes l)) ;
+        nft_item_meta_image = meta.tzip21_tm_display_uri ;
         nft_item_meta_animation = None ;
       }
     with _ ->
@@ -795,27 +768,18 @@ let insert_nft_activity_transfer dbh op kt1 from owner token_id amount =
   } in
   insert_nft_activity dbh op.bo_tsp nft_activity
 
-let token_metadata_enc =
-  let open Json_encoding in
-  EzEncoding.ignore_enc @@
-  obj7
-    (req "name" string)
-    (dft "creators" (creators_enc) [])
-    (opt "description" string)
-    (opt "attributes" any_ezjson_value)
-    (opt "image" string)
-    (opt "displayUri" string)
-    (opt "animation" string)
-
 let get_metadata meta =
   try
-    let n, c, d, at, i1, i2, an = EzEncoding.destruct token_metadata_enc meta in
-    let at = Option.map (EzEncoding.construct Json_encoding.any_ezjson_value) at in
-    let c = EzEncoding.construct creators_enc c in
-    let i = match i1, i2 with Some i, _ | _, Some i -> Some i | _ -> None in
-    Some n, Some c, d, at, i, an
+    let tzip21_meta = EzEncoding.destruct token_metadata_enc meta in
+    tzip21_meta.tzip21_tm_name,
+    Option.bind tzip21_meta.tzip21_tm_creators
+      (fun c -> Some (EzEncoding.construct ext_creators_enc c)),
+    tzip21_meta.tzip21_tm_description,
+    Option.bind tzip21_meta.tzip21_tm_attributes
+      (fun a -> Some (EzEncoding.construct tzip21_attributes_enc a)),
+    tzip21_meta.tzip21_tm_display_uri
   with _ ->
-    None, None, None, None, None, None
+    None, None, None, None, None
 
 let insert_mint dbh op kt1 m =
   let token_id, owner, uri = match m with
