@@ -778,11 +778,19 @@ type token_op_owner = {
   tk_owner: string;
 } [@@deriving encoding {remove_prefix=3}]
 
-type mint = {
+type fa2_mint = {
   mi_op : token_op_owner;
   mi_royalties: token_royalties;
   mi_meta: token_metadata
 } [@@deriving encoding]
+
+type ubi_mint = {
+  mi_account : string ;
+  mi_token_id : string ;
+  mi_uri : string option ;
+} [@@deriving encoding]
+
+type mint = UbiMint of ubi_mint | Fa2Mint of fa2_mint [@@deriving encoding]
 
 type account_token = {
   at_token_id : string;

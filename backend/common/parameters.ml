@@ -89,10 +89,24 @@ let parse_mint = function
     let mi_royalties = List.filter_map (function
         | Mprim { prim = `Elt; args = [ Mstring s; Mint i ]; _ } -> Some (s, Z.to_int64 i)
         | _ -> None) royalties in
-    Ok (Mint_tokens {
-        mi_op = { tk_op = { tk_token_id = Z.to_string id; tk_amount = Z.to_int64 amount };
-                  tk_owner };
-        mi_royalties; mi_meta })
+    Ok (Mint_tokens
+          (Fa2Mint {
+              mi_op = { tk_op = { tk_token_id = Z.to_string id; tk_amount = Z.to_int64 amount };
+                        tk_owner };
+              mi_royalties; mi_meta }))
+  | _ -> unexpected_michelson
+
+let parse_ubi_mint = function
+  | Mprim { prim = `Pair; args = [ account; Mint id; uri ]; _ } ->
+    let$ mi_account = parse_address account in
+    let mi_token_id = Z.to_string id  in
+    let$ mi_uri =
+      match uri with
+      | Mprim { prim = `None; _ } -> Ok None
+      | Mprim { prim = `Some; args = [ Mbytes uri ]; _} ->
+        Ok (Some (Hex.to_string (`Hex (uri :> string))))
+      | _ -> unexpected_michelson in
+    Ok (Mint_tokens (UbiMint { mi_account ; mi_token_id ; mi_uri }))
   | _ -> unexpected_michelson
 
 let parse_burn = function
