@@ -672,8 +672,8 @@ let insert_account dbh addr ~block ~tsp ~level =
       "insert into accounts(address, last_block, last_level, last) \
        values($addr, $block, $level, $tsp) on conflict do nothing"]
 
-let insert_nft_activity dbh timestamp nft_activity =
-  let act_type, act_from, elt =  match nft_activity.nft_activity_type with
+let insert_nft_activity dbh id timestamp nft_activity =
+  let act_type, act_from, elt =  match nft_activity with
     | NftActivityMint elt -> "mint", None, elt
     | NftActivityBurn elt -> "burn", None, elt
     | NftActivityTransfer {elt; from} -> "transfer", Some from, elt in
@@ -691,7 +691,7 @@ let insert_nft_activity dbh timestamp nft_activity =
        $token_id, \
        ${elt.nft_activity_owner}, $value, $?act_from) \
        on conflict do nothing"] >>=? fun () ->
-  Rarible_kafka.produce_nft_activity nft_activity >>= fun () ->
+  Rarible_kafka.produce_nft_activity id timestamp nft_activity >>= fun () ->
   Lwt.return_ok ()
 
 let create_nft_activity_elt op contract mi_op = {
@@ -707,22 +707,14 @@ let create_nft_activity_elt op contract mi_op = {
 let insert_nft_activity_mint dbh op kt1 mi_op =
   let nft_activity_elt = create_nft_activity_elt op kt1 mi_op in
   let nft_activity_type = NftActivityMint nft_activity_elt in
-  let nft_activity = {
-    nft_activity_type ;
-    nft_activity_id = Printf.sprintf "%s_%ld" op.bo_block op.bo_index ;
-    nft_activity_date = op.bo_tsp ;
-  } in
-  insert_nft_activity dbh op.bo_tsp nft_activity
+  let id = Printf.sprintf "%s_%ld" op.bo_block op.bo_index in
+  insert_nft_activity dbh id op.bo_tsp nft_activity_type
 
 let insert_nft_activity_burn dbh op kt1 mi_op =
   let nft_activity_elt = create_nft_activity_elt op kt1 mi_op in
   let nft_activity_type = NftActivityBurn nft_activity_elt in
-  let nft_activity = {
-    nft_activity_type ;
-    nft_activity_id = Printf.sprintf "%s_%ld" op.bo_block op.bo_index ;
-    nft_activity_date = op.bo_tsp ;
-  } in
-  insert_nft_activity dbh op.bo_tsp nft_activity
+  let id = Printf.sprintf "%s_%ld" op.bo_block op.bo_index in
+  insert_nft_activity dbh id op.bo_tsp nft_activity_type
 
 let insert_nft_activity_transfer dbh op kt1 from owner token_id amount =
   let elt = {
@@ -735,12 +727,8 @@ let insert_nft_activity_transfer dbh op kt1 from owner token_id amount =
     nft_activity_block_number = Int64.of_int32 op.bo_level ;
   } in
   let nft_activity_type = NftActivityTransfer {from; elt} in
-  let nft_activity = {
-    nft_activity_type ;
-    nft_activity_id = Printf.sprintf "%s_%ld" op.bo_block op.bo_index ;
-    nft_activity_date = op.bo_tsp ;
-  } in
-  insert_nft_activity dbh op.bo_tsp nft_activity
+  let id = Printf.sprintf "%s_%ld" op.bo_block op.bo_index in
+  insert_nft_activity dbh id op.bo_tsp nft_activity_type
 
 let insert_mint dbh op kt1 m =
   let meta = EzEncoding.construct token_metadata_enc m.mi_meta in
@@ -784,7 +772,8 @@ let insert_transfer dbh op tr lt =
                values($kt1, $tr_token_id, ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, \
                ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, \
                $tr_destination, 0, '{}', ${op.bo_hash}, 0) on conflict do nothing"] in
-          let>? () = insert_account dbh tr_destination ~block:op.bo_block ~level:op.bo_level ~tsp:op.bo_tsp in
+          let>? () =
+            insert_account dbh tr_destination ~block:op.bo_block ~level:op.bo_level ~tsp:op.bo_tsp in
           let>? () = [%pgsql dbh
               "insert into token_updates(transaction, index, block, level, tsp, \
                source, destination, contract, token_id, amount, transfer_index) \
@@ -858,8 +847,8 @@ let insert_order_activity
        $?block, $?level, $date, $order_activity_type) \
        on conflict do nothing"]
 
-let insert_order_activity dbh date activity =
-  begin match activity.order_activity_type with
+let insert_order_activity dbh id date activity =
+  begin match activity with
     | OrderActivityList act ->
       let hash = Some act.order_activity_bid_hash in
       insert_order_activity dbh None None hash None None None date "list"
@@ -886,10 +875,11 @@ let insert_order_activity dbh date activity =
       let level = Some (Int64.to_int32 act.order_activity_match_block_number) in
       insert_order_activity dbh left right left transaction block level date "match"
   end >>=? fun () ->
-  Rarible_kafka.produce_order_activity activity >>= fun () ->
+  Rarible_kafka.produce_order_activity id date activity >>= fun () ->
   Lwt.return_ok ()
 
 let insert_order_activity_new dbh date order =
+  let id = Hex.show @@ Hex.of_bigstring @@ Hacl.Rand.gen 128 in
   let make = order.order_elt.order_elt_make in
   let take = order.order_elt.order_elt_take in
   let>? price = nft_price make take in
@@ -905,16 +895,11 @@ let insert_order_activity_new dbh date order =
           order.order_elt.order_elt_take.asset_type with
     | ATFA_2 _, _ -> OrderActivityList activity
     | _, _ -> OrderActivityBid activity in
-  let order_activity = {
-    order_activity_id = Hex.show @@ Hex.of_bigstring @@ Hacl.Rand.gen 128 ;
-    order_activity_date = date ;
-    order_activity_source = "RARIBLE" ;
-    order_activity_type = order_activity_type ;
-  } in
-  insert_order_activity dbh date order_activity
+  insert_order_activity dbh id date order_activity_type
 
 let insert_order_activity_cancel dbh transaction block index level date hash =
   let>? order = get_order ~dbh hash in
+  let id = Printf.sprintf "%s_%ld" block index in
   match order with
   | Some order ->
     let activity = {
@@ -932,13 +917,7 @@ let insert_order_activity_cancel dbh transaction block index level date hash =
           order.order_elt.order_elt_take.asset_type with
     | ATFA_2 _, _ -> OrderActivityCancelList activity
     | _, _ -> OrderActivityCancelBid activity in
-  let order_activity = {
-    order_activity_id = Printf.sprintf "%s_%ld" block index ;
-    order_activity_date = date ;
-    order_activity_source = "RARIBLE" ;
-    order_activity_type = order_activity_type ;
-  } in
-    insert_order_activity dbh date order_activity
+    insert_order_activity dbh id date order_activity_type
   | None ->
     Lwt.return_ok ()
 
@@ -946,6 +925,7 @@ let insert_order_activity_match
     dbh transaction block index level date
     hash_left left_maker left_asset
     hash_right right_maker right_asset  =
+  let id = Printf.sprintf "%s_%ld" block index in
   let match_left = {
     order_activity_match_side_maker = (match left_maker with Some s -> s | None -> "");
     order_activity_match_side_hash = hash_left ;
@@ -969,13 +949,7 @@ let insert_order_activity_match
       order_activity_match_block_number = Int64.of_int32 level ;
       order_activity_match_log_index = 0 ;
     } in
-  let order_activity = {
-    order_activity_id = Printf.sprintf "%s_%ld" block index ;
-    order_activity_date = date ;
-    order_activity_source = "RARIBLE" ;
-    order_activity_type = order_activity_type ;
-  } in
-  insert_order_activity dbh date order_activity
+  insert_order_activity dbh id date order_activity_type
 
 let insert_cancel dbh op (hash : Tzfunc.H.t) =
   let hash = ( hash :> string ) in

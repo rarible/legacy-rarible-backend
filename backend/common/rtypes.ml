@@ -258,12 +258,6 @@ type nft_activity_type =
   | NftActivityTransfer of {elt: nft_activity_elt; from: A.address} [@kind "transfer"] [@kind_label "@type"] [@title "Transfer"] [@def_title]
 [@@deriving encoding {title="NftActivityType"; def_title}]
 
-type nft_activity = {
-  nft_activity_id : string ;
-  nft_activity_date : A.date ;
-  nft_activity_type : nft_activity_type ;
-} [@@deriving encoding {title="NftActivity"; def_title}]
-
 type nft_activities = {
   nft_activities_continuation : string option ; [@opt]
   nft_activities_items : nft_activity_type list
@@ -661,12 +655,17 @@ type order_activity_type =
   | OrderActivityCancelList of order_activity_cancel_bid [@kind "cancel_list"] [@kind_label "@type"] [@title "OrderActivityCancelList"] [@def_title]
 [@@deriving encoding {title="OrderActivityType"; def_title}]
 
-type order_activity = {
-  order_activity_id : string ;
-  order_activity_date : A.date ;
-  order_activity_source : string ;
-  order_activity_type : order_activity_type ;
-} [@@deriving encoding {title="OrderActivity"; def_title}]
+type all_activity_type =
+  | OrderActivityType of order_activity_type
+  | NftActivityType of nft_activity_type
+[@@deriving encoding]
+
+type activity_type = {
+  activity_id : string ;
+  activity_date : A.date ;
+  activity_source : string ;
+  activity_type : all_activity_type ;
+} [@@deriving encoding {title="ActivityType"; def_title}]
 
 type order_activities = {
   order_activities_items : order_activity_type list [@title "OrderActivitiesItems"];

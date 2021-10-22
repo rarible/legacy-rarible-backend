@@ -51,13 +51,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/NftOwnershipEvent'
       security: []
-  /kafka/nft_activity:
-    summary: kafka_nft_activity
+  /kafka/activity:
+    summary: kafka_activity
     get:
       tags:
       - kafka-controller
-      summary: kafka_nft_activity
-      operationId: kafka_nft_activity
+      summary: kafka_activity
+      operationId: kafka_activity
       parameters: []
       responses:
         "200":
@@ -65,26 +65,30 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/NftActivity'
-      security: []
-  /kafka/order_activity:
-    summary: kafka_order_activity
-    get:
-      tags:
-      - kafka-controller
-      summary: kafka_order_activity
-      operationId: kafka_order_activity
-      parameters: []
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/OrderActivity'
+                $ref: '#/components/schemas/ActivityType'
       security: []
 components:
   schemas:
+    ActivityType:
+      type: object
+      properties:
+        id:
+          type: string
+        date:
+          type: string
+          format: date-time
+        source:
+          type: string
+        type:
+          oneOf:
+          - $ref: '#/components/schemas/OrderActivityType'
+          - $ref: '#/components/schemas/NftActivityType'
+      required:
+      - type
+      - source
+      - date
+      - id
+      additionalProperties: false
     Address:
       type: string
     Asset:
@@ -254,21 +258,6 @@ components:
       - contract
       - owner
       - '@type'
-      additionalProperties: false
-    NftActivity:
-      type: object
-      properties:
-        id:
-          type: string
-        date:
-          type: string
-          format: date-time
-        type:
-          $ref: '#/components/schemas/NftActivityType'
-      required:
-      - type
-      - date
-      - id
       additionalProperties: false
     NftActivityElt:
       type: object
@@ -535,24 +524,6 @@ components:
       - makerEdpk
       - maker
       - data
-      additionalProperties: false
-    OrderActivity:
-      type: object
-      properties:
-        id:
-          type: string
-        date:
-          type: string
-          format: date-time
-        source:
-          type: string
-        type:
-          $ref: '#/components/schemas/OrderActivityType'
-      required:
-      - type
-      - source
-      - date
-      - id
       additionalProperties: false
     OrderActivityBid:
       type: object
