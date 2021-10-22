@@ -162,16 +162,6 @@ let fa2_entrypoints = [
 let fa2_ext_entrypoints = [
   list ~annots:["%update_operators_for_all"] @@
   prim `or_ ~args:[ prim `address; prim `address ];
-
-  pair ~annots:["%mint"] [
-    prim `nat; prim `address; prim `nat; list @@ pair [ prim `address; prim `nat ]
-  ];
-
-  pair ~annots:["%burn"] [ prim `nat; prim `address; prim `nat ];
-
-  pair ~annots:["%setMetadataToken"] [
-    prim `nat;
-    prim `map ~args:[ prim `string; prim `string ] ]
 ]
 
 let storage_fields = function
@@ -649,3 +639,13 @@ let do_transfers_type =
 let pk_to_pkh_exn pk = match Tzfunc.Crypto.pk_to_pkh pk with
   | Error _ -> failwith ("cannot hash edpk " ^ pk)
   | Ok pkh -> pkh
+
+let tzip21_attribute_to_rarible_attribute a = {
+  nft_item_attribute_key = a.attribute_name ;
+  nft_item_attribute_value = Some (a.attribute_value) ;
+  nft_item_attribute_type = a.attribute_type ;
+  nft_item_attribute_format = None ;
+}
+
+let tzip21_attributes_to_rarible_attributes l =
+  List.map tzip21_attribute_to_rarible_attribute l

@@ -77,6 +77,11 @@ let item_id_arg = EzAPI.Arg.string "itemId"
 let collection_arg = EzAPI.Arg.string "collection"
 let ownership_id_arg = EzAPI.Arg.string "ownershipId"
 
+let return = function
+  | Error e ->
+    let code = Errors.code_of_error e in
+    return ~code (Error e)
+  | Ok x -> return (Ok x)
 
 let mk_invalid_argument param msg =
   Error (`INVALID_ARGUMENT (Printf.sprintf "%s %s" param.EzAPI.Param.param_id msg))
@@ -221,7 +226,7 @@ let parse_item_id s =
     match l with
     | c :: tid :: [] ->
       ignore @@ Base58.decode ~prefix:Prefix.contract_public_key_hash c ;
-      Ok (c, Int64.(to_string @@ of_string tid))
+      Ok (c, tid)
     | _ ->
       Error (`INVALID_ARGUMENT "itemId must be in format contract:token_id")
   with _ ->
@@ -463,7 +468,7 @@ let get_nft_activities req input =
       | Error db_err ->
         let str = Crawlori.Rp.string_of_error db_err in
         return (Error (`UNEXPECTED_API_ERROR str))
-      | Ok res -> return_ok res
+      | Ok res -> return (Ok res)
 [@@post
   {path="/v0.1/nft/activities/search";
    params=[size_param;continuation_param];

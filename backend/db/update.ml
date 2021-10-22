@@ -59,7 +59,7 @@ let upgrade_1_to_2 dbh version =
       metadata jsonb not null default '{}',
       royalties jsonb not null default '{}',
       name varchar,
-      creators jsonb not null default '{}',
+      creators jsonb,
       description varchar,
       attributes jsonb,
       image varchar,

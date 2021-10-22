@@ -777,11 +777,19 @@ type token_op_owner = {
   tk_owner: string;
 } [@@deriving encoding {remove_prefix=3}]
 
-type mint = {
+type fa2_mint = {
   mi_op : token_op_owner;
   mi_royalties: token_royalties;
   mi_meta: token_metadata
 } [@@deriving encoding]
+
+type ubi_mint = {
+  mi_account : string ;
+  mi_token_id : string ;
+  mi_uri : string option ;
+} [@@deriving encoding]
+
+type mint = UbiMint of ubi_mint | Fa2Mint of fa2_mint [@@deriving encoding]
 
 type account_token = {
   at_token_id : string;
@@ -842,3 +850,61 @@ type typed_micheline = [
   | `true_
   | `unit
 ] [@@deriving encoding {recursive}]
+
+type format_dimensions = {
+  format_dim_value : string ;
+  format_dim_unit : string ;
+} [@@deriving encoding]
+
+type tzip21_format = {
+  format_uri : string option ;
+  format_hash : string option ;
+  format_mime_type : string option ;
+  format_file_size : int option ;
+  format_file_name : string option ;
+  format_duration : string option ;
+  format_dimensions : format_dimensions option ;
+  format_data_rate : format_dimensions option ;
+} [@@deriving encoding {camel}]
+
+type tzip21_formats = tzip21_format list [@@deriving encoding]
+
+type tzip21_attribute = {
+  attribute_name : string ;
+  attribute_value : string ;
+  attribute_type : string option ;
+} [@@deriving encoding]
+
+type tzip21_attributes = tzip21_attribute list [@@deriving encoding]
+
+type ext_creators =
+  | CParts of part list
+  | CAssoc of (string * int32) list
+  | CTZIP12 of string list
+[@@deriving encoding]
+
+type tzip21_token_metadata = {
+  tzip21_tm_name : string option ;
+  tzip21_tm_symbol : string option ;
+  tzip21_tm_decimals : string option ;
+  tzip21_tm_artifact_uri : string option ;
+  tzip21_tm_display_uri : string option ;
+  tzip21_tm_thumbnail_uri : string option ;
+  tzip21_tm_description : string option ;
+  tzip21_tm_minter : string option ;
+  tzip21_tm_creators : ext_creators option ;
+  tzip21_tm_is_boolean_amount : bool option ;
+  tzip21_tm_formats : tzip21_formats option ;
+  tzip21_tm_attributes : tzip21_attributes option ;
+  tzip21_tm_tags : string list option ;
+  tzip21_tm_contributors : string list option ;
+  tzip21_tm_publishers : string list option ;
+  tzip21_tm_date : A.date option ;
+  tzip21_tm_block_level : int option ;
+  tzip21_tm_genres : string list option ;
+  tzip21_tm_language : string option ;
+  tzip21_tm_rights : string option ;
+  tzip21_tm_right_uri : string option ;
+  tzip21_tm_is_transferable : bool option ;
+  tzip21_tm_should_prefer_symbol : bool option ;
+} [@@deriving encoding {camel}]
