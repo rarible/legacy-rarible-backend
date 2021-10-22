@@ -8,5 +8,11 @@
 (library
  (name let)
  (package rarible)
- (modules parameters utils let)
+ (modules let)
  (libraries crawlori rtypes))
+
+(library
+ (name common)
+ (package rarible)
+ (modules typed_mich utils parameters contract_spec storage_diff)
+ (libraries let))

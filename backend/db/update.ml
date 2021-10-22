@@ -18,15 +18,19 @@ let upgrade_1_to_2 dbh version =
       exchange_v2_contract varchar not null default '',
       validator_contract varchar not null default '',
       fees_receiver jsonb[] not null default '{}',
-      ft_fa2 varchar[] not null default '{}',
-      ft_fa1 varchar[] not null default '{}',
-      ft_lugh varchar[] not null default '{}',
       protocol_fee bigint)|};
+
+    {|create table ft_contracts(
+      address varchar primary key,
+      kind varchar not null,
+      ledger_id varchar,
+      ledger_key jsonb,
+      ledger_value jsonb)|};
 
     {|create table contracts(
       kind varchar not null,
       address varchar primary key,
-      owner varchar not null,
+      owner varchar,
       block varchar not null,
       level int not null,
       tsp timestamp not null,
@@ -36,7 +40,9 @@ let upgrade_1_to_2 dbh version =
       last timestamp not null,
       tokens_number bigint not null default 0,
       next_token_id varchar not null default 0,
-      ledger_id bigint not null default 0,
+      ledger_id varchar,
+      ledger_key jsonb,
+      ledger_value jsonb,
       metadata jsonb not null default '{}',
       name varchar,
       symbol varchar)|};
@@ -55,6 +61,7 @@ let upgrade_1_to_2 dbh version =
       owner varchar not null,
       amount bigint not null,
       supply bigint not null,
+      balance bigint,
       operators varchar[] not null default '{}',
       metadata jsonb not null default '{}',
       royalties jsonb not null default '{}',
@@ -105,6 +112,20 @@ let upgrade_1_to_2 dbh version =
       metadata jsonb,
       royalties jsonb,
       primary key (block, index, transfer_index))|};
+
+    {|create table token_balance_updates(
+      transaction varchar not null,
+      index int not null,
+      block varchar not null,
+      level int not null,
+      main boolean not null default false,
+      tsp timestamp not null,
+      kind varchar not null,
+      contract varchar not null,
+      token_id varchar not null,
+      account varchar,
+      balance bigint,
+      primary key (block, index))|};
 
     {|create table orders(
       maker varchar not null,

@@ -1,10 +1,7 @@
 open Proto
 open Rtypes
 open Utils
-
-let (let$) = Result.bind
-
-let unexpected_michelson = Error `unexpected_michelson_value
+open Let
 
 let parse_address = function
   | Mstring s -> Ok s
@@ -14,101 +11,68 @@ let parse_address = function
   | _ -> unexpected_michelson
 
 let parse_update_operators m =
-  let rec aux acc = function
-    | [] -> Ok acc
-    | Mprim { prim = add; args = [
-        Mprim { prim = `Pair; args = [ owner; operator; Mint id ]; _ }
-      ]; _ } :: t ->
-      let$ op_owner = parse_address owner in
-      let$ op_operator = parse_address operator in
-      begin match add with
-        | `Left->
-          aux ({op_owner; op_operator; op_token_id = Z.to_string id; op_add=true} :: acc) t
-        | `Right ->
-          aux ({op_owner; op_operator; op_token_id = Z.to_string id; op_add=false} :: acc) t
-        | _ -> unexpected_michelson
-      end
-    | _ -> unexpected_michelson in
-  match m with
-  | Mseq l ->
-    let$ l = aux [] l in
-    Ok (Operator_updates (List.rev l))
+  match Typed_mich.parse_value Contract_spec.update_operators_entry m with
+  | Ok (`seq l) ->
+    Ok (Operator_updates (
+        List.filter_map (function
+            | `left (`tuple [ `address op_owner; `address op_operator; `nat id]) ->
+              Some {op_owner; op_operator; op_token_id = Z.to_string id; op_add=true}
+            | `right (`tuple [ `address op_owner; `address op_operator; `nat id]) ->
+              Some {op_owner; op_operator; op_token_id = Z.to_string id; op_add=false}
+            | _ -> None) l))
   | _ -> unexpected_michelson
 
 let parse_update_operators_all m =
-  let rec aux acc = function
-    | [] -> Ok acc
-    | Mprim { prim = `Left; args = [ operator ]; _} :: t ->
-      let$ operator = parse_address operator in
-      aux ((operator, true) :: acc) t
-    | Mprim { prim = `Right; args = [ operator ]; _} :: t ->
-      let$ operator = parse_address operator in
-      aux ((operator, false) :: acc) t
-    | _ -> unexpected_michelson in
-  match m with
-  | Mseq l ->
-    let$ l = aux [] l in
-    Ok (Operator_updates_all (List.rev l))
+  match Typed_mich.parse_value Contract_spec.update_operators_all_entry m with
+  | Ok (`seq l) ->
+    Ok (Operator_updates_all (
+        List.filter_map (function
+            | `left (`address operator) -> Some (operator, true)
+            | `right (`address operator) -> Some (operator, false)
+            | _ -> None) l))
   | _ -> unexpected_michelson
 
 let parse_transfer m =
-  let rec aux_to acc = function
-    | [] -> Ok acc
-    | Mprim { prim = `Pair; args = [
-        destination;
-        Mint id;
-        Mint amount;
-      ]; _} :: t ->
-      let$ tr_destination = parse_address destination in
-      aux_to ({tr_destination; tr_token_id = Z.to_string id; tr_amount = Z.to_int64 amount} :: acc) t
-    | _ -> unexpected_michelson in
-  let rec aux_from acc = function
-    | [] -> Ok acc
-    | Mprim { prim = `Pair; args = [
-          source;
-          Mseq txs
-        ]; _} :: t ->
-      let$ tr_source = parse_address source in
-      let$ txs = aux_to [] txs in
-      aux_from ({ tr_source; tr_txs = List.rev txs } :: acc) t
-    | _ -> unexpected_michelson in
-  match m with
-  | Mseq l ->
-    let$ l = aux_from [] l in
-    Ok (Transfers (List.rev l))
+  match Typed_mich.parse_value Contract_spec.transfer_entry m with
+  | Ok (`seq l) ->
+    Ok (Transfers (
+        List.filter_map (function
+            | `tuple [ `address tr_source; `seq l ] ->
+              let tr_txs = List.filter_map (function
+                  | `tuple [ `address tr_destination; `nat id; `nat amount ] ->
+                    Some {tr_destination; tr_token_id = Z.to_string id; tr_amount = Z.to_int64 amount}
+                  | _ -> None) l in
+              Some {tr_source; tr_txs}
+            | _ -> None) l))
   | _ -> unexpected_michelson
 
-let parse_mint = function
-  | Mprim { prim = `Pair; args = [
-      Mint id;
-      owner;
-      Mint amount;
-      Mseq royalties ]; _ } ->
-    let mi_meta = [] in
-    let$ tk_owner = parse_address owner in
+let parse_mint m =
+  match Typed_mich.parse_value Contract_spec.mint_entry m with
+  | Ok (`tuple [`nat id; `address tk_owner; `nat amount; `seq royalties]) ->
     let mi_royalties = List.filter_map (function
-        | Mprim { prim = `Elt; args = [ Mstring s; Mint i ]; _ } -> Some (s, Z.to_int64 i)
+        | `tuple [`address s; `nat i] -> Some (s, Z.to_int64 i)
         | _ -> None) royalties in
     Ok (Mint_tokens
           (Fa2Mint {
-              mi_op = { tk_op = { tk_token_id = Z.to_string id; tk_amount = Z.to_int64 amount };
-                        tk_owner };
-              mi_royalties; mi_meta }))
-  | Mprim { prim = `Pair; args = [ account; Mint id; uri ]; _ } ->
-    let$ mi_account = parse_address account in
-    let mi_token_id = Z.to_string id  in
-    let$ mi_uri =
-      match uri with
-      | Mprim { prim = `None; _ } -> Ok None
-      | Mprim { prim = `Some; args = [ Mbytes uri ]; _} ->
-        Ok (Some (Hex.to_string (`Hex (uri :> string))))
-      | _ -> unexpected_michelson in
-    Ok (Mint_tokens (UbiMint { mi_account ; mi_token_id ; mi_uri }))
-  | _ -> unexpected_michelson
+              mi_op = {
+                tk_op = { tk_token_id = Z.to_string id; tk_amount = Z.to_int64 amount };
+                tk_owner };
+              mi_royalties; mi_meta = [] }))
+  | _ ->
+    match Typed_mich.parse_value Contract_spec.mint_ubi_entry m with
+    | Ok (`tuple [ `address mi_account; `nat id; uri ]) ->
+      let mi_token_id = Z.to_string id  in
+      let$ mi_uri = match uri with
+        | `none -> Ok None
+        | `some (`bytes uri) ->
+          Ok (Some (Tzfunc.Crypto.hex_to_raw uri :> string))
+        | _ -> unexpected_michelson in
+      Ok (Mint_tokens (UbiMint { mi_account ; mi_token_id ; mi_uri }))
+    | _ -> unexpected_michelson
 
-let parse_burn = function
-  | Mprim {prim = `Pair; args = [Mint id; owner; Mint amount]; _ } ->
-    let$ tk_owner = parse_address owner in
+let parse_burn m =
+  match Typed_mich.parse_value Contract_spec.burn_entry m with
+  | Ok (`tuple [ `nat id; `address tk_owner; `nat amount ]) ->
     Ok (Burn_tokens { tk_owner; tk_op = {
         tk_token_id = Z.to_string id; tk_amount = Z.to_int64 amount } })
   | _ -> unexpected_michelson
@@ -117,17 +81,16 @@ let parse_metadata_uri = function
   | Mbytes h -> Ok (Metadata_uri (Tzfunc.Crypto.hex_to_raw h :> string))
   | _ -> unexpected_michelson
 
-let parse_token_metadata = function
-  | Mprim {prim = `Pair; args = [Mint id; Mseq l]; _ } ->
+let parse_token_metadata m =
+  match Typed_mich.parse_value Contract_spec.set_token_metadata_entry m with
+  | Ok (`tuple [ `nat id; `assoc l ]) ->
     let l = List.filter_map (function
-        | Mprim { prim = `Elt; args = [ Mstring k; Mstring v ]; _ } ->
-          Some (k, v)
+        | (`string k, `string v) -> Some (k, v)
         | _ -> None) l in
     Ok (Token_metadata (Z.to_string id, l))
   | _ -> unexpected_michelson
 
 let rec parse_fa2 e p =
-  let p = flatten p in
   match e, p with
   | EPdefault, Mprim { prim = `Left; args = [ m ]; _ } ->
     parse_fa2 (EPnamed "left") m
@@ -168,25 +131,17 @@ let rec parse_fa2 e p =
 
   | _ -> unexpected_michelson
 
-let parse_set_royalties m = match m with
-  | Mprim { prim = `Pair; args = [
-      contract; Mint id; Mseq l ]; _ } ->
-    begin match parse_address contract with
-      | Ok roy_contract ->
-        let roy_royalties = List.filter_map (function
-            | Mprim { prim = `Pair; args = [ account; Mint value ]; _ } ->
-              begin match parse_address account with
-                | Ok account -> Some (account, Z.to_int64 value)
-                | _ -> None
-              end
-            | _ -> None) l in
-        Ok {roy_contract; roy_token_id = Z.to_string id; roy_royalties}
-      | _ -> unexpected_michelson
-    end
+let parse_set_royalties m =
+  match Typed_mich.parse_value Contract_spec.set_royalties_entry m with
+  | Ok (`tuple [ `address roy_contract; `nat id; `assoc l ]) ->
+    let roy_royalties =
+      List.filter_map (function
+          | (`address account, `nat value) -> Some (account, Z.to_int64 value)
+          | _ -> None) l in
+    Ok {roy_contract; roy_token_id = Z.to_string id; roy_royalties}
   | _ -> unexpected_michelson
 
 let rec parse_royalties e p =
-  let p = flatten p in
   match e, p with
   | EPdefault, Mprim { prim = `Left; args = [ m ]; _ } ->
     parse_royalties (EPnamed "left") m
@@ -203,27 +158,20 @@ let rec parse_royalties e p =
   | EPnamed "setRoyalties", m -> parse_set_royalties m
   | _ -> unexpected_michelson
 
-let parse_edpk = function
-  | Mstring s -> Ok s
-  | Mbytes h ->
-    Result.map fst
-      Tzfunc.Binary.Reader.(pk {s = Tzfunc.Crypto.hex_to_raw h; offset = 0})
-  | _ -> unexpected_michelson
-
-let parse_option_key : typed_micheline -> (string option, _) result = function
+let parse_option_key : micheline_value -> (string option, _) result = function
   | `none -> Ok None
-  | `some [ `key maker ] -> Ok (Some maker)
+  | `some (`key maker) -> Ok (Some maker)
   | _ -> unexpected_michelson
 
-let parse_asset_type (mclass : typed_micheline) (mdata : typed_micheline) = match mclass, mdata with
-  | `left [ `unit ], _ -> Ok ATXTZ
-  | `right [ `left [ `unit ] ], `bytes h ->
+let parse_asset_type (mclass : micheline_value) (mdata : micheline_value) = match mclass, mdata with
+  | `left `unit, _ -> Ok ATXTZ
+  | `right (`left `unit), `bytes h ->
     begin match
         Tzfunc.Read.unpack (Forge.prim `address) (Tzfunc.Crypto.hex_to_raw h) with
     | Ok (Mstring a) -> Ok (ATFA_1_2 a)
     | _ -> unexpected_michelson
     end
-  | `right [ `right [ `left [ `unit ] ] ], `bytes h ->
+  | `right (`right (`left `unit)), `bytes h ->
     begin match
         Tzfunc.Read.unpack (Forge.prim `pair ~args:[ Forge.prim `address; Forge.prim `nat ])
           (Tzfunc.Crypto.hex_to_raw h) with
@@ -234,19 +182,17 @@ let parse_asset_type (mclass : typed_micheline) (mdata : typed_micheline) = matc
     end
   | _ -> unexpected_michelson
 
-let parse_option_tsp = function
-  | `none -> Ok None
-  | `some [ `timestamp tsp ] -> Ok (Some tsp)
-  | _ -> unexpected_michelson
-
 let parse_cancel m =
-  match parse_typed flat_order_type m with
-  | Ok [ maker; make_asset_class; make_asset_data; _;
-         _; take_asset_class; take_asset_data; _;
-         `nat salt; _; _; _; _ ] ->
+  match Typed_mich.(parse_value order_type m) with
+  | Ok (`tuple [
+      maker;
+      `tuple [ `tuple [ make_asset_class; make_asset_data ]; _ ];
+      _;
+      `tuple [ `tuple [ take_asset_class; take_asset_data ]; _ ];
+      `nat salt; _; _; _; _ ]) ->
     let$ maker = match maker with
       | `none -> Ok None
-      | `some [ `key maker ] -> Ok (Some maker)
+      | `some (`key maker) -> Ok (Some maker)
       | _ -> unexpected_michelson in
     let$ mat = parse_asset_type make_asset_class make_asset_data in
     let$ tat = parse_asset_type take_asset_class take_asset_data in
@@ -257,17 +203,23 @@ let parse_cancel m =
 
 
 let parse_do_transfers m =
-  match parse_typed do_transfers_type m with
-  | Ok [
-      _m_asset_class; _m_asset_data; _t_asset_class; _t_asset_data;
+  match Typed_mich.(parse_value do_transfers_type m) with
+  | Ok (`tuple [
+      _make_asset_type; _take_asset_type;
       `nat fill_m_value; `nat fill_t_value;
-      left_maker; left_m_asset_class; left_m_asset_data; `nat left_m_asset_value;
-      _left_taker; left_t_asset_class;  left_t_asset_data; _left_t_asset_value;
-      `nat left_salt; _left_start; _left_end; _left_data_type; _left_data;
-      right_maker; right_m_asset_class; right_m_asset_data; `nat right_m_asset_value;
-      _right_taker; right_t_asset_class;  right_t_asset_data; _right_t_asset_value;
-      `nat right_salt; _right_start; _right_end; _right_data_type; _right_data;
-      _fee_side; _royalties ] ->
+      `tuple [
+        left_maker;
+        `tuple [ `tuple [ left_m_asset_class; left_m_asset_data ]; `nat left_m_asset_value ];
+        _left_taker;
+        `tuple [ `tuple [ left_t_asset_class; left_t_asset_data ]; _ ];
+        `nat left_salt; _; _; _; _ ];
+      `tuple [
+        right_maker;
+        `tuple [ `tuple [ right_m_asset_class; right_m_asset_data ]; `nat right_m_asset_value ];
+        _right_taker;
+        `tuple [ `tuple [ right_t_asset_class; right_t_asset_data ]; _ ];
+        `nat right_salt; _; _; _; _ ];
+      _fee_side; _royalties ]) ->
     let$ left_maker_edpk = parse_option_key left_maker in
     let left_maker = Option.map pk_to_pkh_exn left_maker_edpk in
     let$ left_mat = parse_asset_type left_m_asset_class left_m_asset_data in
@@ -345,62 +297,57 @@ let rec parse_exchange e p =
   | EPnamed "doTransfers", m -> parse_do_transfers m
   | _ -> unexpected_michelson
 
-let parse_ft_mint = function
-  | Mprim { prim = `Pair; args = [
-      owner;
-      Mint amount;
-      Mint id ]; _ } ->
+let parse_ft_fa1_transfer m =
+  match Typed_mich.parse_value (`tuple [ `address; `address; `nat ]) m with
+  | Ok (`tuple [ `address tr_source; `address tr_destination; `nat am ]) ->
+    Ok (FT_transfers [ {tr_source; tr_txs = [{tr_destination; tr_amount = Z.to_int64 am; tr_token_id = "0"}] } ])
+  | _ -> unexpected_michelson
+
+let parse_ft_fa2_transfer m =
+  match parse_transfer m with
+  | Ok (Transfers l) ->
+    let filter trs =
+      List.filter_map (fun tr ->
+          let tr_txs = List.filter (fun tr -> tr.tr_token_id = "0") tr.tr_txs in
+          if tr_txs = [] then None else Some {tr with tr_txs}) trs in
+    Ok (FT_transfers (filter l))
+  | _ -> unexpected_michelson
+
+let parse_ft_mint m =
+  match Typed_mich.parse_value (`tuple [ `address; `nat; `nat ]) m with
+  | Ok (`tuple [ `address owner; `nat amount; `nat id ]) ->
     if id = Z.zero then
-      let$ owner = parse_address owner in
       Ok (FT_mint { owner; amount = Z.to_int64 amount})
     else unexpected_michelson
   | _ -> unexpected_michelson
 
-let parse_ft_burn = function
-  | Mprim { prim = `Pair; args = [
-      owner;
-      Mint amount;
-      Mint id ]; _ } ->
+let parse_ft_burn m =
+  match Typed_mich.parse_value (`tuple [ `address; `nat; `nat ]) m with
+  | Ok (`tuple [ `address owner; `nat amount; `nat id ]) ->
     if id = Z.zero then
-      let$ owner = parse_address owner in
       Ok (FT_burn { owner; amount = Z.to_int64 amount })
     else unexpected_michelson
   | _ -> unexpected_michelson
 
 let parse_ft_fa1 e p =
-  let p = flatten p in
   match e, p with
-  | EPnamed "transfer", Mprim { prim = `Pair; args = [ from; dst; Mint am ]; _} ->
-    let$ tr_source = parse_address from in
-    let$ tr_destination = parse_address dst in
-    Ok (FT_transfers [ {tr_source; tr_txs = [{tr_destination; tr_amount = Z.to_int64 am; tr_token_id = "0"}] } ])
+  | EPnamed "transfer", m -> parse_ft_fa1_transfer m
   | EPnamed "mint", m -> parse_ft_mint m
   | EPnamed "burn", m -> parse_ft_burn m
   | _ -> unexpected_michelson
 
 let parse_ft_fa2 e p =
-  let p = flatten p in
   match e, p with
-  | EPnamed "transfer", m ->
-    begin match parse_transfer m with
-      | Ok (Transfers l) ->
-        let filter trs =
-          List.filter_map (fun tr ->
-              let tr_txs = List.filter (fun tr -> tr.tr_token_id = "0") tr.tr_txs in
-              if tr_txs = [] then None else Some {tr with tr_txs}) trs in
-        Ok (FT_transfers (filter l))
-      | _ -> unexpected_michelson
-    end
+  | EPnamed "transfer", m -> parse_ft_fa2_transfer m
   | EPnamed "mint", m -> parse_ft_mint m
   | EPnamed "burn", m -> parse_ft_burn m
   | _ -> unexpected_michelson
 
-let parse_process_transfer_lugh = function
-  | Mseq [ Mprim { prim = `Pair; args=[Mint amount; source]; _ }; Mint fees;
-           destination; Mint id ] ->
+let parse_process_transfer_lugh m =
+  match Typed_mich.parse_value (`tuple [ `tuple [`nat; `address];  `nat; `address; `nat ]) m with
+  | Ok (`tuple [ `tuple [`nat amount; `address tr_source]; `nat fees;
+                 `address tr_destination; `nat id ]) ->
     if id = Z.zero  then
-      let$ tr_source = parse_address source in
-      let$ tr_destination = parse_address destination in
       Ok (FT_transfers [
           { tr_source; tr_txs = [
                 {tr_token_id = "0"; tr_amount = Z.to_int64 amount; tr_destination};
@@ -412,7 +359,6 @@ let parse_process_transfer_lugh = function
   | _ -> unexpected_michelson
 
 let parse_ft_lugh e m =
-  let m = flatten m in
   match e with
   | EPnamed "process_transfer" -> parse_process_transfer_lugh m
   | EPnamed "mint" -> parse_ft_mint m

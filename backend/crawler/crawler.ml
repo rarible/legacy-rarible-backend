@@ -9,7 +9,7 @@ let filename = ref None
 
 let dummy_extra = {
   admin_wallet = ""; exchange_v2 = ""; royalties = ""; validator = "";
-  ft_fa2 = []; ft_fa1 = []; ft_lugh = [];
+  contracts = SMap.empty; ft_contracts = SMap.empty
 }
 
 let rarible_contracts ?(db=dummy_extra) config =
@@ -22,26 +22,18 @@ let rarible_contracts ?(db=dummy_extra) config =
     let extra = if extra.exchange_v2 = "" then { extra with exchange_v2 = db.exchange_v2 } else extra in
     let extra = if extra.royalties = "" then { extra with royalties = db.royalties } else extra in
     let extra = if extra.validator = "" then { extra with validator = db.validator } else extra in
-    let extra = if extra.ft_fa2 = [] then { extra with ft_fa2 = db.ft_fa2 } else extra in
-    let extra = if extra.ft_fa1 = [] then { extra with ft_fa1 = db.ft_fa1 } else extra in
-    let extra = if extra.ft_lugh = [] then { extra with ft_lugh = db.ft_lugh } else extra in
+    let extra = { extra with ft_contracts = SMap.union (fun _ v _ -> Some v) extra.ft_contracts db.ft_contracts } in
+    let extra = { extra with contracts = SMap.union (fun _ v _ -> Some v) extra.contracts db.contracts } in
     let s = match config.accounts with
       | None -> SSet.empty
       | Some s -> s in
     let s = SSet.add extra.exchange_v2 s in
     let s = SSet.add extra.validator s in
-    let s = List.fold_left (fun acc a -> SSet.add a acc) s (extra.ft_fa2 @ extra.ft_fa1 @ extra.ft_lugh) in
+    let s = SMap.fold (fun a _ acc -> SSet.add a acc) extra.ft_contracts s in
+    let s = SMap.fold (fun a _ acc -> SSet.add a acc) extra.contracts s in
     Lwt.return_ok { config with accounts = Some s; extra }
 
 let fill_config config =
-  let>? accounts = Db.get_contracts () in
-  let>? () = match accounts, config.accounts with
-    | [], None -> Lwt.return_ok ()
-    | [], Some s -> iter_rp Db.insert_fake (SSet.elements s)
-    | l, None -> config.accounts <- Some (SSet.of_list l); Lwt.return_ok ()
-    | l, Some s ->
-      let|>? () = iter_rp Db.insert_fake (SSet.elements s) in
-      config.accounts <- Some (List.fold_left (fun acc a -> SSet.add a acc) s l) in
   let>? db_extra = Db.get_extra_config () in
   let>? config = rarible_contracts ?db:db_extra config in
   let>? () = Db.update_extra_config config.extra in

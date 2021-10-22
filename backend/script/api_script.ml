@@ -1,6 +1,6 @@
 open Rtypes
 open Let
-open Utils
+open Common.Utils
 
 let cwd = Sys.getcwd ()
 let exe = Sys.argv.(0)
@@ -19,9 +19,8 @@ let config = {
   exchange_v2 ;
   validator ;
   royalties = "" ;
-  ft_fa2 = [];
-  ft_fa1 = [];
-  ft_lugh = [];
+  contracts = SMap.empty;
+  ft_contracts = SMap.empty;
 }
 
 let api_pid = ref None
@@ -1038,7 +1037,7 @@ let mint_with_random_token_id ~source ~contract =
   let _owner_alias, owner_pk, owner_sk = generate_address () in
   let owner =  pk_to_pkh_exn owner_pk in
   let tid = generate_token_id () in
-  let amount = string_of_int @@ generate_amount ~max:10 () in
+  let amount = string_of_int @@ (generate_amount ~max:10 () + 1) in
   let royalties = generate_royalties () in
   let metadata = [] in
   mint_tokens tid owner amount royalties source contract >|= fun () ->
@@ -1049,7 +1048,7 @@ let mint_one_with_token_id_from_api ?diff ?alias ~source ~contract () =
   let _owner_alias, owner_pk, owner_sk =
     match alias with None -> generate_address ?diff () | Some a -> by_alias a in
   let owner =  pk_to_pkh_exn owner_pk in
-  let amount = string_of_int 1 in
+  let amount = "1" in
   let royalties = generate_royalties () in
   let name = Filename.basename @@ Filename.temp_file "item" "name" in
   let metadata = [ Printf.sprintf "name=%s" name ] in
@@ -1913,8 +1912,8 @@ let get_head () =
   EzReq_lwt.get
     (EzAPI.URL "https://api.granadanet.tzkt.io/v1/blocks/count")
 
-let make_config admin_wallet validator exchange_v2 royalties ft_fa1 ft_fa2 ft_lugh
-  kafka_broker kafka_username kafka_password =
+let make_config admin_wallet validator exchange_v2 royalties contracts ft_contracts
+    kafka_broker kafka_username kafka_password =
   let open Crawlori.Config in
   (* get_head () >>= function
    * | Error (code, str) ->
@@ -1933,7 +1932,7 @@ let make_config admin_wallet validator exchange_v2 royalties ft_fa1 ft_fa2 ft_lu
       register_kinds = None ;
       allow_no_metadata = false ;
       extra = {
-        admin_wallet ; validator ; exchange_v2 ; royalties; ft_fa1; ft_fa2; ft_lugh
+        admin_wallet ; validator ; exchange_v2 ; royalties; contracts; ft_contracts;
       } ;
     } in
     let temp_fn = Filename.temp_file "config" "" in
@@ -1955,10 +1954,10 @@ let make_config admin_wallet validator exchange_v2 royalties ft_fa1 ft_fa2 ft_lu
       Lwt.return (temp_fn, Some kafka_temp_fn)
 
 
-let start_crawler admin_wallet validator exchange_v2 royalties ft_fa1 ft_fa2 ft_lugh
-    kafka_broker kafka_username kafka_password =
+let start_crawler admin_wallet validator exchange_v2 royalties
+    contracts ft_contracts kafka_broker kafka_username kafka_password =
   make_config
-    admin_wallet validator exchange_v2 royalties ft_fa1 ft_fa2 ft_lugh
+    admin_wallet validator exchange_v2 royalties contracts ft_contracts
     kafka_broker kafka_username kafka_password  >>= fun (config, kafka_config) ->
   let prog = "./_bin/crawler" in
   let args =
@@ -1978,7 +1977,7 @@ let random_test () =
   let r_alias, _r_source = create_royalties () in
   let r_kt1 = find_kt1 r_alias in
   Printf.eprintf "New royalties %s\n%!" r_kt1 ;
-  start_crawler "" validator exchange_v2 r_kt1 [] [] [] "" "" "" >>= fun (cpid, kafka_config) ->
+  start_crawler "" validator exchange_v2 r_kt1 SMap.empty SMap.empty "" "" "" >>= fun (cpid, kafka_config) ->
   api_pid := Some (start_api kafka_config) ;
   crawler_pid := Some cpid ;
   Printf.eprintf "Waiting 6sec to let crawler catch up...\n%!" ;
@@ -2082,7 +2081,7 @@ let match_orders_nft () =
   let v_alias, _v_source = create_validator ~exchange:ex_kt1 ~royalties:r_kt1 in
   let v_kt1 = find_kt1 v_alias in
   Printf.eprintf "New validator %s\n%!" v_kt1 ;
-  start_crawler "" v_kt1 ex_kt1 r_kt1 [] [] [] "" "" "" >>= fun (cpid, kafka_config) ->
+  start_crawler "" v_kt1 ex_kt1 r_kt1 SMap.empty SMap.empty "" "" "" >>= fun (cpid, kafka_config) ->
   api_pid := Some (start_api kafka_config) ;
   crawler_pid := Some cpid ;
   set_validator v_kt1 ex_admin ex_kt1 >>= fun () ->
@@ -2143,7 +2142,7 @@ let match_orders_tezos () =
   let v_alias, _v_source = create_validator ~exchange:ex_kt1 ~royalties:r_kt1 in
   let v_kt1 = find_kt1 v_alias in
   Printf.eprintf "New validator %s\n%!" v_kt1 ;
-  start_crawler "" v_kt1 ex_kt1 r_kt1 [] [] [] "" "" "" >>= fun (cpid, kafka_config) ->
+  start_crawler "" v_kt1 ex_kt1 r_kt1 SMap.empty SMap.empty "" "" "" >>= fun (cpid, kafka_config) ->
   api_pid := Some (start_api kafka_config) ;
   crawler_pid := Some cpid ;
   set_validator v_kt1 ex_admin ex_kt1 >>= fun () ->
@@ -2194,7 +2193,7 @@ let match_orders_lugh () =
   Printf.eprintf "Exchange %s\n%!" ex_kt1 ;
   let v_kt1 = validator in
   Printf.eprintf "Validator %s\n%!" v_kt1 ;
-  start_crawler "" v_kt1 ex_kt1 r_kt1 [] [] [ "KT1HT3EbSPFA1MM2ZiMThB6P6Kky5jebNgAx" ] "" "" ""
+  start_crawler "" v_kt1 ex_kt1 r_kt1 SMap.empty (SMap.singleton "KT1HT3EbSPFA1MM2ZiMThB6P6Kky5jebNgAx" Lugh) "" "" ""
   >>= fun (cpid, kafka_config) ->
   api_pid := Some (start_api kafka_config) ;
   crawler_pid := Some cpid ;
@@ -2306,7 +2305,7 @@ let fill_orders () =
   let v_alias, _v_source = create_validator ~exchange:ex_kt1 ~royalties:r_kt1 in
   let v_kt1 = find_kt1 v_alias in
   Printf.eprintf "New validator %s\n%!" v_kt1 ;
-  start_crawler "" v_kt1 ex_kt1 r_kt1 [] [] [] "" "" "" >>= fun (cpid, kafka_config) ->
+  start_crawler "" v_kt1 ex_kt1 r_kt1 SMap.empty SMap.empty "" "" "" >>= fun (cpid, kafka_config) ->
   api_pid := Some (start_api kafka_config) ;
   crawler_pid := Some cpid ;
   set_validator v_kt1 ex_admin ex_kt1 >>= fun () ->
@@ -2332,7 +2331,7 @@ let cancel_order () =
   let v_alias, _v_source = create_validator ~exchange:ex_kt1 ~royalties:r_kt1 in
   let v_kt1 = find_kt1 v_alias in
   Printf.eprintf "New validator %s\n%!" v_kt1 ;
-  start_crawler "" v_kt1 ex_kt1 r_kt1 [] [] [] "" "" "" >>= fun (cpid, kafka_config) ->
+  start_crawler "" v_kt1 ex_kt1 r_kt1 SMap.empty SMap.empty "" "" "" >>= fun (cpid, kafka_config) ->
   api_pid := Some (start_api kafka_config) ;
   crawler_pid := Some cpid ;
   set_validator v_kt1 ex_admin ex_kt1 >>= fun () ->
@@ -2346,10 +2345,9 @@ let cancel_order () =
   Lwt_unix.sleep 6. >>= fun () ->
   let>? item1 = mint_one_with_token_id_from_api ~source ~contract () in
   Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
-  Lwt_unix.sleep 6. >>= fun () ->
+  let> () = Lwt_unix.sleep 6. in
   let (source1, amount1, token_id1, royalties1, metadata1) = item1 in
-  check_item (contract, (source1, string_of_int amount1, token_id1, royalties1, metadata1))
-  >>= fun () ->
+  let> () = check_item (contract, (source1, string_of_int amount1, token_id1, royalties1, metadata1)) in
   let>? order = sell_nft_for_tezos ~salt:1 contract item1 1 in
   (* TODO : check order *)
   begin cancel_order ~source:source1 ~contract:ex_kt1 order >>= function

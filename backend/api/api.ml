@@ -1,7 +1,7 @@
 open EzAPIServer
 open Rtypes
+open Common
 open Let
-open Utils
 open Errors
 
 module Errors = Errors
@@ -790,7 +790,7 @@ let validate_signature order =
     d.order_rarible_v2_data_v1_origin_fees in
   let$ msg =
     Result.map_error (fun e -> `VALIDATION (Let.string_of_error e)) @@
-    hash_order_form order_elt.order_elt_maker_edpk order_elt.order_elt_make
+    Utils.hash_order_form order_elt.order_elt_maker_edpk order_elt.order_elt_make
       order_elt.order_elt_taker_edpk order_elt.order_elt_take
       order_elt.order_elt_salt order_elt.order_elt_start order_elt.order_elt_end
       data_type payouts origin_fees in
@@ -842,7 +842,7 @@ let get_existing_order hash_key_order =
 
 let upsert_order _req input =
   Format.eprintf "upsert_order\n%!";
-  match order_from_order_form input with
+  match Utils.order_from_order_form input with
   | Error err -> return (Error (`UNEXPECTED_API_ERROR (Let.string_of_error err)))
   | Ok order ->
     match validate_order order with
