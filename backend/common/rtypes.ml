@@ -1,23 +1,5 @@
 type z = Z.t [@encoding Json_encoding.(conv Z.to_string Z.of_string string)] [@@deriving encoding]
 
-(** Config *)
-
-type config = {
-  admin_wallet: string; [@dft ""]
-  exchange_v2: string; [@dft ""]
-  validator: string; [@dft ""]
-  royalties: string; [@dft ""]
-  ft_fa2: string list; [@dft []]
-  ft_fa1: string list; [@dft []]
-  ft_lugh: string list; [@dft []]
-} [@@deriving encoding]
-
-type kafka_config = {
-  kafka_broker : string;
-  kafka_username : string;
-  kafka_password : string;
-} [@@deriving encoding]
-
 module A = struct
   let uint53 =
     Json_encoding.ranged_int53 ~minimum:0L ~maximum:(Int64.shift_left 1L 53) "uint53"
@@ -826,30 +808,118 @@ type exchange_param =
        right: Tzfunc.H.t ; right_maker: string option; right_asset: asset ;
        fill_make_value: int64; fill_take_value: int64}
 
-type typed_micheline = [
+type micheline_value = [
   | `address of string
-  | `assoc of (typed_micheline list * typed_micheline list) list
+  | `assoc of ((micheline_value [@key "key"]) * (micheline_value [@key "value"]) [@object]) list
+  | `bool of bool
   | `bytes of (Proto.hex [@encoding Proto.hex_enc.Proto.Encoding.json])
+  | `chain_id of string
   | `contract
-  | `false_
   | `int of z
   | `key of string
   | `key_hash of string
   | `lambda
-  | `left of typed_micheline list
+  | `left of micheline_value
   | `mutez of z
   | `nat of z
   | `none
   | `operation
-  | `right of typed_micheline list
-  | `seq of typed_micheline list list
+  | `right of micheline_value
+  | `seq of (micheline_value list [@wrap "seq"])
   | `signature of string
-  | `some of typed_micheline list
+  | `some of micheline_value
   | `string of string
   | `timestamp of (Proto.A.timestamp [@encoding Proto.A.timestamp_enc.Proto.Encoding.json])
-  | `true_
+  | `tuple of (micheline_value list [@wrap "tuple"])
   | `unit
 ] [@@deriving encoding {recursive}]
+
+type 'a micheline_type_aux = [
+  | `address
+  | `big_map of (('a [@key "bkey"]) * ('a [@key "bvalue"]) [@object])
+  | `bool
+  | `bytes
+  | `chain_id
+  | `contract of ('a [@wrap "contract"])
+  | `int
+  | `key
+  | `key_hash
+  | `lambda of (('a [@key "arg"]) * ('a [@key "result"]) [@object])
+  | `map of (('a [@key "key"]) * ('a [@key "value"]) [@object])
+  | `mutez
+  | `nat
+  | `operation
+  | `option of ('a [@wrap "option"])
+  | `or_ of (('a [@key "left"]) * ('a [@key "right"]) [@object])
+  | `seq of ('a [@wrap "seq"])
+  | `signature
+  | `string
+  | `timestamp
+  | `tuple of 'a list
+  | `unit
+] [@@deriving encoding]
+
+type micheline_type = {
+  name: string option;
+  typ: micheline_type micheline_type_aux [@key "type"]
+} [@@deriving encoding {recursive}]
+
+type micheline_type_short = micheline_type_short micheline_type_aux
+[@@deriving encoding {recursive}]
+
+(** Config *)
+
+module SMap = Map.Make(String)
+module TMap = Map.Make(struct
+    type t = (string * string * string)
+    let compare (c1, id1, o1) (c2, id2, o2) =
+      let c = String.compare c1 c2 in
+      if c <> 0 then c
+      else
+        let id = String.compare id1 id2 in
+        if id <> 0 then id
+        else String.compare o1 o2
+  end)
+
+type ledger_info = {
+  ledger_id: z;
+  ledger_key: micheline_type_short;
+  ledger_value: micheline_type_short;
+} [@@deriving encoding]
+
+type nft_ledgers = ledger_info option SMap.t
+let nft_ledgers_enc = Json_encoding.(
+    conv SMap.bindings
+      (fun l -> List.fold_left (fun acc (k, v) -> SMap.add k v acc) SMap.empty l)
+      (assoc @@ option ledger_info_enc))
+
+type ft_ledger_kind =
+  | Fa2
+  | Fa1
+  | Lugh
+  | Custom of ledger_info
+[@@deriving encoding]
+
+type ft_ledgers = ft_ledger_kind SMap.t
+let ft_ledgers_enc = Json_encoding.(
+    conv SMap.bindings
+      (fun l -> List.fold_left (fun acc (k, v) -> SMap.add k v acc) SMap.empty l)
+      (assoc @@ ft_ledger_kind_enc))
+
+type config = {
+  admin_wallet: string; [@dft ""]
+  exchange_v2: string; [@dft ""]
+  validator: string; [@dft ""]
+  royalties: string; [@dft ""]
+  ft_contracts: ft_ledgers; [@dft SMap.empty]
+  mutable contracts: nft_ledgers; [@dft SMap.empty]
+} [@@deriving encoding]
+
+type kafka_config = {
+  kafka_broker : string;
+  kafka_username : string;
+  kafka_password : string;
+} [@@deriving encoding]
 
 type format_dimensions = {
   format_dim_value : string ;

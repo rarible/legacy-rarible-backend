@@ -2,6 +2,7 @@ open Let
 open Tzfunc.Proto
 open Rtypes
 open Hooks
+open Common
 open Utils
 
 module Rarible_kafka = Rarible_kafka
@@ -20,24 +21,48 @@ let one ?(err="expected unique row not found") l = match l with
   | [ x ] -> Lwt.return_ok x
   | _ -> Lwt.return_error (`hook_error err)
 
-let get_contracts ?dbh () =
-  use dbh @@ fun dbh ->
-  [%pgsql dbh "select address from contracts where main"]
+let db_contracts =
+  List.fold_left (fun acc r ->
+      let v = match r#ledger_id, r#ledger_key, r#ledger_value with
+        | Some id, Some k, Some v ->
+          let ledger_key = EzEncoding.destruct micheline_type_short_enc k in
+          let ledger_value = EzEncoding.destruct micheline_type_short_enc v in
+          Some {ledger_id=Z.of_string id; ledger_key; ledger_value}
+        | _ -> None in
+      SMap.add r#address v acc) SMap.empty
+
+let db_ft_contracts =
+  List.fold_left (fun acc r ->
+      let v = match r#kind, r#ledger_id, r#ledger_key, r#ledger_value with
+        | "fa2", _, _, _ -> Some Fa2 | "fa1", _, _, _ -> Some Fa1 | "lugh", _, _, _ -> Some Lugh
+        | "custom", Some id, Some k, Some v ->
+          let ledger_key = EzEncoding.destruct micheline_type_short_enc k in
+          let ledger_value = EzEncoding.destruct micheline_type_short_enc v in
+          Some (Custom {ledger_id=Z.of_string id; ledger_key; ledger_value})
+        | _ -> None in
+      match v with None -> acc | Some v -> SMap.add r#address v acc) SMap.empty
 
 let get_extra_config ?dbh () =
   use dbh @@ fun dbh ->
+  let>? contracts =
+    [%pgsql.object dbh "select address, ledger_id, ledger_key, ledger_value \
+                 from contracts where main"] in
+  let>? ft_contracts =
+    [%pgsql.object dbh "select address, kind, ledger_id, ledger_key, ledger_value \
+                 from ft_contracts"] in
   let>? r = [%pgsql.object dbh
       "select admin_wallet, exchange_v2_contract, royalties_contract, \
-       validator_contract, ft_fa2, ft_fa1, ft_lugh from state"] in
+       validator_contract from state"] in
   match r with
-  | [ r ] ->  Lwt.return_ok (Some {
+  | [ r ] ->
+    let contracts = db_contracts contracts in
+    let ft_contracts = db_ft_contracts ft_contracts in
+    Lwt.return_ok (Some {
       admin_wallet = r#admin_wallet;
       exchange_v2 = r#exchange_v2_contract;
       royalties = r#royalties_contract;
       validator = r#validator_contract;
-      ft_fa2 = List.filter_map (fun x -> x) r#ft_fa2;
-      ft_fa1 = List.filter_map (fun x -> x) r#ft_fa1;
-      ft_lugh = List.filter_map (fun x -> x) r#ft_lugh;
+      ft_contracts; contracts
     })
   | [] -> Lwt.return_ok None
   | _ -> Lwt.return_error (`hook_error "wrong_state")
@@ -45,21 +70,28 @@ let get_extra_config ?dbh () =
 let update_extra_config ?dbh e =
   use dbh @@ fun dbh ->
   let>? r = [%pgsql.object dbh "select * from state"] in
-  let ft_fa1 = List.map Option.some e.ft_fa1 in
-  let ft_fa2 = List.map Option.some e.ft_fa2 in
-  let ft_lugh = List.map Option.some e.ft_lugh in
-  match r with
-  | [] ->
-    [%pgsql dbh
-        "insert into state(exchange_v2_contract, royalties_contract, \
-         validator_contract, ft_fa2, ft_fa1, ft_lugh) \
-         values (${e.exchange_v2}, ${e.royalties}, ${e.validator}, \
-         $ft_fa2, $ft_fa1, $ft_lugh)"]
-  | _ ->
-    [%pgsql dbh
-        "update state set exchange_v2_contract = ${e.exchange_v2}, \
-         royalties_contract = ${e.royalties}, validator_contract = ${e.validator}, \
-         ft_fa1 = $ft_fa1, ft_fa2 = $ft_fa2, ft_lugh = $ft_lugh"]
+  let>? () = match r with
+    | [] ->
+      [%pgsql dbh
+          "insert into state(exchange_v2_contract, royalties_contract, \
+           validator_contract) \
+           values (${e.exchange_v2}, ${e.royalties}, ${e.validator})"]
+    | _ ->
+      [%pgsql dbh
+          "update state set exchange_v2_contract = ${e.exchange_v2}, \
+           royalties_contract = ${e.royalties}, validator_contract = ${e.validator}"] in
+  iter_rp (fun (address, lk) ->
+      let kind, id, k, v = match lk with
+        | Fa2 -> "fa2", None, None, None
+        | Fa1 -> "fa1", None, None, None
+        | Lugh -> "lugh", None, None, None
+        | Custom {ledger_id; ledger_key; ledger_value} ->
+          "custom", Some (Z.to_string ledger_id),
+          Some (EzEncoding.construct micheline_type_short_enc ledger_key),
+          Some (EzEncoding.construct micheline_type_short_enc ledger_value) in
+      [%pgsql dbh
+          "insert into ft_contracts(address, kind, ledger_id, ledger_key, ledger_value) \
+           values($address, $kind, $?id, $?k, $?v) on conflict do nothing"]) (SMap.bindings e.ft_contracts)
 
 (* Normalize here in case of ERC20 like asset *)
 let price left right =
@@ -773,10 +805,11 @@ let get_metadata meta =
   with _ ->
     None, None, None, None, None
 
-let insert_mint dbh op kt1 m =
+let insert_mint ~dbh ~op ~contract m =
   let token_id, owner, uri = match m with
     | Fa2Mint m -> m.mi_op.tk_op.tk_token_id, m.mi_op.tk_owner, None
     | UbiMint m -> m.mi_token_id, m.mi_account, m.mi_uri in
+  let>? () = insert_account dbh owner ~block:op.bo_block ~level:op.bo_level ~tsp:op.bo_tsp in
   let>? () = match uri with
     | Some url ->
       begin
@@ -788,7 +821,7 @@ let insert_mint dbh op kt1 m =
                last_block, last_level, last, owner, \
                amount, metadata, transaction, supply, name, creators, \
                description, attributes, image) \
-               values($kt1, $token_id, ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, \
+               values($contract, $token_id, ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, \
                ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, $owner, 0, $json, \
                ${op.bo_hash}, 0, $?name, $?creators, $?description, $?attributes, \
                $?image) on conflict do nothing"]
@@ -799,7 +832,7 @@ let insert_mint dbh op kt1 m =
               "insert into tokens(contract, token_id, block, level, tsp, \
                last_block, last_level, last, owner, \
                amount, transaction, supply) \
-               values($kt1, $token_id, ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, \
+               values($contract, $token_id, ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, \
                ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, $owner, 0, \
                ${op.bo_hash}, 0) on conflict do nothing"]
       end
@@ -808,36 +841,36 @@ let insert_mint dbh op kt1 m =
           "insert into tokens(contract, token_id, block, level, tsp, \
            last_block, last_level, last, owner, \
            amount, transaction, supply) \
-           values($kt1, $token_id, ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, \
+           values($contract, $token_id, ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, \
            ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, $owner, 0, \
            ${op.bo_hash}, 0) on conflict do nothing"] in
-  let>? () = insert_account dbh owner ~block:op.bo_block ~level:op.bo_level ~tsp:op.bo_tsp in
+
   let mint = EzEncoding.construct mint_enc m in
   [%pgsql dbh
       "insert into contract_updates(transaction, index, block, level, tsp, \
        contract, mint) \
        values(${op.bo_hash}, ${op.bo_index}, ${op.bo_block}, ${op.bo_level}, \
-       ${op.bo_tsp}, $kt1, $mint) \
+       ${op.bo_tsp}, $contract, $mint) \
        on conflict do nothing"]
 
-let insert_burn dbh op tr m =
+let insert_burn ~dbh ~op ~contract m =
   let burn = EzEncoding.construct token_op_owner_enc m in
   [%pgsql dbh
       "insert into contract_updates(transaction, index, block, level, tsp, \
        contract, burn) \
        values(${op.bo_hash}, ${op.bo_index}, ${op.bo_block}, ${op.bo_level}, \
-       ${op.bo_tsp}, ${tr.destination}, $burn) \
+       ${op.bo_tsp}, $contract, $burn) \
        on conflict do nothing"]
 
-let insert_transfer dbh op tr lt =
-  let kt1 = tr.destination in
+let insert_transfer ~dbh ~op ~contract lt =
   let|>? _ = fold_rp (fun transfer_index {tr_source; tr_txs} ->
+      let>? () = insert_account dbh tr_source ~block:op.bo_block ~level:op.bo_level ~tsp:op.bo_tsp in
       fold_rp (fun transfer_index {tr_destination; tr_token_id; tr_amount} ->
           let>? () = [%pgsql dbh
               "insert into tokens(contract, token_id, block, level, tsp, \
                last_block, last_level, last, owner, amount, \
                metadata, transaction, supply) \
-               values($kt1, $tr_token_id, ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, \
+               values($contract, $tr_token_id, ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, \
                ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, \
                $tr_destination, 0, '{}', ${op.bo_hash}, 0) on conflict do nothing"] in
           let>? () =
@@ -846,57 +879,87 @@ let insert_transfer dbh op tr lt =
               "insert into token_updates(transaction, index, block, level, tsp, \
                source, destination, contract, token_id, amount, transfer_index) \
                values(${op.bo_hash}, ${op.bo_index}, ${op.bo_block}, ${op.bo_level}, \
-               ${op.bo_tsp}, $tr_source, $tr_destination, ${tr.destination}, \
+               ${op.bo_tsp}, $tr_source, $tr_destination, $contract, \
                $tr_token_id, $tr_amount, $transfer_index) \
                on conflict do nothing"] in
           let|>? () = insert_nft_activity_transfer
-              dbh op kt1 tr_source tr_destination tr_token_id tr_amount in
+              dbh op contract tr_source tr_destination tr_token_id tr_amount in
           Int32.succ transfer_index
         ) transfer_index tr_txs) 0l lt in
   ()
 
-let insert_update_operator dbh op tr lt =
-  let kt1 = tr.destination in
+let insert_token_balances ~dbh ~op ~contract = function
+  | None | Some [] ->
+    Lwt.return_ok ()
+  | Some balances ->
+    iter_rp (fun (k, v) ->
+        let kind, token_id, account, balance = match k, v with
+          | `nat id, Some (`address a) ->
+            "nft", Z.to_string id, Some a, None
+          | `nat id, None -> "nft", Z.to_string id, None, None
+          | `tuple [`nat id; `address a], Some (`nat bal) ->
+            "multi", Z.to_string id, Some a, Some (Z.to_int64 bal)
+          | `tuple [`nat id; `address a], None ->
+            "multi", Z.to_string id, Some a, None
+          | _ -> "", "", None, None in
+        if kind <> "" then
+          let>? () = [%pgsql dbh
+            "insert into token_balance_updates(transaction, index, block, level, \
+             tsp, kind, contract, token_id, account, balance) \
+             values(${op.bo_hash}, ${op.bo_index}, ${op.bo_block}, ${op.bo_level}, \
+             ${op.bo_tsp}, $kind, $contract, $token_id, $?account, $?balance) on conflict do nothing"] in
+          match account with
+          | None -> Lwt.return_ok ()
+          | Some a ->
+            [%pgsql dbh
+                "insert into tokens(contract, token_id, block, level, tsp, \
+                 last_block, last_level, last, owner, amount, \
+                 metadata, transaction, supply) \
+                 values($contract, $token_id, ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, \
+                 ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, \
+                 $a, 0, '{}', ${op.bo_hash}, 0) on conflict do nothing"]
+            (* todo: get supply from other owner *)
+        else Lwt.return_ok ()) balances
+
+let insert_update_operator ~dbh ~op ~contract lt =
   iter_rp (fun {op_owner; op_operator; op_token_id; op_add} ->
       let>? () = [%pgsql dbh
           "insert into token_updates(transaction, index, block, level, tsp, \
            source, operator, add, contract, token_id) \
            values(${op.bo_hash}, ${op.bo_index}, ${op.bo_block}, ${op.bo_level}, \
            ${op.bo_tsp}, $op_owner, $op_operator, $op_add, \
-           $kt1, $op_token_id) on conflict do nothing"] in
+           $contract, $op_token_id) on conflict do nothing"] in
       insert_account dbh op_operator ~block:op.bo_block ~level:op.bo_level ~tsp:op.bo_tsp) lt
 
-let insert_update_operator_all dbh op tr lt =
-  let kt1 = tr.destination in
+let insert_update_operator_all ~dbh ~op ~contract lt =
   let source = op.bo_op.source in
   iter_rp (fun (operator, add) ->
       let>? () = [%pgsql dbh
           "insert into token_updates(transaction, index, block, level, tsp, \
            source, operator, add, contract) \
            values(${op.bo_hash}, ${op.bo_index}, ${op.bo_block}, ${op.bo_level}, \
-           ${op.bo_tsp}, $source, $operator, $add, $kt1) on conflict do nothing"] in
+           ${op.bo_tsp}, $source, $operator, $add, $contract) on conflict do nothing"] in
       insert_account dbh operator ~block:op.bo_block ~level:op.bo_level ~tsp:op.bo_tsp) lt
 
-let insert_metadata_uri dbh op tr s =
+let insert_metadata_uri ~dbh ~op ~contract s =
   [%pgsql dbh
       "insert into contract_updates(transaction, index, block, level, tsp, \
        contract, uri) \
        values(${op.bo_hash}, ${op.bo_index}, ${op.bo_block}, ${op.bo_level}, \
-       ${op.bo_tsp}, ${tr.destination}, $s) \
+       ${op.bo_tsp}, $contract, $s) \
        on conflict do nothing"]
 
-let insert_token_metadata dbh op tr (token_id, l) =
+let insert_token_metadata ~dbh ~op ~contract (token_id, l) =
   let meta = EzEncoding.construct Rtypes.token_metadata_enc l in
   let source = op.bo_op.source in
-  let kt1 = tr.destination in
   [%pgsql dbh
       "insert into token_updates(transaction, index, block, level, tsp, \
        source, token_id, contract, metadata) \
        values(${op.bo_hash}, ${op.bo_index}, ${op.bo_block}, ${op.bo_level}, \
-       ${op.bo_tsp}, $source, $token_id, $kt1, $meta) \
+       ${op.bo_tsp}, $source, $token_id, $contract, $meta) \
        on conflict do nothing"]
 
-let insert_royalties dbh op roy =
+let insert_royalties ~dbh ~op roy =
   let royalties = EzEncoding.(construct token_royalties_enc roy.roy_royalties) in
   let source = op.bo_op.source in
   [%pgsql dbh
@@ -1019,7 +1082,7 @@ let insert_order_activity_match
     } in
   insert_order_activity dbh id date order_activity_type
 
-let insert_cancel dbh op (hash : Tzfunc.H.t) =
+let insert_cancel ~dbh ~op (hash : Tzfunc.H.t) =
   let hash = ( hash :> string ) in
   let source = op.bo_op.source in
   [%pgsql dbh
@@ -1030,7 +1093,7 @@ let insert_cancel dbh op (hash : Tzfunc.H.t) =
   insert_order_activity_cancel
     dbh op.bo_hash op.bo_block op.bo_index op.bo_level op.bo_tsp hash
 
-let insert_do_transfers dbh op
+let insert_do_transfers ~dbh ~op
     ~(left : Tzfunc.H.t) ~left_maker ~left_asset
     ~(right : Tzfunc.H.t) ~right_maker ~right_asset
     ~fill_make_value ~fill_take_value =
@@ -1049,7 +1112,7 @@ let insert_do_transfers dbh op
     left left_maker left_asset
     right right_maker right_asset
 
-let insert_ft_transfers dbh op tr txs =
+let insert_ft_transfers ~dbh ~op ~contract txs =
   let|>? _ = fold_rp (fun transfer_index tx ->
       fold_rp (fun transfer_index txd ->
           let|>? () = [%pgsql dbh
@@ -1057,13 +1120,13 @@ let insert_ft_transfers dbh op tr txs =
                level, tsp, source, destination, contract, amount, transfer_index) \
                values(${op.bo_hash}, ${op.bo_index}, ${op.bo_block}, ${op.bo_level}, \
                ${op.bo_tsp}, ${tx.tr_source}, ${txd.tr_destination}, \
-               ${tr.destination}, ${txd.tr_amount}, $transfer_index) \
+               $contract, ${txd.tr_amount}, $transfer_index) \
                on conflict do nothing"] in
           Int32.succ transfer_index
         ) transfer_index tx.tr_txs) 0l txs in
   ()
 
-let insert_ft_mint_burn dbh op ~contract ~burn ~owner ~amount =
+let insert_ft_mint_burn ~dbh ~op ~contract ~burn ~owner ~amount =
   let source, destination = if burn then Some owner, None else None, Some owner in
   [%pgsql dbh
       "insert into ft_token_updates(transaction, index, block, \
@@ -1073,36 +1136,39 @@ let insert_ft_mint_burn dbh op ~contract ~burn ~owner ~amount =
        $contract, $amount) \
        on conflict do nothing"]
 
-let insert_transaction config dbh op tr =
-  let parse_ft = function
-    | Ok (FT_transfers t) ->
-      Format.printf "\027[0;35mFT transfer %s %ld %s\027[0m@."
-        (short op.bo_hash) op.bo_index (short tr.destination);
-      insert_ft_transfers dbh op tr t
-    | Ok (FT_mint {owner; amount; _}) ->
-      Format.printf "\027[0;35mFT mint %s %ld %s\027[0m@."
-        (short op.bo_hash) op.bo_index (short tr.destination);
-      insert_ft_mint_burn dbh op ~burn:false ~contract:tr.destination ~owner ~amount
-    | Ok (FT_burn {owner; amount; _}) ->
-      Format.printf "\027[0;35mFT burn %s %ld %s\027[0m@."
-        (short op.bo_hash) op.bo_index (short tr.destination);
-      insert_ft_mint_burn dbh op ~burn:true ~contract:tr.destination ~owner ~amount
-    | _ -> Lwt.return_ok () in
-  match tr.parameters with
-  | None | Some { value = Other _; _ } | Some { value = Bytes _; _ } -> Lwt.return_ok ()
-  | Some {entrypoint; value = Micheline m} ->
-    if tr.destination = config.Crawlori.Config.extra.royalties then (* royalties *)
+let insert_ft ~dbh ~op ~contract = function
+  | Ok (FT_transfers t) ->
+    Format.printf "\027[0;35mFT transfer %s %ld %s\027[0m@."
+      (short op.bo_hash) op.bo_index (short contract);
+    insert_ft_transfers ~dbh ~op ~contract t
+  | Ok (FT_mint {owner; amount; _}) ->
+    Format.printf "\027[0;35mFT mint %s %ld %s\027[0m@."
+      (short op.bo_hash) op.bo_index (short contract);
+    insert_ft_mint_burn ~dbh ~op ~burn:false ~contract ~owner ~amount
+  | Ok (FT_burn {owner; amount; _}) ->
+    Format.printf "\027[0;35mFT burn %s %ld %s\027[0m@."
+      (Utils.short op.bo_hash) op.bo_index (Utils.short contract);
+    insert_ft_mint_burn ~dbh ~op ~burn:true ~contract ~owner ~amount
+  | _ -> Lwt.return_ok ()
+
+
+let insert_transaction ~config ~dbh ~op tr =
+  let contract = tr.destination in
+  match tr.parameters, op.bo_meta with
+  | None, _ | Some { value = Other _; _ }, _ | Some { value = Bytes _; _ }, _ | _, None -> Lwt.return_ok ()
+  | Some {entrypoint; value = Micheline m}, Some meta ->
+    if contract = config.Crawlori.Config.extra.royalties then (* royalties *)
       match Parameters.parse_royalties entrypoint m with
       | Ok roy ->
-        Format.printf "\027[0;35mset royalties %s %ld\027[0m@." (short op.bo_hash) op.bo_index;
-        insert_royalties dbh op roy
+        Format.printf "\027[0;35mset royalties %s %ld\027[0m@." (Utils.short op.bo_hash) op.bo_index;
+        insert_royalties ~dbh ~op roy
       | _ -> Lwt.return_ok ()
-    else if tr.destination = config.Crawlori.Config.extra.exchange_v2 then (* exchange_v2 *)
+    else if contract = config.Crawlori.Config.extra.exchange_v2 then (* exchange_v2 *)
       begin match Parameters.parse_exchange entrypoint m with
         | Ok (Cancel hash) ->
           Format.printf "\027[0;35mcancel order %s %ld %s\027[0m@."
             (short op.bo_hash) op.bo_index (hash :> string);
-          insert_cancel dbh op hash
+          insert_cancel ~dbh ~op hash
         | Ok (DoTransfers
                 {left; left_maker; left_asset;
                  right; right_maker; right_asset;
@@ -1110,7 +1176,7 @@ let insert_transaction config dbh op tr =
           Format.printf "\027[0;35mapply orders %s %ld %s %s\027[0m@."
             (short op.bo_hash) op.bo_index (left :> string) (right :> string);
           insert_do_transfers
-            dbh op
+            ~dbh ~op
             ~left ~left_maker ~left_asset
             ~right ~right_maker ~right_asset
             ~fill_make_value ~fill_take_value
@@ -1118,78 +1184,115 @@ let insert_transaction config dbh op tr =
           (* todo : match order *)
           Lwt.return_ok ()
       end
-    else if List.mem tr.destination config.Crawlori.Config.extra.ft_fa2 then
-      parse_ft @@ Parameters.parse_ft_fa2 entrypoint m
-    else if List.mem tr.destination config.Crawlori.Config.extra.ft_fa1 then
-      parse_ft @@ Parameters.parse_ft_fa1 entrypoint m
-    else if List.mem tr.destination config.Crawlori.Config.extra.ft_lugh then
-      parse_ft @@ Parameters.parse_ft_lugh entrypoint m
-    else (* nft *)
+    else match
+        SMap.find_opt contract config.Crawlori.Config.extra.ft_contracts,
+        SMap.find_opt contract config.Crawlori.Config.extra.contracts with
+    | Some Fa2, _ -> insert_ft ~dbh ~op ~contract @@ Parameters.parse_ft_fa2 entrypoint m
+    | Some Fa1, _ -> insert_ft ~dbh ~op ~contract @@ Parameters.parse_ft_fa1 entrypoint m
+    | Some Lugh, _ -> insert_ft ~dbh ~op ~contract @@ Parameters.parse_ft_lugh entrypoint m
+    | Some (Custom _), _ -> Lwt.return_ok () (* todo custom erc20 *)
+    | _, None -> Lwt.return_ok ()
+    | _, Some ledger_info ->
+      let balances = match ledger_info with
+          | None -> None
+          | Some info ->
+            Some (Storage_diff.get_big_map_updates ~id:info.ledger_id info.ledger_key info.ledger_value meta.op_lazy_storage_diff) in
+      let>? () = insert_token_balances ~dbh ~op ~contract balances in
       begin match Parameters.parse_fa2 entrypoint m with
         | Ok (Mint_tokens m) ->
           Format.printf "\027[0;35mmint %s %ld %s\027[0m@."
-            (short op.bo_hash) op.bo_index (short tr.destination);
-          insert_mint dbh op tr.destination m
+            (short op.bo_hash) op.bo_index (short contract);
+          insert_mint ~dbh ~op ~contract m
         | Ok (Burn_tokens b) ->
           Format.printf "\027[0;35mburn %s %ld %s\027[0m@."
-            (short op.bo_hash) op.bo_index (short tr.destination);
-          insert_burn dbh op tr b
+            (short op.bo_hash) op.bo_index (short contract);
+          insert_burn ~dbh ~op ~contract b
         | Ok (Transfers t) ->
           Format.printf "\027[0;35mtransfer %s %ld %s\027[0m@."
-            (short op.bo_hash) op.bo_index (short tr.destination);
-          insert_transfer dbh op tr t
+            (short op.bo_hash) op.bo_index (short contract);
+          insert_transfer ~dbh ~op ~contract t
         | Ok (Operator_updates t) ->
           Format.printf "\027[0;35mupdate operator %s %ld %s\027[0m@."
-            (short op.bo_hash) op.bo_index (short tr.destination);
-          insert_update_operator dbh op tr t
+            (short op.bo_hash) op.bo_index (short contract);
+          insert_update_operator ~dbh ~op ~contract t
         | Ok (Operator_updates_all t) ->
           Format.printf "\027[0;35mupdate operator all %s %ld %s\027[0m@."
-            (short op.bo_hash) op.bo_index (short tr.destination);
-          insert_update_operator_all dbh op tr t
+            (short op.bo_hash) op.bo_index (short contract);
+          insert_update_operator_all ~dbh ~op ~contract t
         | Ok (Metadata_uri s) ->
           Format.printf "\027[0;35mset uri %s %ld %s\027[0m@."
-            (short op.bo_hash) op.bo_index (short tr.destination);
-          insert_metadata_uri dbh op tr s
+            (short op.bo_hash) op.bo_index (short contract);
+          insert_metadata_uri ~dbh ~op ~contract s
         | Ok (Token_metadata x) ->
           Format.printf "\027[0;35mset metadata %s %ld %s\027[0m@."
-            (short op.bo_hash) op.bo_index (short tr.destination);
-          insert_token_metadata dbh op tr x
+            (short op.bo_hash) op.bo_index (short contract);
+          insert_token_metadata ~dbh ~op ~contract x
         | Error _ -> Lwt.return_ok ()
+
       end
 
-let filter_contracts dbh ori =
+let filter_contracts dbh op ori =
+  let open Contract_spec in
   let|>? r = [%pgsql.object dbh "select admin_wallet, royalties_contract from state"] in
-  match r with
-  | [ r ] ->
-    let open Utils in
-    if match_entrypoints (fa2_entrypoints @ fa2_ext_entrypoints) ori.script.code then
-      match match_fields [ "ledger"; "owner"; "admin"; "royaltiesContract" ] ori.script with
-      | Ok [ Some _; Some (Mstring owner); None; Some (Mstring royalties_contract) ] ->
-        if r#royalties_contract = royalties_contract then
-          Some (`nft (owner, (Z.to_int64 Z.zero)))
-        else None
-      | Ok [ Some _; _; Some (Mstring admin); _ ] ->
-        Some (`nft (admin, (Z.to_int64 Z.zero)))
-      | _ ->
-        None
-    else None
+  match r, op.bo_meta, get_entrypoints ori.script with
+  | [ r ], Some meta, Ok entrypoints ->
+    let allocs = Storage_diff.big_map_allocs meta.op_lazy_storage_diff in
+    begin match
+        match_entrypoints ~expected:(fa2_entrypoints @ fa2_ext_entrypoints) ~entrypoints,
+        match_fields ~expected:["ledger"; "owner"; "admin"; "royaltiesContract"] ~allocs ori.script
+      with
+      | [ b_balance; b_update; b_transfer; b_update_all; b_mint; b_burn; b_metadata ],
+        Ok [ f_ledger; f_owner; f_admin; f_royalties_contract ] ->
+        let fa2_spec = match b_balance && b_update && b_transfer, f_ledger with
+          | true, (_, Some (id, k, v)) -> Some (id, k, v)
+          | _ -> None in
+        let ubi_spec = match f_admin with
+          | Some (`address owner), _ -> Some owner
+          | _ -> None in
+        let rarible_spec = match b_update_all && b_mint && b_burn && b_metadata, f_owner, f_royalties_contract with
+          | true, (Some (`address owner), _), (Some (`address royalties_contract), _) when royalties_contract = r#royalties_contract -> Some owner
+          | _ -> None in
+        begin match fa2_spec, rarible_spec, ubi_spec with
+          | Some (id, k, v), Some owner, _ -> Some (`rarible (id, k, v, owner))
+          | Some (id, k, v), _, Some owner -> Some (`ubi (id, k, v, owner))
+          | Some (id, k, v), _, _ -> Some (`fa2 (id, k, v))
+          | _ -> None
+        end
+      | _ -> None
+    end
   | _ -> None
 
 let insert_origination config dbh op ori =
-  let>? r = filter_contracts dbh ori in
+  let>? r = filter_contracts dbh op ori in
   match r with
-  | None -> Lwt.return_ok ()
-  | Some (`nft (owner, ledger_id)) ->
+  | None ->
+    Lwt.return_ok ()
+  | Some k ->
     let kt1 = Tzfunc.Crypto.op_to_KT1 op.bo_hash in
+    let kind, owner, ledger_id, ledger_key, ledger_value, contract_value = match k with
+      | `rarible (id, k, v, owner) ->
+        "rarible", Some owner, Some (Z.to_string id), Some (EzEncoding.construct micheline_type_short_enc k),
+        Some (EzEncoding.construct micheline_type_short_enc v),
+        Some {ledger_id=id; ledger_key=k; ledger_value=v}
+      | `ubi (id, k, v, owner) ->
+        "ubi", Some owner, Some (Z.to_string id), Some (EzEncoding.construct micheline_type_short_enc k),
+        Some (EzEncoding.construct micheline_type_short_enc v),
+        Some {ledger_id=id; ledger_key=k; ledger_value=v}
+      | `fa2 (id, k, v) ->
+        "fa2", None, Some (Z.to_string id), Some (EzEncoding.construct micheline_type_short_enc k),
+        Some (EzEncoding.construct micheline_type_short_enc v),
+        Some {ledger_id=id; ledger_key=k; ledger_value=v} in
     let|>? () = [%pgsql dbh
         "insert into contracts(kind, address, owner, block, level, tsp, \
-         last_block, last_level, last, ledger_id) \
-         values('nft', $kt1, $owner, ${op.bo_block}, ${op.bo_level}, \
-         ${op.bo_tsp}, ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, $ledger_id) \
+         last_block, last_level, last, ledger_id, ledger_key, ledger_value) \
+         values($kind, $kt1, $?owner, ${op.bo_block}, ${op.bo_level}, \
+         ${op.bo_tsp}, ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, $?ledger_id, \
+         $?ledger_key, $?ledger_value) \
          on conflict do nothing"] in
     let open Crawlori.Config in
+    config.extra.contracts <- SMap.add kt1 contract_value config.extra.contracts;
     match config.accounts with
-    | None -> config.accounts <- Some (SSet.singleton kt1)
+    | None -> config.accounts <- Some (SSet.singleton kt1);
     | Some accs -> config.accounts <- Some (SSet.add kt1 accs)
 
 let insert_operation config dbh op =
@@ -1198,7 +1301,7 @@ let insert_operation config dbh op =
   | Some meta ->
     if meta.op_status = `applied then
       match op.bo_op.kind with
-      | Transaction tr -> insert_transaction config dbh op tr
+      | Transaction tr -> insert_transaction ~config ~dbh ~op tr
       (* | Origination ori -> set_origination config dbh op ori *)
       | _ -> Lwt.return_ok ()
     else Lwt.return_ok ()
@@ -1446,6 +1549,51 @@ let token_updates dbh main l =
         else Lwt.return_ok ()
       | _ -> Lwt.return_error (`hook_error "invalid token_update")) l
 
+let token_balance_updates dbh main l =
+  let>? m = fold_rp (fun acc r ->
+      let>? l = match r#kind, r#account, r#balance with
+        | "multi", Some account, Some balance ->
+          let balance = if main then Some balance else None in
+          [%pgsql dbh "update tokens set balance = $?balance where contract = ${r#contract} \
+                       and token_id = ${r#token_id} and owner = $account \
+                       returning owner, amount, balance"]
+        | "multi", Some account, None ->
+          let balance = if main then Some 0L else None in
+          [%pgsql dbh "update tokens set balance = $?balance where contract = ${r#contract} \
+                       and token_id = ${r#token_id} and owner = $account \
+                       returning owner, amount, balance"]
+        | "nft", Some account, _ ->
+          let balance_src = if main then Some 0L else None in
+          let balance_dst = if main then Some 1L else None in
+          let>? l1 =
+            [%pgsql dbh "update tokens set balance = $?balance_src where contract = ${r#contract} \
+                         and token_id = ${r#token_id} \
+                         returning owner, amount, balance"] in
+          let>? l2 = [%pgsql dbh
+              "update tokens set balance = $?balance_dst where contract = ${r#contract} \
+               and token_id = ${r#token_id} and owner = $account \
+               returning owner, amount, balance"] in
+          Lwt.return_ok (l1 @ l2)
+        | "nft", None, _ ->
+          let balance = if main then Some 0L else None in
+          [%pgsql dbh
+              "update tokens set balance = $?balance where contract = ${r#contract} \
+               and token_id = ${r#token_id} \
+               returning owner, amount, balance"]
+        | _ -> Lwt.return_ok [] in
+      Lwt.return_ok @@
+      List.fold_left (fun acc (account, amount, balance) ->
+          match balance with
+          | Some b when b <> amount ->
+            TMap.add (r#contract, r#token_id, account) (amount, b) acc
+          | _ -> acc) acc l
+    ) TMap.empty l in
+  iter_rp (fun ((contract, token_id, owner), (amount, balance)) ->
+      Format.printf "\027[0;33mWarning: wrong aggregate amount: %Ld, balance = %Ld\027[0m" amount balance;
+      [%pgsql dbh
+          "update tokens set amount = $balance where contract = $contract \
+           and token_id = $token_id and owner = $owner"]) @@ TMap.bindings m
+
 let ft_token_updates dbh main l =
   iter_rp (fun r ->
       let amount = if main then r#amount else Int64.neg r#amount in
@@ -1501,7 +1649,6 @@ let set_main _config dbh {Hooks.m_main; m_hash} =
   let>? c_updates =
     [%pgsql.object dbh
         "update contract_updates set main = $m_main where block = $m_hash returning *"] in
-
   let>? cancels =
     [%pgsql.object
       dbh "update order_cancel set main = $m_main where block = $m_hash returning *"] in
@@ -1511,9 +1658,13 @@ let set_main _config dbh {Hooks.m_main; m_hash} =
   let>? ft_updates =
     [%pgsql.object dbh
         "update ft_token_updates set main = $m_main where block = $m_hash returning *"] in
+  let>? tb_updates =
+    [%pgsql.object dbh
+        "update token_balance_updates set main = $m_main where block = $m_hash returning *"] in
   let>? () = contract_updates dbh m_main @@ sort c_updates in
   let>? () = token_updates dbh m_main @@ sort t_updates in
   let>? () = ft_token_updates dbh m_main @@ sort ft_updates in
+  let>? () = token_balance_updates dbh m_main @@ sort tb_updates in
   let>? () = produce_cancel_events dbh m_main @@ sort cancels in
   let>? () = produce_match_events dbh m_main @@ sort matches in
   Lwt.return_ok ()
@@ -1992,13 +2143,13 @@ let mk_nft_collection obj =
   let name, symbol = mk_nft_collection_name_symbol obj in
   {
     nft_collection_id = obj#address ;
-    nft_collection_owner = Some (obj#owner) ;
+    nft_collection_owner = obj#owner ;
     nft_collection_type = CTFA_2 ;
     nft_collection_name = name ;
     nft_collection_symbol = symbol ;
     nft_collection_features = [] ;
     nft_collection_supports_lazy_mint = false ;
-    nft_collection_minters = Some [ obj#owner ]
+    nft_collection_minters = match obj#owner with None -> None | Some owner -> Some [ owner ]
   }
 
 let get_nft_collection_by_id ?dbh collection =
