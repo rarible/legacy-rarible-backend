@@ -1915,13 +1915,13 @@ let get_head () =
 let make_config admin_wallet validator exchange_v2 royalties contracts ft_contracts
     kafka_broker kafka_username kafka_password =
   let open Crawlori.Config in
-  (* get_head () >>= function
-   * | Error (code, str) ->
-   *   failwith (Printf.sprintf "get_head error %d %s" code (Option.value ~default:"" str))
-   * | Ok level -> *)
+  get_head () >>= function
+  | Error (code, str) ->
+    failwith (Printf.sprintf "get_head error %d %s" code (Option.value ~default:"" str))
+  | Ok level ->
     let config = {
       nodes = [ "https://granadanet.smartpy.io" ] ;
-      start =  Some 586460l ;
+      start =  Some Int32.(sub (of_string level) 30l)  ;
       db_kind = `pg ;
       step_forward = 30 ;
       accounts = None ;
