@@ -24,16 +24,9 @@ let kafka_section =
 
 [@@@get
   {register=true;
-   path="/kafka/nft_activity";
-   name="kafka_nft_activity";
-   output=Rtypes.nft_activity_enc;
-   section=kafka_section}]
-
-[@@@get
-  {register=true;
-   path="/kafka/order_activity";
-   name="kafka_order_activity";
-   output=Rtypes.order_activity_enc;
+   path="/kafka/activity";
+   name="kafka_activity";
+   output=Rtypes.activity_type_enc;
    section=kafka_section}]
 
 let () =
