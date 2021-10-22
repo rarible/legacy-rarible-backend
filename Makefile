@@ -38,7 +38,7 @@ deps:
 	@opam pin add -n -y ppx_deriving_jsoo.dev git+https://gitlab.com/o-labs/ppx_deriving_jsoo.git
 	@opam pin add -n -y --ignore-pin-depends tzfunc.~dev git+https://gitlab.com/functori/tzfunc.git
 	@opam pin add -n -y --ignore-pin-depends crawlori.~dev git+https://gitlab.com/functori/crawlori.git
-	@CRAWLORI_NO_UPDATE=true PGDATABASE=$(DB) opam install --deps-only --ignore-pin-depends .
+	PGDATABASE=$(DB) opam install --deps-only --ignore-pin-depends .
 
 ts-global-deps:
 	@sudo npm i -g typescript webpack webpack-cli
