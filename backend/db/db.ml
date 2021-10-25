@@ -475,37 +475,28 @@ let filter_creators =
 
 let token_metadata_enc = EzEncoding.ignore_enc tzip21_token_metadata_enc
 
-let get_nft_item_creators_from_metadata r =
-  try
-    begin
-      match r#creators with
-      | Some c ->
-        begin match EzEncoding.destruct ext_creators_enc c with
-          | CParts l -> l
-          | CAssoc l ->
-            List.map (fun (c, i) -> { part_account = c ; part_value = i }) l
-          | CTZIP12 l ->
-            let len = List.length l in
-            List.map (fun c -> { part_account = c ; part_value = Int32.of_int (10000 / len) }) l
-        end
-      | None -> []
-    end
-  with _ -> []
+let get_nft_item_creators dbh ~contract ~token_id =
+  let|>? r =
+    [%pgsql.object dbh
+        "select account, value FROM tzip21_creators where main and \
+         contract = $contract and token_id = $token_id"] in
+  List.map (fun r -> { part_account = r#account ; part_value = r#value} ) r
 
-let get_nft_item_owners ?dbh contract token_id =
-  use dbh @@ fun dbh ->
+let get_nft_item_owners dbh ~contract ~token_id =
   [%pgsql dbh
       "select owner FROM tokens where main and \
        amount > 0 and contract = $contract and token_id = $token_id"]
 
-let mk_nft_ownership obj =
-  let creators = get_nft_item_creators_from_metadata obj in
+let mk_nft_ownership dbh obj =
+  let contract = obj#contract in
+  let token_id = obj#token_id in
+  let|>? creators = get_nft_item_creators dbh ~contract ~token_id in
   (* TODO : pending *)
   (* TODO : last <> mint date ? *)
-  Lwt.return_ok {
+  {
     nft_ownership_id = Option.get obj#id ;
-    nft_ownership_contract = obj#contract ;
-    nft_ownership_token_id = obj#token_id ;
+    nft_ownership_contract = contract ;
+    nft_ownership_token_id = token_id ;
     nft_ownership_owner = obj#owner ;
     nft_ownership_creators = creators ;
     nft_ownership_value = Int64.to_string obj#amount ;
@@ -520,13 +511,12 @@ let get_nft_ownership_by_id ?dbh ?(old=false) contract token_id owner =
   use dbh @@ fun dbh ->
   let>? l = [%pgsql.object dbh
       "select concat(contract, ':', token_id, ':', owner) as id, \
-       contract, token_id, owner, last, amount, supply, metadata, \
-       name, creators, description, attributes, image, animation \
+       contract, token_id, owner, last, amount, supply, metadata \
        from tokens where \
        main and contract = $contract and token_id = $token_id and \
        owner = $owner and (amount > 0 or $old)"] in
   let>? obj = one l in
-  let>? nft_ownership = mk_nft_ownership obj in
+  let>? nft_ownership = mk_nft_ownership dbh obj in
   Lwt.return_ok nft_ownership
 
 (* let get_nft_item_royalties ?dbh id =
@@ -572,75 +562,139 @@ let get_nft_ownership_by_id ?dbh ?(old=false) contract token_id owner =
  *     nft_item_attribute_value = obj#value ;
  *   } *)
 
-(* let get_nft_item_meta ?dbh id =
- *   use dbh @@ fun dbh ->
- *   let>? meta = [%pgsql.object dbh
- *       "select name, description from nft_item_meta where id = $id "] in
- *   let>? meta = one meta in
- *   let>? medias = [%pgsql.object dbh
- *       "select url, media_type, width, height from nft_media where id = $id "] in
- *   let>? media = one medias in
- *   let>? attributes = [%pgsql.object dbh
- *       "select key, value from nft_item_attributes where id = $id "] in
- *   let>? image =
- *     if media#media_type = "image/png" then
- *       let|>? m = mk_nft_media media in
- *       Some m
- *     else Lwt.return_ok None in
- *   let>? animation =
- *     if media#media_type = "image/gif" then
- *       let|>? m = mk_nft_media media in
- *       Some m
- *     else Lwt.return_ok None in
- *   map_rp (fun r -> mk_item_attribute r) attributes >>=? fun attributes ->
- *   let attrs = match attributes with [] -> None | _ -> Some attributes in
- *   Lwt.return_ok {
- *     nft_item_meta_name = meta#name ;
- *     nft_item_meta_description = meta#description ;
- *     nft_item_meta_attributes = attrs ;
- *     nft_item_meta_image = image ;
- *     nft_item_meta_animation = animation ;
- *   } *)
+let mk_tzip21_format r =
+  let dim =
+    match r#dimensions_value, r#dimensions_unit with
+    | Some dv, Some du -> Some { format_dim_value = dv ; format_dim_unit = du }
+    | _, _ -> None in
+  let data_rate =
+    match r#data_rate_value, r#data_rate_unit with
+    | Some dv, Some du -> Some { format_dim_value = dv ; format_dim_unit = du }
+    | _, _ -> None in
+  {
+    format_uri = r#uri ;
+    format_hash = r#hash ;
+    format_mime_type = r#mime_type ;
+    format_file_size = Option.bind r#file_size (fun i -> Some (Int32.to_int i)) ;
+    format_file_name = r#file_name ;
+    format_duration = r#duration ;
+    format_dimensions = dim ;
+    format_data_rate = data_rate }
 
-let mk_nft_media json =
-  try Some (EzEncoding.destruct nft_media_enc json)
-  with _ ->
-  try
-    let url = EzEncoding.destruct Json_encoding.string json in
-    Some {
-      nft_media_url = [ "", url ] ;
-      nft_media_meta = [] ;
-    }
-  with _ -> None
-
-let mk_nft_attributes json =
-  try Some (EzEncoding.destruct (Json_encoding.list nft_item_attribute_enc) json)
-  with _ -> None
-
-let mk_nft_item_meta r = match r#metadata with
-  | "{}" -> None
+let get_metadata_formats dbh ~contract ~token_id =
+  let>? l =
+    [%pgsql.object dbh
+        "select uri, hash, mime_type, file_size, file_name, duration, \
+         dimensions_value, dimensions_unit, data_rate_value, data_rate_unit \
+         from tzip21_formats where \
+         contract = $contract and token_id = $token_id and main"] in
+  match l with
+  | [] -> Lwt.return_ok None
   | _ ->
-    try
-      let meta = EzEncoding.destruct token_metadata_enc r#metadata in
-      Some {
-        nft_item_meta_name = Option.value ~default:"NO NAME" meta.tzip21_tm_name ;
-        nft_item_meta_description = meta.tzip21_tm_description ;
-        nft_item_meta_attributes =
-          Option.bind meta.tzip21_tm_attributes
-            (fun l -> Some (tzip21_attributes_to_rarible_attributes l)) ;
-        nft_item_meta_image = meta.tzip21_tm_display_uri ;
-        nft_item_meta_animation = None ;
-      }
-    with _ ->
-      None
+    let formats = List.map (fun r -> mk_tzip21_format r) l in
+    Lwt.return_ok (Some formats)
 
-let mk_nft_item ?dbh ?include_meta obj =
-  let creators = get_nft_item_creators_from_metadata obj in
-  get_nft_item_owners ?dbh obj#contract obj#token_id >>=? fun owners ->
+let mk_tzip21_attribute r =
+  Lwt.return_ok {
+    attribute_name = r#name ;
+    attribute_value = r#value ;
+    attribute_type = r#typ ;
+  }
+
+let get_metadata_attributes dbh ~contract ~token_id =
+  let>? l =
+    [%pgsql.object dbh
+        "select name, value, type as typ from tzip21_attributes where \
+         contract = $contract and token_id = $token_id and main"] in
+  match l with
+  | [] -> Lwt.return_ok None
+  | _ ->
+    map_rp (fun r -> mk_tzip21_attribute r) l >>=? fun attributes ->
+    Lwt.return_ok (Some attributes)
+
+let mk_nft_item_meta dbh ~contract ~token_id =
+  let>? creators = get_nft_item_creators dbh ~contract ~token_id in
+  let>? formats = get_metadata_formats dbh ~contract ~token_id in
+  let>? attributes = get_metadata_attributes dbh ~contract ~token_id in
+  let>? l = [%pgsql.object dbh
+      "select contract, token_id, block, level, tsp, \
+       name, symbol, decimals, artifact_uri, display_uri, thumbnail_uri, \
+       description, minter, is_boolean_amount, tags, contributors, \
+       publishers, date, block_level, genres, language, rights, right_uri, \
+       is_transferable, should_prefer_symbol from tzip21_metadata where \
+       contract = $contract and token_id = $token_id and main"] in
+  match l with
+  | [] ->
+    Lwt.return_error (`hook_error ("metadata not found for " ^ contract ^ ":" ^ token_id))
+  | r :: _ ->
+    let tags =
+      Option.bind r#tags (fun l -> Some (List.filter_map (fun x -> x) l)) in
+    let contributors =
+      Option.bind r#contributors (fun l -> Some (List.filter_map (fun x -> x) l)) in
+    let publishers =
+      Option.bind r#publishers (fun l -> Some (List.filter_map (fun x -> x) l)) in
+    let genres =
+      Option.bind r#genres (fun l -> Some (List.filter_map (fun x -> x) l)) in
+    let block_level =
+      Option.bind r#block_level (fun i -> Option.some @@ Int32.to_int i) in
+    Lwt.return_ok @@ Option.some {
+      tzip21_tm_name = r#name ;
+      tzip21_tm_symbol = r#symbol ;
+      tzip21_tm_decimals = Option.bind r#decimals (fun i -> Some (Int32.to_int i)) ;
+      tzip21_tm_artifact_uri = r#artifact_uri ;
+      tzip21_tm_display_uri = r#display_uri ;
+      tzip21_tm_thumbnail_uri = r#thumbnail_uri ;
+      tzip21_tm_description = r#description ;
+      tzip21_tm_minter = r#minter ;
+      tzip21_tm_creators = Some (CParts creators) ;
+      tzip21_tm_is_boolean_amount = r#is_boolean_amount ;
+      tzip21_tm_formats = formats ;
+      tzip21_tm_attributes = attributes ;
+      tzip21_tm_tags = tags ;
+      tzip21_tm_contributors = contributors ;
+      tzip21_tm_publishers = publishers ;
+      tzip21_tm_date = r#date ;
+      tzip21_tm_block_level = block_level ;
+      tzip21_tm_genres = genres ;
+      tzip21_tm_language = r#language ;
+      tzip21_tm_rights = r#rights ;
+      tzip21_tm_right_uri = r#right_uri ;
+      tzip21_tm_is_transferable = r#is_transferable ;
+      tzip21_tm_should_prefer_symbol = r#should_prefer_symbol ;
+    }
+
+let rarible_attributes_of_tzip21_attributes = function
+  | None -> None
+  | Some attr ->
+    Option.some @@
+    List.map (fun a ->
+        { nft_item_attribute_key = a.attribute_name ;
+          nft_item_attribute_value = Some a.attribute_value ;
+          nft_item_attribute_type = a.attribute_type ;
+          nft_item_attribute_format = None ;
+        }) attr
+
+let rarible_meta_of_tzip21_meta meta =
+  match meta with
+  | None -> None
+  | Some m ->
+    Some {
+      nft_item_meta_name = Option.value ~default:"Unnamed item" m.tzip21_tm_name ;
+      nft_item_meta_description = m.tzip21_tm_description ;
+      nft_item_meta_attributes = rarible_attributes_of_tzip21_attributes m.tzip21_tm_attributes ;
+      nft_item_meta_image = m.tzip21_tm_display_uri ;
+      nft_item_meta_animation = None ;
+    }
+
+let mk_nft_item dbh ?include_meta obj =
+  let contract = obj#contract in
+  let token_id = obj#token_id in
+  let>? creators = get_nft_item_creators dbh ~contract ~token_id in
+  get_nft_item_owners dbh ~contract ~token_id >>=? fun owners ->
   (* get_nft_item_royalties  >>=? fun royalties -> *)
-  let meta = match include_meta with
-    | Some true -> mk_nft_item_meta obj
-    | _ -> None in
+  let>? meta = match include_meta with
+    | Some true -> mk_nft_item_meta dbh ~contract ~token_id
+    | _ -> Lwt.return_ok None in
   Lwt.return_ok {
     nft_item_id = Option.get obj#id ;
     nft_item_contract = obj#contract ;
@@ -654,7 +708,7 @@ let mk_nft_item ?dbh ?include_meta obj =
     nft_item_minted_at = obj#tsp ;
     nft_item_pending = None ;
     nft_item_deleted = if obj#supply > 0L then Some false else Some true ;
-    nft_item_meta = meta ;
+    nft_item_meta = rarible_meta_of_tzip21_meta meta ;
   }
 
 let get_nft_item_by_id ?dbh ?include_meta contract token_id =
@@ -665,13 +719,12 @@ let get_nft_item_by_id ?dbh ?include_meta contract token_id =
   use dbh @@ fun dbh ->
   let>? l = [%pgsql.object dbh
       "select concat(contract, ':', token_id) as id, contract, token_id, \
-       last, amount, supply, metadata, name, creators, description, attributes, \
-       image, animation, tsp \
+       last, amount, supply, metadata, tsp \
        from tokens where \
        main and contract = $contract and token_id = $token_id"] in
   match l with
   | obj :: _ ->
-    let>? nft_item = mk_nft_item ~dbh ?include_meta obj in
+    let>? nft_item = mk_nft_item dbh ?include_meta obj in
     Lwt.return_ok nft_item
   | [] -> Lwt.return_error (`hook_error "nft_item not found")
 
@@ -686,14 +739,19 @@ let produce_order_event_hash dbh hash =
   Lwt.return_ok ()
 
 let produce_nft_item_event dbh contract token_id =
-  let>? item = get_nft_item_by_id ~dbh ~include_meta:true contract token_id in
-  if Int64.of_string item.nft_item_supply = 0L then
-    Rarible_kafka.produce_item_event (mk_delete_item_event item)
-    >>= fun () ->
-    Lwt.return_ok ()
-  else
-    Rarible_kafka.produce_item_event (mk_update_item_event item)
-    >>= fun () ->
+  let> item = get_nft_item_by_id ~dbh ~include_meta:true contract token_id in
+  match item with
+  | Ok item ->
+    if Int64.of_string item.nft_item_supply = 0L then
+      Rarible_kafka.produce_item_event (mk_delete_item_event item)
+      >>= fun () ->
+      Lwt.return_ok ()
+    else
+      Rarible_kafka.produce_item_event (mk_update_item_event item)
+      >>= fun () ->
+      Lwt.return_ok ()
+  | Error err ->
+    Printf.eprintf "couldn't produce nft event %S\n%!" @@ Crp.string_of_error err ;
     Lwt.return_ok ()
 
 let produce_nft_ownership_update_event os =
@@ -707,7 +765,9 @@ let produce_nft_ownership_event dbh contract token_id owner =
     get_nft_ownership_by_id
       ~old:true ~dbh contract token_id owner >>= function
     | Ok os -> produce_nft_ownership_update_event os
-    | Error _ -> Lwt.return_unit
+    | Error err ->
+      Printf.eprintf "Couldn't produce ownership event %S\n%!" @@ Crp.string_of_error err ;
+      Lwt.return_unit
   end >>= fun () ->
   Lwt.return_ok ()
 
@@ -805,26 +865,172 @@ let get_metadata meta =
   with _ ->
     None, None, None, None, None
 
+let get_metadata_json meta =
+  (* 3 ways to recovers metadata :directly json, ipfs link and http(s) link *)
+  try
+    Lwt.return_ok (meta, EzEncoding.destruct token_metadata_enc meta)
+  with _ ->
+    begin
+      let proto = String.sub meta 0 6 in
+      if proto = "https:" || proto = "http:/" then EzReq_lwt.get (EzAPI.URL meta)
+      else if proto = "ipfs:/" then
+        let url = String.sub meta 7 ((String.length meta) - 7) in
+        EzReq_lwt.get
+          (EzAPI.URL (Printf.sprintf "https://cloudflare-ipfs.com/ipfs/%s" url))
+      else Lwt.return_error (0, Some (Printf.sprintf "unknow scheme %s"proto))
+    end >>= function
+    | Ok json ->
+      begin try
+          let metadata = EzEncoding.destruct token_metadata_enc json in
+          Lwt.return_ok (json, metadata)
+        with _ -> Lwt.return_error (-1, None)
+      end
+    | Error (c, str) -> Lwt.return_error (c, str)
+
+let insert_mint_metadata_creators  dbh ~contract ~token_id ~block ~level ~tsp ~metadata =
+  match metadata.tzip21_tm_creators with
+  | Some (CParts l) ->
+    iter_rp (fun p ->
+        [%pgsql dbh
+            "insert into tzip21_creators(contract, token_id, block, level, \
+             tsp, account, value) \
+             values($contract, $token_id, $block, $level, $tsp, \
+             ${p.part_account}, ${p.part_value}) \
+             on conflict do nothing"])
+      l
+  | Some (CAssoc l) ->
+    iter_rp (fun (part_account, part_value) ->
+        [%pgsql dbh
+            "insert into tzip21_creators(contract, token_id, block, level, \
+             tsp, account, value) \
+             values($contract, $token_id, $block, $level, $tsp, $part_account, \
+             $part_value) \
+             on conflict do nothing"])
+      l
+  | Some (CTZIP12 l) ->
+    let len = List.length l in
+    let value = Int32.of_int (10000 / len) in
+    iter_rp (fun part_account ->
+        [%pgsql dbh
+            "insert into tzip21_creators(contract, token_id, block, level, \
+             tsp, account, value) \
+             values($contract, $token_id, $block, $level, $tsp, \
+             $part_account, $value) \
+             on conflict do nothing"])
+      l
+  | None ->
+    Lwt.return_ok ()
+
+let insert_mint_metadata_formats dbh ~contract ~token_id ~block ~level ~tsp ~metadata =
+  match metadata.tzip21_tm_formats with
+  | Some formats ->
+  iter_rp (fun f ->
+      let size = Option.bind f.format_file_size (fun i -> Some (Int32.of_int i))  in
+      let dim_value, dim_unit =
+        match f.format_dimensions with
+        | None -> None, None
+        | Some d -> Some d.format_dim_value, Some d.format_dim_unit in
+      let dr_value, dr_unit =
+        match f.format_data_rate with
+        | None -> None, None
+        | Some d -> Some d.format_dim_value, Some d.format_dim_unit in
+      [%pgsql dbh
+          "insert into tzip21_formats(contract, token_id, block, level, \
+           tsp, uri, hash, mime_type, file_size, file_name, duration, \
+           dimensions_value, dimensions_unit, data_rate_value, data_rate_unit) \
+           values($contract, $token_id, $block, $level, $tsp, ${f.format_uri}, \
+           $?{f.format_hash}, $?{f.format_mime_type}, $?size, \
+           $?{f.format_file_name}, $?{f.format_duration}, $?dim_value, \
+           $?dim_unit, $?dr_value, $?dr_unit) \
+           on conflict do nothing"])
+    formats
+  | None -> Lwt.return_ok ()
+
+let insert_mint_metadata_attributes dbh ~contract ~token_id ~block ~level ~tsp ~metadata =
+  match metadata.tzip21_tm_attributes with
+  | Some attributes ->
+    iter_rp (fun a ->
+        [%pgsql dbh
+            "insert into tzip21_attributes(contract, token_id, block, level, \
+             tsp, name, value, type) \
+             values($contract, $token_id, $block, $level, $tsp, \
+             ${a.attribute_name}, ${a.attribute_value}, $?{a.attribute_type}) \
+             on conflict do nothing"])
+      attributes
+  | None -> Lwt.return_ok ()
+
+let insert_mint_metadata dbh ~contract ~token_id ~block ~level ~tsp ~metadata =
+  let>? () =
+    insert_mint_metadata_creators dbh ~contract ~token_id ~block ~level ~tsp ~metadata in
+  let>? () =
+    insert_mint_metadata_formats dbh ~contract ~token_id ~block ~level ~tsp ~metadata in
+  let>? () =
+    insert_mint_metadata_attributes dbh ~contract ~token_id ~block ~level ~tsp ~metadata in
+  let name = metadata.tzip21_tm_name in
+  let symbol = metadata.tzip21_tm_symbol in
+  let decimals = Option.bind metadata.tzip21_tm_decimals (fun i -> Some (Int32.of_int i))  in
+  let artifact_uri = metadata.tzip21_tm_artifact_uri in
+  let display_uri = metadata.tzip21_tm_display_uri in
+  let thumbnail_uri = metadata.tzip21_tm_thumbnail_uri in
+  let description = metadata.tzip21_tm_description in
+  let minter = metadata.tzip21_tm_minter in
+  let is_boolean_amount = metadata.tzip21_tm_is_boolean_amount in
+  let tags = match metadata.tzip21_tm_tags with
+    | None -> None
+    | Some t -> Some (List.map Option.some t) in
+  let contributors = match metadata.tzip21_tm_contributors with
+    | None -> None
+    | Some c -> Some (List.map Option.some c) in
+  let publishers = match metadata.tzip21_tm_publishers with
+    | None -> None
+    | Some p -> Some (List.map Option.some p) in
+  let date = metadata.tzip21_tm_date in
+  let block_level = match metadata.tzip21_tm_block_level with
+    | None -> None
+    | Some i -> Some (Int32.of_int i) in
+  let genres = match metadata.tzip21_tm_genres with
+    | None -> None
+    | Some g -> Some (List.map Option.some g) in
+  let language = metadata.tzip21_tm_language in
+  let rights = metadata.tzip21_tm_rights in
+  let right_uri = metadata.tzip21_tm_right_uri in
+  let is_transferable = metadata.tzip21_tm_is_transferable in
+  let should_prefer_symbol = metadata.tzip21_tm_should_prefer_symbol in
+  [%pgsql dbh
+      "insert into tzip21_metadata(contract, token_id, block, level, tsp, \
+       name, symbol, decimals, artifact_uri, display_uri, thumbnail_uri, \
+       description, minter, is_boolean_amount, tags, contributors, \
+       publishers, date, block_level, genres, language, rights, right_uri, \
+       is_transferable, should_prefer_symbol) \
+       values ($contract, $token_id, $block, $level, $tsp, $?name, $?symbol, \
+       $?decimals, $?artifact_uri, $?display_uri, $?thumbnail_uri, \
+       $?description, $?minter, $?is_boolean_amount, $?tags, $?contributors, \
+       $?publishers, $?date, $?block_level, $?genres, $?language, $?rights, \
+       $?right_uri, $?is_transferable, $?should_prefer_symbol) \
+       on conflict do nothing"]
+
 let insert_mint ~dbh ~op ~contract m =
+  let block = op.bo_block in
+  let level = op.bo_level in
+  let tsp = op.bo_tsp in
   let token_id, owner, uri = match m with
-    | Fa2Mint m -> m.mi_op.tk_op.tk_token_id, m.mi_op.tk_owner, None
-    | UbiMint m -> m.mi_token_id, m.mi_account, m.mi_uri in
+    | Fa2Mint m -> m.fa2m_token_id, m.fa2m_owner, None
+    | UbiMint m -> m.ubim_token_id, m.ubim_owner, m.ubim_uri in
   let>? () = insert_account dbh owner ~block:op.bo_block ~level:op.bo_level ~tsp:op.bo_tsp in
   let>? () = match uri with
-    | Some url ->
+    | Some meta ->
       begin
-        EzReq_lwt.get (EzAPI.URL url) >>= function
-        | Ok json ->
-          let name, creators, description, attributes, image = get_metadata json in
+        get_metadata_json meta >>= function
+        | Ok (json, metadata) ->
+          let>? () =
+            insert_mint_metadata dbh ~contract ~token_id ~block ~level ~tsp ~metadata in
           [%pgsql dbh
               "insert into tokens(contract, token_id, block, level, tsp, \
-               last_block, last_level, last, owner, \
-               amount, metadata, transaction, supply, name, creators, \
-               description, attributes, image) \
-               values($contract, $token_id, ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, \
-               ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, $owner, 0, $json, \
-               ${op.bo_hash}, 0, $?name, $?creators, $?description, $?attributes, \
-               $?image) on conflict do nothing"]
+               last_block, last_level, last, owner, amount, metadata, \
+               transaction, supply) \
+               values($contract, $token_id, $block, $level, $tsp, $block, \
+               $level, $tsp, $owner, 0, $json, ${op.bo_hash}, 0) \
+               on conflict do nothing"]
         | Error (code, str) ->
           Printf.eprintf "Cannot get metadata from url: %d %s\n%!"
             code (match str with None -> "None" | Some s -> s);
@@ -832,19 +1038,18 @@ let insert_mint ~dbh ~op ~contract m =
               "insert into tokens(contract, token_id, block, level, tsp, \
                last_block, last_level, last, owner, \
                amount, transaction, supply) \
-               values($contract, $token_id, ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, \
-               ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, $owner, 0, \
-               ${op.bo_hash}, 0) on conflict do nothing"]
+               values($contract, $token_id, $block, $level, $tsp, \
+               $block, $level, $tsp, $owner, 0, ${op.bo_hash}, 0) \
+               on conflict do nothing"]
       end
     | None ->
       [%pgsql dbh
           "insert into tokens(contract, token_id, block, level, tsp, \
            last_block, last_level, last, owner, \
            amount, transaction, supply) \
-           values($contract, $token_id, ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, \
-           ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, $owner, 0, \
-           ${op.bo_hash}, 0) on conflict do nothing"] in
-
+           values($contract, $token_id, $block, $level, $tsp, $block, $level, \
+           $tsp, $owner, 0, ${op.bo_hash}, 0) \
+           on conflict do nothing"] in
   let mint = EzEncoding.construct mint_enc m in
   [%pgsql dbh
       "insert into contract_updates(transaction, index, block, level, tsp, \
@@ -952,12 +1157,23 @@ let insert_metadata_uri ~dbh ~op ~contract s =
 let insert_token_metadata ~dbh ~op ~contract (token_id, l) =
   let meta = EzEncoding.construct Rtypes.token_metadata_enc l in
   let source = op.bo_op.source in
-  [%pgsql dbh
-      "insert into token_updates(transaction, index, block, level, tsp, \
-       source, token_id, contract, metadata) \
-       values(${op.bo_hash}, ${op.bo_index}, ${op.bo_block}, ${op.bo_level}, \
-       ${op.bo_tsp}, $source, $token_id, $contract, $meta) \
-       on conflict do nothing"]
+  let block = op.bo_block in
+  let level = op.bo_level in
+  let tsp = op.bo_tsp in
+  let>? () =
+    [%pgsql dbh
+        "insert into token_updates(transaction, index, block, level, tsp, \
+         source, token_id, contract, metadata) \
+         values(${op.bo_hash}, ${op.bo_index}, $block, $level, $tsp, $source,\
+         $token_id, $contract, $meta) \
+         on conflict do nothing"] in
+  let> res = get_metadata_json meta in
+  match res with
+  | Ok (_json, metadata) ->
+    insert_mint_metadata dbh ~contract ~token_id ~block ~level ~tsp ~metadata
+  | Error _err ->
+    Printf.eprintf "wrong metadata format %S\n%!" meta ;
+    Lwt.return_ok ()
 
 let insert_royalties ~dbh ~op roy =
   let royalties = EzEncoding.(construct token_royalties_enc roy.roy_royalties) in
@@ -1388,9 +1604,8 @@ let contract_updates dbh main l =
         | Some json, _, _ ->
           let m = EzEncoding.destruct mint_enc json in
           let token_id, owner, amount, has_uri = match m with
-            | Fa2Mint m ->
-              m.mi_op.tk_op.tk_token_id, m.mi_op.tk_owner, m.mi_op.tk_op.tk_amount, false
-            | UbiMint m -> m.mi_token_id, m.mi_account, 1L, true in
+            | Fa2Mint m -> m.fa2m_token_id, m.fa2m_owner, m.fa2m_amount, false
+            | UbiMint m -> m.ubim_token_id, m.ubim_owner, 1L, m.ubim_uri <> None in
           let>? () =
             contract_updates_base
               dbh ~main ~contract ~block ~level ~tsp ~burn:false
@@ -1449,22 +1664,14 @@ let transfer_updates dbh main ~contract ~block ~level ~tsp ~token_id ~source amo
        last_level = case when $main then $level else last_level end, \
        last = case when $main then $tsp else last end where token_id = $token_id and \
        owner = $source and contract = $contract \
-       returning amount, metadata, supply, transaction, tsp, name, royalties, \
-       creators, description, attributes, image, animation"] in
-  let>? new_src_amount, meta, supply, transaction, tsp, name, royalties,
-        creators, description, attributes, image, animation =
+       returning amount, metadata, supply, transaction, tsp, royalties"] in
+  let>? new_src_amount, meta, supply, transaction, tsp, royalties =
     one ~err:"source token not found for transfer update" info in
   let>? l_new_dst_amount =
     [%pgsql dbh
         "update tokens set amount = amount + $amount, \
          metadata = case when amount = 0 then $meta else metadata end, \
-         name = case when amount = 0 then $?name else name end, \
          royalties = case when amount = 0 then $royalties else royalties end, \
-         creators = case when amount = 0 then $?creators else creators end, \
-         description = case when amount = 0 then $?description else description end, \
-         attributes = case when amount = 0 then $?attributes else attributes end, \
-         image = case when amount = 0 then $?image else image end, \
-         animation = case when amount = 0 then $?animation else image end, \
          supply = case when amount = 0 then $supply else supply end, \
          transaction = case when amount = 0 then $transaction else transaction end, \
          last_block = case when $main then $block else block end, \
@@ -1504,19 +1711,32 @@ let transfer_updates dbh main ~contract ~block ~level ~tsp ~token_id ~source amo
        where address = $destination"]
 
 let token_metadata_update dbh ~main ~contract ~block ~level ~tsp ~token_id meta =
-  let name, creators, description, attributes, image = get_metadata meta in
-  let>? () =
-    [%pgsql dbh
-        "update tokens set metadata = $meta, \
-         name = $?name, description = $?description, attributes = $?attributes, \
-         image = $?image, creators = $?creators,\
-         last_block = case when $main then $block else last_block end, \
-         last_level = case when $main then $level else last_level end, \
-         last = case when $main then $tsp else last end \
-         where contract = $contract and \
-         token_id = $token_id"] in
+  get_metadata_json meta >>= begin function
+    | Ok (json, metadata) ->
+      let>? () = insert_mint_metadata dbh ~contract ~token_id ~block ~level ~tsp ~metadata in
+      [%pgsql dbh
+          "update tokens set metadata = $json,  \
+           last_block = case when $main then $block else last_block end, \
+           last_level = case when $main then $level else last_level end, \
+           last = case when $main then $tsp else last end \
+           where contract = $contract and \
+           token_id = $token_id returning supply"]
+    | Error (code, str) ->
+      Printf.eprintf "Cannot get metadata from url: %d %s\n%!"
+        code (match str with None -> "None" | Some s -> s);
+      [%pgsql dbh
+          "update tokens set metadata = $meta,  \
+           last_block = case when $main then $block else last_block end, \
+           last_level = case when $main then $level else last_level end, \
+           last = case when $main then $tsp else last end \
+           where contract = $contract and \
+           token_id = $token_id returning supply"]
+  end >>=? fun supply ->
   if main then
-    produce_nft_item_event dbh contract token_id
+    match supply with
+    | [ i64 ] when i64 > 0L ->
+      produce_nft_item_event dbh contract token_id
+    | _ -> Lwt.return_ok ()
   else Lwt.return_ok ()
 
 let token_updates dbh main l =
@@ -1524,15 +1744,9 @@ let token_updates dbh main l =
       let contract, block, level, tsp, source =
         r#contract, r#block, r#level, r#tsp, r#source in
       match r#destination, r#token_id, r#amount, r#operator, r#add, r#metadata, r#royalties  with
-      | Some destination, Some token_id, Some amount, _, _, meta, _ ->
-        let>? () =
-          let> _ = transfer_updates dbh main ~contract ~block ~level ~tsp ~token_id ~source amount destination in
-          Lwt.return_ok () in
-        begin match meta with
-          | None -> Lwt.return_ok ()
-          | Some meta ->
-            token_metadata_update dbh ~main ~contract ~block ~level ~tsp ~token_id meta
-        end
+      | Some destination, Some token_id, Some amount, _, _, _, _ ->
+        transfer_updates
+          dbh main ~contract ~block ~level ~tsp ~token_id ~source amount destination
       | _, token_id, _, Some operator, Some add, _, _ ->
         operator_updates dbh main ~operator ~add ~contract ~block ~level ~tsp ?token_id ~source
       | _, Some token_id, _, _, _, Some meta, _ ->
@@ -1649,6 +1863,18 @@ let set_main _config dbh {Hooks.m_main; m_hash} =
   let>? c_updates =
     [%pgsql.object dbh
         "update contract_updates set main = $m_main where block = $m_hash returning *"] in
+  let>? () =
+    [%pgsql dbh
+        "update tzip21_metadata set main = $m_main where block = $m_hash"] in
+  let>? () =
+    [%pgsql dbh
+        "update tzip21_formats set main = $m_main where block = $m_hash"] in
+  let>? () =
+    [%pgsql dbh
+        "update tzip21_attributes set main = $m_main where block = $m_hash"] in
+  let>? () =
+    [%pgsql dbh
+        "update tzip21_creators set main = $m_main where block = $m_hash"] in
   let>? cancels =
     [%pgsql.object
       dbh "update order_cancel set main = $m_main where block = $m_hash returning *"] in
@@ -1699,20 +1925,20 @@ let get_nft_items_by_owner ?dbh ?include_meta ?continuation ?(size=50) owner =
     (match continuation with None -> CalendarLib.Calendar.now (), "" | Some (ts, h) -> (ts, h)) in
   let>? l = [%pgsql.object dbh
       "select concat(contract, ':', token_id) as id, contract, token_id, \
-       last, amount, supply, metadata, name, creators, description, attributes, \
-       image, animation, tsp from tokens where \
-       main and owner = $owner and amount > 0 and \
+       last, amount, supply, metadata, tsp from tokens where \
+       main and  metadata <> '{}' and owner = $owner and amount > 0 and \
        ($no_continuation or \
        (last = $ts and concat(contract, ':', token_id) > $id) or \
        (last < $ts)) \
        order by last desc, id asc limit $size64"] in
   let>? nft_items_total = [%pgsql dbh
-      "select count(distinct (contract, token_id)) from tokens where main and owner = $owner and (amount > 0)"] in
+      "select count(distinct (contract, token_id)) from tokens where \
+       main and owner = $owner and (amount > 0) and metadata <> '{}'"] in
   let>? nft_items_total = match nft_items_total with
     | [ None ] -> Lwt.return_ok 0L
     | [ Some i64 ] -> Lwt.return_ok i64
     | _ -> Lwt.return_error (`hook_error "count with more then one row") in
-  map_rp (fun r -> mk_nft_item ?include_meta r) l >>=? fun nft_items_items ->
+  map_rp (fun r -> mk_nft_item dbh ?include_meta r) l >>=? fun nft_items_items ->
   let len = List.length nft_items_items in
   let nft_items_continuation =
     if len <> size then None
@@ -1736,12 +1962,11 @@ let get_nft_items_by_creator ?dbh ?include_meta ?continuation ?(size=50) creator
     (match continuation with None -> CalendarLib.Calendar.now (), "" | Some (ts, h) -> (ts, h)) in
   let>? l = [%pgsql.object dbh
       "select concat(contract, ':', token_id) as id, contract, token_id, \
-       last, amount, supply, metadata, name, creators, description, attributes, \
-       image, animation, tsp \
+       last, amount, supply, metadata, tsp \
        from tokens, \
        jsonb_to_recordset((metadata -> 'creators')) as creators(account varchar, value int) \
        where creators.account = $creator and \
-       main and amount > 0 and \
+       main and metadata <> '{}' and amount > 0 and \
        ($no_continuation or \
        (last = $ts and concat(contract, ':', token_id) > $id) or \
        (last < $ts)) \
@@ -1749,12 +1974,12 @@ let get_nft_items_by_creator ?dbh ?include_meta ?continuation ?(size=50) creator
   let>? nft_items_total = [%pgsql dbh
       "select count(distinct (token_id, contract, owner)) from tokens, \
        jsonb_to_recordset((metadata -> 'creators')) as creators(account varchar, value int) \
-       where main and creators.account = $creator and amount > 0"] in
+       where main and creators.account = $creator and amount > 0 and metadata <> '{}'"] in
   let>? nft_items_total = match nft_items_total with
     | [ None ] -> Lwt.return_ok 0L
     | [ Some i64 ] -> Lwt.return_ok i64
     | _ -> Lwt.return_error (`hook_error "count with more then one row") in
-  let>? nft_items_items = map_rp (fun r -> mk_nft_item ?include_meta r) l in
+  let>? nft_items_items = map_rp (fun r -> mk_nft_item dbh ?include_meta r) l in
   let len = List.length nft_items_items in
   let nft_items_continuation =
     if len <> size then None
@@ -1778,21 +2003,21 @@ let get_nft_items_by_collection ?dbh ?include_meta ?continuation ?(size=50) cont
     (match continuation with None -> CalendarLib.Calendar.now (), "" | Some (ts, h) -> (ts, h)) in
   let>? l = [%pgsql.object dbh
       "select concat(contract, ':', token_id) as id, contract, token_id, \
-       last, amount, supply, metadata, name, creators, description, attributes, \
-       image, animation, tsp \
+       last, amount, supply, metadata, tsp \
        from tokens where \
-       main and contract = $contract and amount <> 0 and \
+       main and metadata <> '{}' and contract = $contract and amount <> 0 and \
        ($no_continuation or \
        (last = $ts and concat(contract, ':', token_id) > $id) or \
        (last < $ts)) \
        order by last desc, id asc limit $size64"] in
   let>? nft_items_total = [%pgsql dbh
-      "select count(distinct (token_id, owner)) from tokens where main and contract = $contract and amount > 0"] in
+      "select count(distinct (token_id, owner)) from tokens where \
+       main and contract = $contract and amount > 0 and metadata <> '{}'"] in
   let>? nft_items_total = match nft_items_total with
     | [ None ] -> Lwt.return_ok 0L
     | [ Some i64 ] -> Lwt.return_ok i64
     | _ -> Lwt.return_error (`hook_error "count with more then one row") in
-  let>? nft_items_items = map_rp (fun r -> mk_nft_item ?include_meta r) l in
+  let>? nft_items_items = map_rp (fun r -> mk_nft_item dbh ?include_meta r) l in
   let len = List.length nft_items_items in
   let nft_items_continuation =
     if len <> size then None
@@ -1804,16 +2029,10 @@ let get_nft_items_by_collection ?dbh ?include_meta ?continuation ?(size=50) cont
 let get_nft_item_meta_by_id ?dbh contract token_id =
   Format.eprintf "get_nft_meta_by_id %s %s@." contract token_id ;
   use dbh @@ fun dbh ->
-  let>? l = [%pgsql.object dbh
-      "select metadata, name, creators, description, attributes, \
-       image, animation from tokens \
-       where contract = $contract and token_id = $token_id and main"] in
-  match l with
-  | [] -> Lwt.return_error (`hook_error ("nft_item not found " ^ contract ^ ":" ^ token_id))
-  | r :: _ ->
-    match mk_nft_item_meta r with
-    | None -> Lwt.return_error (`hook_error ("item without metadata " ^ contract ^ ":" ^ token_id))
-    | Some meta -> Lwt.return_ok meta
+  let>? meta = mk_nft_item_meta dbh ~contract ~token_id in
+  match rarible_meta_of_tzip21_meta meta with
+  | None -> Lwt.return_error (`hook_error ("item without metadata " ^ contract ^ ":" ^ token_id))
+  | Some meta -> Lwt.return_ok meta
 
 let get_nft_all_items
     ?dbh ?last_updated_to ?last_updated_from ?show_deleted ?include_meta
@@ -1843,10 +2062,9 @@ let get_nft_all_items
     (match show_deleted with None -> false | Some b -> b) in
   let>? l = [%pgsql.object dbh
       "select concat(contract, ':', token_id) as id, contract, token_id, \
-       last, amount, supply, metadata, name, creators, description, attributes, \
-       image, animation, tsp \
+       last, amount, supply, metadata, tsp \
        from tokens where \
-       main and \
+       main and metadata <> '{}' and \
        (supply > 0 and amount > 0 or (not $no_show_deleted and $show_deleted_v)) and \
        ($no_last_updated_to or (last <= $last_updated_to_v)) and \
        ($no_last_updated_from or (last >= $last_updated_from_v)) and \
@@ -1855,12 +2073,13 @@ let get_nft_all_items
        (last < $ts)) \
        order by last desc, id asc limit $size64"] in
   let>? nft_items_total = [%pgsql dbh
-      "select count(distinct (owner, contract, token_id)) from tokens where main and (amount > 0)"] in
+      "select count(distinct (owner, contract, token_id)) from tokens where \
+       main and (amount > 0) and metadata <> '{}'"] in
   let>? nft_items_total = match nft_items_total with
     | [ None ] -> Lwt.return_ok 0L
     | [ Some i64 ] -> Lwt.return_ok i64
     | _ -> Lwt.return_error (`hook_error "count with more then one row") in
-  let>? nft_items_items = map_rp (fun r -> mk_nft_item ?include_meta r) l in
+  let>? nft_items_items = map_rp (fun r -> mk_nft_item dbh ?include_meta r) l in
   let len = List.length nft_items_items in
   let nft_items_continuation =
     if len <> size then None
@@ -2061,8 +2280,7 @@ let get_nft_ownerships_by_item ?dbh ?continuation ?(size=50) contract token_id =
   use dbh @@ fun dbh ->
   let>? l = [%pgsql.object dbh
       "select concat(contract, ':', token_id, ':', owner) as id, \
-       contract, token_id, owner, last, amount, supply, metadata, \
-       name, creators, description, attributes, image, animation \
+       contract, token_id, owner, last, amount, supply, metadata \
        from tokens where \
        main and contract = $contract and token_id = $token_id and amount <> 0 and \
        ($no_continuation or \
@@ -2077,7 +2295,7 @@ let get_nft_ownerships_by_item ?dbh ?continuation ?(size=50) contract token_id =
     | [ None ] -> Lwt.return_ok 0L
     | [ Some i64 ] -> Lwt.return_ok i64
     | _ -> Lwt.return_error (`hook_error "count with more then one row") in
-  let>? nft_ownerships_ownerships = map_rp (fun r -> mk_nft_ownership r) l in
+  let>? nft_ownerships_ownerships = map_rp (fun r -> mk_nft_ownership dbh r) l in
   let len = List.length nft_ownerships_ownerships in
   let nft_ownerships_continuation =
     if len <> size then None
@@ -2099,8 +2317,7 @@ let get_nft_all_ownerships ?dbh ?continuation ?(size=50) () =
   use dbh @@ fun dbh ->
   let>? l = [%pgsql.object dbh
       "select concat(contract, ':', token_id, ':', owner) as id, \
-       contract, token_id, owner, last, amount, supply, metadata, \
-       name, creators, description, attributes, image, animation \
+       contract, token_id, owner, last, amount, supply, metadata \
        from tokens where \
        main and amount > 0 and \
        ($no_continuation or \
@@ -2113,7 +2330,7 @@ let get_nft_all_ownerships ?dbh ?continuation ?(size=50) () =
     | [ None ] -> Lwt.return_ok 0L
     | [ Some i64 ] -> Lwt.return_ok i64
     | _ -> Lwt.return_error (`hook_error "count with more then one row") in
-  let>? nft_ownerships_ownerships = map_rp (fun r -> mk_nft_ownership r) l in
+  let>? nft_ownerships_ownerships = map_rp (fun r -> mk_nft_ownership dbh r) l in
   let len = List.length nft_ownerships_ownerships in
   let nft_ownerships_continuation =
     if len <> size then None
@@ -2136,7 +2353,7 @@ let generate_nft_token_id ?dbh contract =
 
 let mk_nft_collection_name_symbol r =
   match r#name with
-  | None -> "NO NAME", r#symbol
+  | None -> "Unnamed Collection", r#symbol
   | Some n -> n, r#symbol
 
 let mk_nft_collection obj =
