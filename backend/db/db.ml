@@ -1030,7 +1030,11 @@ let insert_mint ~dbh ~op ~contract m =
                transaction, supply) \
                values($contract, $token_id, $block, $level, $tsp, $block, \
                $level, $tsp, $owner, 0, $json, ${op.bo_hash}, 0) \
-               on conflict do nothing"]
+               on conflict (contract, owner, token_id) do update set \
+               metadata = $json \
+               where tokens.contract = $contract and \
+               tokens.token_id = $token_id and \
+               tokens.owner = $owner"]
         | Error (code, str) ->
           Printf.eprintf "Cannot get metadata from url: %d %s\n%!"
             code (match str with None -> "None" | Some s -> s);
