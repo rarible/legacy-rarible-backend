@@ -47,6 +47,85 @@ let upgrade_1_to_2 dbh version =
       name varchar,
       symbol varchar)|};
 
+    {|create table tzip21_creators(
+      contract varchar not null,
+      token_id varchar not null,
+      block varchar not null,
+      level int not null,
+      tsp timestamp not null,
+      main boolean not null default false,
+      account varchar not null,
+      value int not null,
+      primary key (contract, token_id))|};
+
+    {|create table tzip21_formats(
+      contract varchar not null,
+      token_id varchar not null,
+      block varchar not null,
+      level int not null,
+      tsp timestamp not null,
+      main boolean not null default false,
+      uri varchar not null,
+      hash varchar,
+      mime_type varchar,
+      file_size int,
+      file_name varchar,
+      duration varchar ,
+      dimensions_value varchar,
+      dimensions_unit varchar,
+      data_rate_value varchar,
+      data_rate_unit varchar)|};
+
+    {|create table tzip21_attributes(
+      contract varchar not null,
+      token_id varchar not null,
+      block varchar not null,
+      level int not null,
+      tsp timestamp not null,
+      main boolean not null default false,
+      name varchar not null,
+      value varchar not null,
+      type varchar)|};
+
+    {|create table tzip21_metadata(
+      contract varchar not null,
+      token_id varchar not null,
+      block varchar not null,
+      level int not null,
+      tsp timestamp not null,
+      main boolean not null default false,
+      name varchar,
+      symbol varchar,
+      decimals int,
+      artifact_uri varchar,
+      display_uri varchar,
+      thumbnail_uri varchar,
+      description varchar,
+      minter varchar,
+      is_boolean_amount boolean,
+      tags varchar[],
+      contributors varchar[],
+      publishers varchar[],
+      date timestamp,
+      block_level int,
+      genres varchar[],
+      language varchar,
+      rights varchar,
+      right_uri varchar,
+      is_transferable boolean,
+      should_prefer_symbol boolean,
+      primary key (contract, token_id))|};
+
+    {|create table royalties(
+      contract varchar primary key,
+      token_id varchar,
+      block varchar not null,
+      level int not null,
+      tsp timestamp not null,
+      main boolean not null default false,
+      account varchar not null,
+      value int not null)|};
+
     {|create table tokens(
       contract varchar not null,
       token_id varchar not null,
@@ -65,12 +144,6 @@ let upgrade_1_to_2 dbh version =
       operators varchar[] not null default '{}',
       metadata jsonb not null default '{}',
       royalties jsonb not null default '{}',
-      name varchar,
-      creators jsonb,
-      description varchar,
-      attributes jsonb,
-      image varchar,
-      animation varchar,
       primary key (contract, owner, token_id))|};
 
     {|create table accounts(

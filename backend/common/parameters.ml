@@ -48,26 +48,21 @@ let parse_transfer m =
 
 let parse_mint m =
   match Typed_mich.parse_value Contract_spec.mint_entry m with
-  | Ok (`tuple [`nat id; `address tk_owner; `nat amount; `seq royalties]) ->
-    let mi_royalties = List.filter_map (function
-        | `tuple [`address s; `nat i] -> Some (s, Z.to_int64 i)
-        | _ -> None) royalties in
+  | Ok (`tuple [`nat id; `address fa2m_owner; `nat amount; `seq _royalties]) ->
+    let fa2m_token_id = Z.to_string id in
+    let fa2m_amount = Z.to_int64 amount  in
     Ok (Mint_tokens
-          (Fa2Mint {
-              mi_op = {
-                tk_op = { tk_token_id = Z.to_string id; tk_amount = Z.to_int64 amount };
-                tk_owner };
-              mi_royalties; mi_meta = [] }))
+          (Fa2Mint { fa2m_token_id ; fa2m_owner ; fa2m_amount }))
   | _ ->
     match Typed_mich.parse_value Contract_spec.mint_ubi_entry m with
-    | Ok (`tuple [ `address mi_account; `nat id; uri ]) ->
-      let mi_token_id = Z.to_string id  in
-      let$ mi_uri = match uri with
+    | Ok (`tuple [ `address ubim_owner; `nat id; uri ]) ->
+      let ubim_token_id = Z.to_string id  in
+      let$ ubim_uri = match uri with
         | `none -> Ok None
         | `some (`bytes uri) ->
           Ok (Some (Tzfunc.Crypto.hex_to_raw uri :> string))
         | _ -> unexpected_michelson in
-      Ok (Mint_tokens (UbiMint { mi_account ; mi_token_id ; mi_uri }))
+      Ok (Mint_tokens (UbiMint { ubim_owner ; ubim_token_id ; ubim_uri }))
     | _ -> unexpected_michelson
 
 let parse_burn m =

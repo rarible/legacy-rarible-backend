@@ -125,12 +125,6 @@ type nft_item_attribute = {
   nft_item_attribute_format : string option; [@opt]
 } [@@deriving encoding {title="NftItemAttribute"; def_title}]
 
-type meta = {
-  meta_type : string;
-  meta_width : int option; [@opt]
-  meta_height : int option; [@opt]
-} [@@deriving encoding {title="NftMediaMeta"; def_title}]
-
 let assoc : type t. t Json_encoding.encoding -> (string * t) list Json_encoding.encoding =
   fun t ->
   Json_encoding.custom
@@ -148,11 +142,6 @@ let assoc : type t. t Json_encoding.encoding -> (string * t) list Json_encoding.
            (element
               (Object {object_specs with additional_properties = Some (root s)}))
            s))
-
-type nft_media = {
-  nft_media_url : (string * string) list ; [@encoding assoc Json_encoding.string]
-  nft_media_meta : (string * meta) list [@encoding assoc meta_enc];
-} [@@deriving encoding {title="NftMedia"; def_title}]
 
 type nft_item_meta = {
   nft_item_meta_name : string;
@@ -760,15 +749,15 @@ type token_op_owner = {
 } [@@deriving encoding {remove_prefix=3}]
 
 type fa2_mint = {
-  mi_op : token_op_owner;
-  mi_royalties: token_royalties;
-  mi_meta: token_metadata
+  fa2m_token_id: string;
+  fa2m_amount: int64;
+  fa2m_owner: string;
 } [@@deriving encoding]
 
 type ubi_mint = {
-  mi_account : string ;
-  mi_token_id : string ;
-  mi_uri : string option ;
+  ubim_owner : string ;
+  ubim_token_id : string ;
+  ubim_uri : string option ;
 } [@@deriving encoding]
 
 type mint = UbiMint of ubi_mint | Fa2Mint of fa2_mint [@@deriving encoding]
@@ -927,7 +916,7 @@ type format_dimensions = {
 } [@@deriving encoding]
 
 type tzip21_format = {
-  format_uri : string option ;
+  format_uri : string ;
   format_hash : string option ;
   format_mime_type : string option ;
   format_file_size : int option ;
@@ -956,7 +945,7 @@ type ext_creators =
 type tzip21_token_metadata = {
   tzip21_tm_name : string option ;
   tzip21_tm_symbol : string option ;
-  tzip21_tm_decimals : string option ;
+  tzip21_tm_decimals : int option ;
   tzip21_tm_artifact_uri : string option ;
   tzip21_tm_display_uri : string option ;
   tzip21_tm_thumbnail_uri : string option ;
