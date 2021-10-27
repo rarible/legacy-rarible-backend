@@ -198,7 +198,7 @@ let upgrade_1_to_2 dbh version =
       token_id varchar not null,
       account varchar,
       balance bigint,
-      primary key (block, index))|};
+      unique (block, index, contract, token_id, account))|};
 
     {|create table orders(
       maker varchar not null,
