@@ -15,7 +15,7 @@ export function invert_order(
   order: OrderForm,
   amount: bigint,
   maker_edpk: string,
-  salt: bigint = 0n
+  salt: bigint = BigInt(0)
 ): OrderForm {
   const [makeValue, takeValue] = calculate_amounts(
     order.make.value,

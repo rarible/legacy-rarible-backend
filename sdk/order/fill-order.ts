@@ -20,8 +20,10 @@ const zero_edpk = "edpkteDwHwoNPB18tKToFKeSCykvr1ExnoMV5nawTJy9Y9nLTfQ541"
 function get_make_asset(
   provider: Provider,
   order: OrderForm,
-  amount: bigint) {
-  const inverted = invert_order(order, amount, zero_edpk)
+  amount: bigint,
+  edpk: string
+  ) {
+  const inverted = invert_order(order, amount, edpk)
   const make_fee = get_make_fee(provider.config.fees, inverted)
   return add_fee(inverted.make, make_fee)
 }
@@ -51,14 +53,16 @@ export async function fill_order_arg(
   left: OrderForm,
   request: FillOrderRequest
 ): Promise<TransactionArg[]> {
-  const make = get_make_asset(provider, left, request.amount)
+  const pk = (request.edpk) ? request.edpk : await get_public_key(provider)
+  if (!pk) throw new Error("cannot get public key")
+
+  const make = get_make_asset(provider, left, request.amount, pk)
   const arg_approve =
     (make.asset_type.asset_class != "XTZ" )
     ? await approve_arg(provider, left.maker, left.make, request.infinite)
     : undefined
   const args = (arg_approve) ? [ arg_approve ] : []
-  const pk = (request.edpk) ? request.edpk : await get_public_key(provider)
-  if (!pk) throw new Error("cannot get public key")
+
   const right = {
     ...invert_order(left, request.amount, pk),
     data: {
@@ -68,9 +72,9 @@ export async function fill_order_arg(
     },
   }
   const amount =
-    (left.make.asset_type.asset_class === "XTZ" && left.salt === 0n)
+    (left.make.asset_type.asset_class === "XTZ" && left.salt === BigInt(0))
     ? get_real_value(provider, left)
-    : (right.make.asset_type.asset_class === "XTZ" && right.salt === 0n)
+    : (right.make.asset_type.asset_class === "XTZ" && right.salt === BigInt(0))
     ? get_real_value(provider, right)
     : undefined
   const parameter = match_order_to_struct(provider, left, right)

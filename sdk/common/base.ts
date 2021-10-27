@@ -114,7 +114,7 @@ export function asset_type_of_json(a: any) : AssetType {
 }
 
 export function mutez_to_tez(mu: bigint) : number {
-  const factor = 1000000n
+  const factor = BigInt(1000000)
   return Number(mu / factor) + Number(mu % factor) / Number(factor)
 }
 

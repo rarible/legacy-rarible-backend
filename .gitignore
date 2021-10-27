@@ -11,3 +11,4 @@
 /sdk/www/*.js.*
 /deployment/crawler_config.json
 /test
+.idea

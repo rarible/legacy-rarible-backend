@@ -1,18 +1,52 @@
 {
-  "devDependencies": {
+  "scripts": {
+    "serve": "vue-cli-service serve test/test-web.ts",
+    "build": "tsc --project tsconfig.json",
+    "run-test": "ts-node test/test.ts",
+    "build-prod": "webpack --config webpack.config.build.js && tsc --declaration --emitDeclarationOnly"
+  },
+  "dependencies": {
     "@airgap/beacon-sdk": "^2.3.2",
     "@taquito/beacon-wallet": "^10.1.2",
     "@taquito/signer": "^10.1.2",
+    "@taquito/taquito": "^10.0.0",
     "@temple-wallet/dapp": "^5.0.2",
     "@types/bs58check": "^2.1.0",
     "@types/elliptic": "^6.4.13",
     "@types/keccak": "^3.0.1",
+    "@vue/cli": "^4.5.14",
     "bs58check": "^2.1.2",
+    "core-js": "^3.6.5",
     "json-formatter-js": "^2.3.4",
     "keccak": "^3.0.2",
     "node-polyfill-webpack-plugin": "^1.1.4",
     "ts-loader": "^9.2.6",
+    "ts-node": "^10.3.0",
+    "typescript": "^4.4.4",
     "vue": "^2.6.14",
+    "webpack": "^5.58.2",
+    "webpack-cli": "^4.9.0",
     "yargs": "^17.2.1"
-  }
+  },
+  "devDependencies": {
+    "@vue/cli-service": "~4.5.0",
+    "babel-eslint": "^10.1.0",
+    "eslint": "^6.7.2",
+    "eslint-plugin-vue": "^6.2.2",
+    "vue-template-compiler": "^2.6.11"
+  },
+  "name": "tezos-sdk-module",
+  "version": "0.0.5",
+  "main": "dist/main/index.js",
+  "types": "dist/main/index.d.ts",
+  "directories": {
+    "test": "test"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://gitlab.com/tezos-paris-hub/rarible/rarible-backend/issues"
+  },
+  "homepage": "https://gitlab.com/tezos-paris-hub/rarible/rarible-backend#readme",
+  "description": ""
 }

@@ -1,10 +1,12 @@
 {
   "compilerOptions": {
+    "lib": ["es6", "dom", "esnext"],
     "strict": true,
     "module": "commonjs",
     "moduleResolution": "node",
     "outDir": "dist",
-    "target": "es2020"
+    "target": "esnext",
+    "declaration": true
   },
   "include": [ "main/*.ts", "test/*.ts", "providers/*/*.ts" ]
 }

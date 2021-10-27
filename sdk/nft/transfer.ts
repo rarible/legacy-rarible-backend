@@ -7,7 +7,7 @@ function transfer_param(
   to: string,
   token_id: bigint[],
   token_amount?: bigint[] ) : MichelsonData {
-  const amount : bigint[] = (token_amount) ? token_amount : token_id.map((_) => 1n)
+  const amount : bigint[] = (token_amount) ? token_amount : token_id.map((_) => BigInt(1))
   return [
     {
       prim: 'Pair',

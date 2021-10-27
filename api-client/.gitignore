@@ -1,0 +1,7 @@
+node_modules
+.idea
+*.iml
+src
+build
+api-docs
+/model/target/

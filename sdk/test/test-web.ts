@@ -4,14 +4,20 @@ import JSONFormatter from "json-formatter-js"
 import Vue from "vue"
 
 function parse_parts(s : string) : Array<Part> {
-  if (s == '') s = '{}'
-  const json = JSON.parse(s) as { [key:string] : number }
-  const parts : Array<Part> = []
-  Object.keys(json).forEach(
-    function(k : string) : void {
-      parts.push({account: k, value: BigInt(json[k])})
-    })
-  return parts
+  try {
+    if (s == '') s = '{}'
+    const json = JSON.parse(s) as { [key:string] : number }
+    const parts : Array<Part> = []
+    Object.keys(json).forEach(
+      function(k : string) : void {
+        parts.push({account: k, value: BigInt(json[k])})
+      })
+    return parts
+  } catch (e) {
+    console.error(e)
+    throw e
+  }
+
 }
 
 interface RawAssetType {
@@ -390,7 +396,7 @@ export default new Vue({
         const make_value = parse_asset_value(this.upsert.make.asset_type, this.upsert.make.value)
         const take_value = parse_asset_value(this.upsert.take.asset_type, this.upsert.take.value)
         let payouts = parse_parts(this.upsert.payouts)
-        if (payouts.length == 0) payouts = [ { account: pk_to_pkh(maker_edpk), value: 10000n} ]
+        if (payouts.length == 0) payouts = [ { account: pk_to_pkh(maker_edpk), value: BigInt(10000)} ]
         const origin_fees = parse_parts(this.upsert.origin_fees)
         if (!make_asset_type) {
           this.upsert.status = 'danger'
@@ -444,7 +450,7 @@ export default new Vue({
         const amount = BigInt(this.sell.amount)
         const price = BigInt(this.sell.price * 1000000.)
         let payouts = parse_parts(this.sell.payouts)
-        if (payouts.length == 0) payouts = [ { account: maker, value: 10000n} ]
+        if (payouts.length == 0) payouts = [ { account: maker, value: BigInt(10000)} ]
         const origin_fees = parse_parts(this.sell.origin_fees)
         if (!make_asset_type) {
           this.sell.status = 'danger'
@@ -496,7 +502,7 @@ export default new Vue({
         const amount = BigInt(this.bid.amount)
         const price = BigInt(this.bid.price * 1000000.)
         let payouts = parse_parts(this.bid.payouts)
-        if (payouts.length == 0) payouts = [ { account: pk_to_pkh(maker), value: 10000n} ]
+        if (payouts.length == 0) payouts = [ { account: pk_to_pkh(maker), value: BigInt(10000)} ]
         const origin_fees = parse_parts(this.bid.origin_fees)
         if (!make_asset_type) {
           this.bid.status = 'danger'
@@ -563,7 +569,7 @@ export default new Vue({
         let payouts = parse_parts(this.upsert.payouts)
         const origin_fees = parse_parts(this.upsert.origin_fees)
         let account = await get_address(p)
-        if (payouts.length == 0) payouts = [ { account, value: 10000n} ]
+        if (payouts.length == 0) payouts = [ { account, value: BigInt(10000)} ]
         const op = await fill_order(p, this.fill.selected, {
           amount: BigInt(this.fill.amount),
           payouts, origin_fees
