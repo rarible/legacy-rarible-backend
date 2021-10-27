@@ -42,8 +42,7 @@ export function in_memory_provider(edsk: string, endpoint: string) : TezosProvid
   }
   const balance = async() => {
     const a = await address()
-    const b = await tk.tz.getBalance(a)
-    return BigInt(b.toString())
+    return tk.tz.getBalance(a)
   }
   return {
     kind: "in_memory",

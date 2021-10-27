@@ -1,4 +1,5 @@
 import { Provider, OperationResult } from "../common/base"
+import BigNumber from "@taquito/rpc/node_modules/bignumber.js"
 
 export const exchangeV2_code : any =
   [  {  "prim": "storage",
@@ -15446,7 +15447,7 @@ export const exchangeV2_code : any =
      ]
   }  ]
 
-export function exchangeV2_storage(owner: string, defaultFeeReceiver: string, protocolFee: bigint) : any {
+export function exchangeV2_storage(owner: string, defaultFeeReceiver: string, protocolFee: BigNumber) : any {
   return {  "prim": "Pair",
             "args": [
               {  "string": owner  },
@@ -15489,7 +15490,7 @@ export async function deploy_exchangeV2(
   provider : Provider,
   owner: string,
   receiver: string,
-  fee: bigint
+  fee: BigNumber
 ) : Promise<OperationResult> {
   const init = exchangeV2_storage(owner, receiver, fee)
   return provider.tezos.originate({init, code: exchangeV2_code})

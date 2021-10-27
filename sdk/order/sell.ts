@@ -2,14 +2,15 @@ import { Provider, XTZAssetType, FTAssetType } from "../common/base"
 import { ExtendedAssetType, check_asset_type } from "../common/check-asset-type"
 import { Part, OrderForm, salt } from "./utils"
 import { upsert_order } from "./upsert-order"
+import BigNumber from "@taquito/rpc/node_modules/bignumber.js"
 
 export interface SellRequest {
   maker: string,
   maker_edpk: string,
   make_asset_type: ExtendedAssetType
-  amount: bigint
+  amount: BigNumber
   take_asset_type: XTZAssetType | FTAssetType
-  price: bigint
+  price: BigNumber
   payouts: Array<Part>
   origin_fees: Array<Part>
 }
@@ -27,7 +28,7 @@ export async function sell(
     },
     take: {
       asset_type: request.take_asset_type,
-      value: request.price * request.amount,
+      value: new BigNumber(request.price).multipliedBy(request.amount),
     },
     type: "RARIBLE_V2",
     data: {

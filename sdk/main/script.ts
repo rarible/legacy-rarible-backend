@@ -1,6 +1,7 @@
 import { transfer, mint, burn, deploy_nft_public, deploy_royalties, set_token_metadata, set_metadata, deploy_exchangeV2, deploy_validator, send, TransactionArg} from "."
 import { in_memory_provider } from '../providers/in_memory/in_memory_provider'
 import yargs from 'yargs'
+import BigNumber from "@taquito/rpc/node_modules/bignumber.js"
 
 async function main() {
   const argv = yargs(process.argv.slice(2)).options({
@@ -24,26 +25,26 @@ async function main() {
 
   }).argv
 
-  const token_id_opt = (argv.token_id!=undefined) ? BigInt(argv.token_id) : undefined
-  const token_id = (argv.token_id!=undefined) ? BigInt(argv.token_id) : 0n
+  const token_id_opt = (argv.token_id!=undefined) ? new BigNumber(argv.token_id) : undefined
+  const token_id = (argv.token_id!=undefined) ? new BigNumber(argv.token_id) : new BigNumber(0)
 
   const royalties0 = JSON.parse(argv.royalties) as { [key: string] : number }
-  const royalties : { [key: string] : bigint } = {};
+  const royalties : { [key: string] : BigNumber } = {};
   if (royalties0) {
     Object.keys(royalties0).forEach(
       function(k : string) : void {
-        royalties[k] = BigInt(royalties0[k])
+        royalties[k] = new BigNumber(royalties0[k])
       })
   }
 
-  const amount = (argv.amount) ? BigInt(argv.amount as number) : undefined
+  const amount = (argv.amount) ? new BigNumber(argv.amount as number) : undefined
   const metadata = JSON.parse(argv.metadata) as { [_: string] : string }
 
   const tezos = in_memory_provider(argv.edsk, argv.endpoint)
 
   const config = {
     exchange: argv.exchange,
-    fees: 0n,
+    fees: new BigNumber(0),
     nft_public: "",
     mt_public: "",
   }
@@ -117,7 +118,7 @@ async function main() {
 
     case 'deploy_exchange':
       console.log("deploy exchange")
-      const op_deploy_exchange = await deploy_exchangeV2(provider, owner, receiver, BigInt(argv.fee))
+      const op_deploy_exchange = await deploy_exchangeV2(provider, owner, receiver, new BigNumber(argv.fee))
       await op_deploy_exchange.confirmation()
       console.log(op_deploy_exchange.contract)
       break

@@ -3,6 +3,7 @@
 /_bin
 /sdk/node_modules
 /sdk/package-lock.json
+/sdk/yarn.json
 /sdk/dist
 *.tz
 /config/crawler_config.json

@@ -1,21 +1,22 @@
 import { OrderForm, pk_to_pkh } from "./utils"
 import { is_nft } from "./is-nft"
+import BigNumber from "@taquito/rpc/node_modules/bignumber.js"
 
 function calculate_amounts(
-  make: bigint,
-  take: bigint,
-  amount: bigint,
+  make: BigNumber,
+  take: BigNumber,
+  amount: BigNumber,
   bid: boolean
-): [bigint, bigint] {
-  if (bid) return [amount, (amount * make) /take ]
-  else return [(amount * take) / make, amount]
+): [BigNumber, BigNumber] {
+  if (bid) return [amount, new BigNumber(amount).multipliedBy(make).div(take) ]
+  else return [new BigNumber(amount).multipliedBy(take).div(make), amount]
 }
 
 export function invert_order(
   order: OrderForm,
-  amount: bigint,
+  amount: BigNumber,
   maker_edpk: string,
-  salt: bigint = BigInt(0)
+  salt: BigNumber = new BigNumber(0)
 ): OrderForm {
   const [makeValue, takeValue] = calculate_amounts(
     order.make.value,

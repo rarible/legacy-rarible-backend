@@ -2,6 +2,7 @@ import { Provider, transfer, mint, burn, deploy_nft_private, deploy_mt_private, 
 import { beacon_provider } from '../providers/beacon/beacon_provider'
 import JSONFormatter from "json-formatter-js"
 import Vue from "vue"
+import BigNumber from "@taquito/rpc/node_modules/bignumber.js"
 
 function parse_parts(s : string) : Array<Part> {
   try {
@@ -10,7 +11,7 @@ function parse_parts(s : string) : Array<Part> {
     const parts : Array<Part> = []
     Object.keys(json).forEach(
       function(k : string) : void {
-        parts.push({account: k, value: BigInt(json[k])})
+        parts.push({account: k, value: new BigNumber(json[k])})
       })
     return parts
   } catch (e) {
@@ -44,26 +45,26 @@ function parse_asset_type(r : RawAssetType) : AssetType | ExtendedAssetType | un
     return {
       asset_class: r.asset_class,
       contract: (r.contract=='public') ? undefined : (r.contract=='custom') ? r.contract_custom : r.contract,
-      token_id: BigInt(r.token_id)
+      token_id: new BigNumber(r.token_id)
     }
   } else if (r.asset_class == 'Unknown' && (r.contract || (r.contract == 'custom' && r.contract_custom))) {
     return {
       contract: (r.contract=='custom') ? r.contract_custom : r.contract,
-      token_id: BigInt(r.token_id)
+      token_id: new BigNumber(r.token_id)
     }
   } else return undefined
 }
 
-function parse_asset_value(r: RawAssetType, value: number) : bigint {
-  if (r.asset_class == 'XTZ') return BigInt(value * 1000000.)
-  else return BigInt(value)
+function parse_asset_value(r: RawAssetType, value: number) : BigNumber {
+  if (r.asset_class == 'XTZ') return new BigNumber(value * 1000000.)
+  else return new BigNumber(value)
 }
 
 async function provider(node: string, api:string) : Promise<Provider> {
   const tezos = await beacon_provider({node})
   const config = {
     exchange: "KT1XgQ52NeNdjo3jLpbsPBRfg8YhWoQ5LB7g",
-    fees: 300n,
+    fees: new BigNumber(300),
     nft_public: "",
     mt_public: "",
   }
@@ -250,7 +251,7 @@ export default new Vue({
       const asset_type = parse_asset_type(this.transfer.asset_type) as TokenAssetType
       const p = (this.provider) ? this.provider : await provider(this.node, this.api_url)
       this.provider = p
-      const transfer_amount = (this.transfer.amount) ? BigInt(this.transfer.amount) : undefined
+      const transfer_amount = (this.transfer.amount) ? new BigNumber(this.transfer.amount) : undefined
       const op = await transfer(p, asset_type, this.transfer.destination, transfer_amount)
       this.transfer.result = `operation ${op.hash} injected`
       await op.confirmation()
@@ -270,15 +271,15 @@ export default new Vue({
         const p = (this.provider) ? this.provider : await provider(this.node, this.api_url)
         this.provider = p
         const royalties0 = JSON.parse(this.mint.royalties) as { [key:string] : number }
-        const royalties : { [key:string] : bigint } = {}
+        const royalties : { [key:string] : BigNumber } = {}
         const contract = (this.mint.contract=="custom") ? this.mint.contract_custom : this.mint.contract
-        const mint_amount = (this.mint.asset_class=='NFT') ? undefined : BigInt(this.mint.amount)
+        const mint_amount = (this.mint.asset_class=='NFT') ? undefined : new BigNumber(this.mint.amount)
         Object.keys(royalties0).forEach(
           function(k : string) : void {
-            royalties[k] = BigInt(royalties0[k])
+            royalties[k] = new BigNumber(royalties0[k])
           })
         const metadata = (this.mint.metadata) ? JSON.parse(this.mint.metadata) : undefined
-        const token_id = (this.mint.token_id!=undefined) ? BigInt(this.mint.token_id) : undefined
+        const token_id = (this.mint.token_id!=undefined) ? new BigNumber(this.mint.token_id) : undefined
         const op = await mint(p, contract, royalties, mint_amount, token_id, metadata)
         this.mint.result = `operation ${op.hash} injected`
         await op.confirmation()
@@ -293,7 +294,7 @@ export default new Vue({
       const asset_type = parse_asset_type(this.burn.asset_type) as TokenAssetType
       const p = (this.provider) ? this.provider : await provider(this.node, this.api_url)
       this.provider = p
-      const op = await burn(p, asset_type, (this.burn.amount) ? BigInt(this.burn.amount) : undefined)
+      const op = await burn(p, asset_type, (this.burn.amount) ? new BigNumber(this.burn.amount) : undefined)
       this.burn.result = `operation ${op.hash} injected`
       await op.confirmation()
       this.burn.status = 'success'
@@ -341,7 +342,7 @@ export default new Vue({
         const p = (this.provider) ? this.provider : await provider(this.node, this.api_url)
         this.provider = p
         const owner = await p.tezos.address()
-        const op = await approve_token(p, owner, { asset_type, value: BigInt(this.approve.value) })
+        const op = await approve_token(p, owner, { asset_type, value: new BigNumber(this.approve.value) })
         if (!op) {
           this.approve.status = 'warning'
           this.approve.result = "asset already approved"
@@ -396,7 +397,7 @@ export default new Vue({
         const make_value = parse_asset_value(this.upsert.make.asset_type, this.upsert.make.value)
         const take_value = parse_asset_value(this.upsert.take.asset_type, this.upsert.take.value)
         let payouts = parse_parts(this.upsert.payouts)
-        if (payouts.length == 0) payouts = [ { account: pk_to_pkh(maker_edpk), value: BigInt(10000)} ]
+        if (payouts.length == 0) payouts = [ { account: pk_to_pkh(maker_edpk), value: new BigNumber(10000)} ]
         const origin_fees = parse_parts(this.upsert.origin_fees)
         if (!make_asset_type) {
           this.upsert.status = 'danger'
@@ -447,10 +448,10 @@ export default new Vue({
         const maker = pk_to_pkh(maker_edpk)
         const make_asset_type = parse_asset_type(this.sell.make_asset_type) as ExtendedAssetType
         const take_asset_type = parse_asset_type(this.sell.take_asset_type) as XTZAssetType | FTAssetType
-        const amount = BigInt(this.sell.amount)
-        const price = BigInt(this.sell.price * 1000000.)
+        const amount = new BigNumber(this.sell.amount)
+        const price = new BigNumber(this.sell.price * 1000000.)
         let payouts = parse_parts(this.sell.payouts)
-        if (payouts.length == 0) payouts = [ { account: maker, value: BigInt(10000)} ]
+        if (payouts.length == 0) payouts = [ { account: maker, value: new BigNumber(10000)} ]
         const origin_fees = parse_parts(this.sell.origin_fees)
         if (!make_asset_type) {
           this.sell.status = 'danger'
@@ -499,10 +500,10 @@ export default new Vue({
         const maker = pk_to_pkh(maker_edpk)
         const make_asset_type = parse_asset_type(this.bid.make_asset_type) as XTZAssetType | FTAssetType
         const take_asset_type = parse_asset_type(this.bid.take_asset_type) as ExtendedAssetType
-        const amount = BigInt(this.bid.amount)
-        const price = BigInt(this.bid.price * 1000000.)
+        const amount = new BigNumber(this.bid.amount)
+        const price = new BigNumber(this.bid.price).multipliedBy(1000000)
         let payouts = parse_parts(this.bid.payouts)
-        if (payouts.length == 0) payouts = [ { account: pk_to_pkh(maker), value: BigInt(10000)} ]
+        if (payouts.length == 0) payouts = [ { account: pk_to_pkh(maker), value: new BigNumber(10000)} ]
         const origin_fees = parse_parts(this.bid.origin_fees)
         if (!make_asset_type) {
           this.bid.status = 'danger'
@@ -569,9 +570,9 @@ export default new Vue({
         let payouts = parse_parts(this.upsert.payouts)
         const origin_fees = parse_parts(this.upsert.origin_fees)
         let account = await get_address(p)
-        if (payouts.length == 0) payouts = [ { account, value: BigInt(10000)} ]
+        if (payouts.length == 0) payouts = [ { account, value: new BigNumber(10000)} ]
         const op = await fill_order(p, this.fill.selected, {
-          amount: BigInt(this.fill.amount),
+          amount: new BigNumber(this.fill.amount),
           payouts, origin_fees
         })
         this.fill.result = `operation ${op.hash} injected`

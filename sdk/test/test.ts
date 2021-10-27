@@ -1,6 +1,6 @@
-
 import { storage, StorageFA2, get_balance } from "../main"
 import { in_memory_provider } from '../providers/in_memory/in_memory_provider'
+import BigNumber from "@taquito/rpc/node_modules/bignumber.js"
 
 async function main() {
 
@@ -9,12 +9,13 @@ async function main() {
       'edsk3UUamwmemNBJgDvS8jXCgKsvjL2NoTwYRFpGSRPut4Hmfs6dG8',
       'https://granada.tz.functori.com')
 
-  const config = {
-    exchange: "KT1C5kWbfzASApxCMHXFLbHuPtnRaJXE4WMu",
-    fees: 0n,
-    nft_public: "",
-    mt_public: "",
-  }
+    const config = {
+      exchange: "KT1C5kWbfzASApxCMHXFLbHuPtnRaJXE4WMu",
+      fees: new BigNumber(0),
+      nft_public: "",
+      mt_public: "",
+    }
+
     const provider = {
       tezos,
       api: "https://localhost:8080/v0.1",
