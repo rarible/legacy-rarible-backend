@@ -17,7 +17,6 @@ install:
   script:
     - if [ ! -d _opam ]; then opam switch create --no-install . ocaml-system; fi
     - eval $(opam env)
-    - sudo /etc/init.d/postgresql start
     - make deps
     - make
   only:
