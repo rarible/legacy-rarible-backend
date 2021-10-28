@@ -23,9 +23,10 @@ let upgrade_1_to_2 dbh version =
     {|create table ft_contracts(
       address varchar primary key,
       kind varchar not null,
-      ledger_id varchar,
+      ledger_id varchar not null,
       ledger_key jsonb,
-      ledger_value jsonb)|};
+      ledger_value jsonb,
+      crawled boolean not null default false)|};
 
     {|create table contracts(
       kind varchar not null,
@@ -40,7 +41,7 @@ let upgrade_1_to_2 dbh version =
       last timestamp not null,
       tokens_number bigint not null default 0,
       next_token_id varchar not null default 0,
-      ledger_id varchar,
+      ledger_id varchar not null,
       ledger_key jsonb,
       ledger_value jsonb,
       metadata jsonb not null default '{}',

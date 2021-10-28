@@ -1,4 +1,16 @@
+(library
+ (name crawler_config)
+ (modules crawler_config)
+ (package rarible)
+ (libraries crawlori))
+
 (executable
  (name crawler)
  (modules crawler)
- (libraries let db ez_api.icurl_lwt))
+ (libraries crawler_config db ez_api.icurl_lwt))
+
+(executable
+ (name recrawl_single)
+ (modules recrawl_single)
+ (preprocess (pps ppx_deriving_encoding))
+ (libraries crawler_config db ez_api.icurl_lwt))

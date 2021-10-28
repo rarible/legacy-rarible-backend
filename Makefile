@@ -29,16 +29,8 @@ opam-switch:
 	@opam switch create . 4.12.0 --no-install
 
 deps:
-	@opam pin add -n -y ez_pgocaml.dev git+https://github.com/ocamlpro/ez_pgocaml.git
-	@opam pin add -n -y ez_api.dev git+https://github.com/maxtori/ez_api.git#allow-static-dynamic
-	@opam pin add -n -y digestif.dev git+https://github.com/maxtori/digestif.git#keccak-256
-	@opam pin add -n -y hacl.dev git+https://gitlab.com/maxtori/ocaml-hacl.git
-	@opam pin add -n -y json-data-encoding.dev git+https://gitlab.com/maxtori/json-data-encoding.git#schema-fix
-	@opam pin add -n -y ppx_deriving_encoding.dev git+https://gitlab.com/maxtori/ppx_deriving_encoding.git#rarible
-	@opam pin add -n -y ppx_deriving_jsoo.dev git+https://gitlab.com/o-labs/ppx_deriving_jsoo.git
-	@opam pin add -n -y --ignore-pin-depends tzfunc.~dev git+https://gitlab.com/functori/tzfunc.git
-	@opam pin add -n -y --ignore-pin-depends crawlori.~dev git+https://gitlab.com/functori/crawlori.git
-	PGDATABASE=$(DB) opam install --deps-only --ignore-pin-depends .
+	@opam update
+	PGDATABASE=$(DB) opam install --deps-only .
 
 ts-global-deps:
 	@sudo npm i -g typescript webpack webpack-cli

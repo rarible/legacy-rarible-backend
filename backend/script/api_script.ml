@@ -2193,7 +2193,8 @@ let match_orders_lugh () =
   Printf.eprintf "Exchange %s\n%!" ex_kt1 ;
   let v_kt1 = validator in
   Printf.eprintf "Validator %s\n%!" v_kt1 ;
-  start_crawler "" v_kt1 ex_kt1 r_kt1 SMap.empty (SMap.singleton "KT1HT3EbSPFA1MM2ZiMThB6P6Kky5jebNgAx" Lugh) "" "" ""
+  start_crawler "" v_kt1 ex_kt1 r_kt1 SMap.empty
+    (SMap.singleton "KT1HT3EbSPFA1MM2ZiMThB6P6Kky5jebNgAx" {ft_kind=Lugh; ft_crawled=true; ft_id=Z.of_int 94594}) "" "" ""
   >>= fun (cpid, kafka_config) ->
   api_pid := Some (start_api kafka_config) ;
   crawler_pid := Some cpid ;
