@@ -25,7 +25,7 @@ let handle_operation contract ft config () op =
         if not (tr.destination = contract) then Lwt.return_ok ()
         else
           Db.use None (fun dbh ->
-              Format.printf "TEST %ld %s@." op.bo_level op.bo_hash;
+              Format.printf "Block %s (%ld)@." (Common.Utils.short op.bo_block) op.bo_level;
               Db.insert_ft ~dbh ~config ~op ~contract {ft with Rtypes.ft_crawled=true})
       | _ -> Lwt.return_ok ()
     else Lwt.return_ok ()
