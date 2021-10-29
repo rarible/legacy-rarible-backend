@@ -1,5 +1,6 @@
 DB=rarible
 CONVERTERS=$(OPAM_SWITCH_PREFIX)/share/crawlori/converters
+IMAGE=rarible:latest
 
 -include Makefile.config
 
@@ -13,6 +14,8 @@ copy: build openapi kafka_openapi
 	@cp -f _build/default/backend/crawler/crawler.exe _bin/crawler
 	@cp -f _build/default/backend/api/main_api.exe _bin/api
 	@cp -f _build/default/backend/script/api_script.exe _bin/tester
+	@cp -f _build/default/backend/crawler/recrawl_single.exe _bin/recrawl
+	@cp -f _build/default/backend/db/update.exe _bin/update_db
 
 clean:
 	@dune clean
@@ -26,7 +29,7 @@ drop:
 	@rm -f _build/default/backend/db/.rarible_witness
 
 opam-switch:
-	@opam switch create . 4.12.0 --no-install
+	@opam switch create . 4.13.1 --no-install
 
 deps:
 	@opam update
@@ -65,3 +68,6 @@ kafka_openapi:
 
 typedoc:
 	@npx typedoc --tsconfig sdk/tsconfig.json --options sdk/typedoc.json
+
+build-docker:
+	docker build -t $(IMAGE) -f docker/Dockerfile .

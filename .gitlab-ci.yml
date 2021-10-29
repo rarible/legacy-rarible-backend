@@ -8,7 +8,7 @@ pages:
   only:
     - master
 
-install:
+check:
   stage: build
   image: maxtori/opam-postgres:debian
   cache:
@@ -21,3 +21,19 @@ install:
     - make
   only:
     - merge_requests
+
+docker:
+  stage: deploy
+  image: docker:latest
+  services:
+    - name: docker:dind
+  variables:
+    DOCKER_TLS_CERTDIR: "/certs"
+  script:
+    - docker login -u "gitlab-ci-token" -p $CI_JOB_TOKEN $CI_REGISTRY
+    - docker build -t $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA -f docker/Dockerfile .
+    - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
+    - docker tag $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA $CI_REGISTRY_IMAGE:latest
+    - docker push $CI_REGISTRY_IMAGE:latest
+  only:
+    - master
