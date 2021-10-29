@@ -23,24 +23,35 @@ let one ?(err="expected unique row not found") l = match l with
 
 let db_contracts =
   List.fold_left (fun acc r ->
-      let v = match r#ledger_id, r#ledger_key, r#ledger_value with
-        | Some id, Some k, Some v ->
+      let v = match r#ledger_key, r#ledger_value with
+        | Some k, Some v ->
           let ledger_key = EzEncoding.destruct micheline_type_short_enc k in
           let ledger_value = EzEncoding.destruct micheline_type_short_enc v in
-          Some {ledger_id=Z.of_string id; ledger_key; ledger_value}
+          Some {nft_type = {ledger_key; ledger_value}; nft_id=Z.of_string r#ledger_id}
         | _ -> None in
       SMap.add r#address v acc) SMap.empty
 
+let db_ft_contract r =
+  let v = match r#kind, r#ledger_key, r#ledger_value with
+    | "fa2_single", _, _ -> Some Fa2_single
+    | "fa1", _, _ -> Some Fa1
+    | "fa2_multiple", _, _ -> Some Fa2_multiple
+    | "lugh", _, _ -> Some Lugh
+    | "fa2_multiple_inversed", _, _ -> Some Fa2_multiple_inversed
+    | "custom", Some k, Some v ->
+      let ledger_key = EzEncoding.destruct micheline_type_short_enc k in
+      let ledger_value = EzEncoding.destruct micheline_type_short_enc v in
+      Some (Custom {ledger_key; ledger_value})
+    | _ -> None in
+  match v with
+  | None -> None
+  | Some ft_kind -> Some {ft_kind; ft_id = Z.of_string r#ledger_id; ft_crawled=r#crawled}
+
 let db_ft_contracts =
   List.fold_left (fun acc r ->
-      let v = match r#kind, r#ledger_id, r#ledger_key, r#ledger_value with
-        | "fa2", _, _, _ -> Some Fa2 | "fa1", _, _, _ -> Some Fa1 | "lugh", _, _, _ -> Some Lugh
-        | "custom", Some id, Some k, Some v ->
-          let ledger_key = EzEncoding.destruct micheline_type_short_enc k in
-          let ledger_value = EzEncoding.destruct micheline_type_short_enc v in
-          Some (Custom {ledger_id=Z.of_string id; ledger_key; ledger_value})
-        | _ -> None in
-      match v with None -> acc | Some v -> SMap.add r#address v acc) SMap.empty
+      match db_ft_contract r with
+      | None -> acc
+      | Some ft -> SMap.add r#address ft acc) SMap.empty
 
 let get_extra_config ?dbh () =
   use dbh @@ fun dbh ->
@@ -48,8 +59,9 @@ let get_extra_config ?dbh () =
     [%pgsql.object dbh "select address, ledger_id, ledger_key, ledger_value \
                  from contracts where main"] in
   let>? ft_contracts =
-    [%pgsql.object dbh "select address, kind, ledger_id, ledger_key, ledger_value \
-                 from ft_contracts"] in
+    [%pgsql.object dbh
+        "select address, kind, ledger_id, ledger_key, ledger_value, crawled \
+         from ft_contracts"] in
   let>? r = [%pgsql.object dbh
       "select admin_wallet, exchange_v2_contract, royalties_contract, \
        validator_contract from state"] in
@@ -81,17 +93,20 @@ let update_extra_config ?dbh e =
           "update state set exchange_v2_contract = ${e.exchange_v2}, \
            royalties_contract = ${e.royalties}, validator_contract = ${e.validator}"] in
   iter_rp (fun (address, lk) ->
-      let kind, id, k, v = match lk with
-        | Fa2 -> "fa2", None, None, None
-        | Fa1 -> "fa1", None, None, None
-        | Lugh -> "lugh", None, None, None
-        | Custom {ledger_id; ledger_key; ledger_value} ->
-          "custom", Some (Z.to_string ledger_id),
+      let id = Z.to_string lk.ft_id in
+      let kind, k, v = match lk.ft_kind with
+        | Fa2_single -> "fa2_single", None, None
+        | Fa2_multiple -> "fa2_multiple", None, None
+        | Fa2_multiple_inversed -> "fa2_multiple_inversed", None, None
+        | Fa1 -> "fa1", None, None
+        | Lugh -> "lugh", None, None
+        | Custom {ledger_key; ledger_value} ->
+          "custom",
           Some (EzEncoding.construct micheline_type_short_enc ledger_key),
           Some (EzEncoding.construct micheline_type_short_enc ledger_value) in
       [%pgsql dbh
-          "insert into ft_contracts(address, kind, ledger_id, ledger_key, ledger_value) \
-           values($address, $kind, $?id, $?k, $?v) on conflict do nothing"]) (SMap.bindings e.ft_contracts)
+          "insert into ft_contracts(address, kind, ledger_id, ledger_key, ledger_value, crawled) \
+           values($address, $kind, $id, $?k, $?v, ${lk.ft_crawled}) on conflict do nothing"]) (SMap.bindings e.ft_contracts)
 
 (* Normalize here in case of ERC20 like asset *)
 let price left right =
@@ -1104,18 +1119,30 @@ let insert_transfer ~dbh ~op ~contract lt =
         ) transfer_index tr_txs) 0l lt in
   ()
 
-let insert_token_balances ~dbh ~op ~contract balances =
+let insert_token_balances ~dbh ~op ~contract ?(ft=false) balances =
   iter_rp (fun (k, v) ->
-      let kind, token_id, account, balance = match k, v with
-        | `nat id, Some (`address a) ->
+      let kind, token_id, account, balance = match k, v, ft with
+        | `nat id, Some (`address a), false ->
           "nft", Z.to_string id, Some a, None
-        | `nat id, None -> "nft", Z.to_string id, None, None
-        | `tuple [`nat id; `address a], Some (`nat bal)
-        | `tuple [`address a; `nat id], Some (`nat bal) ->
+        | `nat id, None, false -> "nft", Z.to_string id, None, None
+        | `tuple [`nat id; `address a], Some (`nat bal), false
+        | `tuple [`address a; `nat id], Some (`nat bal), false ->
           "multi", Z.to_string id, Some a, Some (Z.to_int64 bal)
-        | `tuple [`nat id; `address a], None
-        | `tuple [`address a; `nat id], None ->
+        | `tuple [`nat id; `address a], None, false
+        | `tuple [`address a; `nat id], None, false ->
           "multi", Z.to_string id, Some a, None
+        | `tuple [`nat id; `address a], Some (`nat bal), true
+        | `tuple [`address a; `nat id], Some (`nat bal), true ->
+          "ft_multi", Z.to_string id, Some a, Some (Z.to_int64 bal)
+        | `tuple [`nat id; `address a], None, true
+        | `tuple [`address a; `nat id], None, true ->
+          "ft_multi", Z.to_string id, Some a, None
+        | `address a, Some (`nat bal), true ->
+          "ft", "-1", Some a, Some (Z.to_int64 bal)
+        | `address a, None, true ->
+          "ft", "-1", Some a, None
+        | `tuple [`address a; `nat _], Some (`tuple (`nat bal :: _)), true ->
+          "ft", "-1", Some a, Some (Z.to_int64 bal)
         | _ -> "", "", None, None in
       if kind <> "" then
         let>? () = [%pgsql dbh
@@ -1123,9 +1150,9 @@ let insert_token_balances ~dbh ~op ~contract balances =
              tsp, kind, contract, token_id, account, balance) \
              values(${op.bo_hash}, ${op.bo_index}, ${op.bo_block}, ${op.bo_level}, \
              ${op.bo_tsp}, $kind, $contract, $token_id, $?account, $?balance) on conflict do nothing"] in
-        match account with
-        | None -> Lwt.return_ok ()
-        | Some a ->
+        match account, ft with
+        | None, _ | _, true -> Lwt.return_ok ()
+        | Some a, _ ->
           [%pgsql dbh
               "insert into tokens(contract, token_id, block, level, tsp, \
                last_block, last_level, last, owner, amount, \
@@ -1338,44 +1365,37 @@ let insert_do_transfers ~dbh ~op
     left left_maker left_asset
     right right_maker right_asset
 
-let insert_ft_transfers ~dbh ~op ~contract txs =
-  let|>? _ = fold_rp (fun transfer_index tx ->
-      fold_rp (fun transfer_index txd ->
-          let|>? () = [%pgsql dbh
-              "insert into ft_token_updates(transaction, index, block, \
-               level, tsp, source, destination, contract, amount, transfer_index) \
-               values(${op.bo_hash}, ${op.bo_index}, ${op.bo_block}, ${op.bo_level}, \
-               ${op.bo_tsp}, ${tx.tr_source}, ${txd.tr_destination}, \
-               $contract, ${txd.tr_amount}, $transfer_index) \
-               on conflict do nothing"] in
-          Int32.succ transfer_index
-        ) transfer_index tx.tr_txs) 0l txs in
-  ()
+let check_ft_status ~dbh ~config ~crawled contract =
+  if crawled then Lwt.return_ok true
+  else
+    let>? l = [%pgsql dbh "select crawled from ft_contracts where address = $contract"] in
+    match l with
+    | [ c ] ->
+      let ft_contracts = SMap.update contract (function
+          | None -> None
+          | Some ft -> Some {ft with ft_crawled=true}) config.Crawlori.Config.extra.ft_contracts in
+      if c then config.Crawlori.Config.extra.ft_contracts <- ft_contracts;
+      Lwt.return_ok c
+    | _ -> Lwt.return_ok false
 
-let insert_ft_mint_burn ~dbh ~op ~contract ~burn ~owner ~amount =
-  let source, destination = if burn then Some owner, None else None, Some owner in
-  [%pgsql dbh
-      "insert into ft_token_updates(transaction, index, block, \
-       level, tsp, source, destination, contract, amount) \
-       values(${op.bo_hash}, ${op.bo_index}, ${op.bo_block}, ${op.bo_level}, \
-       ${op.bo_tsp}, $?source, $?destination, \
-       $contract, $amount) \
-       on conflict do nothing"]
-
-let insert_ft ~dbh ~op ~contract = function
-  | Ok (FT_transfers t) ->
-    Format.printf "\027[0;35mFT transfer %s %ld %s\027[0m@."
-      (short op.bo_hash) op.bo_index (short contract);
-    insert_ft_transfers ~dbh ~op ~contract t
-  | Ok (FT_mint {owner; amount; _}) ->
-    Format.printf "\027[0;35mFT mint %s %ld %s\027[0m@."
-      (short op.bo_hash) op.bo_index (short contract);
-    insert_ft_mint_burn ~dbh ~op ~burn:false ~contract ~owner ~amount
-  | Ok (FT_burn {owner; amount; _}) ->
-    Format.printf "\027[0;35mFT burn %s %ld %s\027[0m@."
-      (Utils.short op.bo_hash) op.bo_index (Utils.short contract);
-    insert_ft_mint_burn ~dbh ~op ~burn:true ~contract ~owner ~amount
-  | _ -> Lwt.return_ok ()
+let insert_ft ~dbh ~config ~op ~contract ft =
+  Format.printf "\027[0;35mFT update %s %ld %s\027[0m@."
+    (short op.bo_hash) op.bo_index (short contract);
+  let>? crawled = check_ft_status ~dbh ~config ~crawled:ft.ft_crawled contract in
+  match crawled, op.bo_meta with
+  | false, _ | _, None ->
+    Lwt.return_ok ()
+  | _, Some meta ->
+    let id = ft.ft_id in
+    let key, value = match ft.ft_kind with
+      | Fa2_single -> Contract_spec.ledger_fa2_single_field
+      | Fa2_multiple -> Contract_spec.ledger_fa2_multiple_field
+      | Lugh -> Contract_spec.ledger_lugh_field
+      | Fa1 -> Contract_spec.ledger_fa1_field
+      | Fa2_multiple_inversed -> Contract_spec.ledger_fa2_multiple_inversed_field
+      | Custom {ledger_key; ledger_value} -> ledger_key, ledger_value in
+    let balances = Storage_diff.get_big_map_updates ~id key value meta.op_lazy_storage_diff in
+    insert_token_balances ~dbh ~op ~contract ~ft:true balances
 
 let insert_transaction ~config ~dbh ~op tr =
   let contract = tr.destination in
@@ -1412,16 +1432,15 @@ let insert_transaction ~config ~dbh ~op tr =
     else match
         SMap.find_opt contract config.Crawlori.Config.extra.ft_contracts,
         SMap.find_opt contract config.Crawlori.Config.extra.contracts with
-    | Some Fa2, _ -> insert_ft ~dbh ~op ~contract @@ Parameters.parse_ft_fa2 entrypoint m
-    | Some Fa1, _ -> insert_ft ~dbh ~op ~contract @@ Parameters.parse_ft_fa1 entrypoint m
-    | Some Lugh, _ -> insert_ft ~dbh ~op ~contract @@ Parameters.parse_ft_lugh entrypoint m
-    | Some (Custom _), _ -> Lwt.return_ok () (* todo custom erc20 *)
+    | Some ft, _ -> insert_ft ~dbh ~config ~op ~contract ft
     | _, None -> Lwt.return_ok ()
     | _, Some ledger_info ->
       let>? () = match ledger_info with
         | None -> Lwt.return_ok ()
         | Some info ->
-          let balances = Storage_diff.get_big_map_updates ~id:info.ledger_id info.ledger_key info.ledger_value meta.op_lazy_storage_diff in
+          let balances = Storage_diff.get_big_map_updates ~id:info.nft_id
+              info.nft_type.ledger_key info.nft_type.ledger_value
+              meta.op_lazy_storage_diff in
           insert_token_balances ~dbh ~op ~contract balances in
       begin match Parameters.parse_fa2 entrypoint m with
         | Ok (Mint_tokens m) ->
@@ -1507,15 +1526,15 @@ let insert_origination config dbh op ori =
       | `rarible (id, k, v, owner) ->
         "rarible", Some owner, Some (Z.to_string id), Some (EzEncoding.construct micheline_type_short_enc k),
         Some (EzEncoding.construct micheline_type_short_enc v),
-        Some {ledger_id=id; ledger_key=k; ledger_value=v}
+        Some {nft_id=id; nft_type={ledger_key=k; ledger_value=v}}
       | `ubi (id, k, v, owner) ->
         "ubi", Some owner, Some (Z.to_string id), Some (EzEncoding.construct micheline_type_short_enc k),
         Some (EzEncoding.construct micheline_type_short_enc v),
-        Some {ledger_id=id; ledger_key=k; ledger_value=v}
+        Some {nft_id=id; nft_type={ledger_key=k; ledger_value=v}}
       | `fa2 (id, k, v) ->
         "fa2", None, Some (Z.to_string id), Some (EzEncoding.construct micheline_type_short_enc k),
         Some (EzEncoding.construct micheline_type_short_enc v),
-        Some {ledger_id=id; ledger_key=k; ledger_value=v} in
+        Some {nft_id=id; nft_type={ledger_key=k; ledger_value=v}} in
     let|>? () = [%pgsql dbh
         "insert into contracts(kind, address, owner, block, level, tsp, \
          last_block, last_level, last, ledger_id, ledger_key, ledger_value) \
@@ -3383,3 +3402,18 @@ let get_order_activities ?dbh ?continuation ?size = function
     get_order_activities_all ?dbh ?continuation ?size types
 
   (* ORDER UPDATE field = fill, make_stock, cancelled, last_update, make_balance, make_price_usd, take_price_usd, assets values ?? *)
+
+let set_main_recrawl ?dbh hash =
+  use dbh @@ fun dbh ->
+  [%pgsql dbh
+      "update token_balance_updates set main = true where \
+       block = $hash and (kind='ft' or kind='ft_multiple')"]
+
+let set_crawled ?dbh contract =
+  use dbh @@ fun dbh ->
+  [%pgsql dbh "update ft_contracts set crawled = true where address = $contract"]
+
+let get_ft_contract ?dbh contract =
+  use dbh @@ fun dbh ->
+  let>? l = [%pgsql.object dbh "select * from ft_contracts where address = $contract"] in
+  one @@ List.map db_ft_contract l

@@ -870,38 +870,38 @@ module TMap = Map.Make(struct
         else String.compare o1 o2
   end)
 
-type ledger_info = {
-  ledger_id: z;
+type ledger_type = {
   ledger_key: micheline_type_short;
   ledger_value: micheline_type_short;
 } [@@deriving encoding]
 
-type nft_ledgers = ledger_info option SMap.t
-let nft_ledgers_enc = Json_encoding.(
-    conv SMap.bindings
-      (fun l -> List.fold_left (fun acc (k, v) -> SMap.add k v acc) SMap.empty l)
-      (assoc @@ option ledger_info_enc))
+type nft_ledger = {
+  nft_type: ledger_type;
+  nft_id: z;
+} [@@deriving encoding]
 
 type ft_ledger_kind =
-  | Fa2
+  | Fa2_single
+  | Fa2_multiple
+  | Fa2_multiple_inversed
   | Fa1
   | Lugh
-  | Custom of ledger_info
+  | Custom of ledger_type
 [@@deriving encoding]
 
-type ft_ledgers = ft_ledger_kind SMap.t
-let ft_ledgers_enc = Json_encoding.(
-    conv SMap.bindings
-      (fun l -> List.fold_left (fun acc (k, v) -> SMap.add k v acc) SMap.empty l)
-      (assoc @@ ft_ledger_kind_enc))
+type ft_ledger = {
+  ft_kind: ft_ledger_kind;
+  ft_id: z;
+  ft_crawled: bool; [@dft false]
+} [@@deriving encoding]
 
 type config = {
   admin_wallet: string; [@dft ""]
   exchange_v2: string; [@dft ""]
   validator: string; [@dft ""]
   royalties: string; [@dft ""]
-  ft_contracts: ft_ledgers; [@dft SMap.empty]
-  mutable contracts: nft_ledgers; [@dft SMap.empty]
+  mutable ft_contracts: ft_ledger SMap.t; [@map] [@dft SMap.empty]
+  mutable contracts: nft_ledger option SMap.t; [@map] [@dft SMap.empty]
 } [@@deriving encoding]
 
 type kafka_config = {

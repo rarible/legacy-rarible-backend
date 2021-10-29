@@ -98,6 +98,10 @@ let match_fields ~expected ~allocs script =
            | Some id -> Some (id, k, v))
       ) expected)
 
-let ledger_field = `tuple [ `address; `nat ], `nat
+let ledger_fa2_multiple_field = `tuple [ `address; `nat ], `nat
+let ledger_fa2_multiple_inversed_field = `tuple [ `nat; `address ], `nat
+let ledger_fa2_single_field = `address, `nat
+let ledger_fa1_field = `address, `tuple [`nat; `map (`address, `nat) ]
+let ledger_lugh_field = `tuple [ `address; `nat ], `tuple [`nat; `nat; `bool ]
 
 let set_royalties_entry = `tuple [`address; `nat; `map (`address, `nat)]

@@ -1,11 +1,12 @@
 {
   "nodes": [ "https://granadanet.smartpy.io" ],
-  "start": 572780,
+  "start": 581688,
   "db_kind": "pg",
   "step_forward": 30,
-  "accounts": [ "KT1Caj4ZXbop5AswuH4RAv61rMVEeVdtFk4f" ],
+  "ft_contracts": {
+    "KT1HT3EbSPFA1MM2ZiMThB6P6Kky5jebNgAx": { "kind": "lugh", "id": "94594" }
+  },
   "validator": "KT1JrWXMuHp7nkX7j3trtxckVBiTyggDNnU1",
   "exchange_v2": "KT1CfvTiEz9EVBLBLLYYFvRTwqyLsCvoZtWm",
-  "royalties": "KT1JPYtEMv8PHXfmLoMuWRLsVykoEou5AqKG",
-  "ft_lugh": [ "KT1HT3EbSPFA1MM2ZiMThB6P6Kky5jebNgAx" ]
+  "royalties": "KT1JPYtEMv8PHXfmLoMuWRLsVykoEou5AqKG"
 }
