@@ -1158,7 +1158,7 @@ let match_orders ?amount ~source ~contract order_left order_right =
   let open Tzfunc.Crypto in
   let r =
     Result.bind (Sk.b58dec @@ snd source) @@ fun sk ->
-    Result.bind (Sk.to_public_key sk) @@ fun pk ->
+    let pk = Sk.to_public_key sk in
     Ok (sk, Pk.b58enc ~curve:`ed25519 pk) in
   match r with
   | Error _ -> assert false
@@ -1191,7 +1191,7 @@ let cancel_order ~source ~contract order =
   let open Tzfunc.Crypto in
   let r =
     Result.bind (Sk.b58dec @@ snd source) @@ fun sk ->
-    Result.bind (Sk.to_public_key sk) @@ fun pk ->
+    let pk = Sk.to_public_key sk in
     Ok (sk, Pk.b58enc ~curve:`ed25519 pk) in
   match r with
   | Error _ -> assert false
