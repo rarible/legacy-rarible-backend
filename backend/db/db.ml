@@ -406,6 +406,12 @@ let get_order_updates ?dbh obj make maker take data =
     let last_update_at = match matches with hd :: _ -> hd#tsp | [] -> obj#created_at in
     fill, make_stock, cancelled, last_update_at, make_balance
 
+let calculate_status fill take make_stock cancelled =
+  if cancelled then CANCELLED
+  else if make_stock > 0L then OACTIVE
+  else if fill = Int64.of_string take.asset_value then OFILLED
+  else INACTIVE
+
 let mk_order ?dbh order_obj =
   mk_asset
     order_obj#make_asset_type_class
@@ -429,6 +435,7 @@ let mk_order ?dbh order_obj =
   } in
   let>? (fill, make_stock, cancelled, last_update_at, make_balance) =
     get_order_updates ?dbh order_obj order_elt_make order_obj#maker order_elt_take data in
+  let status = calculate_status fill order_elt_take make_stock cancelled in
   let order_elt = {
     order_elt_maker = order_obj#maker;
     order_elt_maker_edpk = order_obj#maker_edpk ;
@@ -448,7 +455,7 @@ let mk_order ?dbh order_obj =
     order_elt_hash = order_obj#hash ;
     order_elt_make_balance = Option.some @@ Int64.to_string make_balance ;
     order_elt_price_history = price_history ;
-    order_elt_status = None (* todo *)
+    order_elt_status = Some status
   } in
   let rarible_v2_order = {
     order_elt = order_elt ;
@@ -3390,8 +3397,6 @@ let get_order_activities ?dbh ?continuation ?size = function
     get_order_activities_by_user ?dbh ?continuation ?size filter
   | OrderActivityFilterAll types ->
     get_order_activities_all ?dbh ?continuation ?size types
-
-  (* ORDER UPDATE field = fill, make_stock, cancelled, last_update, make_balance, make_price_usd, take_price_usd, assets values ?? *)
 
 let set_main_recrawl ?dbh hash =
   use dbh @@ fun dbh ->
