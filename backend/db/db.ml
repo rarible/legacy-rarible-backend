@@ -407,10 +407,10 @@ let get_order_updates ?dbh obj make maker take data =
     fill, make_stock, cancelled, last_update_at, make_balance
 
 let calculate_status fill take make_stock cancelled =
-  if cancelled then CANCELLED
+  if cancelled then OCANCELLED
   else if make_stock > 0L then OACTIVE
   else if fill = Int64.of_string take.asset_value then OFILLED
-  else INACTIVE
+  else OINACTIVE
 
 let mk_order ?dbh order_obj =
   mk_asset
@@ -3033,6 +3033,56 @@ let get_bid_orders_by_item
         (mk_order_continuation @@ List.hd @@ List.rev orders) in
   Lwt.return_ok
     { orders_pagination_orders = orders ; orders_pagination_continuation }
+
+let get_currencies_by_bid_orders_of_item ?dbh contract token_id =
+  Format.eprintf "get_currencies_by_bid_orders_of_item %s %s\n%!" contract token_id ;
+  use dbh @@ fun dbh ->
+  let>? l =
+    [%pgsql.object dbh
+        "select hash, make_asset_type_class, \
+         make_asset_type_contract, make_asset_type_token_id from orders \
+         where take_asset_type_contract = $contract and \
+         take_asset_type_token_id = $token_id"] in
+  map_rp (fun r ->
+      mk_asset
+        r#make_asset_type_class
+        r#make_asset_type_contract
+        r#make_asset_type_token_id
+        "0") l >>=? fun assets ->
+  let types = List.map (fun a -> a.asset_type) assets in
+  let currencies =
+    List.fold_left (fun acc t ->
+        if List.exists (fun tt -> t = tt) acc then acc
+        else t :: acc) [] types in
+  Lwt.return_ok {
+    order_currencies_order_type = COTBID ;
+    order_currencies_currencies = currencies ;
+  }
+
+let get_currencies_by_sell_orders_of_item ?dbh contract token_id =
+  Format.eprintf "get_currencies_by_bid_orders_of_item %s %s\n%!" contract token_id ;
+  use dbh @@ fun dbh ->
+  let>? l =
+    [%pgsql.object dbh
+        "select hash, take_asset_type_class, \
+         take_asset_type_contract, take_asset_type_token_id from orders \
+         where make_asset_type_contract = $contract and \
+         make_asset_type_token_id = $token_id"] in
+  map_rp (fun r ->
+      mk_asset
+        r#take_asset_type_class
+        r#take_asset_type_contract
+        r#take_asset_type_token_id
+        "0") l >>=? fun assets ->
+  let types = List.map (fun a -> a.asset_type) assets in
+  let currencies =
+    List.fold_left (fun acc t ->
+        if List.exists (fun tt -> t = tt) acc then acc
+        else t :: acc) [] types in
+  Lwt.return_ok {
+    order_currencies_order_type = COTSELL ;
+    order_currencies_currencies = currencies ;
+  }
 
 let insert_price_history dbh date make_value take_value hash_key =
   [%pgsql dbh

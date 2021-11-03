@@ -452,8 +452,8 @@ type order_status =
   | OACTIVE
   | OFILLED
   | OHISTORICAL
-  | INACTIVE
-  | CANCELLED
+  | OINACTIVE
+  | OCANCELLED
 [@@deriving encoding {enum; title="OrderStatus"; def_title}]
 
 type order_elt = {
@@ -965,3 +965,13 @@ type tzip21_token_metadata = {
   tzip21_tm_is_transferable : bool option ;
   tzip21_tm_should_prefer_symbol : bool option ;
 } [@@deriving encoding {camel}]
+
+type currency_order_type =
+  | COTSELL
+  | COTBID
+[@@deriving encoding {enum; title="OrderType"; def_title}]
+
+type order_currencies = {
+  order_currencies_order_type : currency_order_type ;
+  order_currencies_currencies : asset_type list ;
+} [@@deriving encoding {title="OrderCurrencies"; def_title}]

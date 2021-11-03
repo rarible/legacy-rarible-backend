@@ -882,6 +882,74 @@ paths:
               schema:
                 $ref: '#/components/schemas/OrderPagination'
       security: []
+  /v0.1/order/orders/currencies/byBidOrdersOfItem:
+    description: Returns currencies made as payment in all bid orders of the item
+    get:
+      tags:
+      - order-controller
+      description: Returns currencies made as payment in all bid orders of the item
+      operationId: getCurrenciesByBidOrdersOfItem
+      parameters:
+      - name: contract
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/schemas/Address'
+      - name: tokenId
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/schemas/BigInteger'
+      responses:
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                oneOf:
+                - $ref: '#/components/schemas/UNEXPECTED_API_ERROR'
+                - $ref: '#/components/schemas/BAD_REQUEST'
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderCurrencies'
+      security: []
+  /v0.1/order/orders/currencies/bySellOrdersOfItem:
+    description: Returns currencies taken as payment in all sell orders of the item
+    get:
+      tags:
+      - order-controller
+      description: Returns currencies taken as payment in all sell orders of the item
+      operationId: getCurrenciesBySellOrdersOfItem
+      parameters:
+      - name: contract
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/schemas/Address'
+      - name: tokenId
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/schemas/BigInteger'
+      responses:
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                oneOf:
+                - $ref: '#/components/schemas/UNEXPECTED_API_ERROR'
+                - $ref: '#/components/schemas/BAD_REQUEST'
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderCurrencies'
+      security: []
   /v0.1/order/activities/search:
     description: get Order activities with some filter
     post:
@@ -972,6 +1040,19 @@ components:
       - $ref: '#/components/schemas/XTZAssetType'
       - $ref: '#/components/schemas/FA_1_2AssetType'
       - $ref: '#/components/schemas/FA_2AssetType'
+    BAD_REQUEST:
+      type: object
+      properties:
+        code:
+          type: string
+          enum:
+          - BAD_REQUEST
+        message:
+          type: string
+      required:
+      - message
+      - code
+      additionalProperties: false
     BigDecimal:
       type: string
     BigInteger:
@@ -1820,6 +1901,19 @@ components:
       - $ref: '#/components/schemas/OrderActivityBid'
       - $ref: '#/components/schemas/OrderActivityCancelBid'
       - $ref: '#/components/schemas/OrderActivityCancelList'
+    OrderCurrencies:
+      type: object
+      properties:
+        order_type:
+          $ref: '#/components/schemas/OrderType'
+        currencies:
+          type: array
+          items:
+            $ref: '#/components/schemas/AssetType'
+      required:
+      - currencies
+      - order_type
+      additionalProperties: false
     OrderForm:
       type: object
       properties:
@@ -1911,11 +2005,16 @@ components:
     OrderStatus:
       type: string
       enum:
-      - OACTIVE
-      - OFILLED
-      - OHISTORICAL
+      - ACTIVE
+      - FILLED
+      - HISTORICAL
       - INACTIVE
       - CANCELLED
+    OrderType:
+      type: string
+      enum:
+      - SELL
+      - BID
     Part:
       type: object
       properties:

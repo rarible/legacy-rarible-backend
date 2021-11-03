@@ -1150,6 +1150,48 @@ let get_order_bids_by_item req () =
    name="orders_bids_by_item";
    section=orders_section}]
 
+let get_currencies_by_bid_orders_of_item req () =
+  Format.eprintf "get_currencies_by_bid_orders_of_item\n%!";
+  match get_required_contract_param req with
+  | Error err -> return @@ Error err
+  | Ok contract ->
+    match get_required_token_id_param req with
+    | Error err -> return @@ Error err
+    | Ok token_id ->
+      Db.get_currencies_by_bid_orders_of_item contract token_id >>= function
+      | Error db_err ->
+        let str = Crawlori.Rp.string_of_error db_err in
+        return (Error (`UNEXPECTED_API_ERROR str))
+      | Ok res -> return_ok res
+[@@get
+  {path="/v0.1/order/orders/currencies/byBidOrdersOfItem";
+   params=[contract_param;token_id_param];
+   output=order_currencies_enc;
+   errors=[bad_request_case; unexpected_api_error_case];
+   name="get_currencies_by_bid_orders_of_item";
+   section=orders_section}]
+
+let get_currencies_by_sell_orders_of_item req () =
+  Format.eprintf "get_currencies_by_sell_orders_of_item\n%!";
+  match get_required_contract_param req with
+  | Error err -> return @@ Error err
+  | Ok contract ->
+    match get_required_token_id_param req with
+    | Error err -> return @@ Error err
+    | Ok token_id ->
+      Db.get_currencies_by_sell_orders_of_item contract token_id >>= function
+      | Error db_err ->
+        let str = Crawlori.Rp.string_of_error db_err in
+        return (Error (`UNEXPECTED_API_ERROR str))
+      | Ok res -> return_ok res
+[@@get
+  {path="/v0.1/order/orders/currencies/bySellOrdersOfItem";
+   params=[contract_param;token_id_param];
+   output=order_currencies_enc;
+   errors=[bad_request_case; unexpected_api_error_case];
+   name="get_currencies_by_sell_orders_of_item";
+   section=orders_section}]
+
 (* order-activity-controller *)
 let get_order_activities req input =
   match get_size_param req with
@@ -1184,7 +1226,6 @@ let validate _req input =
    output=Json_encoding.bool;
    errors=[invalid_argument_case; unexpected_api_error_case];
    section=signature_section}]
-
 
 (* module V_0_1 = struct
  *

@@ -707,9 +707,9 @@ components:
     OrderStatus:
       type: string
       enum:
-      - OACTIVE
-      - OFILLED
-      - OHISTORICAL
+      - ACTIVE
+      - FILLED
+      - HISTORICAL
       - INACTIVE
       - CANCELLED
     Part:
