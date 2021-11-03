@@ -363,7 +363,11 @@ components:
         date:
           type: string
           format: date-time
+        createdAt:
+          type: string
+          format: date-time
       required:
+      - createdAt
       - date
       - lazyValue
       - value

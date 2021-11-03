@@ -261,6 +261,7 @@ type nft_ownership = {
   nft_ownership_value : A.big_integer ;
   nft_ownership_lazy_value : A.big_integer ;
   nft_ownership_date : A.date ;
+  nft_ownership_created_at : A.date ;
 } [@@deriving encoding {camel; title="NftOwnership"; def_title}]
 
 type nft_ownerships = {

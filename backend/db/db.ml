@@ -515,6 +515,7 @@ let mk_nft_ownership dbh obj =
     nft_ownership_value = Int64.to_string obj#amount ;
     nft_ownership_lazy_value = "0" ;
     nft_ownership_date = obj#last ;
+    nft_ownership_created_at = obj#tsp ;
   }
 
 let get_nft_ownership_by_id ?dbh ?(old=false) contract token_id owner =
@@ -523,7 +524,7 @@ let get_nft_ownership_by_id ?dbh ?(old=false) contract token_id owner =
   use dbh @@ fun dbh ->
   let>? l = [%pgsql.object dbh
       "select concat(contract, ':', token_id, ':', owner) as id, \
-       contract, token_id, owner, last, amount, supply, metadata \
+       contract, token_id, owner, last, tsp, amount, supply, metadata \
        from tokens where \
        main and contract = $contract and token_id = $token_id and \
        owner = $owner and (amount > 0 or $old)"] in
@@ -2303,7 +2304,7 @@ let get_nft_ownerships_by_item ?dbh ?continuation ?(size=50) contract token_id =
   use dbh @@ fun dbh ->
   let>? l = [%pgsql.object dbh
       "select concat(contract, ':', token_id, ':', owner) as id, \
-       contract, token_id, owner, last, amount, supply, metadata \
+       contract, token_id, owner, tsp, last, amount, supply, metadata \
        from tokens where \
        main and contract = $contract and token_id = $token_id and amount <> 0 and \
        ($no_continuation or \
@@ -2340,7 +2341,7 @@ let get_nft_all_ownerships ?dbh ?continuation ?(size=50) () =
   use dbh @@ fun dbh ->
   let>? l = [%pgsql.object dbh
       "select concat(contract, ':', token_id, ':', owner) as id, \
-       contract, token_id, owner, last, amount, supply, metadata \
+       contract, token_id, owner, tsp, last, amount, supply, metadata \
        from tokens where \
        main and amount > 0 and \
        ($no_continuation or \
