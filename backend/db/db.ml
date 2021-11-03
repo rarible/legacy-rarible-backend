@@ -1561,8 +1561,8 @@ let insert_operation config dbh op =
   | _ -> Lwt.return_ok ()
 
 let insert_block config dbh b =
-  EzEncoding.construct Tzfunc.Proto.full_block_enc.Encoding.json b
-  |> Rarible_kafka.produce_test >>= fun () ->
+  (* EzEncoding.construct Tzfunc.Proto.full_block_enc.Encoding.json b
+   * |> Rarible_kafka.produce_test >>= fun () -> *)
   iter_rp (fun op ->
       iter_rp (fun c ->
           match c.man_metadata with

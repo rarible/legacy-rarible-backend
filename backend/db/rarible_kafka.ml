@@ -15,10 +15,13 @@ let topic_test = ref None
 
 let kafka_config = ref None
 
+let max_message_bytes = string_of_int @@ 5 * 1024 * 1024
+
 let set_config config =
   let open Rtypes in
   kafka_config :=
   Some [
+    "message.max.bytes", max_message_bytes ;
     "metadata.broker.list", config.kafka_broker ;
     "security.protocol", "SASL_PLAINTEXT" ;
     "sasl.mechanism", "PLAIN" ;
