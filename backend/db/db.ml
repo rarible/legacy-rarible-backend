@@ -445,7 +445,6 @@ let mk_order ?dbh order_obj =
     order_elt_signature = order_obj#signature ;
     order_elt_created_at = order_obj#created_at ;
     order_elt_last_update_at = last_update_at ;
-    order_elt_pending = None ;
     order_elt_hash = order_obj#hash ;
     order_elt_make_balance = Option.some @@ Int64.to_string make_balance ;
     order_elt_price_history = price_history ;
@@ -506,7 +505,6 @@ let mk_nft_ownership dbh obj =
   let contract = obj#contract in
   let token_id = obj#token_id in
   let|>? creators = get_nft_item_creators dbh ~contract ~token_id in
-  (* TODO : pending *)
   (* TODO : last <> mint date ? *)
   {
     nft_ownership_id = Option.get obj#id ;
@@ -517,7 +515,6 @@ let mk_nft_ownership dbh obj =
     nft_ownership_value = Int64.to_string obj#amount ;
     nft_ownership_lazy_value = "0" ;
     nft_ownership_date = obj#last ;
-    nft_ownership_pending = [] ;
   }
 
 let get_nft_ownership_by_id ?dbh ?(old=false) contract token_id owner =
@@ -548,13 +545,6 @@ let get_nft_ownership_by_id ?dbh ?(old=false) contract token_id owner =
  *     item_transfer_value = Int64.to_string it_obj#value;
  *     item_transfer_from = it_obj#transfer_from;
  *   } *)
-
-(* let get_nft_item_pending ?dbh id =
- *   use dbh @@ fun dbh ->
- *   let>? l =
- *     [%pgsql.object dbh
- *         "select owner, value, transfer_from from item_transfers where id = $id "] in
- *   map_rp (fun r -> mk_item_transfer r) l *)
 
 (* let mk_media_meta obj =
  *   Lwt.return_ok
@@ -721,7 +711,6 @@ let mk_nft_item dbh ?include_meta obj =
     nft_item_royalties = [] ;
     nft_item_date = obj#last ;
     nft_item_minted_at = obj#tsp ;
-    nft_item_pending = None ;
     nft_item_deleted = if obj#supply > 0L then Some false else Some true ;
     nft_item_meta = rarible_meta_of_tzip21_meta meta ;
   }
