@@ -63,22 +63,26 @@ export const order_type : MichelsonType = {
                 {prim: 'pair', args:[
                   {prim: 'bytes'}, {prim: 'bytes'} ]}]}]}]}]}]}]}]}
 
-export function asset_type_to_struct(a : AssetType) : MichelsonData {
+export function asset_type_to_struct(p: Provider, a : AssetType) : MichelsonData {
   switch (a.asset_class) {
     case "XTZ":
       return { prim: 'Pair', args: [ XTZ,  { bytes: "00" } ] }
-    case "FA_1_2":
+    case "FT":
       return { prim: 'Pair', args: [ FA_1_2,  {
         bytes: pack({ string: a.contract }, fa_1_2_type) } ] }
-    case "FA_2":
+    case "NFT":
       return { prim: 'Pair', args: [ FA_2,  {
         bytes: pack({ prim: "Pair", args: [
-          { string: a.contract }, { int: a.token_id.toString() } ] }, fa_2_type) } ] }
+          { string: a.contract || p.config.nft_public  }, { int: a.token_id.toString() } ] }, fa_2_type) } ] }
+    case "MT":
+      return { prim: 'Pair', args: [ FA_2,  {
+        bytes: pack({ prim: "Pair", args: [
+          { string: a.contract || p.config.mt_public  }, { int: a.token_id.toString() } ] }, fa_2_type) } ] }
   }
 }
 
-export function asset_to_struct(a: Asset) : MichelsonData {
-  return { prim: "Pair", args: [ asset_type_to_struct(a.asset_type), { int: a.value.toString() } ] }
+export function asset_to_struct(p: Provider, a: Asset) : MichelsonData {
+  return { prim: "Pair", args: [ asset_type_to_struct(p, a.asset_type), { int: a.value.toString() } ] }
 }
 
 export function data_to_struct(data: OrderRaribleV2DataV1) : MichelsonData {
@@ -90,7 +94,7 @@ export function data_to_struct(data: OrderRaribleV2DataV1) : MichelsonData {
   ] }
 }
 
-export function order_to_struct(order: OrderForm) : MichelsonData {
+export function order_to_struct(p: Provider, order: OrderForm) : MichelsonData {
   let data_type = keccak(
     pack({ string: order.data.data_type }, { prim: 'string'} ))
   let data = pack(data_to_struct(order.data), order_data_type)
@@ -98,11 +102,11 @@ export function order_to_struct(order: OrderForm) : MichelsonData {
     prim: "Pair", args: [
       some_struct({string: order.maker_edpk}),
       { prim: "Pair", args: [
-        asset_to_struct(order.make),
+        asset_to_struct(p, order.make),
         { prim: "Pair", args: [
           (order.taker_edpk) ? some_struct({string: order.taker_edpk}) : none_struct(),
           { prim: "Pair", args: [
-            asset_to_struct(order.take),
+            asset_to_struct(p, order.take),
             { prim: "Pair", args: [
               { int: order.salt.toString() },
               { prim: "Pair", args: [
@@ -117,16 +121,17 @@ export function order_to_struct(order: OrderForm) : MichelsonData {
 export async function sign_order(
   provider: Provider,
   order: OrderForm) : Promise<string> {
-  let h = pack(order_to_struct(order), order_type)
+  let h = pack(order_to_struct(provider, order), order_type)
   const signature = sign(provider, h)
   return signature
 }
 
 export async function order_key(
+  provider: Provider,
   order: OrderForm) : Promise<string> {
   const maker = pack({string: order.maker_edpk}, { prim: "key" })
-  const make_asset = keccak(pack(asset_type_to_struct(order.make.asset_type), asset_type_type))
-  const take_asset = keccak(pack(asset_type_to_struct(order.take.asset_type), asset_type_type))
+  const make_asset = keccak(pack(asset_type_to_struct(provider, order.make.asset_type), asset_type_type))
+  const take_asset = keccak(pack(asset_type_to_struct(provider, order.take.asset_type), asset_type_type))
   const salt = pack({int: order.salt.toString()}, {prim:"nat"})
   return keccak(maker + make_asset + take_asset + salt)
 }

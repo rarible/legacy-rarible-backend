@@ -1,17 +1,18 @@
 (library
  (public_name rarible.script)
- (modules script)
+ (modules script script_types)
  (name script)
+ (wrapped false)
  (libraries unix hex))
 
 (library
  (name script_js)
  (package rarible)
  (modules script_js)
- (libraries script tzfunc))
+ (libraries  script tzfunc))
 
 (executable
  (public_name rarible.api_script)
  (modules api_script)
  (name api_script)
- (libraries script api script_js ez_api.icurl_lwt ez_api.icurl))
+ (libraries api script_js ez_api.icurl_lwt ez_api.icurl))

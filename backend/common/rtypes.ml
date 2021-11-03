@@ -291,7 +291,8 @@ type nft_collection_feature =
 [@@deriving encoding {enum; title="NftCollectionFeature"; def_title}]
 
 type nft_collection_type =
-  | CTFA_2 [@key "FA_2"]
+  | CTNFT
+  | CTMT
 [@@deriving encoding {enum; title="NftCollectionType"; def_title}]
 
 type nft_collection = {
@@ -311,15 +312,16 @@ type nft_collections = {
   nft_collections_collections : nft_collection list ;
 } [@@deriving encoding {title="NftCollections"; def_title}]
 
-type asset_fa2 = {
-  asset_fa2_contract : A.address ;
-  asset_fa2_token_id : A.big_integer ;
+type asset_type_gen = {
+  asset_contract : A.address ;
+  asset_token_id : A.big_integer ;
 } [@@deriving encoding {camel; title="FA_2AssetType"; def_title}]
 
 type asset_type =
   | ATXTZ [@kind_label "assetClass"] [@kind "XTZ"] [@title "XTZAssetType"] [@def_title]
-  | ATFA_1_2 of (A.address [@wrap "contract"]) [@kind_label "assetClass"] [@kind "FA_1_2"] [@title "FA_1_2AssetType"] [@def_title]
-  | ATFA_2 of asset_fa2 [@kind_label "assetClass"] [@kind "FA_2"] [@title "FA_2AssetType"] [@def_title]
+  | ATFT of (A.address [@wrap "contract"]) [@kind_label "assetClass"] [@kind "FT"] [@title "FTAssetType"] [@def_title]
+  | ATNFT of asset_type_gen [@kind_label "assetClass"] [@kind "NFT"] [@title "NFTAssetType"] [@def_title]
+  | ATMT of asset_type_gen [@kind_label "assetClass"] [@kind "MT"] [@title "MTAssetType"] [@def_title]
 [@@deriving encoding {title="AssetType"; def_title}]
 
 type asset = {
@@ -746,9 +748,9 @@ type token_op_owner = {
   tk_owner: string;
 } [@@deriving encoding {remove_prefix=3}]
 
-type fa2_mint = {
+type 'a fa2_mint = {
   fa2m_token_id: string;
-  fa2m_amount: int64;
+  fa2m_amount: 'a;
   fa2m_owner: string;
 } [@@deriving encoding]
 
@@ -758,7 +760,16 @@ type ubi_mint = {
   ubim_uri : string option ;
 } [@@deriving encoding]
 
-type mint = UbiMint of ubi_mint | Fa2Mint of fa2_mint [@@deriving encoding]
+type mint =
+  | UbiMint of ubi_mint
+  | NFTMint of unit fa2_mint
+  | MTMint of int64 fa2_mint
+[@@deriving encoding]
+
+type burn =
+  | MTBurn of { amount: int64; token_id: string }
+  | NFTBurn of string
+[@@deriving encoding]
 
 type account_token = {
   at_token_id : string;
@@ -771,7 +782,7 @@ type nft_param =
   | Operator_updates of operator_update list
   | Operator_updates_all of (string * bool) list
   | Mint_tokens of mint
-  | Burn_tokens of token_op_owner
+  | Burn_tokens of burn
   | Metadata_uri of string
   | Token_metadata of (string * (string * string) list)
 [@@deriving encoding]

@@ -77,13 +77,16 @@ export async function transfer_arg(
   const from = await get_address(provider)
   const checked_asset = await check_asset_type(provider, asset_type)
   switch (checked_asset.asset_class) {
-    case "FA_2" :
-      if (amount) {
-        return transfer_mt_arg(checked_asset.contract, from, to, checked_asset.token_id, amount) }
-      else
-        return transfer_nft_arg(checked_asset.contract, from, to, checked_asset.token_id)
+    case "NFT":
+      const dst_nft = checked_asset.contract || provider.config.nft_public
+      if (amount==undefined || amount==1n) return transfer_nft_arg(dst_nft, from, to, checked_asset.token_id)
+      else throw new Error("Cannot transfer an amount of NFT token")
+    case "MT":
+      const dst_mt = checked_asset.contract || provider.config.mt_public
+      if (amount!=undefined) return transfer_mt_arg(dst_mt, from, to, checked_asset.token_id, amount)
+      else throw new Error("Cannot transfer an undefined amount of MT token")
     default:
-      throw new Error("Cannot transfer non FA2 tokens")
+      throw new Error("Cannot transfer non NFT/MT tokens")
   }
 }
 

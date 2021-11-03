@@ -1,40 +1,36 @@
 import { MichelsonData } from "@taquito/michel-codec"
-import { Provider, TransactionArg, send, get_address, OperationResult } from "../common/base"
+import { Provider, TransactionArg, send, OperationResult } from "../common/base"
 import { check_asset_type, ExtendedAssetType } from "../common/check-asset-type"
 
 function burn_param(
   token_id: bigint,
-  owner: string,
-  amount = 1n) : MichelsonData {
-  return {
-    prim: 'Pair',
-    args: [
-      { int: token_id.toString() },
-      { prim : 'Pair', args: [
-        { string : owner },
-        { int : amount.toString() } ] } ] }
+  amount?: bigint) : MichelsonData {
+  if (amount==undefined) return { int: token_id.toString() }
+  else return [ { int: token_id.toString() }, { int : amount.toString() } ]
 }
 
 export async function burn_arg(
   provider: Provider,
   asset_type: ExtendedAssetType,
-  amount?: bigint,
-  owner?: string) : Promise<TransactionArg> {
-  owner = (owner) ? owner : await get_address(provider)
+  amount?: bigint) : Promise<TransactionArg> {
   const checked_asset = await check_asset_type(provider, asset_type)
   switch (checked_asset.asset_class) {
-    case "FA_2":
-      const parameter = burn_param(checked_asset.token_id, owner, amount)
-      return { destination: checked_asset.contract, entrypoint: "burn", parameter }
-    default: throw new Error("Cannot burn non FA2 tokens")
+    case "NFT":
+      const p_nft = burn_param(checked_asset.token_id, amount)
+      const dst_nft = checked_asset.contract || provider.config.nft_public
+      return { destination: dst_nft, entrypoint: "burn", parameter: p_nft }
+    case "MT":
+      const p_mt = burn_param(checked_asset.token_id, amount)
+      const dst_mt = checked_asset.contract || provider.config.mt_public
+      return { destination: dst_mt, entrypoint: "burn", parameter: p_mt }
+    default: throw new Error("Cannot burn non NFT/MT tokens")
   }
 }
 
 export async function burn(
   provider: Provider,
   asset_type: ExtendedAssetType,
-  amount?: bigint,
-  owner?: string) : Promise<OperationResult> {
-  const arg = await burn_arg(provider, asset_type, amount, owner)
+  amount?: bigint) : Promise<OperationResult> {
+  const arg = await burn_arg(provider, asset_type, amount)
   return send(provider, arg)
 }

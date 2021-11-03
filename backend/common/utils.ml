@@ -17,13 +17,15 @@ let rec michelson_type_eq m1 m2 = match m1, m2 with
 
 let string_of_asset_type = function
   | ATXTZ -> "XTZ"
-  | ATFA_1_2 _ -> "FA_1_2"
-  | ATFA_2 _ -> "FA_2"
+  | ATFT _ -> "FT"
+  | ATNFT _ -> "NFT"
+  | ATMT _ -> "MT"
 
 let asset_class_mich = function
   | ATXTZ -> prim `Left ~args:[prim `Unit]
-  | ATFA_1_2 _ -> prim `Right ~args:[prim `Left ~args:[ prim `Unit ]]
-  | ATFA_2 _ -> prim `Right ~args:[prim `Right ~args:[ prim `Left ~args:[ prim `Unit ] ]]
+  | ATFT _ -> prim `Right ~args:[prim `Left ~args:[ prim `Unit ]]
+  | ATNFT _ | ATMT _ ->
+    prim `Right ~args:[prim `Right ~args:[ prim `Left ~args:[ prim `Unit ] ]]
 
 let asset_class_type =
   (prim `or_ ~args:[prim `unit; prim `or_ ~args:[prim `unit; prim `or_ ~args:[
@@ -31,10 +33,11 @@ let asset_class_type =
 
 let asset_data = function
   | ATXTZ -> Ok (Tzfunc.Raw.mk "\000")
-  | ATFA_1_2 a -> Tzfunc.Forge.pack (prim `address) (Mstring a)
-  | ATFA_2 { asset_fa2_contract; asset_fa2_token_id } ->
+  | ATFT a -> Tzfunc.Forge.pack (prim `address) (Mstring a)
+  | ATNFT { asset_contract; asset_token_id }
+  | ATMT { asset_contract; asset_token_id } ->
     Tzfunc.Forge.pack (prim `pair ~args:[ prim `address; prim `nat ])
-      (prim `Pair ~args:[ Mstring asset_fa2_contract; Mint (Z.of_string asset_fa2_token_id) ])
+      (prim `Pair ~args:[ Mstring asset_contract; Mint (Z.of_string asset_token_id) ])
 
 let asset_type_mich a =
   let$ data = asset_data a in

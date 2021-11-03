@@ -1,5 +1,5 @@
-import { AssetType, FA2AssetType } from "../common/base"
+import { AssetType } from "../common/base"
 
-export function is_nft(a: AssetType) : a is FA2AssetType {
-  return (a.asset_class === "FA_2")
+export function is_nft(a: AssetType) : boolean {
+  return (a.asset_class === "NFT" || a.asset_class === "MT")
 }

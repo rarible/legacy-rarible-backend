@@ -1,9 +1,39 @@
 (rule
- (deps fa2.arl)
- (targets fa2.tz)
+ (deps nft-public.arl)
+ (targets nft-public.tz)
+ (action (with-stdout-to %{targets} (run completium-cli generate michelson %{deps}))))
+
+(rule
+ (deps nft-private.arl)
+ (targets nft-private.tz)
+ (action (with-stdout-to %{targets} (run completium-cli generate michelson %{deps}))))
+
+(rule
+ (deps mt-public.arl)
+ (targets mt-public.tz)
+ (action (with-stdout-to %{targets} (run completium-cli generate michelson %{deps}))))
+
+(rule
+ (deps mt-private.arl)
+ (targets mt-private.tz)
  (action (with-stdout-to %{targets} (run completium-cli generate michelson %{deps}))))
 
 (rule
  (deps royalties.arl)
  (targets royalties.tz)
+ (action (with-stdout-to %{targets} (run completium-cli generate michelson %{deps}))))
+
+(rule
+ (deps exchangeV2.arl)
+ (targets exchangeV2.tz)
+ (action (with-stdout-to %{targets} (run completium-cli generate michelson %{deps}))))
+
+(rule
+ (deps validator.arl)
+ (targets validator.tz)
+ (action (with-stdout-to %{targets} (run completium-cli generate michelson %{deps}))))
+
+(rule
+ (deps matcher.arl)
+ (targets matcher.tz)
  (action (with-stdout-to %{targets} (run completium-cli generate michelson %{deps}))))

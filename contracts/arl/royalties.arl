@@ -1,6 +1,9 @@
-archetype royalties(owner : address)
+archetype royalties(
+  owner : address
+)
 
 variable owner_candidate : option<address> = none
+variable validator : option<address> = none
 
 asset whitelist {
   a : address
@@ -28,17 +31,28 @@ record part {
 
 asset royalties identified by rtoken rtokenId to big_map {
   rtoken : address;
-  rtokenId : nat;
+  rtokenId : option<nat>;
   rvalue : list<part>;
 }
 
-entry setRoyalties(token : address, tokenId : nat, value : list<part>) {
-  called by token
+entry setRoyalties(token : address, tokenId : option<nat>, value : list<part>) {
+  // called by owner
   effect {
     royalties.addupdate((token, tokenId), {rvalue = value})
   }
 }
 
+entry setValidator(ivalidator : option<address>) {
+  called by owner
+  effect {
+    validator := ivalidator
+  }
+}
+
 getter getRoyalties(token : address, tokenId : nat, data : bytes) : list<part> * bytes {
-  return ((royalties[(token, tokenId)].rvalue, data))
+  dorequire(caller = require_some(validator, "validator must be not none"), "validator is not caller");
+  return
+  (if royalties.contains((token, some(tokenId)))
+  then ((royalties[(token, some(tokenId))].rvalue, data))
+  else ((royalties[(token, none)].rvalue, data)))
 }

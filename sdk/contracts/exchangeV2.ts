@@ -1,6 +1,6 @@
 import { Provider, OperationResult } from "../common/base"
 
-export const exchange_code : any =
+export const exchangeV2_code : any =
   [  {  "prim": "storage",
         "args": [
           {  "prim": "pair",
@@ -15446,7 +15446,7 @@ export const exchange_code : any =
      ]
   }  ]
 
-export function exchange_storage(owner: string, defaultFeeReceiver: string, protocolFee: bigint) : any {
+export function exchangeV2_storage(owner: string, defaultFeeReceiver: string, protocolFee: bigint) : any {
   return {  "prim": "Pair",
             "args": [
               {  "string": owner  },
@@ -15470,7 +15470,7 @@ export function exchange_storage(owner: string, defaultFeeReceiver: string, prot
                                                {  "string": ""  },
                                                {  "bytes": ""  }
                                              ]
-                                          }  ]
+                                       }  ]
                                      ]
                                   }
                                 ]
@@ -15483,14 +15483,14 @@ export function exchange_storage(owner: string, defaultFeeReceiver: string, prot
               }
             ]
          }
-}
+  }
 
-export async function deploy_exchange(
+export async function deploy_exchangeV2(
   provider : Provider,
   owner: string,
   receiver: string,
   fee: bigint
 ) : Promise<OperationResult> {
-  const init = exchange_storage(owner, receiver, fee)
-  return provider.tezos.originate({init, code: exchange_code})
+  const init = exchangeV2_storage(owner, receiver, fee)
+  return provider.tezos.originate({init, code: exchangeV2_code})
 }

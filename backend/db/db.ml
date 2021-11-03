@@ -117,11 +117,11 @@ let price left right =
 
 let nft_price left right =
   match left.asset_type with
-  | ATFA_2 _ -> price left right
+  | ATNFT _ | ATMT _ -> price left right
   | _ -> price right left
 
 let mk_side_type asset = match asset.asset_type with
-  | ATFA_2 _ -> STBID
+  | ATNFT _ | ATMT _ -> STBID
   | _ -> STSELL
 
 let mk_asset asset_class contract token_id asset_value =
@@ -155,22 +155,29 @@ let mk_asset asset_class contract token_id asset_value =
       | _, _ ->
         Lwt.return_error (`hook_error ("contract addr or tokenId for XTZ asset"))
     end
-  | "FA_1_2" ->
+  | "FT" ->
     begin
       match contract, token_id with
       | Some c, None ->
-        let asset_type = ATFA_1_2 c in
+        let asset_type = ATFT c in
         Lwt.return_ok { asset_type; asset_value }
       | _, _ ->
         Lwt.return_error (`hook_error ("need contract and no tokenId for FA1.2 asset"))
     end
-  | "FA_2" ->
+  | "NFT" ->
     begin
       match contract, token_id with
-      | Some c, Some id ->
-        let asset_type =
-          ATFA_2
-            { asset_fa2_contract = c ; asset_fa2_token_id = id } in
+      | Some asset_contract, Some asset_token_id ->
+        let asset_type = ATNFT { asset_contract; asset_token_id } in
+        Lwt.return_ok { asset_type; asset_value }
+      | _, _ ->
+        Lwt.return_error (`hook_error ("no contract addr for FA2 asset"))
+    end
+  | "MT" ->
+    begin
+      match contract, token_id with
+      | Some asset_contract, Some asset_token_id ->
+        let asset_type = ATMT { asset_contract; asset_token_id } in
         Lwt.return_ok { asset_type; asset_value }
       | _, _ ->
         Lwt.return_error (`hook_error ("no contract addr for FA2 asset"))
@@ -194,17 +201,17 @@ let db_from_asset asset =
   | ATXTZ ->
     Lwt.return_ok
       (string_of_asset_type asset.asset_type, None, None, asset.asset_value)
-  | ATFA_1_2 c ->
+  | ATFT c ->
     Lwt.return_ok
       (string_of_asset_type asset.asset_type,
        Some c,
        None,
        asset.asset_value)
-  | ATFA_2 fa2 ->
+  | ATNFT fa2 | ATMT fa2 ->
     Lwt.return_ok
       (string_of_asset_type asset.asset_type,
-       Some fa2.asset_fa2_contract,
-       Some fa2.asset_fa2_token_id,
+       Some fa2.asset_contract,
+       Some fa2.asset_token_id,
        asset.asset_value)
 
 let mk_order_activity_bid obj =
@@ -300,7 +307,7 @@ let mk_order_activity_cancel obj =
   } in
   Lwt.return_ok @@
   match make.asset_type with
-  | ATFA_2 _ ->
+  | ATNFT _ | ATMT _ ->
     OrderActivityCancelList bid
   | _ ->
     OrderActivityCancelBid bid
@@ -359,17 +366,15 @@ let get_cancelled hash l =
 
 let get_make_balance ?dbh make owner = match make.asset_type with
   | ATXTZ -> Lwt.return_ok 0L
-  | ATFA_1_2 _addr ->
+  | ATFT _addr ->
     Printf.eprintf "TODO : get_make_balance FA1.2\n%!" ;
     Lwt.return_ok 0L
-  | ATFA_2 { asset_fa2_contract ; asset_fa2_token_id }->
-    let contract = asset_fa2_contract in
-    let token_id = asset_fa2_token_id in
+  | ATNFT { asset_contract ; asset_token_id } | ATMT { asset_contract ; asset_token_id } ->
     use dbh @@ fun dbh ->
     let|>? l = [%pgsql.object dbh
         "select amount from tokens where \
          main and \
-         contract = $contract and token_id = $token_id and \
+         contract = $asset_contract and token_id = $asset_token_id and \
          owner = $owner"] in
     match l with
     | [ r ] -> r#amount
@@ -1026,7 +1031,8 @@ let insert_mint ~dbh ~op ~contract m =
   let level = op.bo_level in
   let tsp = op.bo_tsp in
   let token_id, owner, uri = match m with
-    | Fa2Mint m -> m.fa2m_token_id, m.fa2m_owner, None
+    | NFTMint m -> m.fa2m_token_id, m.fa2m_owner, None
+    | MTMint m -> m.fa2m_token_id, m.fa2m_owner, None
     | UbiMint m -> m.ubim_token_id, m.ubim_owner, m.ubim_uri in
   let>? () = insert_account dbh owner ~block:op.bo_block ~level:op.bo_level ~tsp:op.bo_tsp in
   let>? () = match uri with
@@ -1075,7 +1081,7 @@ let insert_mint ~dbh ~op ~contract m =
        on conflict do nothing"]
 
 let insert_burn ~dbh ~op ~contract m =
-  let burn = EzEncoding.construct token_op_owner_enc m in
+  let burn = EzEncoding.construct Json_encoding.(tup2 burn_enc string) (m, op.bo_op.source) in
   [%pgsql dbh
       "insert into contract_updates(transaction, index, block, level, tsp, \
        contract, burn) \
@@ -1124,10 +1130,10 @@ let insert_token_balances ~dbh ~op ~contract ?(ft=false) balances =
         | `nat id, None, false -> "nft", Z.to_string id, None, None
         | `tuple [`nat id; `address a], Some (`nat bal), false
         | `tuple [`address a; `nat id], Some (`nat bal), false ->
-          "multi", Z.to_string id, Some a, Some (Z.to_int64 bal)
+          "mt", Z.to_string id, Some a, Some (Z.to_int64 bal)
         | `tuple [`nat id; `address a], None, false
         | `tuple [`address a; `nat id], None, false ->
-          "multi", Z.to_string id, Some a, None
+          "mt", Z.to_string id, Some a, None
         | `tuple [`nat id; `address a], Some (`nat bal), true
         | `tuple [`address a; `nat id], Some (`nat bal), true ->
           "ft_multi", Z.to_string id, Some a, Some (Z.to_int64 bal)
@@ -1274,7 +1280,7 @@ let insert_order_activity_new dbh date order =
   let order_activity_type =
     match order.order_elt.order_elt_make.asset_type,
           order.order_elt.order_elt_take.asset_type with
-    | ATFA_2 _, _ -> OrderActivityList activity
+    | ATNFT _, _ | ATMT _, _ -> OrderActivityList activity
     | _, _ -> OrderActivityBid activity in
   insert_order_activity dbh id date order_activity_type
 
@@ -1296,7 +1302,7 @@ let insert_order_activity_cancel dbh transaction block index level date hash =
   let order_activity_type =
     match order.order_elt.order_elt_make.asset_type,
           order.order_elt.order_elt_take.asset_type with
-    | ATFA_2 _, _ -> OrderActivityCancelList activity
+    | ATNFT _, _ | ATMT _, _ -> OrderActivityCancelList activity
     | _, _ -> OrderActivityCancelBid activity in
     insert_order_activity dbh id date order_activity_type
   | None ->
@@ -1477,44 +1483,55 @@ let ledger_kind k v = match k, v with
   | `address, `nat -> `single
   | _ -> `unknown
 
-let filter_contracts dbh op ori =
+let filter_contracts op ori =
   let open Contract_spec in
-  let|>? r = [%pgsql.object dbh "select admin_wallet, royalties_contract from state"] in
-  match r, op.bo_meta, get_entrypoints ori.script with
-  | [ r ], Some meta, Ok entrypoints ->
+  Format.printf "TEST1@.";
+  match op.bo_meta, get_entrypoints ori.script with
+  | Some meta, Ok entrypoints ->
+    Format.printf "TEST2@.";
     let allocs = Storage_diff.big_map_allocs meta.op_lazy_storage_diff in
     begin match
         match_entrypoints ~expected:(fa2_entrypoints @ fa2_ext_entrypoints) ~entrypoints,
-        match_fields ~expected:["ledger"; "owner"; "admin"; "royaltiesContract"] ~allocs ori.script
+        match_fields ~expected:["ledger"; "owner"; "admin"] ~allocs ori.script
       with
-      | [ b_balance; b_update; b_transfer; b_update_all; b_mint; b_burn; b_metadata ],
-        Ok [ f_ledger; f_owner; f_admin; f_royalties_contract ] ->
+      | [ b_balance; b_update; b_transfer; b_update_all; b_mint_nft; b_mint_mt;
+          b_burn_nft; b_burn_mt; b_metadata ],
+        Ok [ f_ledger; f_owner; f_admin ] ->
+        Format.printf "TEST3@.";
         let fa2_spec = match b_balance && b_update && b_transfer, f_ledger with
           | true, (_, Some (id, k, v)) ->
+            Format.printf "TEST4@.";
             begin match ledger_kind k v with
-              | `nft | `multiple -> Some (id, k, v)
-              | _ -> None
+              | `nft | `multiple -> Format.printf "TEST5@."; Some (id, k, v)
+              | _ -> Format.printf "TEST6@."; None
             end
-          | _ -> None in
+          | _ -> Format.printf "TEST7@."; None in
         let ubi_spec = match f_admin with
-          | Some (`address owner), _ -> Some owner
-          | _ -> None in
-        let rarible_spec = match b_update_all && b_mint && b_burn && b_metadata, f_owner, f_royalties_contract with
-          | true, (Some (`address owner), _), (Some (`address royalties_contract), _) when royalties_contract = r#royalties_contract -> Some owner
-          | _ -> None in
+          | Some (`address owner), _ -> Format.printf "TEST8@."; Some owner
+          | _ -> Format.printf "TEST9@."; None in
+        let rarible_spec =
+          match b_update_all && (b_mint_nft || b_mint_mt)
+                && (b_burn_nft || b_burn_mt) && b_metadata, f_owner with
+          | true, (Some (`address owner), _) -> Format.printf "TEST10@."; Some owner
+          | _ -> Format.printf "TEST12@."; None in
         begin match fa2_spec, rarible_spec, ubi_spec with
-          | Some (id, k, v), Some owner, _ -> Some (`rarible (id, k, v, owner))
-          | Some (id, k, v), _, Some owner -> Some (`ubi (id, k, v, owner))
-          | Some (id, k, v), _, _ -> Some (`fa2 (id, k, v))
-          | _ -> None
+          | Some (id, k, v), Some owner, _ ->
+            Format.printf "TEST13@.";
+            Some (`rarible (id, k, v, owner))
+          | Some (id, k, v), _, Some owner ->
+            Format.printf "TEST14@.";
+            Some (`ubi (id, k, v, owner))
+          | Some (id, k, v), _, _ ->
+            Format.printf "TEST15@.";
+            Some (`fa2 (id, k, v))
+          | _ -> Format.printf "TEST16@."; None
         end
-      | _ -> None
+      | _ -> Format.printf "TEST17@."; None
     end
-  | _ -> None
+  | _ -> Format.printf "TEST18@.";None
 
 let insert_origination config dbh op ori =
-  let>? r = filter_contracts dbh op ori in
-  match r with
+  match filter_contracts op ori with
   | None ->
     Lwt.return_ok ()
   | Some k ->
@@ -1638,7 +1655,8 @@ let contract_updates dbh main l =
         | Some json, _, _ ->
           let m = EzEncoding.destruct mint_enc json in
           let token_id, owner, amount, has_uri = match m with
-            | Fa2Mint m -> m.fa2m_token_id, m.fa2m_owner, m.fa2m_amount, false
+            | NFTMint m -> m.fa2m_token_id, m.fa2m_owner, 1L, false
+            | MTMint m -> m.fa2m_token_id, m.fa2m_owner, m.fa2m_amount, false
             | UbiMint m -> m.ubim_token_id, m.ubim_owner, 1L, m.ubim_uri <> None in
           let>? () =
             contract_updates_base
@@ -1651,14 +1669,16 @@ let contract_updates dbh main l =
             else Lwt.return_ok () in
           produce_nft_ownership_event dbh contract token_id owner
         | _, Some json, _ ->
-          let tk = EzEncoding.destruct token_op_owner_enc json in
+          let b, account = EzEncoding.destruct Json_encoding.(tup2 burn_enc string) json in
+          let token_id, amount = match b with
+            | NFTBurn token_id -> token_id, 1L
+            | MTBurn {token_id; amount} -> token_id, amount in
           let>? () =
             contract_updates_base
-              dbh ~main ~contract ~block ~level ~tsp ~burn:true
-              ~account:tk.tk_owner ~token_id:tk.tk_op.tk_token_id ~amount:tk.tk_op.tk_amount in
+              dbh ~main ~contract ~block ~level ~tsp ~burn:true ~account ~token_id ~amount in
           let>? () =
-            produce_nft_item_event dbh contract tk.tk_op.tk_token_id in
-          produce_nft_ownership_event dbh contract tk.tk_op.tk_token_id tk.tk_owner
+            produce_nft_item_event dbh contract token_id in
+          produce_nft_ownership_event dbh contract token_id account
         | _, _, Some uri ->
           metadata_uri_update dbh ~main ~contract ~block ~level ~tsp uri
         | _ -> Lwt.return_ok () in
@@ -1800,41 +1820,58 @@ let token_updates dbh main l =
 let token_balance_updates dbh main l =
   let>? m = fold_rp (fun acc r ->
       let l = match r#kind, r#account, r#balance with
-        | "multi", Some account, Some balance ->
+        | "mt", Some account, Some balance ->
           let balance = if main then Some balance else None in
-          [ account, balance, 0L ]
-        | "multi", Some account, None ->
+          [ Some account, balance, 0L, None ]
+        | "mt", Some account, None ->
           let balance = if main then Some 0L else None in
-          [ account, balance, 0L ]
+          [ Some account, balance, 0L, None ]
         | "nft", Some account, _ ->
-          let balance_src = if main then Some 0L else None in
-          let balance_dst = if main then Some 1L else None in
-          [ "", balance_src, 1L; account, balance_dst, 1L ]
+          let balance_src = if main then Some 0L else Some 1L in
+          let balance_dst = if main then Some 1L else Some 0L in
+          [ Some account, balance_dst, 1L, balance_src  ]
         | "nft", None, _ ->
-          let balance, supply = if main then Some 0L, 0L else None, 1L in
-          [ "", balance, supply ]
+          let balance, supply = if main then Some 0L, 0L else Some 1L, 1L in
+          [ None, balance, supply, None ]
         | _ -> [] in
-      let>? l = fold_rp (fun acc (account, balance, supply) ->
-          let>? l =
-            [%pgsql dbh
-                "insert into tokens(contract, token_id, block, level, tsp, \
-                 last_block, last_level, last, owner, amount, transaction, balance, supply) \
-                 values(${r#contract}, ${r#token_id}, ${r#block}, ${r#level}, ${r#tsp}, \
-                 ${r#block}, ${r#level}, ${r#tsp}, $account, 0, ${r#transaction}, $?balance, $supply) \
-                 on conflict (contract, token_id, owner) \
-                 do update set balance = $?balance where tokens.contract = ${r#contract} \
-                 and tokens.token_id = ${r#token_id} and ($account = '' or tokens.owner = $account) \
-                 returning owner, amount, balance"] in
+      let>? l = fold_rp (fun acc (account, balance, supply, other) ->
+          let>? l = match account with
+            | Some account ->
+              let>? l = [%pgsql dbh
+                  "insert into tokens(contract, token_id, block, level, tsp, \
+                   last_block, last_level, last, owner, amount, transaction, balance, supply) \
+                   values(${r#contract}, ${r#token_id}, ${r#block}, ${r#level}, ${r#tsp}, \
+                   ${r#block}, ${r#level}, ${r#tsp}, $account, 0, ${r#transaction}, $?balance, $supply) \
+                   on conflict (contract, token_id, owner) \
+                   do update set balance = $?balance where tokens.contract = ${r#contract} \
+                   and tokens.token_id = ${r#token_id} and tokens.owner = $account \
+                   returning owner, amount, balance"] in
+              begin match other with
+                | None -> Lwt.return_ok l
+                | Some b ->
+                  let|>? l2 =
+                    [%pgsql dbh
+                        "update tokens set balance = $b where tokens.contract = ${r#contract} \
+                         and tokens.token_id = ${r#token_id} and owner <> $account \
+                         returning owner, amount, balance"] in
+                  l @ l2
+              end
+            | None ->
+              [%pgsql dbh
+                  "update tokens set balance = $?balance where tokens.contract = ${r#contract} \
+                   and tokens.token_id = ${r#token_id} returning owner, amount, balance"]
+          in
           Lwt.return_ok (acc @ l)) [] l in
-  Lwt.return_ok @@
-  List.fold_left (fun acc (account, amount, balance) ->
-      match balance with
-      | Some b when b <> amount ->
-        TMap.add (r#contract, r#token_id, account) (amount, b) acc
-      | _ -> acc) acc l
+      Lwt.return_ok @@
+      List.fold_left (fun acc (account, amount, balance) ->
+          match balance with
+          | Some b when b <> amount ->
+            TMap.add (r#contract, r#token_id, account) (amount, b) acc
+          | _ -> acc) acc l
     ) TMap.empty l in
   iter_rp (fun ((contract, token_id, owner), (amount, balance)) ->
-      Format.printf "\027[0;33mWarning: wrong aggregate amount: %Ld, balance = %Ld\027[0m@." amount balance;
+      Format.printf "\027[0;33mWarning: wrong aggregate amount for %s %s %s: %Ld, balance = %Ld\027[0m@."
+        contract token_id owner amount balance;
       [%pgsql dbh
           "update tokens set amount = $balance where contract = $contract \
            and token_id = $token_id and owner = $owner"]) @@ TMap.bindings m
@@ -2440,10 +2477,13 @@ let mk_nft_collection_name_symbol r =
 
 let mk_nft_collection obj =
   let name, symbol = mk_nft_collection_name_symbol obj in
+  let nft_collection_type = match obj#kind with
+    | "mt" -> CTMT
+    | _ -> CTNFT in
   {
     nft_collection_id = obj#address ;
     nft_collection_owner = obj#owner ;
-    nft_collection_type = CTFA_2 ;
+    nft_collection_type ;
     nft_collection_name = name ;
     nft_collection_symbol = symbol ;
     nft_collection_features = [] ;
@@ -2455,7 +2495,7 @@ let get_nft_collection_by_id ?dbh collection =
   Format.eprintf "get_nft_collection_by_id %s@." collection ;
   use dbh @@ fun dbh ->
   let>? l = [%pgsql.object dbh
-      "select address, owner, metadata, name, symbol \
+      "select address, owner, metadata, name, symbol, kind \
        from contracts where address = $collection and main"] in
   let>? obj = one l in
   let nft_item = mk_nft_collection obj in
@@ -2471,7 +2511,7 @@ let search_nft_collections_by_owner ?dbh ?continuation ?(size=50) owner =
   let no_continuation, collection =
     continuation = None, (match continuation with None -> "" | Some c -> c) in
   let>? l = [%pgsql.object dbh
-      "select address, owner, metadata, name, symbol \
+      "select address, owner, metadata, name, symbol, kind \
        from contracts where \
        main and owner = $owner and \
        ($no_continuation or (address > $collection)) \
@@ -2482,7 +2522,7 @@ let search_nft_collections_by_owner ?dbh ?continuation ?(size=50) owner =
     | [ None ] -> Lwt.return_ok 0L
     | [ Some i64 ] -> Lwt.return_ok i64
     | _ -> Lwt.return_error (`hook_error "count with more then one row") in
-  let nft_collections_collections = List.map  (fun r -> mk_nft_collection r) l in
+  let nft_collections_collections = List.map (fun r -> mk_nft_collection r) l in
   let len = List.length nft_collections_collections in
   let nft_collections_continuation =
     if len <> size then None
@@ -2499,7 +2539,7 @@ let get_nft_all_collections ?dbh ?continuation ?(size=50) () =
   let no_continuation, collection =
     continuation = None, (match continuation with None -> "" | Some c -> c) in
   let>? l = [%pgsql.object dbh
-      "select address, owner, metadata, name, symbol \
+      "select address, owner, metadata, name, symbol, kind \
        from contracts where main and \
        ($no_continuation or (address > $collection)) \
        order by address asc limit $size64"] in
@@ -2706,13 +2746,14 @@ let rec get_sell_orders_by_item_aux
   let no_currency = currency = None in
   let currency_tezos = currency = Some ATXTZ in
   let currency_fa1_2, currency_fa1_2_contract =
-    (match currency with Some (ATFA_1_2 _) -> true | _ -> false),
-    match currency with Some ATFA_1_2 c -> c | _ -> ""  in
+    (match currency with Some (ATFT _) -> true | _ -> false),
+    match currency with Some ATFT c -> c | _ -> ""  in
   let currency_fa2, (currency_fa2_contract, currency_fa2_token_id) =
-    (match currency with Some (ATFA_2 _) -> true | _ -> false),
+    (match currency with Some (ATNFT _) | Some (ATMT _) -> true | _ -> false),
     match currency with
-    | Some ATFA_2 {asset_fa2_contract ; asset_fa2_token_id } ->
-      asset_fa2_contract, asset_fa2_token_id
+    | Some ATNFT {asset_contract ; asset_token_id }
+    | Some ATMT {asset_contract ; asset_token_id } ->
+      asset_contract, asset_token_id
     | _ -> "", ""  in
   let no_start_date, start_date_v =
     start_date = None, (match start_date with None -> CalendarLib.Calendar.now () | Some d -> d) in
@@ -3034,13 +3075,14 @@ let rec get_bid_orders_by_item_aux
   let no_currency = currency = None in
   let currency_tezos = currency = Some ATXTZ in
   let currency_fa1_2, currency_fa1_2_contract =
-    (match currency with Some (ATFA_1_2 _) -> true | _ -> false),
-    match currency with Some ATFA_1_2 c -> c | _ -> ""  in
+    (match currency with Some (ATFT _) -> true | _ -> false),
+    match currency with Some ATFT c -> c | _ -> ""  in
   let currency_fa2, (currency_fa2_contract, currency_fa2_token_id) =
-    (match currency with Some (ATFA_2 _) -> true | _ -> false),
+    (match currency with Some (ATNFT _) | Some (ATMT _) -> true | _ -> false),
     match currency with
-    | Some ATFA_2 {asset_fa2_contract ; asset_fa2_token_id } ->
-      asset_fa2_contract, asset_fa2_token_id
+    | Some ATNFT {asset_contract ; asset_token_id }
+    | Some ATMT {asset_contract ; asset_token_id } ->
+      asset_contract, asset_token_id
     | _ -> "", ""  in
   let no_start_date, start_date_v =
     start_date = None, (match start_date with None -> CalendarLib.Calendar.now () | Some d -> d) in

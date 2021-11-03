@@ -8,7 +8,7 @@ let client = ref (Option.value ~default:"tezos-client" (Sys.getenv_opt "TEZOS_CL
 let endpoint = ref None
 let contract = ref None
 let source = ref (None : string option)
-let burn_cap = ref 2.5
+let burn_cap = ref 3.2
 let mich = ref (None: string option)
 let fee = ref (None: float option)
 let verbose = ref 0
@@ -59,15 +59,14 @@ let command_result ?(f=(fun l -> String.concat " " @@ List.map String.trim l)) c
   | _, Unix.WEXITED 0 -> s
   | _ -> failwith (Format.sprintf "Error processing %S" cmd)
 
-let storage_fa2 ~admin ~royalties =
-  Format.sprintf {|(Pair %S (Pair %S (Pair {} (Pair {} (Pair {} (Pair {} {Elt "" 0x}))))))|}
-    admin royalties
+let storage_nft ?(expiry=31536000000L) admin =
+  Format.sprintf {|{ %S; {}; {}; {}; {}; {}; {}; {}; {}; %Ld; False; {Elt "" 0x} }|} admin expiry
 
 let storage_ubi admin =
   Format.sprintf "Pair %S (Some %S) None False {} {} {} {} {}" admin admin
 
 let storage_royalties ~admin =
-  Format.sprintf "(Pair %S (Pair None (Pair {} {})))" admin
+  Format.sprintf "{ %S; None; None; {}; {} }" admin
 
 let storage_exchange ~admin ~receiver ~fee =
   Format.sprintf {|(Pair %S (Pair %S (Pair %Ld (Pair None (Pair {} (Pair None {Elt "" 0x}))))))|}
@@ -81,7 +80,7 @@ let compile_contract filename =
   Filename.quote_command "completium-cli" [ "generate"; "michelson"; filename ]
 
 let deploy_aux
-    ?(dry_run=false) ?(burn_cap=2.5) ?fee ?(verbose=0) ?endpoint
+    ?(dry_run=false) ?(burn_cap= !burn_cap) ?fee ?(verbose=0) ?endpoint
     ?(force=false) ~filename storage source contract =
     let dry_run = if dry_run then [ "--dry-run" ] else [] in
     let mich = match Filename.extension filename with
@@ -193,45 +192,6 @@ let owners bm_id l =
 
 (** printers *)
 
-let mint_tokens ~id ~owner ~amount l =
-  Format.sprintf "Pair %Ld %S %Ld {%s}" id owner amount
-    (String.concat "; " @@ List.map (fun (ad, am) -> Format.sprintf "Pair %S %Ld" ad  am) l)
-
-let mint_ubi_tokens ~id ~owner =
-  Format.sprintf "Pair %S %Ld None" owner id
-
-let burn_tokens ~id ~owner ~amount =
-  Format.sprintf "Pair %Ld %S %Ld" id owner amount
-
-let set_royalties token_addr l =
-  Format.sprintf "Pair %S None { %s }"
-    token_addr
-    (String.concat "; " @@ List.map (fun (ad, am) -> Format.sprintf "Pair %S %Ld" ad  am) l)
-
-let transfer l =
-  Format.sprintf "{%s}" @@ String.concat "; " @@
-  List.map (fun (src, l) ->
-      Format.sprintf "Pair %S {%s}" src @@
-      String.concat "; " @@ List.map (fun (id, amount, to_) ->
-          Format.sprintf "Pair %S %Ld %Ld" to_ id amount) l)
-    l
-
-let update_operators l =
-  Format.sprintf "{%s}" @@ String.concat "; " @@
-  List.map (fun (id, owner, operator, add) ->
-      Format.sprintf "%s (Pair %S %S %Ld)"
-        (if add then "Left" else "Right") owner operator id) l
-
-let update_operators_for_all l =
-  Format.sprintf "{%s}" @@ String.concat "; " @@
-  List.map (fun (operator, add) ->
-      Format.sprintf "%s %S"
-        (if add then "Left" else "Right") operator) l
-
-let set_token_metadata id l =
-  Format.sprintf "Pair %Ld {%s}" id @@ String.concat "; " @@
-  List.map (fun (k, v) -> Format.sprintf "Elt %S %S" k v) l
-
 let hex s =
   let shift i =
     if i < 10 then Char.chr @@ i + 48
@@ -241,129 +201,171 @@ let hex s =
       if i mod 2 = 0 then shift @@ Char.code (String.get s pos) / 16
       else shift @@ (Char.code (String.get s pos)) mod 16)
 
-let set_metadata_uri s =
-  Format.sprintf "0x%s" (hex s)
+let mint_tokens_repr ?(kind=`nft) ?(metadata=[]) ?(royalties=[]) ~owner id =
+  Format.sprintf "{ %Ld; %S; %s{%s}; {%s} }" id owner
+    (match kind with `nft -> "" | `mt supply -> Format.sprintf "%Ld; " supply)
+    (String.concat "; " @@ List.map (fun (k, v) -> Format.sprintf "Elt %s 0x%s" k (hex v)) metadata)
+    (String.concat "; " @@ List.map (fun (ad, am) -> Format.sprintf "Pair %S %Ld" ad  am) royalties)
+
+let mint_ubi_tokens_repr ~id ~owner =
+  Format.sprintf "{%S; %Ld; None}" owner id
+
+let burn_tokens_repr ~id ~kind =
+  Format.sprintf "{%Ld%s}" id
+    (match kind with `nft -> "" | `mt amount -> Format.sprintf "; %Ld" amount)
+
+let set_royalties_repr ~id ~royalties =
+  Format.sprintf "{%Ld; {%s}}" id
+    (String.concat "; " @@ List.map (fun (ad, am) -> Format.sprintf "{%S; %Ld}" ad  am) royalties)
+
+type transfer_dest = {
+  trd_id: int64;
+  trd_amount: int64;
+  trd_dst: string
+}
+
+type transfer = {
+  tr_src: string;
+  tr_txs: transfer_dest list
+}
+
+let transfer_repr l =
+  Format.sprintf "{%s}" @@ String.concat "; " @@
+  List.map (fun {tr_src; tr_txs} ->
+      Format.sprintf "{%S; {%s}}" tr_src @@
+      String.concat "; " @@ List.map (fun {trd_id; trd_amount; trd_dst} ->
+          Format.sprintf "{%S; %Ld; %Ld}" trd_dst trd_id trd_amount) tr_txs)
+    l
+
+type update_operator = {
+  uo_id: int64;
+  uo_owner: string;
+  uo_operator: string;
+  uo_add: bool
+}
+
+let update_operators_repr l =
+  Format.sprintf "{%s}" @@ String.concat "; " @@
+  List.map (fun {uo_id; uo_owner; uo_operator; uo_add} ->
+      Format.sprintf "%s {%S; %S; %Ld}"
+        (if uo_add then "Left" else "Right") uo_owner uo_operator uo_id) l
+
+let update_operators_for_all_repr l =
+  Format.sprintf "{%s}" @@ String.concat "; " @@
+  List.map (fun (operator, add) ->
+      Format.sprintf "%s %S"
+        (if add then "Left" else "Right") operator) l
+
+let set_token_metadata_repr ~id ~metadata =
+  Format.sprintf "{%Ld; {%s}}" id @@ String.concat "; " @@
+  List.map (fun (k, v) -> Format.sprintf "Elt %S %S" k v) metadata
+
+let set_metadata_repr ~key ~value =
+  Format.sprintf "{%S; 0x%s}" key (hex value)
 
 (** entrypoints *)
 
 let match_orders_aux ?endpoint source contract param =
   call_aux ?endpoint ~entrypoint:"matchOrders" ~param source contract
 
-let mint_tokens_aux ?endpoint id owner amount royalties source contract =
-  let param =
-    mint_tokens ~id:(Int64.of_string id) ~owner ~amount:(Int64.of_string amount) royalties in
+let mint_tokens_aux ?endpoint ?kind ?royalties ?metadata ~id ~owner source contract =
+  let param = mint_tokens_repr ~owner ?kind ?metadata ?royalties id in
   call_aux ?endpoint ~entrypoint:"mint" ~param source contract
 
 let mint_ubi_tokens_aux ?endpoint id owner source contract =
-  let param =
-    mint_ubi_tokens ~id:(Int64.of_string id) ~owner in
+  let param = mint_ubi_tokens_repr ~id ~owner in
   call_aux ?endpoint ~entrypoint:"mint" ~param source contract
 
-let mint_tokens id owner amount l =
-  let l = List.fold_left (fun acc s ->
+let mint_tokens ~id ~owner ~kind royalties =
+  let kind = match String.split_on_char '=' kind with
+    | [ "mt"; supply ] -> `mt (Int64.of_string supply)
+    | [ "nft" ] -> `nft
+    | _ -> failwith "kind of token not understood" in
+  let royalties = List.fold_left (fun acc s ->
       match String.split_on_char '=' s with
       | [ ad; v ] -> acc @ [ ad, Int64.of_string v ]
-      | _ -> acc) [] l in
+      | _ -> acc) [] royalties in
   call ~entrypoint:"mint" @@
-  mint_tokens ~id:(Int64.of_string id) ~owner ~amount:(Int64.of_string amount) l
+  mint_tokens_repr ~owner ~kind ~royalties (Int64.of_string id)
 
-let set_royalties_aux ?endpoint token_addr l source contract =
-  let param = set_royalties token_addr l in
+let set_royalties_aux ?endpoint ~id ~royalties source contract =
+  let param = set_royalties_repr ~id ~royalties in
   call_aux ?endpoint ~entrypoint:"setRoyalties" ~param source contract
 
-let burn_tokens_aux ?endpoint id amount source contract =
-  let param =
-    burn_tokens ~id:(Int64.of_string id) ~owner:source ~amount:(Int64.of_string amount) in
+let burn_tokens_aux ?endpoint ~id ~kind source contract =
+  let param = burn_tokens_repr ~id ~kind in
   call_aux ?endpoint ~entrypoint:"burn" ~param source contract
 
-let burn_tokens id owner amount =
+let burn_tokens ~id ~kind =
+  let kind = match String.split_on_char '=' kind with
+    | [ "mt"; amount ] -> `mt (Int64.of_string amount)
+    | [ "nft" ] -> `nft
+    | _ -> failwith "kind of token not understood" in
   call ~entrypoint:"burn" @@
-  burn_tokens ~id:(Int64.of_string id) ~owner ~amount:(Int64.of_string amount)
+  burn_tokens_repr ~id:(Int64.of_string id) ~kind
 
 let transfer_aux ?endpoint l source contract =
-  let l = List.fold_left (fun acc s ->
-      match acc, String.split_on_char '=' s with
-      | (src, l) :: t, [ id; dst ] ->
-        begin match String.split_on_char '*' id with
-          | [ id; amount ] ->
-            (src, l @ [ Int64.of_string id, Int64.of_string amount, dst ]) :: t
-          | _ ->
-            (src, l @ [ Int64.of_string id, 1L, dst ]) :: t
-        end
-      | _ -> (s, []) :: acc) [] l in
-  let param = transfer (List.rev l) in
+  let param = transfer_repr l in
   call_aux ?endpoint ~entrypoint:"transfer" ~param source contract
 
 let transfer l =
   let l = List.fold_left (fun acc s ->
       match acc, String.split_on_char '=' s with
-      | (src, l) :: t, [ id; dst ] ->
+      | {tr_src; tr_txs} :: t, [ id; trd_dst ] ->
         begin match String.split_on_char '*' id with
           | [ id; amount ] ->
-            (src, l @ [ Int64.of_string id, Int64.of_string amount, dst ]) :: t
+            {tr_src; tr_txs = tr_txs @ [
+                 {trd_id = Int64.of_string id;
+                  trd_amount = Int64.of_string amount; trd_dst } ]} :: t
           | _ ->
-            (src, l @ [ Int64.of_string id, 1L, dst ]) :: t
+            {tr_src; tr_txs = tr_txs @ [
+                 { trd_id = Int64.of_string id; trd_amount = 1L; trd_dst }]} :: t
         end
-      | _ -> (s, []) :: acc) [] l in
-  call ~entrypoint:"transfer" @@ transfer (List.rev l)
+      | _ -> {tr_src=s; tr_txs = []} :: acc) [] l in
+  call ~entrypoint:"transfer" @@ transfer_repr (List.rev l)
 
 let update_operators_aux ?endpoint l source contract =
-  let l = List.map (fun s ->
-      let i = String.index s '=' in
-      let id = Int64.of_string (String.sub s 0 i) in
-      let s = String.sub s (i+1) (String.length s - i - 1) in
-      let add, i = match String.index_opt s '+' with
-        | Some i -> true, i
-        | None -> false, String.index s '-' in
-      id, String.sub s 0 i, String.sub s (i+1) (String.length s - i - 1), add) l in
-  let param = update_operators l in
+  let param = update_operators_repr l in
   call_aux ?endpoint ~entrypoint:"update_operators" ~param source contract
 
 let update_operators l =
   let l = List.map (fun s ->
       let i = String.index s '=' in
-      let id = Int64.of_string (String.sub s 0 i) in
+      let uo_id = Int64.of_string (String.sub s 0 i) in
       let s = String.sub s (i+1) (String.length s - i - 1) in
-      let add, i = match String.index_opt s '+' with
+      let uo_add, i = match String.index_opt s '+' with
         | Some i -> true, i
         | None -> false, String.index s '-' in
-      id, String.sub s 0 i, String.sub s (i+1) (String.length s - i - 1), add) l in
-  call ~entrypoint:"update_operators" @@ update_operators l
+      {uo_id; uo_owner=String.sub s 0 i; uo_operator=String.sub s (i+1) (String.length s - i - 1); uo_add}) l in
+  call ~entrypoint:"update_operators" @@ update_operators_repr l
 
 let update_operators_for_all_aux ?endpoint l source contract =
-  let l = List.map (fun s ->
-      let add = String.get s 0 = '+' in
-      String.sub s 1 (String.length s - 1), add) l in
-  let param = update_operators_for_all l in
+  let param = update_operators_for_all_repr l in
   call_aux ?endpoint ~entrypoint:"update_operators_for_all" ~param source contract
 
 let update_operators_for_all l =
   let l = List.map (fun s ->
       let add = String.get s 0 = '+' in
       String.sub s 1 (String.length s - 1), add) l in
-  call ~entrypoint:"update_operators_for_all" @@ update_operators_for_all l
+  call ~entrypoint:"update_operators_for_all" @@ update_operators_for_all_repr l
 
-let set_token_metadata_aux ?endpoint id l source contract =
-  let l = List.filter_map (fun s ->
-      match String.index_opt s '=' with
-      | None -> None
-      | Some i -> Some (String.sub s 0 i, String.sub s (i+1) (String.length s - i - 1))) l in
-  let param = set_token_metadata (Int64.of_string id) l in
+let set_token_metadata_aux ?endpoint ~id ~metadata source contract =
+  let param = set_token_metadata_repr ~id ~metadata in
   call_aux ?endpoint ~entrypoint:"setTokenMetadata" ~param source contract
 
-let set_token_metadata id l =
-  let l = List.filter_map (fun s ->
+let set_token_metadata ~id ~metadata =
+  let metadata = List.filter_map (fun s ->
       match String.index_opt s '=' with
       | None -> None
-      | Some i -> Some (String.sub s 0 i, String.sub s (i+1) (String.length s - i - 1))) l in
-  call ~entrypoint:"setTokenMetadata" @@ set_token_metadata (Int64.of_string id) l
+      | Some i -> Some (String.sub s 0 i, String.sub s (i+1) (String.length s - i - 1))) metadata in
+  call ~entrypoint:"setTokenMetadata" @@ set_token_metadata_repr ~id:(Int64.of_string id) ~metadata
 
-let set_metadata_uri_aux ?endpoint s source contract =
-  let param = set_metadata_uri s in
-  call_aux ?endpoint ~entrypoint:"setMetadataUri" ~param source contract
+let set_metadata_aux ?endpoint ~key ~value source contract =
+  let param = set_metadata_repr ~key ~value in
+  call_aux ?endpoint ~entrypoint:"setMetadata" ~param source contract
 
-let set_metadata_uri s =
-  call ~entrypoint:"setMetadataUri" @@ set_metadata_uri s
+let set_metadata ~key ~value =
+  call ~entrypoint:"setMetadataUri" @@ set_metadata_repr ~key ~value
 
 let set_validator_aux ?endpoint kt1 source contract =
   let param = Printf.sprintf "%S" kt1  in
@@ -402,8 +404,8 @@ let main () =
   let cmd = match List.rev !action with
     | [ "compile"; "contract"; filename ] -> Some (compile_contract filename)
     | [ "deploy"; filename; storage ] -> deploy ~filename storage
-    | [ "deploy_fa2"; admin; royalties ] ->
-      deploy ~filename:"contracts/arl/fa2.arl" (storage_fa2 ~admin ~royalties)
+    | [ "deploy_nft"; admin ] ->
+      deploy ~filename:"contracts/arl/fa2.arl" (storage_nft admin)
     | [ "deploy_royalties"; admin ] ->
       deploy ~filename:"contracts/arl/royalties.arl" (storage_royalties ~admin)
     | [ "deploy_exchange"; admin; receiver; fee ] ->
@@ -415,13 +417,13 @@ let main () =
     | [ "storage" ] -> get_storage ()
     | [ "value"; bm_id; key; typ ] -> Some (get_bigmap_value bm_id key typ)
     | [ "call"; entrypoint; s ] -> call ~entrypoint s
-    | "mint" :: id :: owner :: amount :: l -> mint_tokens id owner amount l
-    | "burn" :: id :: owner :: amount :: [] -> burn_tokens id owner amount
+    | "mint" :: id :: owner :: kind :: royalties -> mint_tokens ~id ~owner ~kind royalties
+    | "burn" :: [ id; kind ] -> burn_tokens ~id ~kind
     | "transfer" :: l -> transfer l
     | "update_operators" :: l -> update_operators l
     | "update_operators_for_all" :: l -> update_operators_for_all l
-    | "set_token_metadata" :: id :: l -> set_token_metadata id l
-    | "set_metadata_uri" :: [ s ] -> set_metadata_uri s
+    | "set_token_metadata" :: id :: metadata -> set_token_metadata ~id ~metadata
+    | "set_metadata" :: [ key; value ] -> set_metadata ~key ~value
     | "owners" :: bm_id :: l -> owners bm_id l
     | _ -> Arg.usage spec usage; None in
   match cmd with

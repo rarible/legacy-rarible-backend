@@ -1,4 +1,4 @@
-import { transfer, mint, burn, deploy_fa2, deploy_royalties, set_token_metadata, set_metadata_uri, deploy_exchange, deploy_validator, send, TransactionArg} from "."
+import { transfer, mint, burn, deploy_nft_public, deploy_royalties, set_token_metadata, set_metadata, deploy_exchangeV2, deploy_validator, send, TransactionArg} from "."
 import { in_memory_provider } from '../providers/in_memory/in_memory_provider'
 import yargs from 'yargs'
 
@@ -13,17 +13,19 @@ async function main() {
     royalties: {type: 'string', default: '{}'},
     amount: {type: 'number'},
     metadata: {type: 'string', default: '{}'},
-    metadata_uri: {type: 'string', default: ''},
+    metadata_key: {type: 'string', default: ''},
+    metadata_value: {type: 'string', default: ''},
     to: {type: 'string'},
     owner: {type: 'string'},
     receiver: {type: 'string'},
     fee: {type: 'number', default: 0},
     validator: {type: 'string', default: 'KT1RtsevY6b6izV12QMxvVZviSTy4Mcu2apg'},
     operator: {type: 'string', default: 'KT1XgQ52NeNdjo3jLpbsPBRfg8YhWoQ5LB7g'},
+
   }).argv
 
-  const token_id_opt = (argv.token_id) ? BigInt(argv.token_id) : undefined
-  const token_id = (argv.token_id) ? BigInt(argv.token_id) : 0n
+  const token_id_opt = (argv.token_id!=undefined) ? BigInt(argv.token_id) : undefined
+  const token_id = (argv.token_id!=undefined) ? BigInt(argv.token_id) : 0n
 
   const royalties0 = JSON.parse(argv.royalties) as { [key: string] : number }
   const royalties : { [key: string] : bigint } = {};
@@ -41,7 +43,9 @@ async function main() {
 
   const config = {
     exchange: argv.exchange,
-    fees: 0n
+    fees: 0n,
+    nft_public: "",
+    mt_public: "",
   }
 
   const provider = {
@@ -52,32 +56,33 @@ async function main() {
   const to = (argv.to) ? argv.to : await provider.tezos.address()
   const owner = (argv.owner) ? argv.owner : await provider.tezos.address()
   const receiver = (argv.receiver) ? argv.receiver : await provider.tezos.address()
+  const asset_class = (amount==undefined) ? "NFT" : "MT"
 
   switch(argv._[0]) {
     case 'transfer' :
       console.log("transfer")
-      const op_transfer = await transfer(provider, { asset_class: "FA_2", contract: argv.contract, token_id }, to, amount)
+      const op_transfer = await transfer(provider, { asset_class, contract: argv.contract, token_id }, to, amount)
       await op_transfer.confirmation()
       console.log(op_transfer.hash)
       break
 
     case 'mint':
       console.log("mint")
-      const op_mint = await mint(provider, argv.contract, royalties, amount, token_id_opt)
+      const op_mint = await mint(provider, argv.contract, royalties, amount, token_id_opt, undefined, argv.owner)
       await op_mint.confirmation()
       console.log(op_mint.hash)
       break
 
     case 'burn':
       console.log("burn")
-      const op_burn = await burn(provider, { asset_class: "FA_2", contract: argv.contract, token_id }, amount)
+      const op_burn = await burn(provider, { asset_class, contract: argv.contract, token_id }, amount)
       await op_burn.confirmation()
       console.log(op_burn.hash)
       break
 
-    case 'deploy_fa2':
-      console.log("deploy fa2")
-      const op_deploy_fa2 = await deploy_fa2(provider, owner, argv.royalties_contract)
+    case 'deploy_nft':
+      console.log("deploy nft")
+      const op_deploy_fa2 = await deploy_nft_public(provider, owner)
       await op_deploy_fa2.confirmation()
       console.log(op_deploy_fa2.contract)
       break
@@ -96,9 +101,9 @@ async function main() {
       console.log(op_token_metadata.hash)
       break
 
-    case 'set_metadata_uri':
+    case 'set_metadata':
       console.log("set metadata uri")
-      const op_metadata_uri = await set_metadata_uri(provider, argv.contract, argv.metadata_uri)
+      const op_metadata_uri = await set_metadata(provider, argv.contract, argv.metadata_key, argv.metadata_value)
       await op_metadata_uri.confirmation()
       console.log(op_metadata_uri.hash)
       break
@@ -112,7 +117,7 @@ async function main() {
 
     case 'deploy_exchange':
       console.log("deploy exchange")
-      const op_deploy_exchange = await deploy_exchange(provider, owner, receiver, BigInt(argv.fee))
+      const op_deploy_exchange = await deploy_exchangeV2(provider, owner, receiver, BigInt(argv.fee))
       await op_deploy_exchange.confirmation()
       console.log(op_deploy_exchange.contract)
       break
