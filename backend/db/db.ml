@@ -711,7 +711,7 @@ let mk_nft_item dbh ?include_meta obj =
     nft_item_royalties = [] ;
     nft_item_date = obj#last ;
     nft_item_minted_at = obj#tsp ;
-    nft_item_deleted = if obj#supply > 0L then Some false else Some true ;
+    nft_item_deleted = obj#supply = 0L ;
     nft_item_meta = rarible_meta_of_tzip21_meta meta ;
   }
 

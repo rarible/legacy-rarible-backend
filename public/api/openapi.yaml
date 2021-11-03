@@ -1057,55 +1057,6 @@ components:
       - message
       - code
       additionalProperties: false
-    ItemHistory:
-      oneOf:
-      - $ref: '#/components/schemas/ItemRoyalty'
-      - $ref: '#/components/schemas/ItemTransfer'
-    ItemRoyalty:
-      type: object
-      properties:
-        type:
-          type: string
-          enum:
-          - ROYALTY
-        royalties:
-          type: array
-          items:
-            $ref: '#/components/schemas/Part'
-      required:
-      - royalties
-      - type
-      additionalProperties: false
-    ItemTransfer:
-      type: object
-      properties:
-        type:
-          type: string
-          enum:
-          - TRANSFER
-        owner:
-          $ref: '#/components/schemas/Address'
-        value:
-          $ref: '#/components/schemas/Address'
-        from:
-          $ref: '#/components/schemas/Address'
-      required:
-      - from
-      - type
-      additionalProperties: false
-    ItemTransferElt:
-      type: object
-      properties:
-        type:
-          type: string
-          enum:
-          - TRANSFER
-        from:
-          $ref: '#/components/schemas/Address'
-      required:
-      - from
-      - type
-      additionalProperties: false
     Mint:
       type: object
       properties:
@@ -1364,15 +1315,12 @@ components:
         mintedAt:
           type: string
           format: date-time
-        pending:
-          type: array
-          items:
-            $ref: '#/components/schemas/ItemTransferElt'
         deleted:
           type: boolean
         meta:
           $ref: '#/components/schemas/NftItemMeta'
       required:
+      - deleted
       - mintedAt
       - date
       - royalties
@@ -1455,12 +1403,7 @@ components:
         date:
           type: string
           format: date-time
-        pending:
-          type: array
-          items:
-            $ref: '#/components/schemas/ItemHistory'
       required:
-      - pending
       - date
       - lazyValue
       - value
@@ -1552,10 +1495,6 @@ components:
         lastUpdateAt:
           type: string
           format: date-time
-        pending:
-          type: array
-          items:
-            $ref: '#/components/schemas/OrderExchangeHistory'
         hash:
           $ref: '#/components/schemas/Word'
         makeBalance:
@@ -1877,33 +1816,6 @@ components:
       - $ref: '#/components/schemas/OrderActivityBid'
       - $ref: '#/components/schemas/OrderActivityCancelBid'
       - $ref: '#/components/schemas/OrderActivityCancelList'
-    OrderCancel:
-      type: object
-      properties:
-        type:
-          type: string
-          enum:
-          - CANCEL
-        hash:
-          $ref: '#/components/schemas/Word'
-        make:
-          $ref: '#/components/schemas/Asset'
-        take:
-          $ref: '#/components/schemas/Asset'
-        date:
-          type: string
-          format: date-time
-        maker:
-          $ref: '#/components/schemas/Address'
-      required:
-      - date
-      - hash
-      - type
-      additionalProperties: false
-    OrderExchangeHistory:
-      oneOf:
-      - $ref: '#/components/schemas/OrderCancel'
-      - $ref: '#/components/schemas/OrderSideMatch'
     OrderForm:
       type: object
       properties:
@@ -1991,43 +1903,6 @@ components:
       - originFees
       - payouts
       - dataType
-      additionalProperties: false
-    OrderSide:
-      type: string
-      enum:
-      - LEFT
-      - RIGHT
-    OrderSideMatch:
-      type: object
-      properties:
-        type:
-          type: string
-          enum:
-          - ORDER_SIDE_MATCH
-        hash:
-          $ref: '#/components/schemas/Word'
-        make:
-          $ref: '#/components/schemas/Asset'
-        take:
-          $ref: '#/components/schemas/Asset'
-        date:
-          type: string
-          format: date-time
-        maker:
-          $ref: '#/components/schemas/Address'
-        side:
-          $ref: '#/components/schemas/OrderSide'
-        fill:
-          $ref: '#/components/schemas/BigInteger'
-        taker:
-          $ref: '#/components/schemas/Address'
-        counterHash:
-          $ref: '#/components/schemas/Word'
-      required:
-      - fill
-      - date
-      - hash
-      - type
       additionalProperties: false
     OrderStatus:
       type: string

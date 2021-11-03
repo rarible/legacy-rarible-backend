@@ -162,7 +162,7 @@ type nft_item = {
   nft_item_royalties : part list;
   nft_item_date : A.date;
   nft_item_minted_at : A.date;
-  nft_item_deleted : bool option; [@opt]
+  nft_item_deleted : bool;
   nft_item_meta : nft_item_meta option; [@opt]
 } [@@deriving encoding {camel; title="NftItem"; def_title}]
 
