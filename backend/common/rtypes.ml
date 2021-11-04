@@ -975,3 +975,8 @@ type order_currencies = {
   order_currencies_order_type : currency_order_type ;
   order_currencies_currencies : asset_type list ;
 } [@@deriving encoding {title="OrderCurrencies"; def_title}]
+
+type activity_sort =
+  | LATEST_FIRST
+  | EARLIEST_FIRST
+[@@deriving encoding {enum;title="ActivitySort"; def_title}]

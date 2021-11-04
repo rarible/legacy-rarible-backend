@@ -11,6 +11,11 @@ paths:
       description: Search activities with some filter
       operationId: getNftActivities
       parameters:
+      - name: sort
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/schemas/ActivitySort'
       - name: size
         in: query
         required: false
@@ -1006,6 +1011,11 @@ paths:
       description: get Order activities with some filter
       operationId: getOrderActivities
       parameters:
+      - name: sort
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/schemas/ActivitySort'
       - name: size
         in: query
         required: false
