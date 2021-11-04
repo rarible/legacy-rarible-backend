@@ -162,8 +162,7 @@ type nft_item = {
   nft_item_royalties : part list;
   nft_item_date : A.date;
   nft_item_minted_at : A.date;
-  nft_item_pending : item_transfer list option; [@opt]
-  nft_item_deleted : bool option; [@opt]
+  nft_item_deleted : bool;
   nft_item_meta : nft_item_meta option; [@opt]
 } [@@deriving encoding {camel; title="NftItem"; def_title}]
 
@@ -262,7 +261,7 @@ type nft_ownership = {
   nft_ownership_value : A.big_integer ;
   nft_ownership_lazy_value : A.big_integer ;
   nft_ownership_date : A.date ;
-  nft_ownership_pending : item_history list;
+  nft_ownership_created_at : A.date ;
 } [@@deriving encoding {camel; title="NftOwnership"; def_title}]
 
 type nft_ownerships = {
@@ -453,8 +452,8 @@ type order_status =
   | OACTIVE
   | OFILLED
   | OHISTORICAL
-  | INACTIVE
-  | CANCELLED
+  | OINACTIVE
+  | OCANCELLED
 [@@deriving encoding {enum; title="OrderStatus"; def_title}]
 
 type order_elt = {
@@ -473,7 +472,6 @@ type order_elt = {
   order_elt_signature: A.edsig;
   order_elt_created_at: A.date;
   order_elt_last_update_at: A.date;
-  order_elt_pending: order_exchange_history list option ; [@opt]
   order_elt_hash: A.word;
   order_elt_make_balance: A.big_integer option; [@opt]
   order_elt_price_history: order_price_history_record list ; [@dft []]
@@ -967,3 +965,18 @@ type tzip21_token_metadata = {
   tzip21_tm_is_transferable : bool option ;
   tzip21_tm_should_prefer_symbol : bool option ;
 } [@@deriving encoding {camel}]
+
+type currency_order_type =
+  | COTSELL
+  | COTBID
+[@@deriving encoding {enum; title="OrderType"; def_title}]
+
+type order_currencies = {
+  order_currencies_order_type : currency_order_type ;
+  order_currencies_currencies : asset_type list ;
+} [@@deriving encoding {title="OrderCurrencies"; def_title}]
+
+type activity_sort =
+  | LATEST_FIRST
+  | EARLIEST_FIRST
+[@@deriving encoding {enum;title="ActivitySort"; def_title}]

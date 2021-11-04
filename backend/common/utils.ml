@@ -277,7 +277,6 @@ let order_elt_from_order_form_elt elt =
     order_elt_signature = elt.order_form_elt_signature;
     order_elt_created_at = now;
     order_elt_last_update_at = now;
-    order_elt_pending = Some [];
     order_elt_hash = (hash :> string);
     order_elt_make_balance = None;
     order_elt_price_history = [];
@@ -384,6 +383,11 @@ let order_bid_status_to_string l =
   String.concat ";" @@
   List.map (fun t ->
       EzEncoding.construct order_bid_status_enc t) l
+
+let order_status_to_string l =
+  String.concat ";" @@
+  List.map (fun t ->
+      EzEncoding.construct order_status_enc t) l
 
 let short ?(len=8) h =
   if String.length h > len then String.sub h 0 len else h

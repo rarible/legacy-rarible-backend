@@ -71,6 +71,7 @@ let end_date_param = pint ~required:true ~enc:A.uint53 "endDate"
 let source_param = pstring "source"
 let status_param = pstring "status"
 let currency_param = pstring "currencyId"
+let sort_param = pstring ~enc:activity_sort_enc "sort"
 
 let hash_arg = EzAPI.Arg.string "hash"
 let item_id_arg = EzAPI.Arg.string "itemId"
@@ -371,7 +372,20 @@ let get_required_status_param req =
     with _ ->
       mk_invalid_argument
         status_param
-        "must be a ACTIVE FILLED HISTORICAL, INACTIVE OR CANCELLED separated with ','"
+        "must be a ACTIVE, FILLED, HISTORICAL, INACTIVE OR CANCELLED separated with ','"
+
+let get_status_param req =
+  match EzAPI.Req.find_param status_param req with
+  | None -> Ok None
+  | Some o ->
+    try
+      match String.split_on_char ',' o with
+      | [] -> Ok (Some [ EzEncoding.destruct order_status_enc o ])
+      | l -> Ok (Some (List.map (EzEncoding.destruct order_status_enc) l))
+    with _ ->
+      mk_invalid_argument
+        status_param
+        "must be a ACTIVE, FILLED, HISTORICAL, INACTIVE OR CANCELLED separated with ','"
 
 let get_continuation_price_param req =
   match EzAPI.Req.find_param continuation_param req with
@@ -406,6 +420,17 @@ let get_currency_param req =
           mk_invalid_argument currency_param "must be XTZ, FA_1_2:ADDRESS or FA_2:ADDRESS:TOKENID"
       with _ ->
         mk_invalid_argument currency_param "must be XTZ, FA_1_2:ADDRESS or FA_2:ADDRESS:TOKENID"
+    end
+
+let get_sort_param req =
+  match EzAPI.Req.find_param sort_param req with
+  | None -> Ok None
+  | Some str ->
+    begin
+      try
+        Ok (Some (EzEncoding.destruct activity_sort_enc str))
+      with _ ->
+        mk_invalid_argument sort_param "must be LATEST_FIRST or EARLIEST_FIRST"
     end
 
 (* (\* gateway-controller *\)
@@ -458,20 +483,23 @@ let get_currency_param req =
 (* nft-activity-controller *)
 
 let get_nft_activities req input =
-  match get_size_param req with
+  match get_sort_param req with
   | Error err -> return @@ Error err
-  | Ok size ->
-    match get_continuation_ownerships_param req with
+  | Ok sort ->
+    match get_size_param req with
     | Error err -> return @@ Error err
-    | Ok continuation ->
-      Db.get_nft_activities ?continuation ?size input >>= function
-      | Error db_err ->
-        let str = Crawlori.Rp.string_of_error db_err in
-        return (Error (`UNEXPECTED_API_ERROR str))
-      | Ok res -> return (Ok res)
+    | Ok size ->
+      match get_continuation_ownerships_param req with
+      | Error err -> return @@ Error err
+      | Ok continuation ->
+        Db.get_nft_activities ?sort ?continuation ?size input >>= function
+        | Error db_err ->
+          let str = Crawlori.Rp.string_of_error db_err in
+          return (Error (`UNEXPECTED_API_ERROR str))
+        | Ok res -> return (Ok res)
 [@@post
   {path="/v0.1/nft/activities/search";
-   params=[size_param;continuation_param];
+   params=[sort_param;size_param;continuation_param];
    input=nft_activity_filter_enc;
    output=nft_activities_enc;
    errors=[invalid_argument_case; unexpected_api_error_case];
@@ -1008,21 +1036,32 @@ let get_sell_orders_by_item req () =
           match get_currency_param req with
           | Error err -> return @@ Error err
           | Ok currency ->
-          match get_size_param req with
-          | Error err -> return @@ Error err
-          | Ok size ->
-            match get_continuation_price_param req with
+            match get_status_param req with
             | Error err -> return @@ Error err
-            | Ok continuation ->
-              Db.get_sell_orders_by_item
-                ?origin ?continuation ?size ?maker ?currency contract token_id >>= function
-              | Error db_err ->
-                let str = Crawlori.Rp.string_of_error db_err in
-                return (Error (`UNEXPECTED_API_ERROR str))
-              | Ok res -> return_ok res
+            | Ok statuses ->
+              match get_start_date_param req with
+              | Error err -> return @@ Error err
+              | Ok start_date ->
+                match get_end_date_param req with
+                | Error err -> return @@ Error err
+                | Ok end_date ->
+                  match get_size_param req with
+                  | Error err -> return @@ Error err
+                  | Ok size ->
+                    match get_continuation_price_param req with
+                    | Error err -> return @@ Error err
+                    | Ok continuation ->
+                      Db.get_sell_orders_by_item
+                        ?origin ?continuation ?size ?maker ?currency
+                        ?statuses ?start_date ?end_date contract token_id >>= function
+                      | Error db_err ->
+                        let str = Crawlori.Rp.string_of_error db_err in
+                        return (Error (`UNEXPECTED_API_ERROR str))
+                      | Ok res -> return_ok res
 [@@get
   {path="/v0.1/orders/sell/byItem";
    params=[contract_param;token_id_param;maker_param;origin_param;
+           currency_param;status_param;start_date_param;end_date_param;
            size_param;continuation_param];
    output=orders_pagination_enc;
    errors=[invalid_argument_case; unexpected_api_error_case];
@@ -1129,43 +1168,100 @@ let get_order_bids_by_item req () =
           match get_currency_param req with
           | Error err -> return @@ Error err
           | Ok currency ->
-            match get_size_param req with
+            match get_status_param req with
             | Error err -> return @@ Error err
-            | Ok size ->
-              match get_continuation_price_param req with
+            | Ok statuses ->
+              match get_start_date_param req with
               | Error err -> return @@ Error err
-              | Ok continuation ->
-                Db.get_bid_orders_by_item
-                  ?origin ?continuation ?size ?maker ?currency contract token_id >>= function
-                | Error db_err ->
-                  let str = Crawlori.Rp.string_of_error db_err in
-                  return (Error (`UNEXPECTED_API_ERROR str))
-                | Ok res -> return_ok res
+              | Ok start_date ->
+                match get_end_date_param req with
+                | Error err -> return @@ Error err
+                | Ok end_date ->
+                  match get_size_param req with
+                  | Error err -> return @@ Error err
+                  | Ok size ->
+                    match get_continuation_price_param req with
+                    | Error err -> return @@ Error err
+                    | Ok continuation ->
+                      Db.get_bid_orders_by_item
+                        ?origin ?continuation ?size ?maker ?currency
+                        ?statuses ?start_date ?end_date contract token_id
+                      >>= function
+                      | Error db_err ->
+                        let str = Crawlori.Rp.string_of_error db_err in
+                        return (Error (`UNEXPECTED_API_ERROR str))
+                      | Ok res -> return_ok res
 [@@get
   {path="/v0.1/orders/bids/byItem";
    params=[contract_param;token_id_param;maker_param;origin_param;
+           currency_param;status_param;start_date_param;end_date_param;
            size_param;continuation_param];
    output=orders_pagination_enc;
    errors=[invalid_argument_case; unexpected_api_error_case];
    name="orders_bids_by_item";
    section=orders_section}]
 
-(* order-activity-controller *)
-let get_order_activities req input =
-  match get_size_param req with
+let get_currencies_by_bid_orders_of_item req () =
+  Format.eprintf "get_currencies_by_bid_orders_of_item\n%!";
+  match get_required_contract_param req with
   | Error err -> return @@ Error err
-  | Ok size ->
-    match get_continuation_last_update_param req with
+  | Ok contract ->
+    match get_required_token_id_param req with
     | Error err -> return @@ Error err
-    | Ok continuation ->
-      Db.get_order_activities ?continuation ?size input >>= function
+    | Ok token_id ->
+      Db.get_currencies_by_bid_orders_of_item contract token_id >>= function
       | Error db_err ->
         let str = Crawlori.Rp.string_of_error db_err in
         return (Error (`UNEXPECTED_API_ERROR str))
       | Ok res -> return_ok res
+[@@get
+  {path="/v0.1/order/orders/currencies/byBidOrdersOfItem";
+   params=[contract_param;token_id_param];
+   output=order_currencies_enc;
+   errors=[bad_request_case; unexpected_api_error_case];
+   name="get_currencies_by_bid_orders_of_item";
+   section=orders_section}]
+
+let get_currencies_by_sell_orders_of_item req () =
+  Format.eprintf "get_currencies_by_sell_orders_of_item\n%!";
+  match get_required_contract_param req with
+  | Error err -> return @@ Error err
+  | Ok contract ->
+    match get_required_token_id_param req with
+    | Error err -> return @@ Error err
+    | Ok token_id ->
+      Db.get_currencies_by_sell_orders_of_item contract token_id >>= function
+      | Error db_err ->
+        let str = Crawlori.Rp.string_of_error db_err in
+        return (Error (`UNEXPECTED_API_ERROR str))
+      | Ok res -> return_ok res
+[@@get
+  {path="/v0.1/order/orders/currencies/bySellOrdersOfItem";
+   params=[contract_param;token_id_param];
+   output=order_currencies_enc;
+   errors=[bad_request_case; unexpected_api_error_case];
+   name="get_currencies_by_sell_orders_of_item";
+   section=orders_section}]
+
+(* order-activity-controller *)
+let get_order_activities req input =
+  match get_sort_param req with
+  | Error err -> return @@ Error err
+  | Ok sort ->
+    match get_size_param req with
+    | Error err -> return @@ Error err
+    | Ok size ->
+      match get_continuation_last_update_param req with
+      | Error err -> return @@ Error err
+      | Ok continuation ->
+        Db.get_order_activities ?sort ?continuation ?size input >>= function
+        | Error db_err ->
+          let str = Crawlori.Rp.string_of_error db_err in
+          return (Error (`UNEXPECTED_API_ERROR str))
+        | Ok res -> return_ok res
 [@@post
   {path="/v0.1/order/activities/search";
-   params=[size_param;continuation_param];
+   params=[sort_param;size_param;continuation_param];
    name="get_order_activities";
    input=order_activity_filter_enc;
    output=order_activities_enc;
@@ -1184,7 +1280,6 @@ let validate _req input =
    output=Json_encoding.bool;
    errors=[invalid_argument_case; unexpected_api_error_case];
    section=signature_section}]
-
 
 (* module V_0_1 = struct
  *

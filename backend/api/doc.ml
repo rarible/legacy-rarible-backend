@@ -30,6 +30,11 @@ let docs = List.map (fun (n, t, d) -> (n, (t, d, None, None))) @@ [
     "orders_sell", "getSellOrders", "Get sell orders" ;
     "orders_bids_by_maker", "getOrderBidsByMaker", "Get order bids by maker" ;
     "orders_bids_by_item", "getOrderBidsByItem", "Get order bids by item" ;
+    "get_currencies_by_bid_orders_of_item", "getCurrenciesByBidOrdersOfItem",
+    "Returns currencies made as payment in all bid orders of the item" ;
+    "get_currencies_by_sell_orders_of_item", "getCurrenciesBySellOrdersOfItem",
+    "Returns currencies taken as payment in all sell orders of the item" ;
+
 
     (* Order Activity controller *)
     "get_order_activities", "getOrderActivities", "get Order activities with some filter" ;
