@@ -384,6 +384,11 @@ let order_bid_status_to_string l =
   List.map (fun t ->
       EzEncoding.construct order_bid_status_enc t) l
 
+let order_status_to_string l =
+  String.concat ";" @@
+  List.map (fun t ->
+      EzEncoding.construct order_status_enc t) l
+
 let short ?(len=8) h =
   if String.length h > len then String.sub h 0 len else h
 

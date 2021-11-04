@@ -371,7 +371,20 @@ let get_required_status_param req =
     with _ ->
       mk_invalid_argument
         status_param
-        "must be a ACTIVE FILLED HISTORICAL, INACTIVE OR CANCELLED separated with ','"
+        "must be a ACTIVE, FILLED, HISTORICAL, INACTIVE OR CANCELLED separated with ','"
+
+let get_status_param req =
+  match EzAPI.Req.find_param status_param req with
+  | None -> Ok None
+  | Some o ->
+    try
+      match String.split_on_char ',' o with
+      | [] -> Ok (Some [ EzEncoding.destruct order_status_enc o ])
+      | l -> Ok (Some (List.map (EzEncoding.destruct order_status_enc) l))
+    with _ ->
+      mk_invalid_argument
+        status_param
+        "must be a ACTIVE, FILLED, HISTORICAL, INACTIVE OR CANCELLED separated with ','"
 
 let get_continuation_price_param req =
   match EzAPI.Req.find_param continuation_param req with
@@ -1008,21 +1021,32 @@ let get_sell_orders_by_item req () =
           match get_currency_param req with
           | Error err -> return @@ Error err
           | Ok currency ->
-          match get_size_param req with
-          | Error err -> return @@ Error err
-          | Ok size ->
-            match get_continuation_price_param req with
+            match get_status_param req with
             | Error err -> return @@ Error err
-            | Ok continuation ->
-              Db.get_sell_orders_by_item
-                ?origin ?continuation ?size ?maker ?currency contract token_id >>= function
-              | Error db_err ->
-                let str = Crawlori.Rp.string_of_error db_err in
-                return (Error (`UNEXPECTED_API_ERROR str))
-              | Ok res -> return_ok res
+            | Ok statuses ->
+              match get_start_date_param req with
+              | Error err -> return @@ Error err
+              | Ok start_date ->
+                match get_end_date_param req with
+                | Error err -> return @@ Error err
+                | Ok end_date ->
+                  match get_size_param req with
+                  | Error err -> return @@ Error err
+                  | Ok size ->
+                    match get_continuation_price_param req with
+                    | Error err -> return @@ Error err
+                    | Ok continuation ->
+                      Db.get_sell_orders_by_item
+                        ?origin ?continuation ?size ?maker ?currency
+                        ?statuses ?start_date ?end_date contract token_id >>= function
+                      | Error db_err ->
+                        let str = Crawlori.Rp.string_of_error db_err in
+                        return (Error (`UNEXPECTED_API_ERROR str))
+                      | Ok res -> return_ok res
 [@@get
   {path="/v0.1/orders/sell/byItem";
    params=[contract_param;token_id_param;maker_param;origin_param;
+           currency_param;status_param;start_date_param;end_date_param;
            size_param;continuation_param];
    output=orders_pagination_enc;
    errors=[invalid_argument_case; unexpected_api_error_case];
@@ -1129,21 +1153,33 @@ let get_order_bids_by_item req () =
           match get_currency_param req with
           | Error err -> return @@ Error err
           | Ok currency ->
-            match get_size_param req with
+            match get_status_param req with
             | Error err -> return @@ Error err
-            | Ok size ->
-              match get_continuation_price_param req with
+            | Ok statuses ->
+              match get_start_date_param req with
               | Error err -> return @@ Error err
-              | Ok continuation ->
-                Db.get_bid_orders_by_item
-                  ?origin ?continuation ?size ?maker ?currency contract token_id >>= function
-                | Error db_err ->
-                  let str = Crawlori.Rp.string_of_error db_err in
-                  return (Error (`UNEXPECTED_API_ERROR str))
-                | Ok res -> return_ok res
+              | Ok start_date ->
+                match get_end_date_param req with
+                | Error err -> return @@ Error err
+                | Ok end_date ->
+                  match get_size_param req with
+                  | Error err -> return @@ Error err
+                  | Ok size ->
+                    match get_continuation_price_param req with
+                    | Error err -> return @@ Error err
+                    | Ok continuation ->
+                      Db.get_bid_orders_by_item
+                        ?origin ?continuation ?size ?maker ?currency
+                        ?statuses ?start_date ?end_date contract token_id
+                      >>= function
+                      | Error db_err ->
+                        let str = Crawlori.Rp.string_of_error db_err in
+                        return (Error (`UNEXPECTED_API_ERROR str))
+                      | Ok res -> return_ok res
 [@@get
   {path="/v0.1/orders/bids/byItem";
    params=[contract_param;token_id_param;maker_param;origin_param;
+           currency_param;status_param;start_date_param;end_date_param;
            size_param;continuation_param];
    output=orders_pagination_enc;
    errors=[invalid_argument_case; unexpected_api_error_case];
