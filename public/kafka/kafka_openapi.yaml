@@ -105,8 +105,9 @@ components:
     AssetType:
       oneOf:
       - $ref: '#/components/schemas/XTZAssetType'
-      - $ref: '#/components/schemas/FA_1_2AssetType'
-      - $ref: '#/components/schemas/FA_2AssetType'
+      - $ref: '#/components/schemas/FTAssetType'
+      - $ref: '#/components/schemas/NFTAssetType'
+      - $ref: '#/components/schemas/MTAssetType'
     BigDecimal:
       type: string
     BigInteger:
@@ -150,26 +151,26 @@ components:
       type: string
     Edsig:
       type: string
-    FA_1_2AssetType:
+    FTAssetType:
       type: object
       properties:
         assetClass:
           type: string
           enum:
-          - FA_1_2
+          - FT
         contract:
           $ref: '#/components/schemas/Address'
       required:
       - contract
       - assetClass
       additionalProperties: false
-    FA_2AssetType:
+    MTAssetType:
       type: object
       properties:
         assetClass:
           type: string
           enum:
-          - FA_2
+          - MT
         contract:
           $ref: '#/components/schemas/Address'
         tokenId:
@@ -209,6 +210,22 @@ components:
       - contract
       - owner
       - '@type'
+      additionalProperties: false
+    NFTAssetType:
+      type: object
+      properties:
+        assetClass:
+          type: string
+          enum:
+          - NFT
+        contract:
+          $ref: '#/components/schemas/Address'
+        tokenId:
+          $ref: '#/components/schemas/BigInteger'
+      required:
+      - tokenId
+      - contract
+      - assetClass
       additionalProperties: false
     NftActivityElt:
       type: object

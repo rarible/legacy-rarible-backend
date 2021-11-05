@@ -410,12 +410,15 @@ let get_currency_param req =
     begin
       try
         match String.split_on_char ':' str with
-        | "FA_1_2" :: contract :: [] ->
+        | "FT" :: contract :: [] ->
           ignore @@ Base58.decode ~prefix:Prefix.contract_public_key_hash contract ;
-          Ok (Some (ATFA_1_2 contract))
-        | "FA_2" :: contract :: token_id :: [] ->
+          Ok (Some (ATFT contract))
+        | "NFT" :: contract :: token_id :: [] ->
           ignore @@ Base58.decode ~prefix:Prefix.contract_public_key_hash contract ;
-          Ok (Some (ATFA_2 { asset_fa2_contract = contract ; asset_fa2_token_id = token_id }))
+          Ok (Some (ATNFT { asset_contract = contract ; asset_token_id = token_id }))
+        | "MT" :: contract :: token_id :: [] ->
+          ignore @@ Base58.decode ~prefix:Prefix.contract_public_key_hash contract ;
+          Ok (Some (ATMT { asset_contract = contract ; asset_token_id = token_id }))
         | _ ->
           mk_invalid_argument currency_param "must be XTZ, FA_1_2:ADDRESS or FA_2:ADDRESS:TOKENID"
       with _ ->

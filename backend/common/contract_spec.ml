@@ -49,15 +49,19 @@ let fa2_entrypoints : (string * micheline_type_short) list = [
 ]
 
 let update_operators_all_entry = `seq (`or_ (`address, `address))
-let mint_entry = `tuple [ `nat; `address; `nat; `seq (`tuple [`address; `nat]) ]
+let mint_mt_entry = `tuple [ `nat; `address; `nat; `map (`string, `bytes); `seq (`tuple [`address; `nat]) ]
+let mint_nft_entry = `tuple [ `nat; `address; `map (`string, `bytes); `seq (`tuple [`address; `nat]) ]
 let mint_ubi_entry = `tuple [ `address; `nat; `option `bytes ]
-let burn_entry = `tuple [ `nat; `address; `nat ]
-let set_token_metadata_entry = `tuple [ `nat; `map (`string, `string) ]
+let burn_nft_entry = `nat
+let burn_mt_entry = `tuple [ `nat; `nat ]
+let set_token_metadata_entry = `tuple [ `nat; `map (`string, `bytes) ]
 
 let fa2_ext_entrypoints : (string * micheline_type_short) list = [
   "update_operators_for_all", update_operators_all_entry;
-  "mint", mint_entry;
-  "burn", burn_entry;
+  "mint", mint_mt_entry;
+  "mint", mint_nft_entry;
+  "burn", burn_mt_entry;
+  "burn", burn_nft_entry;
   "setTokenMetadata", set_token_metadata_entry;
 ]
 
@@ -99,6 +103,7 @@ let match_fields ~expected ~allocs script =
       ) expected)
 
 let ledger_fa2_multiple_field = `tuple [ `address; `nat ], `nat
+let ledger_nft_field = `nat, `address
 let ledger_fa2_multiple_inversed_field = `tuple [ `nat; `address ], `nat
 let ledger_fa2_single_field = `address, `nat
 let ledger_fa1_field = `address, `tuple [`nat; `map (`address, `nat) ]

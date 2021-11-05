@@ -1096,8 +1096,9 @@ components:
     AssetType:
       oneOf:
       - $ref: '#/components/schemas/XTZAssetType'
-      - $ref: '#/components/schemas/FA_1_2AssetType'
-      - $ref: '#/components/schemas/FA_2AssetType'
+      - $ref: '#/components/schemas/FTAssetType'
+      - $ref: '#/components/schemas/NFTAssetType'
+      - $ref: '#/components/schemas/MTAssetType'
     BAD_REQUEST:
       type: object
       properties:
@@ -1154,32 +1155,16 @@ components:
       type: string
     Edsig:
       type: string
-    FA_1_2AssetType:
+    FTAssetType:
       type: object
       properties:
         assetClass:
           type: string
           enum:
-          - FA_1_2
+          - FT
         contract:
           $ref: '#/components/schemas/Address'
       required:
-      - contract
-      - assetClass
-      additionalProperties: false
-    FA_2AssetType:
-      type: object
-      properties:
-        assetClass:
-          type: string
-          enum:
-          - FA_2
-        contract:
-          $ref: '#/components/schemas/Address'
-        tokenId:
-          $ref: '#/components/schemas/BigInteger'
-      required:
-      - tokenId
       - contract
       - assetClass
       additionalProperties: false
@@ -1195,6 +1180,22 @@ components:
       required:
       - message
       - code
+      additionalProperties: false
+    MTAssetType:
+      type: object
+      properties:
+        assetClass:
+          type: string
+          enum:
+          - MT
+        contract:
+          $ref: '#/components/schemas/Address'
+        tokenId:
+          $ref: '#/components/schemas/BigInteger'
+      required:
+      - tokenId
+      - contract
+      - assetClass
       additionalProperties: false
     Mint:
       type: object
@@ -1226,6 +1227,22 @@ components:
       - contract
       - owner
       - '@type'
+      additionalProperties: false
+    NFTAssetType:
+      type: object
+      properties:
+        assetClass:
+          type: string
+          enum:
+          - NFT
+        contract:
+          $ref: '#/components/schemas/Address'
+        tokenId:
+          $ref: '#/components/schemas/BigInteger'
+      required:
+      - tokenId
+      - contract
+      - assetClass
       additionalProperties: false
     NftActivities:
       type: object
@@ -1405,7 +1422,8 @@ components:
     NftCollectionType:
       type: string
       enum:
-      - FA_2
+      - NFT
+      - MT
     NftCollections:
       type: object
       properties:

@@ -22,18 +22,24 @@ export interface XTZAssetType  {
   asset_class: "XTZ";
 }
 
-export interface FA12AssetType {
-  asset_class: "FA_1_2";
+export interface FTAssetType {
+  asset_class: "FT";
   contract: string;
 }
 
-export interface FA2AssetType {
-  asset_class: "FA_2";
-  contract: string;
+export interface NFTAssetType {
+  asset_class: "NFT";
+  contract?: string;
   token_id: bigint;
 }
 
-export type TokenAssetType = FA12AssetType | FA2AssetType
+export interface MultipleAssetType {
+  asset_class: "MT";
+  contract?: string;
+  token_id: bigint;
+}
+
+export type TokenAssetType = FTAssetType | NFTAssetType | MultipleAssetType
 export type AssetType = XTZAssetType | TokenAssetType
 
 export interface Asset {
@@ -74,31 +80,34 @@ export interface TransactionArg {
 
 export function asset_type_to_json(a: AssetType) : any {
   switch (a.asset_class) {
-    case "FA_2":
+    case "XTZ":
+      return { assetClass: a.asset_class }
+    case "FT":
+      return { assetClass: a.asset_class, contract: a.contract }
+    case "NFT":
+    case "MT":
       return {
         assetClass: a.asset_class,
         contract: a.contract,
         tokenId: a.token_id.toString()
       }
-    case "XTZ":
-      return { assetClass: a.asset_class }
-    case "FA_1_2":
-      return { assetClass: a.asset_class, contract: a.contract }
   }
 }
 
 export function asset_type_of_json(a: any) : AssetType {
   switch (a.assetClass) {
-    case "FA_2":
+    case "XTZ":
+      return { asset_class: a.assetClass }
+    case "FT":
+      return { asset_class: a.assetClass, contract: a.contract }
+
+    case "NFT":
+    case "MT":
       return {
         asset_class: a.assetClass,
         contract: a.contract,
         token_id: BigInt(a.tokenId)
       }
-    case "XTZ":
-      return { asset_class: a.assetClass }
-    case "FA_1_2":
-      return { asset_class: a.assetClass, contract: a.contract }
     default: throw new Error("Unknown Asset Class")
   }
 }
@@ -213,4 +222,10 @@ export async function get_transaction(
   const r = await fetch(provider.api + '/transaction/' + op_hash)
   if (r.ok) { return r.json() }
   else throw new Error("/transaction/" + op_hash + " failed")
+}
+
+export function to_hex(s: string) : string {
+  const encoder = new TextEncoder();
+  const a = encoder.encode(s)
+  return a.reduce((acc, x) => acc + x.toString(16).padStart(2, '0'), '')
 }

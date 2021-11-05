@@ -1,0 +1,74 @@
+archetype matcher(
+  owner     : address,
+  validator : address
+)
+
+variable owner_candidate : option<address> = none
+
+entry transferOwnership(candidate : address) {
+  called by owner
+  effect {
+    owner_candidate := some(candidate);
+  }
+}
+
+entry claimOwnership() {
+  called by opt_get(owner_candidate)
+  effect {
+    owner := opt_get(owner_candidate);
+    owner_candidate := none
+  }
+}
+
+enum asset_class =
+| XTZ
+| FA_1_2
+| FA_2
+
+record asset_type {
+  assetClass : asset_class;
+  assetData  : bytes;
+}
+
+record %asset {
+  assetType : asset_type;
+  assetValue : nat;
+}
+
+record order {
+  maker : option<key>;
+  makeAsset : %asset;
+  taker : option<key>;
+  takeAsset : %asset;
+  salt : nat;
+  start : option<date>;
+  %end :  option<date>;
+  dataType : bytes;
+  data : bytes;
+}
+
+record res {
+  orderL    : order;
+  orderR    : order;
+  makeMatch : option<asset_type>;
+  takeMatch : option<asset_type>;
+}
+
+entry setValidator(ivalidator : address) {
+  called by owner
+  effect {
+    validator := ivalidator
+  }
+}
+
+getter matchAssets(orderLeft : order, orderRight : order) : res {
+  dorequire(caller = validator, "caller must be validator");
+  var left_make  : asset_type = orderLeft.makeAsset.assetType;
+  var left_take  : asset_type = orderLeft.makeAsset.assetType;
+  var right_make : asset_type = orderRight.takeAsset.assetType;
+  var right_take : asset_type = orderRight.takeAsset.assetType;
+
+  // Implement the business logic of an external matcher
+
+  return ({orderLeft; orderRight ; none<asset_type>; none<asset_type>})
+}

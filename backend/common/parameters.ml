@@ -47,30 +47,37 @@ let parse_transfer m =
   | _ -> unexpected_michelson
 
 let parse_mint m =
-  match Typed_mich.parse_value Contract_spec.mint_entry m with
-  | Ok (`tuple [`nat id; `address fa2m_owner; `nat amount; `seq _royalties]) ->
+  match Typed_mich.parse_value Contract_spec.mint_mt_entry m with
+  | Ok (`tuple [`nat id; `address fa2m_owner; `nat amount; `assoc _meta; `seq _royalties]) ->
     let fa2m_token_id = Z.to_string id in
     let fa2m_amount = Z.to_int64 amount  in
     Ok (Mint_tokens
-          (Fa2Mint { fa2m_token_id ; fa2m_owner ; fa2m_amount }))
+          (MTMint { fa2m_token_id ; fa2m_owner ; fa2m_amount }))
   | _ ->
-    match Typed_mich.parse_value Contract_spec.mint_ubi_entry m with
-    | Ok (`tuple [ `address ubim_owner; `nat id; uri ]) ->
-      let ubim_token_id = Z.to_string id  in
-      let$ ubim_uri = match uri with
-        | `none -> Ok None
-        | `some (`bytes uri) ->
-          Ok (Some (Tzfunc.Crypto.hex_to_raw uri :> string))
-        | _ -> unexpected_michelson in
-      Ok (Mint_tokens (UbiMint { ubim_owner ; ubim_token_id ; ubim_uri }))
-    | _ -> unexpected_michelson
+    match Typed_mich.parse_value Contract_spec.mint_nft_entry m with
+    | Ok (`tuple [`nat id; `address fa2m_owner; `assoc _meta; `seq _royalties]) ->
+      let fa2m_token_id = Z.to_string id in
+      Ok (Mint_tokens
+            (NFTMint { fa2m_token_id ; fa2m_owner ; fa2m_amount = () }))
+    | _ ->
+      match Typed_mich.parse_value Contract_spec.mint_ubi_entry m with
+      | Ok (`tuple [ `address ubim_owner; `nat id; uri ]) ->
+        let ubim_token_id = Z.to_string id  in
+        let$ ubim_uri = match uri with
+          | `none -> Ok None
+          | `some (`bytes uri) ->
+            Ok (Some (Tzfunc.Crypto.hex_to_raw uri :> string))
+          | _ -> unexpected_michelson in
+        Ok (Mint_tokens (UbiMint { ubim_owner ; ubim_token_id ; ubim_uri }))
+      | _ -> unexpected_michelson
 
 let parse_burn m =
-  match Typed_mich.parse_value Contract_spec.burn_entry m with
-  | Ok (`tuple [ `nat id; `address tk_owner; `nat amount ]) ->
-    Ok (Burn_tokens { tk_owner; tk_op = {
-        tk_token_id = Z.to_string id; tk_amount = Z.to_int64 amount } })
-  | _ -> unexpected_michelson
+  match Typed_mich.parse_value Contract_spec.burn_mt_entry m with
+  | Ok (`tuple [ `nat id; `nat amount ]) ->
+    Ok (Burn_tokens (MTBurn { token_id = Z.to_string id; amount = Z.to_int64 amount }))
+  | _ -> match Typed_mich.parse_value Contract_spec.burn_mt_entry m with
+    | Ok (`nat id) -> Ok (Burn_tokens (NFTBurn (Z.to_string id)))
+    | _ -> unexpected_michelson
 
 let parse_metadata_uri = function
   | Mbytes h -> Ok (Metadata_uri (Tzfunc.Crypto.hex_to_raw h :> string))
@@ -163,16 +170,16 @@ let parse_asset_type (mclass : micheline_value) (mdata : micheline_value) = matc
   | `right (`left `unit), `bytes h ->
     begin match
         Tzfunc.Read.unpack (Forge.prim `address) (Tzfunc.Crypto.hex_to_raw h) with
-    | Ok (Mstring a) -> Ok (ATFA_1_2 a)
+    | Ok (Mstring a) -> Ok (ATFT a)
     | _ -> unexpected_michelson
     end
   | `right (`right (`left `unit)), `bytes h ->
     begin match
         Tzfunc.Read.unpack (Forge.prim `pair ~args:[ Forge.prim `address; Forge.prim `nat ])
           (Tzfunc.Crypto.hex_to_raw h) with
-    | Ok (Mprim { prim = `Pair; args = [ Mstring asset_fa2_contract; Mint token_id ]; _}) ->
-      let asset_fa2_token_id = Z.to_string token_id in
-      Ok (ATFA_2 {asset_fa2_contract; asset_fa2_token_id})
+    | Ok (Mprim { prim = `Pair; args = [ Mstring asset_contract; Mint token_id ]; _}) ->
+      let asset_token_id = Z.to_string token_id in
+      Ok (ATNFT {asset_contract; asset_token_id}) (* todo separate nft and mt *)
     | _ -> unexpected_michelson
     end
   | _ -> unexpected_michelson

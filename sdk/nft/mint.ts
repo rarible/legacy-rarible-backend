@@ -1,29 +1,25 @@
 import { MichelsonData } from "@taquito/michel-codec"
-import { Provider, send, send_batch, TransactionArg, get_address, OperationResult } from "../common/base"
+import { Provider, send, TransactionArg, get_address, OperationResult } from "../common/base"
 
 function mint_param(
   token_id: bigint,
   owner: string,
+  metadata: { [key: string]: string },
   royalties: { [key: string]: bigint },
-  amount = 1n) : MichelsonData {
-  return {
-    prim: 'Pair',
-    args: [
-      { int : token_id.toString() },
-      { prim: 'Pair', args: [
-        { string : owner },
-        { prim: 'Pair', args: [
-          { int : amount.toString() },
-          Object.keys(royalties).map(function(k) { return {prim: 'Pair', args: [ {string : k}, {int: royalties[k].toString() }] }}) ] } ] } ] }
+  amount?: bigint) : MichelsonData {
+  const meta : MichelsonData = Object.keys(metadata).map(function(k) { return {prim: 'Elt', args: [ {string : k}, {bytes: metadata[k] } ] } })
+  const roya = Object.keys(royalties).map(function(k) { return [ {string : k}, {int: royalties[k].toString() }] })
+  if (amount==undefined) return [ { int : token_id.toString() }, { string : owner }, meta, roya ]
+  else return [ { int : token_id.toString() }, { string : owner }, { int: amount.toString() }, meta, roya ]
 }
 
 function metadata_param(
   token_id: bigint,
   metadata : { [key: string] : string }) : MichelsonData {
-  return { prim: 'Pair', args: [
+  return [
     { int: token_id.toString() },
     Object.keys(metadata).sort().map(function(k) { return {prim: 'Elt', args: [ {string : k}, {string: metadata[k] }] }})
-  ] }
+  ]
 }
 
 export async function get_next_token_id(
@@ -61,13 +57,12 @@ export async function mint_nft_arg(
   token_id?: bigint,
   metadata?: { [key: string]: string },
   owner?: string,
-) : Promise<[bigint, TransactionArg[]]> {
+) : Promise<[bigint, TransactionArg]> {
   const owner2 = (owner) ? owner : await get_address(provider)
+  const meta = (metadata==undefined) ? {} : metadata
   const next_id = (token_id!=undefined) ? token_id : await get_next_token_id(provider, contract)
-  const parameter = mint_param(next_id, owner2, royalties)
-  const arg : TransactionArg[] = [ { destination: contract, entrypoint: 'mint', parameter } ]
-  if (metadata) { return [ next_id, arg.concat([metadata_arg(contract, next_id, metadata)]) ] }
-  else return [ next_id, arg ]
+  const parameter = mint_param(next_id, owner2, meta, royalties)
+  return [ next_id, { destination: contract, entrypoint: 'mint', parameter } ]
 }
 
 export async function mint_nft(
@@ -78,8 +73,8 @@ export async function mint_nft(
   metadata?: { [key: string]: string },
   owner?: string,
 ) : Promise<OperationResult> {
-  const [ next_id, args ] = await mint_nft_arg(provider, contract, royalties, token_id, metadata, owner)
-  let op = (args.length == 1) ? await send(provider, args[0]) : await send_batch(provider, args)
+  const [ next_id, arg ] = await mint_nft_arg(provider, contract, royalties, token_id, metadata, owner)
+  let op = await send(provider, arg)
   op.token_id = next_id
   return op
 }
@@ -92,15 +87,12 @@ export async function mint_mt_arg(
   token_id?: bigint,
   metadata?: { [key: string]: string },
   owner?: string,
-) : Promise<[bigint, TransactionArg[]]> {
+) : Promise<[bigint, TransactionArg]> {
   const owner2 = (owner) ? owner : await get_address(provider)
+  const meta = (metadata==undefined) ? {} : metadata
   const next_id = (token_id!=undefined) ? token_id : await get_next_token_id(provider, contract)
-  const parameter = mint_param(next_id, owner2, royalties, supply)
-  const arg : TransactionArg[] = [ { destination: contract, entrypoint: 'mint', parameter } ]
-  const arg_meta = (metadata!=undefined)
-    ? [ metadata_arg(contract, next_id, metadata) ]
-    : []
-  return [ next_id, arg.concat(arg_meta) ]
+  const parameter = mint_param(next_id, owner2, meta, royalties, supply)
+  return [ next_id, { destination: contract, entrypoint: 'mint', parameter } ]
 }
 
 export async function mint_mt(
@@ -112,8 +104,8 @@ export async function mint_mt(
   metadata?: { [key: string]: string },
   owner?: string,
 ) : Promise<OperationResult> {
-  const [ next_id, args ] = await mint_mt_arg(provider, contract, royalties, supply, token_id, metadata, owner)
-  let op = (args.length == 1) ? await send(provider, args[0]) : await send_batch(provider, args)
+  const [ next_id, arg ] = await mint_mt_arg(provider, contract, royalties, supply, token_id, metadata, owner)
+  let op = await send(provider, arg)
   op.token_id = next_id
   return op
 }
@@ -126,7 +118,7 @@ export async function mint_arg(
   token_id?: bigint,
   metadata?: { [key: string]: string },
   owner?: string,
-) : Promise<[bigint, TransactionArg[]]> {
+) : Promise<[bigint, TransactionArg]> {
     if (supply!=undefined) { return mint_mt_arg(provider, contract, royalties, supply, token_id, metadata, owner) }
   else { return mint_nft_arg(provider, contract, royalties, token_id, metadata, owner) }
 }

@@ -1,6 +1,6 @@
 import { Provider, OperationResult } from "../common/base"
 
-export const validator_code =
+export const validator_code : any =
   [  {  "prim": "storage",
         "args": [
           {  "prim": "pair",
@@ -13804,7 +13804,7 @@ export function validator_storage(exchangeV2: string, royaltiesContract: string)
                                           {  "string": ""  },
                                           {  "bytes": ""  }
                                         ]
-                                  }  ]
+                                     }  ]
                                 ]
                              }
                            ]
@@ -13815,7 +13815,7 @@ export function validator_storage(exchangeV2: string, royaltiesContract: string)
               }
             ]
          }
-  }
+}
 
 export async function deploy_validator(
   provider : Provider,

@@ -1,4 +1,4 @@
-import { Provider, XTZAssetType, FA12AssetType } from "../common/base"
+import { Provider, XTZAssetType, FTAssetType } from "../common/base"
 import { ExtendedAssetType, check_asset_type } from "../common/check-asset-type"
 import { Part, OrderForm, salt } from "./utils"
 import { upsert_order } from "./upsert-order"
@@ -6,7 +6,7 @@ import { upsert_order } from "./upsert-order"
 export type BidRequest = {
   maker: string
   maker_edpk: string
-  make_asset_type: XTZAssetType | FA12AssetType
+  make_asset_type: XTZAssetType | FTAssetType
   amount: bigint
   take_asset_type: ExtendedAssetType
   price: bigint

@@ -48,42 +48,33 @@
           <b-tab title="Deploy" class="mt-4">
             <div>
               <b-form-group label="Owner *" class="mb-2">
-                <b-form-input v-model="deploy.fa2_owner"></b-form-input>
+                <b-form-input v-model="deploy.owner"></b-form-input>
               </b-form-group>
-              <b-form-group label="Royalties Contract *" class="mb-2">
-                <b-form-select v-model="deploy.royalties_contract" :options="royalties_contracts_options"></b-form-select>
-                <b-form-input v-if="deploy.royalties_contract=='custom'" v-model="deploy.royalties_contract_custom" class="mt-2"></b-form-input>
+              <b-form-group label="Kind" class="mb-2">
+                <b-form-select v-model="deploy.kind" :options="['NFT', 'MT']"></b-form-select>
               </b-form-group>
               <div class="text-center" class="mb-2">
                 <b-button class="m-2" @click="deploy_fa2()">
                   Deploy FA2
                 </b-button>
               </div>
-              <div :class="'text-center text-'+deploy.fa2_status">{{ deploy.fa2_result }}</div>
-            </div>
-            <div class="mt-4">
-              <b-form-group label="Owner *" class="mb-2">
-                <b-form-input v-model="deploy.royalties_owner"></b-form-input>
-              </b-form-group>
-              <div class="text-center" class="mb-2">
-                <b-button class="m-2" @click="deploy_royalties()">
-                  Deploy Royalties
-                </b-button>
-              </div>
-              <div :class="'text-center text-'+deploy.royalties_status">{{ deploy.royalties_result }}</div>
+              <div :class="'text-center text-'+deploy.status">{{ deploy.result }}</div>
             </div>
           </b-tab>
 
           <b-tab title="Mint" class="mt-4">
+            <b-form-group label="Class *" class="mb-2">
+              <b-form-select v-model="mint.asset_class" :options="['NFT', 'MT']"></b-form-select>
+            </b-form-group>
             <b-form-group label="Contract *" class="mb-2">
-              <b-form-select v-model="mint.contract" :options="fa2_contracts_options"></b-form-select>
+              <b-form-select v-model="mint.contract" :options="nft_contracts_options"></b-form-select>
               <b-form-input v-if="mint.contract=='custom'" v-model="mint.contract_custom" class="mt-2"></b-form-input>
             </b-form-group>
             <b-form-group label="Token ID" class="mb-2">
               <b-form-input v-model="mint.token_id"></b-form-input>
             </b-form-group>
             <b-form-group label="Amount" class="mb-2">
-              <b-form-input v-model="mint.amount" type="number"></b-form-input>
+              <b-form-input v-model="mint.amount" type="number" :disabled="mint.asset_class=='NFT'"></b-form-input>
             </b-form-group>
             <b-form-group label="Royalties" description="{ &quot;tz1...&quot;: 42, ... }" class="mb-2">
               <b-form-input v-model="mint.royalties"></b-form-input>
@@ -100,15 +91,19 @@
           </b-tab>
 
           <b-tab title="Burn" class="mt-4">
-            <b-form-group label="Contract *" class="mb-2">
-              <b-form-select v-model="burn.contract" :options="fa2_contracts_options"></b-form-select>
-              <b-form-input v-if="burn.contract=='custom'" v-model="burn.contract_custom" class="mt-2"></b-form-input>
+            <b-form-group label="Class *" class="mb-2">
+              <b-form-select v-model="burn.asset_type.asset_class" :options="['NFT', 'MT']"></b-form-select>
             </b-form-group>
-            <b-form-group label="Token ID *" class="mb-2">
-              <b-form-input v-model="burn.token_id"></b-form-input>
+            <b-form-group label="Contract *" class="mb-2">
+              <b-form-select v-model="burn.asset_type.contract" :options="nft_contracts_options"></b-form-select>
+              <b-form-input v-if="burn.asset_type.contract=='custom'" v-model="burn.asset_type.contract_custom" class="mt-2"></b-form-input>
+            </b-form-group>
+            <b-form-group label="Token ID" class="mb-2">
+              <b-form-input v-model="burn.asset_type.token_id">
+              </b-form-input>
             </b-form-group>
             <b-form-group label="Amount" class="mb-2">
-              <b-form-input v-model="burn.amount" type="number"></b-form-input>
+              <b-form-input v-model="burn.amount" type="number" :disabled="burn.asset_type.asset_class=='NFT'"></b-form-input>
             </b-form-group>
             <div class="text-center" class="mb-2">
               <b-button class="m-2" @click="fburn()">
@@ -119,18 +114,22 @@
           </b-tab>
 
           <b-tab title="Transfer" class="mt-4">
-            <b-form-group label="Contract *" class="mb-2">
-              <b-form-select v-model="transfer.contract" :options="fa2_contracts_options"></b-form-select>
-              <b-form-input v-if="transfer.contract=='custom'" v-model="transfer.contract_custom" class="mt-2"></b-form-input>
+            <b-form-group label="Class *" class="mb-2">
+              <b-form-select v-model="transfer.asset_type.asset_class" :options="['NFT', 'MT']"></b-form-select>
             </b-form-group>
-            <b-form-group label="Token ID *" class="mb-2">
-              <b-form-input v-model="transfer.token_id"></b-form-input>
+            <b-form-group label="Contract *" class="mb-2">
+              <b-form-select v-model="transfer.asset_type.contract" :options="nft_contracts_options"></b-form-select>
+              <b-form-input v-if="transfer.asset_type.contract=='custom'" v-model="transfer.asset_type.contract_custom" class="mt-2"></b-form-input>
+            </b-form-group>
+            <b-form-group label="Token ID" class="mb-2">
+              <b-form-input v-model="transfer.asset_type.token_id">
+              </b-form-input>
             </b-form-group>
             <b-form-group label="Destination *" class="mb-2">
               <b-form-input v-model="transfer.destination"></b-form-input>
             </b-form-group>
             <b-form-group label="Amount" class="mb-2">
-              <b-form-input v-model="transfer.amount" type="number"></b-form-input>
+              <b-form-input v-model="transfer.amount" type="number" :disabled="transfer.asset_type.asset_class=='NFT'"></b-form-input>
             </b-form-group>
             <div class="text-center" class="mb-2">
               <b-button class="m-2" @click="ftransfer()">
@@ -142,14 +141,14 @@
 
           <b-tab title="Approve" class="mt-4">
             <b-form-group label="Class *" class="mb-2">
-              <b-form-select v-model="approve.asset_type.asset_class" :options="['FA_1_2', 'FA_2']"></b-form-select>
+              <b-form-select v-model="approve.asset_type.asset_class" :options="['FT', 'NFT', 'MT']"></b-form-select>
             </b-form-group>
             <b-form-group label="Contract *" class="mb-2">
-              <b-form-select v-model="approve.asset_type.contract" :options="fa2_contracts_options" :disabled="approve.asset_type.asset_class=='XTZ'"></b-form-select>
+              <b-form-select v-model="approve.asset_type.contract" :options="nft_contracts_options" :disabled="approve.asset_type.asset_class=='XTZ'"></b-form-select>
               <b-form-input v-if="approve.asset_type.contract=='custom'" v-model="approve.asset_type.contract_custom" class="mt-2"></b-form-input>
             </b-form-group>
             <b-form-group label="Token ID" class="mb-2">
-              <b-form-input v-model="approve.asset_type.token_id" :disabled="approve.asset_type.asset_class!='FA_2'">
+              <b-form-input v-model="approve.asset_type.token_id" :disabled="approve.asset_type.asset_class in ['XTZ', 'FT']">
               </b-form-input>
             </b-form-group>
             <b-form-group label="Value" class="mb-2">
@@ -181,12 +180,12 @@
             <b-form-group label="Make Asset *" class="mb-2">
               <b-input-group>
                 <b-input-group-text>Class</b-input-group-text>
-                <b-form-select v-model="upsert.make.asset_type.asset_class" :options="['XTZ', 'FA_1_2', 'FA_2']"></b-form-select>
+                <b-form-select v-model="upsert.make.asset_type.asset_class" :options="['XTZ', 'FT', 'NFT', 'MT']"></b-form-select>
                 <b-input-group-text>Contract</b-input-group-text>
-                <b-form-select v-model="upsert.make.asset_type.contract" :options="fa2_contracts_options" :disabled="upsert.make.asset_type.asset_class=='XTZ'"></b-form-select>
+                <b-form-select v-model="upsert.make.asset_type.contract" :options="nft_contracts_options" :disabled="upsert.make.asset_type.asset_class=='XTZ'"></b-form-select>
                 <b-form-input v-if="upsert.make.asset_type.contract=='custom'" v-model="upsert.make.asset_type.contract_custom" :disabled="upsert.make.asset_type.asset_class=='XTZ'"></b-form-input>
                 <b-input-group-text>Token ID</b-input-group-text>
-                <b-form-input v-model="upsert.make.asset_type.token_id" :disabled="upsert.make.asset_type.asset_class!='FA_2'" type="number"></b-form-input>
+                <b-form-input v-model="upsert.make.asset_type.token_id" :disabled="upsert.make.asset_type.asset_class in ['XTZ', 'FT']" type="number"></b-form-input>
                 <b-input-group-text>Value</b-input-group-text>
                 <b-form-input v-model="upsert.make.value" type="number"></b-form-input>
               </b-input-group>
@@ -194,9 +193,9 @@
             <b-form-group label="Take Asset *" class="mb-2">
               <b-input-group>
                 <b-input-group-text>Class</b-input-group-text>
-                <b-form-select v-model="upsert.take.asset_type.asset_class" :options="['XTZ', 'FA_1_2', 'FA_2']"></b-form-select>
+                <b-form-select v-model="upsert.take.asset_type.asset_class" :options="['XTZ', 'FT', 'NFT', 'MT']"></b-form-select>
                 <b-input-group-text>Contract</b-input-group-text>
-                <b-form-select v-model="upsert.take.asset_type.contract" :options="fa2_contracts_options" :disabled="upsert.take.asset_type.asset_class=='XTZ'"></b-form-select>
+                <b-form-select v-model="upsert.take.asset_type.contract" :options="nft_contracts_options" :disabled="upsert.take.asset_type.asset_class=='XTZ'"></b-form-select>
                 <b-form-input v-if="upsert.take.asset_type.contract=='custom'" v-model="upsert.take.asset_type.contract_custom" :disabled="upsert.take.asset_type.asset_class=='XTZ'"></b-form-input>
                 <b-input-group-text>Token ID</b-input-group-text>
                 <b-form-input v-model="upsert.take.asset_type.token_id" :disabled="upsert.take.asset_type.asset_class!='FA_2'" type="number"></b-form-input>
@@ -227,18 +226,18 @@
             <b-form-group label="Make Asset Type *" class="mb-2">
               <b-input-group>
                 <b-input-group-text>Class</b-input-group-text>
-                <b-form-select v-model="sell.make_asset_type.asset_class" :options="['XTZ', 'FA_1_2', 'FA_2', 'Unknown']"></b-form-select>
+                <b-form-select v-model="sell.make_asset_type.asset_class" :options="['XTZ', 'FT', 'NFT', 'MT', 'Unknown']"></b-form-select>
                 <b-input-group-text>Contract</b-input-group-text>
-                <b-form-select v-model="sell.make_asset_type.contract" :options="fa2_contracts_options" :disabled="sell.make_asset_type.asset_class=='XTZ'"></b-form-select>
+                <b-form-select v-model="sell.make_asset_type.contract" :options="nft_contracts_options" :disabled="sell.make_asset_type.asset_class=='XTZ'"></b-form-select>
                 <b-form-input v-if="sell.make_asset_type.contract=='custom'" v-model="sell.make_asset_type.contract_custom" :disabled="sell.make_asset_type.asset_class=='XTZ'"></b-form-input>
                 <b-input-group-text>Token ID</b-input-group-text>
-                <b-form-input v-model="sell.make_asset_type.token_id" :disabled="sell.make_asset_type.asset_class in ['XTZ', 'FA_1_2']" type="number"></b-form-input>
+                <b-form-input v-model="sell.make_asset_type.token_id" :disabled="sell.make_asset_type.asset_class in ['XTZ', 'FT']" type="number"></b-form-input>
               </b-input-group>
             </b-form-group>
             <b-form-group label="Take Asset Type *" class="mb-2">
               <b-input-group>
                 <b-input-group-text>Class</b-input-group-text>
-                <b-form-select v-model="sell.take_asset_type.asset_class" :options="['XTZ', 'FA_1_2']"></b-form-select>
+                <b-form-select v-model="sell.take_asset_type.asset_class" :options="['XTZ', 'FT']"></b-form-select>
                 <b-input-group-text>Contract</b-input-group-text>
                 <b-form-select v-model="sell.take_asset_type.contract" :options="fa2_contracts_options" :disabled="sell.take_asset_type.asset_class=='XTZ'"></b-form-select>
                 <b-form-input v-if="sell.take_asset_type.contract=='custom'" v-model="sell.take_asset_type.contract_custom" :disabled="sell.take_asset_type.asset_class=='XTZ'"></b-form-input>
@@ -273,21 +272,21 @@
             <b-form-group label="Make Asset Type *" class="mb-2">
               <b-input-group>
                 <b-input-group-text>Class</b-input-group-text>
-                <b-form-select v-model="bid.make_asset_type.asset_class" :options="['XTZ', 'FA_1_2']"></b-form-select>
+                <b-form-select v-model="bid.make_asset_type.asset_class" :options="['XTZ', 'FT']"></b-form-select>
                 <b-input-group-text>Contract</b-input-group-text>
-                <b-form-select v-model="bid.make_asset_type.contract" :options="fa2_contracts_options" :disabled="bid.make_asset_type.asset_class=='XTZ'"></b-form-select>
+                <b-form-select v-model="bid.make_asset_type.contract" :options="nft_contracts_options" :disabled="bid.make_asset_type.asset_class=='XTZ'"></b-form-select>
                 <b-form-input v-if="bid.make_asset_type.contract=='custom'" v-model="bid.make_asset_type.contract_custom" :disabled="bid.make_asset_type.asset_class=='XTZ'"></b-form-input>
               </b-input-group>
             </b-form-group>
             <b-form-group label="Take Asset Type *" class="mb-2">
               <b-input-group>
                 <b-input-group-text>Class</b-input-group-text>
-                <b-form-select v-model="bid.take_asset_type.asset_class" :options="['XTZ', 'FA_1_2', 'FA_2', 'Unknown']"></b-form-select>
+                <b-form-select v-model="bid.take_asset_type.asset_class" :options="['XTZ', 'FT', 'NFT', 'MT', 'Unknown']"></b-form-select>
                 <b-input-group-text>Contract</b-input-group-text>
-                <b-form-select v-model="bid.take_asset_type.contract" :options="fa2_contracts_options" :disabled="bid.take_asset_type.asset_class=='XTZ'"></b-form-select>
+                <b-form-select v-model="bid.take_asset_type.contract" :options="nft_contracts_options" :disabled="bid.take_asset_type.asset_class=='XTZ'"></b-form-select>
                 <b-form-input v-if="bid.take_asset_type.contract=='custom'" v-model="bid.take_asset_type.contract_custom" :disabled="bid.take_asset_type.asset_class=='XTZ'"></b-form-input>
                 <b-input-group-text>Token ID</b-input-group-text>
-                <b-form-input v-model="bid.take_asset_type.token_id" :disabled="bid.take_asset_type.asset_class in ['XTZ', 'FA_1_2']" type="number"></b-form-input>
+                <b-form-input v-model="bid.take_asset_type.token_id" :disabled="bid.take_asset_type.asset_class in ['XTZ', 'FT']" type="number"></b-form-input>
               </b-input-group>
             </b-form-group>
             <b-form-group label="Amount *" class="mb-2">

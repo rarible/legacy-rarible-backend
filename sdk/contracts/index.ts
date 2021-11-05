@@ -1,3 +1,4 @@
 export * from "./royalties"
-export * from "./exchange"
+export * from "./exchangeV2"
 export * from "./validator"
+export * from "./matcher"

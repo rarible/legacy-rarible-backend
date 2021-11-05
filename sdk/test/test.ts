@@ -9,7 +9,9 @@ async function main() {
 
   const config = {
     exchange: "KT1C5kWbfzASApxCMHXFLbHuPtnRaJXE4WMu",
-    fees: 0n
+    fees: 0n,
+    nft_public: "",
+    mt_public: "",
   }
 
   const provider = {
