@@ -27,8 +27,9 @@ asset operator identified by oaddr otoken oowner to big_map {
 }
 
 asset token_metadata to big_map {
-  key_token_id   : nat;
-  extras         : map<string, bytes>;
+  ftoken_metadata : nat;
+  token_id        : nat;
+  token_info      : map<string, bytes>;
 }
 
 record operator_param {
@@ -166,7 +167,7 @@ entry setTokenMetadata(iTokenId : nat, iExtras : map<string, bytes>) {
   called by selfaddress
   effect {
     dorequire(not pause, "CONTRACT_PAUSED");
-    token_metadata.addupdate(iTokenId, {extras = iExtras});
+    token_metadata.addupdate(iTokenId, {token_id = iTokenId; token_info = iExtras});
   }
 }
 
@@ -314,7 +315,7 @@ entry setRoyalties(tokenId : nat, value : list<part>) {
   called by selfaddress
   effect {
     dorequire(not pause, "CONTRACT_PAUSED");
-    royalties.addupdate(tokenId, {rvalue = value})
+    royalties.add({ rtokenId = tokenId; rvalue = value });
   }
 }
 

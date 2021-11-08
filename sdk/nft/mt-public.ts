@@ -83,10 +83,23 @@ export const mt_public_code : any =
                                    {  "prim": "big_map",
                                       "args": [
                                         {  "prim": "nat"  },
-                                        {  "prim": "map",
+                                        {  "prim": "pair",
                                            "args": [
-                                             {  "prim": "string"  },
-                                             {  "prim": "bytes"  }
+                                             {  "prim": "nat",
+                                                "annots": [
+                                                  "%token_id"
+                                                ]
+                                             },
+                                             {  "prim": "map",
+                                                "args": [
+                                                  {  "prim": "string"  },
+                                                  {  "prim": "bytes"  }
+                                                ]
+                                                ,
+                                                "annots": [
+                                                  "%token_info"
+                                                ]
+                                             }
                                            ]
                                         }
                                       ]
@@ -1522,22 +1535,22 @@ export const mt_public_code : any =
                                                               {  "prim": "bytes"  },
                                                               {  "prim": "pair",
                                                                  "args": [
-                                                                   {
+                                                                   {  
                                                                    "prim": "timestamp",
                                                                    "annots": [
-
+                                                                     
                                                                    "%createdAt"
                                                                    ]
                                                                    },
-                                                                   {
+                                                                   {  
                                                                    "prim": "option",
                                                                    "args": [
-
+                                                                     
                                                                    {  "prim": "int"  }
                                                                    ]
                                                                    ,
                                                                    "annots": [
-
+                                                                     
                                                                    "%expiry"
                                                                    ]
                                                                    }
@@ -3318,6 +3331,18 @@ export const mt_public_code : any =
                                          {  "int": "2"  }
                                        ]
                                     },
+                                    {  "prim": "DIG",
+                                       "args": [
+                                         {  "int": "3"  }
+                                       ]
+                                    },
+                                    {  "prim": "DUP"  },
+                                    {  "prim": "DUG",
+                                       "args": [
+                                         {  "int": "4"  }
+                                       ]
+                                    },
+                                    {  "prim": "PAIR"  },
                                     {  "prim": "SOME"  },
                                     {  "prim": "DIG",
                                        "args": [
@@ -6387,7 +6412,7 @@ export const mt_public_code : any =
                                                              {  "prim": "pair",
                                                                 "args": [
                                                                   {  "prim": "timestamp"  },
-                                                                  {
+                                                                  {  
                                                                   "prim": "option",
                                                                   "args": [
                                                                     {  "prim": "int"  }
@@ -6414,7 +6439,7 @@ export const mt_public_code : any =
                                                              {  "int": "1"  },
                                                              [  {  "prim": "DIG",
                                                                    "args": [
-
+                                                                     
                                                                    {  "int": "9"  }
                                                                    ]
                                                              },
@@ -6468,7 +6493,7 @@ export const mt_public_code : any =
                                                            "args": [
                                                              [  {  "prim": "PUSH",
                                                                    "args": [
-
+                                                                     
                                                                    {  "prim": "string"  },
                                                                    {  "string": "NotFound"  }
                                                                    ]
@@ -6510,7 +6535,7 @@ export const mt_public_code : any =
                                                            "args": [
                                                              [  {  "prim": "PUSH",
                                                                    "args": [
-
+                                                                     
                                                                    {  "prim": "string"  },
                                                                    {  "string": "NotFound"  }
                                                                    ]
@@ -6561,7 +6586,7 @@ export const mt_public_code : any =
                                                              {  "int": "1"  },
                                                              [  {  "prim": "DIG",
                                                                    "args": [
-
+                                                                     
                                                                    {  "int": "8"  }
                                                                    ]
                                                              },
@@ -6604,7 +6629,7 @@ export const mt_public_code : any =
                                                            "args": [
                                                              [  {  "prim": "DIG",
                                                                    "args": [
-
+                                                                     
                                                                    {  "int": "8"  }
                                                                    ]
                                                              },
@@ -6628,7 +6653,7 @@ export const mt_public_code : any =
                                                              {  "prim": "GET"  },
                                                              {  "prim": "IF_NONE",
                                                                 "args": [
-                                                                  [  {
+                                                                  [  {  
                                                                   "prim": "PUSH",
                                                                   "args": [
                                                                     {  "prim": "string"  },
@@ -6658,53 +6683,53 @@ export const mt_public_code : any =
                                                              {  "prim": "MEM"  },
                                                              {  "prim": "IF",
                                                                 "args": [
-                                                                  [  {
+                                                                  [  {  
                                                                   "prim": "DIG",
                                                                   "args": [
                                                                     {  "int": "9"  }
                                                                   ]
                                                                   },
                                                                   {  "prim": "DUP"  },
-                                                                  {
+                                                                  {  
                                                                   "prim": "DUG",
                                                                   "args": [
                                                                     {  "int": "10"  }
                                                                   ]
                                                                   },
-                                                                  {
+                                                                  {  
                                                                   "prim": "DIG",
                                                                   "args": [
                                                                     {  "int": "10"  }
                                                                   ]
                                                                   },
                                                                   {  "prim": "DUP"  },
-                                                                  {
+                                                                  {  
                                                                   "prim": "DUG",
                                                                   "args": [
                                                                     {  "int": "11"  }
                                                                   ]
                                                                   },
-                                                                  {
+                                                                  {  
                                                                   "prim": "DIG",
                                                                   "args": [
                                                                     {  "int": "2"  }
                                                                   ]
                                                                   },
                                                                   {  "prim": "DUP"  },
-                                                                  {
+                                                                  {  
                                                                   "prim": "DUG",
                                                                   "args": [
                                                                     {  "int": "3"  }
                                                                   ]
                                                                   },
                                                                   {  "prim": "GET"  },
-                                                                  {
+                                                                  {  
                                                                   "prim": "IF_NONE",
                                                                   "args": [
-                                                                    [  {
+                                                                    [  {  
                                                                     "prim": "PUSH",
                                                                     "args": [
-
+                                                                      
                                                                     {  "prim": "string"  },
                                                                     {  "string": "NotFound"  }
                                                                     ]
@@ -6715,20 +6740,20 @@ export const mt_public_code : any =
                                                                   },
                                                                   {  "prim": "UNPAIR"  },
                                                                   {  "prim": "SWAP"  },
-                                                                  {
+                                                                  {  
                                                                   "prim": "DROP",
                                                                   "args": [
                                                                     {  "int": "1"  }
                                                                   ]
                                                                   },
-                                                                  {
+                                                                  {  
                                                                   "prim": "DIG",
                                                                   "args": [
                                                                     {  "int": "4"  }
                                                                   ]
                                                                   },
                                                                   {  "prim": "DUP"  },
-                                                                  {
+                                                                  {  
                                                                   "prim": "DUG",
                                                                   "args": [
                                                                     {  "int": "5"  }
@@ -6738,48 +6763,48 @@ export const mt_public_code : any =
                                                                   {  "prim": "SWAP"  },
                                                                   {  "prim": "PAIR"  },
                                                                   {  "prim": "SOME"  },
-                                                                  {
+                                                                  {  
                                                                   "prim": "DIG",
                                                                   "args": [
                                                                     {  "int": "2"  }
                                                                   ]
                                                                   },
                                                                   {  "prim": "DUP"  },
-                                                                  {
+                                                                  {  
                                                                   "prim": "DUG",
                                                                   "args": [
                                                                     {  "int": "3"  }
                                                                   ]
                                                                   },
                                                                   {  "prim": "UPDATE"  },
-                                                                  {
+                                                                  {  
                                                                   "prim": "DIP",
                                                                   "args": [
                                                                     {  "int": "1"  },
-                                                                    [  {
+                                                                    [  {  
                                                                     "prim": "DIG",
                                                                     "args": [
-
+                                                                      
                                                                     {  "int": "9"  }
                                                                     ]
                                                                     },
-                                                                    {
+                                                                    {  
                                                                     "prim": "DROP",
                                                                     "args": [
-
+                                                                      
                                                                     {  "int": "1"  }
                                                                     ]
                                                                     }  ]
                                                                   ]
                                                                   },
-                                                                  {
+                                                                  {  
                                                                   "prim": "DUG",
                                                                   "args": [
                                                                     {  "int": "9"  }
                                                                   ]
                                                                   }  ],
                                                                   [  {  "prim": "DUP"  },
-                                                                  {
+                                                                  {  
                                                                   "prim": "PUSH",
                                                                   "args": [
                                                                     {  "prim": "string"  },
@@ -6792,7 +6817,7 @@ export const mt_public_code : any =
                                                              }  ],
                                                              [  {  "prim": "DIG",
                                                                    "args": [
-
+                                                                     
                                                                    {  "int": "9"  }
                                                                    ]
                                                              },
@@ -6816,7 +6841,7 @@ export const mt_public_code : any =
                                                              {  "prim": "MEM"  },
                                                              {  "prim": "IF",
                                                                 "args": [
-                                                                  [  {
+                                                                  [  {  
                                                                   "prim": "PUSH",
                                                                   "args": [
                                                                     {  "prim": "string"  },
@@ -6824,27 +6849,27 @@ export const mt_public_code : any =
                                                                   ]
                                                                   },
                                                                   {  "prim": "FAILWITH"  }  ],
-                                                                  [  {
+                                                                  [  {  
                                                                   "prim": "DIG",
                                                                   "args": [
                                                                     {  "int": "9"  }
                                                                   ]
                                                                   },
                                                                   {  "prim": "DUP"  },
-                                                                  {
+                                                                  {  
                                                                   "prim": "DUG",
                                                                   "args": [
                                                                     {  "int": "10"  }
                                                                   ]
                                                                   },
-                                                                  {
+                                                                  {  
                                                                   "prim": "DIG",
                                                                   "args": [
                                                                     {  "int": "3"  }
                                                                   ]
                                                                   },
                                                                   {  "prim": "DUP"  },
-                                                                  {
+                                                                  {  
                                                                   "prim": "DUG",
                                                                   "args": [
                                                                     {  "int": "4"  }
@@ -6854,41 +6879,41 @@ export const mt_public_code : any =
                                                                   {  "prim": "NOW"  },
                                                                   {  "prim": "PAIR"  },
                                                                   {  "prim": "SOME"  },
-                                                                  {
+                                                                  {  
                                                                   "prim": "DIG",
                                                                   "args": [
                                                                     {  "int": "2"  }
                                                                   ]
                                                                   },
                                                                   {  "prim": "DUP"  },
-                                                                  {
+                                                                  {  
                                                                   "prim": "DUG",
                                                                   "args": [
                                                                     {  "int": "3"  }
                                                                   ]
                                                                   },
                                                                   {  "prim": "UPDATE"  },
-                                                                  {
+                                                                  {  
                                                                   "prim": "DIP",
                                                                   "args": [
                                                                     {  "int": "1"  },
-                                                                    [  {
+                                                                    [  {  
                                                                     "prim": "DIG",
                                                                     "args": [
-
+                                                                      
                                                                     {  "int": "9"  }
                                                                     ]
                                                                     },
-                                                                    {
+                                                                    {  
                                                                     "prim": "DROP",
                                                                     "args": [
-
+                                                                      
                                                                     {  "int": "1"  }
                                                                     ]
                                                                     }  ]
                                                                   ]
                                                                   },
-                                                                  {
+                                                                  {  
                                                                   "prim": "DUG",
                                                                   "args": [
                                                                     {  "int": "9"  }
@@ -6932,7 +6957,7 @@ export const mt_public_code : any =
                                                              {  "prim": "GET"  },
                                                              {  "prim": "IF_NONE",
                                                                 "args": [
-                                                                  [  {
+                                                                  [  {  
                                                                   "prim": "PUSH",
                                                                   "args": [
                                                                     {  "prim": "string"  },
@@ -6974,7 +6999,7 @@ export const mt_public_code : any =
                                                              {  "prim": "GET"  },
                                                              {  "prim": "IF_NONE",
                                                                 "args": [
-                                                                  [  {
+                                                                  [  {  
                                                                   "prim": "PUSH",
                                                                   "args": [
                                                                     {  "prim": "string"  },
@@ -7025,13 +7050,13 @@ export const mt_public_code : any =
                                                              {  "prim": "DIP",
                                                                 "args": [
                                                                   {  "int": "1"  },
-                                                                  [  {
+                                                                  [  {  
                                                                   "prim": "DIG",
                                                                   "args": [
                                                                     {  "int": "8"  }
                                                                   ]
                                                                   },
-                                                                  {
+                                                                  {  
                                                                   "prim": "DROP",
                                                                   "args": [
                                                                     {  "int": "1"  }
@@ -7680,7 +7705,7 @@ export const mt_public_code : any =
                                                              {  "int": "1"  },
                                                              [  {  "prim": "DIG",
                                                                    "args": [
-
+                                                                     
                                                                    {  "int": "15"  }
                                                                    ]
                                                              },
@@ -7735,7 +7760,7 @@ export const mt_public_code : any =
                                                            "args": [
                                                              [  {  "prim": "PUSH",
                                                                    "args": [
-
+                                                                     
                                                                    {  "prim": "string"  },
                                                                    {  "string": "NotFound"  }
                                                                    ]
@@ -7796,7 +7821,7 @@ export const mt_public_code : any =
                                                            "args": [
                                                              [  {  "prim": "DIG",
                                                                    "args": [
-
+                                                                     
                                                                    {  "int": "4"  }
                                                                    ]
                                                              },
@@ -7827,7 +7852,7 @@ export const mt_public_code : any =
                                                              {  "prim": "ABS"  }  ],
                                                              [  {  "prim": "PUSH",
                                                                    "args": [
-
+                                                                     
                                                                    {  "prim": "string"  },
                                                                    {  "string": "NatAssign"  }
                                                                    ]
@@ -7865,7 +7890,7 @@ export const mt_public_code : any =
                                                              {  "int": "1"  },
                                                              [  {  "prim": "DIG",
                                                                    "args": [
-
+                                                                     
                                                                    {  "int": "16"  }
                                                                    ]
                                                              },
@@ -8196,7 +8221,7 @@ export const mt_public_code : any =
                                                              {  "int": "1"  },
                                                              [  {  "prim": "DIG",
                                                                    "args": [
-
+                                                                     
                                                                    {  "int": "15"  }
                                                                    ]
                                                              },
@@ -8385,50 +8410,6 @@ export const mt_public_code : any =
                                                "args": [
                                                  {  "prim": "string"  },
                                                  {  "string": "CONTRACT_PAUSED"  }
-                                               ]
-                                         },
-                                         {  "prim": "FAILWITH"  }  ],
-                                         [    ]
-                                       ]
-                                    },
-                                    {  "prim": "SELF"  },
-                                    {  "prim": "ADDRESS"  },
-                                    {  "prim": "SENDER"  },
-                                    {  "prim": "COMPARE"  },
-                                    {  "prim": "EQ"  },
-                                    {  "prim": "DIG",
-                                       "args": [
-                                         {  "int": "11"  }
-                                       ]
-                                    },
-                                    {  "prim": "DUP"  },
-                                    {  "prim": "DUG",
-                                       "args": [
-                                         {  "int": "12"  }
-                                       ]
-                                    },
-                                    {  "prim": "SENDER"  },
-                                    {  "prim": "DIG",
-                                       "args": [
-                                         {  "int": "4"  }
-                                       ]
-                                    },
-                                    {  "prim": "DUP"  },
-                                    {  "prim": "DUG",
-                                       "args": [
-                                         {  "int": "5"  }
-                                       ]
-                                    },
-                                    {  "prim": "PAIR"  },
-                                    {  "prim": "MEM"  },
-                                    {  "prim": "OR"  },
-                                    {  "prim": "NOT"  },
-                                    {  "prim": "IF",
-                                       "args": [
-                                         [  {  "prim": "PUSH",
-                                               "args": [
-                                                 {  "prim": "string"  },
-                                                 {  "string": "CALLER NOT OWNER"  }
                                                ]
                                          },
                                          {  "prim": "FAILWITH"  }  ],
@@ -8943,7 +8924,7 @@ export const mt_public_code : any =
           ]
        }  ]
      ]
-  }  ]
+  }  ];
 
 export function mt_public_storage(owner: string) : any {
   return {  "prim": "Pair",
@@ -8981,7 +8962,7 @@ export function mt_public_storage(owner: string) : any {
                                                                    {  "string": ""  },
                                                                    {  "bytes": ""  }
                                                                  ]
-                                                              }  ]
+                                                           }  ]
                                                          ]
                                                       }
                                                     ]
@@ -9001,8 +8982,8 @@ export function mt_public_storage(owner: string) : any {
                  ]
               }
             ]
-         }
-}
+         };
+  }
 
 export async function deploy_mt_public(
   provider : Provider,
