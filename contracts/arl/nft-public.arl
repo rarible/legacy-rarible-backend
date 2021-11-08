@@ -26,8 +26,9 @@ asset operator identified by oaddr otoken oowner to big_map {
 }
 
 asset token_metadata to big_map {
-  key_token_id   : nat;
-  extras         : map<string, bytes>;
+  ftoken_metadata : nat;
+  token_id        : nat;
+  token_info      : map<string, bytes>;
 }
 
 record operator_param {
@@ -100,14 +101,13 @@ entry update_operators_for_all (upl : list<or<address, address>>) {
   done;
 }
 
-function checkOperator(txs : list<address * list<transfer_destination>>) : bool {
+function checkOwnerAndOperator(txs : list<address * list<transfer_destination>>) : bool {
   var res = true;
-
   for tx in txs do
     var %from = tx[0];
     var tds = tx[1];
     for td in tds do begin
-      res &= if caller <> %from then (operator.contains((caller,td.token_id_dest,%from))) else true
+      res &= operator.contains((caller,td.token_id_dest,%from)) or ledger[td.token_id_dest].lowner = caller
     end
     done
   done;
@@ -159,7 +159,7 @@ entry setTokenMetadata(iTokenId : nat, iExtras : map<string, bytes>) {
   called by selfaddress
   effect {
     dorequire(not pause, "CONTRACT_PAUSED");
-    token_metadata.addupdate(iTokenId, {extras = iExtras});
+    token_metadata.addupdate(iTokenId, {token_id = iTokenId; token_info = iExtras});
   }
 }
 
@@ -254,7 +254,7 @@ entry setExpiry (powner: address, newExpiry: duration, specificPermitOrDefault: 
 
 entry %transfer (txs : list<address * list<transfer_destination>>) {
   dorequire(not pause, "CONTRACT_PAUSED");
-  if not checkOperator(txs) then begin
+  if not checkOwnerAndOperator(txs) then begin
     match getFromAddress(txs) with
     | some(%from) -> begin
       transfer 0tz to entry self.consumePermit(%from, blake2b(pack(txs)), FA2_NOT_OPERATOR)
@@ -262,14 +262,14 @@ entry %transfer (txs : list<address * list<transfer_destination>>) {
     | none -> ()
     end
   end;
+
   for tx in txs do
     var %from = tx[0];
     var tds = tx[1];
     for td in tds do begin
+      dorequire(td.token_amount_dest = 1, "FA2_INSUFFICIENT_BALANCE");
       var tokenid = td.token_id_dest;
-      dorequire(ledger[tokenid].lowner = caller, "CALLER NOT OWNER");
-      ledger.remove(td.token_id_dest);
-      ledger.add({ ltoken = td.token_id_dest; lowner = td.to_dest });
+      ledger.update(tokenid, { lowner = td.to_dest });
     end done;
   done
 }
