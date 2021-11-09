@@ -28,10 +28,12 @@ let order_bid_section =
   EzAPI.Doc.{section_name = "order-bid-controller"; section_docs = []}
 let signature_section =
   EzAPI.Doc.{section_name = "order-signature-controller"; section_docs = []}
+let balance_section =
+  EzAPI.Doc.{section_name = "ft-balance-controller"; section_docs = []}
 let sections = [
   nft_section; ownerships_section; items_section; collections_section;
   orders_section; order_activities_section; aggregation_section; order_bid_section;
-  signature_section]
+  signature_section; balance_section]
 
 let pstring ?enc ?required name =
   let schema = Option.map (Json_encoding.schema ~definitions_path:"/components/schemas/") enc in
@@ -456,15 +458,6 @@ let get_sort_param req =
  *    output=currency_rate_enc;
  *    errors=[rarible_error_500]}] *)
 
-(* (\* erc20-balance-controller *\)
- * let get_erc20_balance ((_, erc20_contract), erc20_owner) () =
- *   return_ok { erc20_contract;
- *               erc20_owner;
- *               erc20_balance = Z.zero;
- *               erc20_decimal_balance = Z.zero }
- * [@@get
- *   {path="/v0.1/balances/{contract:string}/{owner:string}";
- *    output=erc20_decimal_balance_enc}] *)
 
 (* (\* erc20-token-controller *\)
  * let get_erc20_token_by_id (_, contract) () =
@@ -1283,6 +1276,27 @@ let validate _req input =
    output=Json_encoding.bool;
    errors=[invalid_argument_case; unexpected_api_error_case];
    section=signature_section}]
+
+(* ft-balance-controller *)
+let get_ft_balance ((_, contract), ft_owner) () =
+  let> r = Db.get_ft_balance ~contract ft_owner in
+  match r with
+  | Error e ->
+    let str = Crawlori.Rp.string_of_error e in
+    return (Error (`UNEXPECTED_API_ERROR str))
+  | Ok `contract_not_found -> return (Error (`TOKEN_NOT_FOUND contract))
+  | Ok `balance_not_found -> return (Error (`BALANCE_NOT_FOUND (contract ^ " - " ^ ft_owner)))
+  | Ok (`ok ft_balance) ->
+    return_ok {
+      ft_contract = contract;
+      ft_owner;
+      ft_balance }
+[@@get
+  {path="/v0.1/balances/{contract:string}/{owner:string}";
+   name="ft_balance";
+   output=ft_balance_enc;
+   errors=[unexpected_api_error_case; token_not_found_case; balance_not_found_case];
+   section=balance_section}]
 
 (* module V_0_1 = struct
  *

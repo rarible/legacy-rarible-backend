@@ -1078,6 +1078,46 @@ paths:
               schema:
                 type: boolean
       security: []
+  /v0.1/balances/{contrac}/{owne}:
+    summary: ft_balance
+    get:
+      tags:
+      - ft-balance-controller
+      summary: ft_balance
+      operationId: ft_balance
+      parameters:
+      - name: contrac
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: owne
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UNEXPECTED_API_ERROR'
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                oneOf:
+                - $ref: '#/components/schemas/BALANCE_NOT_FOUND'
+                - $ref: '#/components/schemas/TOKEN_NOT_FOUND'
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FTBalance'
+      security: []
 components:
   schemas:
     Address:
@@ -1106,6 +1146,19 @@ components:
           type: string
           enum:
           - BAD_REQUEST
+        message:
+          type: string
+      required:
+      - message
+      - code
+      additionalProperties: false
+    BALANCE_NOT_FOUND:
+      type: object
+      properties:
+        code:
+          type: string
+          enum:
+          - BALANCE_NOT_FOUND
         message:
           type: string
       required:
@@ -1167,6 +1220,20 @@ components:
       required:
       - contract
       - assetClass
+      additionalProperties: false
+    FTBalance:
+      type: object
+      properties:
+        contract:
+          type: string
+        owner:
+          $ref: '#/components/schemas/Address'
+        balance:
+          $ref: '#/components/schemas/BigDecimal'
+      required:
+      - balance
+      - owner
+      - contract
       additionalProperties: false
     INVALID_ARGUMENT:
       type: object
@@ -2117,6 +2184,19 @@ components:
       - signature
       - message
       - signer
+      additionalProperties: false
+    TOKEN_NOT_FOUND:
+      type: object
+      properties:
+        code:
+          type: string
+          enum:
+          - TOKEN_NOT_FOUND
+        message:
+          type: string
+      required:
+      - message
+      - code
       additionalProperties: false
     Transfer:
       type: object
