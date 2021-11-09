@@ -47,6 +47,11 @@ export async function temple_provider(endpoint: string, network: TempleDAppNetwo
     const c = await tk.wallet.at(contract)
     return c.storage()
   }
+  const balance = async() => {
+    const a = await address()
+    const b = await tk.tz.getBalance(a)
+    return BigInt(b.toString())
+  }
   return {
     kind: "temple",
     transfer,
@@ -55,6 +60,7 @@ export async function temple_provider(endpoint: string, network: TempleDAppNetwo
     sign,
     address,
     public_key,
-    storage
+    storage,
+    balance
   }
 }

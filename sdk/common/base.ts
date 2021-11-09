@@ -63,6 +63,7 @@ export interface TezosProvider {
   address: () => Promise<string>;
   public_key: () => Promise<string | undefined>;
   storage: (contract: string) => Promise<any>;
+  balance: () => Promise<bigint>
 }
 
 export interface Provider {

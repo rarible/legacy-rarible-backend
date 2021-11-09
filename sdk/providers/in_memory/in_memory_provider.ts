@@ -40,7 +40,11 @@ export function in_memory_provider(edsk: string, endpoint: string) : TezosProvid
     const c = await tk.contract.at(contract)
     return c.storage()
   }
-
+  const balance = async() => {
+    const a = await address()
+    const b = await tk.tz.getBalance(a)
+    return BigInt(b.toString())
+  }
   return {
     kind: "in_memory",
     transfer,
@@ -49,6 +53,7 @@ export function in_memory_provider(edsk: string, endpoint: string) : TezosProvid
     sign,
     address,
     public_key,
-    storage
+    storage,
+    balance
   }
 }

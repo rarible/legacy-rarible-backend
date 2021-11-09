@@ -3781,3 +3781,20 @@ let get_ft_contract ?dbh contract =
   use dbh @@ fun dbh ->
   let>? l = [%pgsql.object dbh "select * from ft_contracts where address = $contract"] in
   one @@ List.map db_ft_contract l
+
+let get_ft_balance ?dbh ~contract account =
+  use dbh @@ fun dbh ->
+  let>? l = [%pgsql dbh
+      "select decimals from ft_contracts where address = $contract"] in
+  match l with
+  | [] | _ :: _ :: _ -> Lwt.return_ok `contract_not_found
+  | [ decimals ] ->
+    let decimals = Int32.to_int decimals in
+    let|>? l = [%pgsql dbh
+        "select balance from token_balance_updates where contract = $contract \
+         and account = $account and main order by level desc limit 1"] in
+    match l with
+    | [] | _ :: _ :: _ | [ None ] -> `balance_not_found
+    | [ Some b ] ->
+      let b = Int64.to_string b in
+      `ok (pp_balance ~decimals b)

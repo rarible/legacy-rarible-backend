@@ -57,6 +57,12 @@ export async function beacon_provider(network: Network, name = "rarible") : Prom
     const c = await tk.wallet.at(contract)
     return c.storage()
   }
+  const balance = async() => {
+    const a = await address()
+    const b = await tk.tz.getBalance(a)
+    return BigInt(b.toString())
+  }
+
   return {
     kind: "beacon",
     transfer,
@@ -65,6 +71,7 @@ export async function beacon_provider(network: Network, name = "rarible") : Prom
     sign,
     address,
     public_key,
-    storage
+    storage,
+    balance
   }
 }

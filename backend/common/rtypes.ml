@@ -329,22 +329,34 @@ type asset = {
   asset_value : A.big_decimal [@key "value"] ;
 } [@@deriving encoding {title="Asset"; def_title} ]
 
+let pp_balance ~decimals b =
+  let factor = Z.(pow (of_int 10) decimals) in
+  let b = Z.of_string b in
+  let dec = Z.(to_string @@ rem b factor) in
+  let dec_str =
+    if dec = "0" then ""
+    else Format.sprintf ".%s%s"
+        (String.make (decimals - String.length dec) '0') dec in
+  let num = Z.(to_string @@ div b factor) in
+  Format.sprintf "%s%s" num dec_str
+
+let absolute_balance ~decimals b =
+  let factor = Z.(pow (of_int 10) decimals) in
+  let {Q.num; den} = Q.of_string b in
+  Z.(to_string @@ mul (div factor den) num)
+
 let asset_enc =
   (* todo different factor for fa12 *)
-  let factor = Z.of_int 1000000 in
   let open Json_encoding in
   conv
     (fun a -> match a.asset_type with
        | ATXTZ ->
-         let dec = Z.(rem (of_string a.asset_value) factor) in
-         let dec_str = if dec = Z.zero then "" else Format.sprintf ".%06d" (Z.to_int dec) in
-         let num = Z.(to_string @@ div (of_string a.asset_value) factor) in
-         { a with asset_value = Format.sprintf "%s%s" num dec_str }
+         let asset_value = pp_balance ~decimals:6 a.asset_value in
+         { a with asset_value }
        | _ -> a)
     (fun a -> match a.asset_type with
        | ATXTZ ->
-         let {Q.num; den} = Q.of_string a.asset_value in
-         let asset_value = Z.(to_string @@ mul (div factor den) num) in
+         let asset_value = absolute_balance ~decimals:6 a.asset_value in
          { a with asset_value }
        | _ -> a)
     asset_enc
@@ -711,6 +723,13 @@ type signature_validation_form = {
   svf_message: string;
   svf_signature: A.edsig;
 } [@@deriving encoding {title="SignatureValidationForm"; def_title}]
+
+
+type ft_balance = {
+  ft_contract: string;
+  ft_owner: A.address;
+  ft_balance: A.big_decimal
+} [@@deriving encoding {title="FTBalance"; def_title}]
 
 (** Interaction with Tezos contract *)
 

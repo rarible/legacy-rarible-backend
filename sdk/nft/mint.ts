@@ -26,8 +26,12 @@ export async function get_next_token_id(
   provider: Provider,
   contract: string) : Promise<bigint> {
   const r = await fetch(provider.api + '/v0.1/collections/' + contract + '/generate_token_id')
-  const json = await r.json()
-  return BigInt(JSON.stringify(json.tokenId))
+  if (r.ok) {
+    const json = await r.json()
+    return BigInt(JSON.stringify(json.tokenId))
+  } else {
+    throw new Error(r.statusText)
+  }
 }
 
 export function metadata_arg(
