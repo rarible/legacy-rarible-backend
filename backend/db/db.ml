@@ -1485,10 +1485,8 @@ let ledger_kind k v = match k, v with
 
 let filter_contracts op ori =
   let open Contract_spec in
-  Format.printf "TEST1@.";
   match op.bo_meta, get_entrypoints ori.script with
   | Some meta, Ok entrypoints ->
-    Format.printf "TEST2@.";
     let allocs = Storage_diff.big_map_allocs meta.op_lazy_storage_diff in
     begin match
         match_entrypoints ~expected:(fa2_entrypoints @ fa2_ext_entrypoints) ~entrypoints,
@@ -1497,38 +1495,33 @@ let filter_contracts op ori =
       | [ b_balance; b_update; b_transfer; b_update_all; b_mint_nft; b_mint_mt;
           b_burn_nft; b_burn_mt; b_metadata ],
         Ok [ f_ledger; f_owner; f_admin ] ->
-        Format.printf "TEST3@.";
         let fa2_spec = match b_balance && b_update && b_transfer, f_ledger with
           | true, (_, Some (id, k, v)) ->
-            Format.printf "TEST4@.";
             begin match ledger_kind k v with
-              | `nft | `multiple -> Format.printf "TEST5@."; Some (id, k, v)
-              | _ -> Format.printf "TEST6@."; None
+              | `nft | `multiple -> Some (id, k, v)
+              | _ -> None
             end
-          | _ -> Format.printf "TEST7@."; None in
+          | _ -> None in
         let ubi_spec = match f_admin with
-          | Some (`address owner), _ -> Format.printf "TEST8@."; Some owner
-          | _ -> Format.printf "TEST9@."; None in
+          | Some (`address owner), _ -> Some owner
+          | _ -> None in
         let rarible_spec =
           match b_update_all && (b_mint_nft || b_mint_mt)
                 && (b_burn_nft || b_burn_mt) && b_metadata, f_owner with
-          | true, (Some (`address owner), _) -> Format.printf "TEST10@."; Some owner
-          | _ -> Format.printf "TEST12@."; None in
+          | true, (Some (`address owner), _) -> Some owner
+          | _ -> None in
         begin match fa2_spec, rarible_spec, ubi_spec with
           | Some (id, k, v), Some owner, _ ->
-            Format.printf "TEST13@.";
             Some (`rarible (id, k, v, owner))
           | Some (id, k, v), _, Some owner ->
-            Format.printf "TEST14@.";
             Some (`ubi (id, k, v, owner))
           | Some (id, k, v), _, _ ->
-            Format.printf "TEST15@.";
             Some (`fa2 (id, k, v))
-          | _ -> Format.printf "TEST16@."; None
+          | _ -> None
         end
-      | _ -> Format.printf "TEST17@."; None
+      | _ -> None
     end
-  | _ -> Format.printf "TEST18@.";None
+  | _ -> None
 
 let insert_origination config dbh op ori =
   match filter_contracts op ori with
