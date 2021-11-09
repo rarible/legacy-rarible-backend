@@ -106,7 +106,8 @@ let update_extra_config ?dbh e =
           Some (EzEncoding.construct micheline_type_short_enc ledger_value) in
       [%pgsql dbh
           "insert into ft_contracts(address, kind, ledger_id, ledger_key, ledger_value, crawled) \
-           values($address, $kind, $id, $?k, $?v, ${lk.ft_crawled}) on conflict do nothing"]) (SMap.bindings e.ft_contracts)
+           values($address, $kind, $id, $?k, $?v, ${lk.ft_crawled}) on conflict do nothing"])
+    (SMap.bindings e.ft_contracts)
 
 (* Normalize here in case of ERC20 like asset *)
 let price left right =
@@ -700,7 +701,19 @@ let rarible_meta_of_tzip21_meta meta =
       nft_item_meta_name = Option.value ~default:"Unnamed item" m.tzip21_tm_name ;
       nft_item_meta_description = m.tzip21_tm_description ;
       nft_item_meta_attributes = rarible_attributes_of_tzip21_attributes m.tzip21_tm_attributes ;
-      nft_item_meta_image = m.tzip21_tm_display_uri ;
+      nft_item_meta_image =
+        begin match m.tzip21_tm_display_uri with
+          | Some _ as uri -> uri
+          | None ->
+            begin match m.tzip21_tm_thumbnail_uri with
+              | Some _ as uri -> uri
+              | None ->
+                begin match m.tzip21_tm_artifact_uri with
+                  | Some _ as uri -> uri
+                  | None -> None
+                end
+            end
+        end ;
       nft_item_meta_animation = None ;
     }
 
@@ -811,7 +824,7 @@ let insert_account dbh addr ~block ~tsp ~level =
       "insert into accounts(address, last_block, last_level, last) \
        values($addr, $block, $level, $tsp) on conflict do nothing"]
 
-let insert_nft_activity dbh id timestamp nft_activity =
+let insert_nft_activity dbh index timestamp nft_activity =
   let act_type, act_from, elt =  match nft_activity with
     | NftActivityMint elt -> "mint", None, elt
     | NftActivityBurn elt -> "burn", None, elt
@@ -821,16 +834,15 @@ let insert_nft_activity dbh id timestamp nft_activity =
   let level = Int64.to_int32 elt.nft_activity_block_number in
   [%pgsql dbh
       "insert into nft_activities(\
-       activity_type, transaction, block, level, date, contract, token_id, \
+       activity_type, transaction, index, block, level, date, contract, token_id, \
        owner, amount, tr_from) values ($act_type, \
-       ${elt.nft_activity_transaction_hash}, \
+       ${elt.nft_activity_transaction_hash}, $index, \
        ${elt.nft_activity_block_hash}, \
        $level, $timestamp, \
        ${elt.nft_activity_contract}, \
        $token_id, \
        ${elt.nft_activity_owner}, $value, $?act_from) \
        on conflict do nothing"] >>=? fun () ->
-  Rarible_kafka.produce_nft_activity id timestamp nft_activity >>= fun () ->
   Lwt.return_ok ()
 
 let create_nft_activity_elt op contract token_id owner amount = {
@@ -846,14 +858,12 @@ let create_nft_activity_elt op contract token_id owner amount = {
 let insert_nft_activity_mint dbh op kt1 token_id owner amount =
   let nft_activity_elt = create_nft_activity_elt op kt1 token_id owner amount in
   let nft_activity_type = NftActivityMint nft_activity_elt in
-  let id = Printf.sprintf "%s_%ld" op.bo_block op.bo_index in
-  insert_nft_activity dbh id op.bo_tsp nft_activity_type
+  insert_nft_activity dbh op.bo_index op.bo_tsp nft_activity_type
 
 let insert_nft_activity_burn dbh op kt1 token_id owner amount =
   let nft_activity_elt = create_nft_activity_elt op kt1 token_id owner amount in
   let nft_activity_type = NftActivityBurn nft_activity_elt in
-  let id = Printf.sprintf "%s_%ld" op.bo_block op.bo_index in
-  insert_nft_activity dbh id op.bo_tsp nft_activity_type
+  insert_nft_activity dbh op.bo_index op.bo_tsp nft_activity_type
 
 let insert_nft_activity_transfer dbh op kt1 from owner token_id amount =
   let elt = {
@@ -866,8 +876,30 @@ let insert_nft_activity_transfer dbh op kt1 from owner token_id amount =
     nft_activity_block_number = Int64.of_int32 op.bo_level ;
   } in
   let nft_activity_type = NftActivityTransfer {from; elt} in
-  let id = Printf.sprintf "%s_%ld" op.bo_block op.bo_index in
-  insert_nft_activity dbh id op.bo_tsp nft_activity_type
+  insert_nft_activity dbh op.bo_index op.bo_tsp nft_activity_type
+
+let mk_nft_activity_elt obj = {
+  nft_activity_owner = obj#owner ;
+  nft_activity_contract = obj#contract ;
+  nft_activity_token_id = obj#token_id ;
+  nft_activity_value = Int64.to_string obj#amount ;
+  nft_activity_transaction_hash = obj#transaction ;
+  nft_activity_block_hash = obj#block ;
+  nft_activity_block_number = Int64.of_int32 obj#level ;
+}
+
+let mk_nft_activity obj = match obj#activity_type with
+  | "mint" ->
+    let nft_activity_elt = mk_nft_activity_elt obj in
+    Lwt.return_ok @@ NftActivityMint nft_activity_elt
+  | "burn" ->
+    let nft_activity_elt = mk_nft_activity_elt obj in
+    Lwt.return_ok @@ NftActivityBurn nft_activity_elt
+  | "transfer" ->
+    let elt = mk_nft_activity_elt obj in
+    let from = Option.get obj#tr_from in
+    Lwt.return_ok @@ NftActivityTransfer {elt; from}
+  | _ as t -> Lwt.return_error (`hook_error ("unknown nft activity type " ^ t))
 
 let get_metadata meta =
   try
@@ -1030,10 +1062,10 @@ let insert_mint ~dbh ~op ~contract m =
   let block = op.bo_block in
   let level = op.bo_level in
   let tsp = op.bo_tsp in
-  let token_id, owner, uri = match m with
-    | NFTMint m -> m.fa2m_token_id, m.fa2m_owner, None
-    | MTMint m -> m.fa2m_token_id, m.fa2m_owner, None
-    | UbiMint m -> m.ubim_token_id, m.ubim_owner, m.ubim_uri in
+  let token_id, owner, amount, uri = match m with
+    | NFTMint m -> m.fa2m_token_id, m.fa2m_owner, 1L, None
+    | MTMint m -> m.fa2m_token_id, m.fa2m_owner, m.fa2m_amount, None
+    | UbiMint m -> m.ubim_token_id, m.ubim_owner, 1L, m.ubim_uri in
   let>? () = insert_account dbh owner ~block:op.bo_block ~level:op.bo_level ~tsp:op.bo_tsp in
   let>? () = match uri with
     | Some meta ->
@@ -1073,21 +1105,27 @@ let insert_mint ~dbh ~op ~contract m =
            $tsp, $owner, 0, ${op.bo_hash}, 0) \
            on conflict do nothing"] in
   let mint = EzEncoding.construct mint_enc m in
-  [%pgsql dbh
-      "insert into contract_updates(transaction, index, block, level, tsp, \
-       contract, mint) \
-       values(${op.bo_hash}, ${op.bo_index}, ${op.bo_block}, ${op.bo_level}, \
-       ${op.bo_tsp}, $contract, $mint) \
-       on conflict do nothing"]
+  let>? () =
+    [%pgsql dbh
+        "insert into contract_updates(transaction, index, block, level, tsp, \
+         contract, mint) \
+         values(${op.bo_hash}, ${op.bo_index}, ${op.bo_block}, ${op.bo_level}, \
+         ${op.bo_tsp}, $contract, $mint) \
+         on conflict do nothing"] in
+  insert_nft_activity_mint dbh op contract token_id owner amount
 
 let insert_burn ~dbh ~op ~contract m =
   let burn = EzEncoding.construct Json_encoding.(tup2 burn_enc string) (m, op.bo_op.source) in
-  [%pgsql dbh
-      "insert into contract_updates(transaction, index, block, level, tsp, \
-       contract, burn) \
-       values(${op.bo_hash}, ${op.bo_index}, ${op.bo_block}, ${op.bo_level}, \
-       ${op.bo_tsp}, $contract, $burn) \
-       on conflict do nothing"]
+  let token_id, owner, amount = match m with
+    | MTBurn { amount; token_id } -> token_id, "", amount
+    | NFTBurn token_id -> token_id, "", 1L in
+  let>? () =
+    [%pgsql dbh
+        "insert into contract_updates(transaction, index, block, level, tsp, \
+         contract, burn) \
+         values(${op.bo_hash}, ${op.bo_index}, ${op.bo_block}, ${op.bo_level}, \
+         ${op.bo_tsp}, $contract, $burn) on conflict do nothing"] in
+  insert_nft_activity_burn dbh op contract token_id owner amount
 
 let insert_transfer ~dbh ~op ~contract lt =
   let|>? _ = fold_rp (fun transfer_index {tr_source; tr_txs} ->
@@ -1195,7 +1233,19 @@ let insert_metadata_uri ~dbh ~op ~contract s =
        on conflict do nothing"]
 
 let insert_token_metadata ~dbh ~op ~contract (token_id, l) =
-  let meta = EzEncoding.construct Rtypes.token_metadata_enc l in
+  let>? json, tzip21_meta =
+    match List.assoc_opt "" l with
+    | Some meta ->
+      begin
+        get_metadata_json meta >>= function
+        | Ok (json, metadata) -> Lwt.return_ok (json, Some metadata)
+      | Error (code, str) ->
+        Printf.eprintf "Cannot get metadata from url: %d %s\n%!"
+          code (match str with None -> "None" | Some s -> s);
+        Lwt.return_ok (meta, None)
+    end
+  | None ->
+    Lwt.return_ok (EzEncoding.construct Rtypes.token_metadata_enc l, None) in
   let source = op.bo_op.source in
   let block = op.bo_block in
   let level = op.bo_level in
@@ -1205,15 +1255,10 @@ let insert_token_metadata ~dbh ~op ~contract (token_id, l) =
         "insert into token_updates(transaction, index, block, level, tsp, \
          source, token_id, contract, metadata) \
          values(${op.bo_hash}, ${op.bo_index}, $block, $level, $tsp, $source,\
-         $token_id, $contract, $meta) \
-         on conflict do nothing"] in
-  let> res = get_metadata_json meta in
-  match res with
-  | Ok (_json, metadata) ->
-    insert_mint_metadata dbh ~contract ~token_id ~block ~level ~tsp ~metadata
-  | Error _err ->
-    Printf.eprintf "wrong metadata format %S\n%!" meta ;
-    Lwt.return_ok ()
+         $token_id, $contract, $json) on conflict do nothing"] in
+  match tzip21_meta with
+  | None -> Lwt.return_ok ()
+  | Some metadata -> insert_mint_metadata dbh ~contract ~token_id ~block ~level ~tsp ~metadata
 
 let insert_royalties ~dbh ~op roy =
   let royalties = EzEncoding.(construct token_royalties_enc roy.roy_royalties) in
@@ -1485,10 +1530,8 @@ let ledger_kind k v = match k, v with
 
 let filter_contracts op ori =
   let open Contract_spec in
-  Format.printf "TEST1@.";
   match op.bo_meta, get_entrypoints ori.script with
   | Some meta, Ok entrypoints ->
-    Format.printf "TEST2@.";
     let allocs = Storage_diff.big_map_allocs meta.op_lazy_storage_diff in
     begin match
         match_entrypoints ~expected:(fa2_entrypoints @ fa2_ext_entrypoints) ~entrypoints,
@@ -1497,38 +1540,33 @@ let filter_contracts op ori =
       | [ b_balance; b_update; b_transfer; b_update_all; b_mint_nft; b_mint_mt;
           b_burn_nft; b_burn_mt; b_metadata ],
         Ok [ f_ledger; f_owner; f_admin ] ->
-        Format.printf "TEST3@.";
         let fa2_spec = match b_balance && b_update && b_transfer, f_ledger with
           | true, (_, Some (id, k, v)) ->
-            Format.printf "TEST4@.";
             begin match ledger_kind k v with
-              | `nft | `multiple -> Format.printf "TEST5@."; Some (id, k, v)
-              | _ -> Format.printf "TEST6@."; None
+              | `nft | `multiple -> Some (id, k, v)
+              | _ -> None
             end
-          | _ -> Format.printf "TEST7@."; None in
+          | _ -> None in
         let ubi_spec = match f_admin with
-          | Some (`address owner), _ -> Format.printf "TEST8@."; Some owner
-          | _ -> Format.printf "TEST9@."; None in
+          | Some (`address owner), _ -> Some owner
+          | _ -> None in
         let rarible_spec =
           match b_update_all && (b_mint_nft || b_mint_mt)
                 && (b_burn_nft || b_burn_mt) && b_metadata, f_owner with
-          | true, (Some (`address owner), _) -> Format.printf "TEST10@."; Some owner
-          | _ -> Format.printf "TEST12@."; None in
+          | true, (Some (`address owner), _) -> Some owner
+          | _ -> None in
         begin match fa2_spec, rarible_spec, ubi_spec with
           | Some (id, k, v), Some owner, _ ->
-            Format.printf "TEST13@.";
             Some (`rarible (id, k, v, owner))
           | Some (id, k, v), _, Some owner ->
-            Format.printf "TEST14@.";
             Some (`ubi (id, k, v, owner))
           | Some (id, k, v), _, _ ->
-            Format.printf "TEST15@.";
             Some (`fa2 (id, k, v))
-          | _ -> Format.printf "TEST16@."; None
+          | _ -> None
         end
-      | _ -> Format.printf "TEST17@."; None
+      | _ -> None
     end
-  | _ -> Format.printf "TEST18@.";None
+  | _ -> None
 
 let insert_origination config dbh op ori =
   match filter_contracts op ori with
@@ -1655,8 +1693,10 @@ let contract_updates dbh main l =
         | Some json, _, _ ->
           let m = EzEncoding.destruct mint_enc json in
           let token_id, owner, amount, has_uri = match m with
-            | NFTMint m -> m.fa2m_token_id, m.fa2m_owner, 1L, false
-            | MTMint m -> m.fa2m_token_id, m.fa2m_owner, m.fa2m_amount, false
+            | NFTMint m ->
+              m.fa2m_token_id, m.fa2m_owner, 1L, false
+            | MTMint m ->
+              m.fa2m_token_id, m.fa2m_owner, m.fa2m_amount, false
             | UbiMint m -> m.ubim_token_id, m.ubim_owner, 1L, m.ubim_uri <> None in
           let>? () =
             contract_updates_base
@@ -1906,14 +1946,26 @@ let produce_cancel_events dbh main l =
         | None -> Lwt.return_ok ()
         | Some h ->
           produce_order_event_hash dbh h
-      else Lwt.return_ok ())l
+      else Lwt.return_ok ())
+    l
 
 let produce_match_events dbh main l =
   iter_rp (fun r ->
       if main then
         let>? () = produce_order_event_hash dbh r#hash_left in
         produce_order_event_hash dbh r#hash_right
-      else Lwt.return_ok ())l
+      else Lwt.return_ok ())
+    l
+
+let produce_nft_activitiy_events main l =
+  iter_rp (fun r ->
+      if main then
+        let>? ev = mk_nft_activity r in
+        let id = Printf.sprintf "%s_%ld" r#block r#index in
+        Rarible_kafka.produce_nft_activity id r#date ev >>= fun () ->
+        Lwt.return_ok ()
+      else Lwt.return_ok ())
+    l
 
 let set_main _config dbh {Hooks.m_main; m_hash} =
   let sort l = List.sort (fun r1 r2 ->
@@ -1922,7 +1974,9 @@ let set_main _config dbh {Hooks.m_main; m_hash} =
   use (Some dbh) @@ fun dbh ->
   let>? () = [%pgsql dbh "update contracts set main = $m_main where block = $m_hash"] in
   let>? () = [%pgsql dbh "update tokens set main = $m_main where block = $m_hash"] in
-  let>? () = [%pgsql dbh "update nft_activities set main = $m_main where block = $m_hash"] in
+  let>? nactivities =
+    [%pgsql.object dbh
+        "update nft_activities set main = $m_main where block = $m_hash returning *"] in
   let>? () =
     [%pgsql dbh "update order_activities set main = $m_main where block = $m_hash"] in
   let>? t_updates =
@@ -1961,6 +2015,7 @@ let set_main _config dbh {Hooks.m_main; m_hash} =
   let>? () = token_balance_updates dbh m_main @@ sort tb_updates in
   let>? () = produce_cancel_events dbh m_main @@ sort cancels in
   let>? () = produce_match_events dbh m_main @@ sort matches in
+  let>? () = produce_nft_activitiy_events m_main @@ sort nactivities in
   Lwt.return_ok ()
 
 let get_level ?dbh () =
@@ -2160,29 +2215,6 @@ let mk_nft_activity_continuation obj =
   Printf.sprintf "%Ld_%s"
     (Int64.of_float @@ CalendarLib.Calendar.to_unixfloat obj#date)
     obj#transaction
-
-let mk_nft_activity_elt obj = {
-  nft_activity_owner = obj#owner ;
-  nft_activity_contract = obj#contract ;
-  nft_activity_token_id = obj#token_id ;
-  nft_activity_value = Int64.to_string obj#amount ;
-  nft_activity_transaction_hash = obj#transaction ;
-  nft_activity_block_hash = obj#block ;
-  nft_activity_block_number = Int64.of_int32 obj#level ;
-}
-
-let mk_nft_activity obj = match obj#activity_type with
-  | "mint" ->
-    let nft_activity_elt = mk_nft_activity_elt obj in
-    Lwt.return_ok @@ NftActivityMint nft_activity_elt
-  | "burn" ->
-    let nft_activity_elt = mk_nft_activity_elt obj in
-    Lwt.return_ok @@ NftActivityBurn nft_activity_elt
-  | "transfer" ->
-    let elt = mk_nft_activity_elt obj in
-    let from = Option.get obj#tr_from in
-    Lwt.return_ok @@ NftActivityTransfer {elt; from}
-  | _ as t -> Lwt.return_error (`hook_error ("unknown nft activity type " ^ t))
 
 let get_nft_activities_by_collection ?dbh ?(sort=LATEST_FIRST) ?continuation ?(size=50) filter =
   Format.eprintf "get_nft_activities_by_collection %s [%s] %s %d@."

@@ -243,6 +243,7 @@ let upgrade_1_to_2 dbh version =
     {|create table nft_activities(
       activity_type varchar not null,
       transaction varchar,
+      index int not null,
       block varchar not null,
       level int not null,
       main boolean not null default false,
