@@ -211,8 +211,11 @@ let mint_ubi_tokens_repr ~id ~owner =
   Format.sprintf "{%S; %Ld; None}" owner id
 
 let burn_tokens_repr ~id ~kind =
-  Format.sprintf "{%Ld%s}" id
-    (match kind with `nft -> "" | `mt amount -> Format.sprintf "; %Ld" amount)
+  match kind with
+    | `nft -> Format.sprintf "%Ld" id
+    | _ ->
+      Format.sprintf "{%Ld%s}" id
+        (match kind with `nft -> "" | `mt amount -> Format.sprintf "; %Ld" amount)
 
 let set_royalties_repr ~id ~royalties =
   Format.sprintf "{%Ld; {%s}}" id
@@ -258,7 +261,7 @@ let update_operators_for_all_repr l =
 
 let set_token_metadata_repr ~id ~metadata =
   Format.sprintf "{%Ld; {%s}}" id @@ String.concat "; " @@
-  List.map (fun (k, v) -> Format.sprintf "Elt %S %S" k v) metadata
+  List.map (fun (k, v) -> Format.sprintf "Elt %S 0x%s" k (hex v)) metadata
 
 let set_metadata_repr ~key ~value =
   Format.sprintf "{%S; 0x%s}" key (hex value)
