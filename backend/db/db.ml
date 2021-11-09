@@ -700,7 +700,19 @@ let rarible_meta_of_tzip21_meta meta =
       nft_item_meta_name = Option.value ~default:"Unnamed item" m.tzip21_tm_name ;
       nft_item_meta_description = m.tzip21_tm_description ;
       nft_item_meta_attributes = rarible_attributes_of_tzip21_attributes m.tzip21_tm_attributes ;
-      nft_item_meta_image = m.tzip21_tm_display_uri ;
+      nft_item_meta_image =
+        begin match m.tzip21_tm_display_uri with
+          | Some _ as uri -> uri
+          | None ->
+            begin match m.tzip21_tm_thumbnail_uri with
+              | Some _ as uri -> uri
+              | None ->
+                begin match m.tzip21_tm_artifact_uri with
+                  | Some _ as uri -> uri
+                  | None -> None
+                end
+            end
+        end ;
       nft_item_meta_animation = None ;
     }
 
@@ -1195,7 +1207,22 @@ let insert_metadata_uri ~dbh ~op ~contract s =
        on conflict do nothing"]
 
 let insert_token_metadata ~dbh ~op ~contract (token_id, l) =
-  let meta = EzEncoding.construct Rtypes.token_metadata_enc l in
+  Format.eprintf "insert_token_metadata %s [%s]@."
+    token_id
+    (String.concat ";" @@ List.map (fun (k, v) -> Format.sprintf "%S:%S" k v) l) ;
+  let>? json, tzip21_meta =
+    match List.assoc_opt "" l with
+    | Some meta ->
+      begin
+        get_metadata_json meta >>= function
+        | Ok (json, metadata) -> Lwt.return_ok (json, Some metadata)
+      | Error (code, str) ->
+        Printf.eprintf "Cannot get metadata from url: %d %s\n%!"
+          code (match str with None -> "None" | Some s -> s);
+        Lwt.return_ok (meta, None)
+    end
+  | None ->
+    Lwt.return_ok (EzEncoding.construct Rtypes.token_metadata_enc l, None) in
   let source = op.bo_op.source in
   let block = op.bo_block in
   let level = op.bo_level in
@@ -1205,15 +1232,10 @@ let insert_token_metadata ~dbh ~op ~contract (token_id, l) =
         "insert into token_updates(transaction, index, block, level, tsp, \
          source, token_id, contract, metadata) \
          values(${op.bo_hash}, ${op.bo_index}, $block, $level, $tsp, $source,\
-         $token_id, $contract, $meta) \
-         on conflict do nothing"] in
-  let> res = get_metadata_json meta in
-  match res with
-  | Ok (_json, metadata) ->
-    insert_mint_metadata dbh ~contract ~token_id ~block ~level ~tsp ~metadata
-  | Error _err ->
-    Printf.eprintf "wrong metadata format %S\n%!" meta ;
-    Lwt.return_ok ()
+         $token_id, $contract, $json) on conflict do nothing"] in
+  match tzip21_meta with
+  | None -> Lwt.return_ok ()
+  | Some metadata -> insert_mint_metadata dbh ~contract ~token_id ~block ~level ~tsp ~metadata
 
 let insert_royalties ~dbh ~op roy =
   let royalties = EzEncoding.(construct token_royalties_enc roy.roy_royalties) in
@@ -1648,8 +1670,10 @@ let contract_updates dbh main l =
         | Some json, _, _ ->
           let m = EzEncoding.destruct mint_enc json in
           let token_id, owner, amount, has_uri = match m with
-            | NFTMint m -> m.fa2m_token_id, m.fa2m_owner, 1L, false
-            | MTMint m -> m.fa2m_token_id, m.fa2m_owner, m.fa2m_amount, false
+            | NFTMint m ->
+              m.fa2m_token_id, m.fa2m_owner, 1L, false
+            | MTMint m ->
+              m.fa2m_token_id, m.fa2m_owner, m.fa2m_amount, false
             | UbiMint m -> m.ubim_token_id, m.ubim_owner, 1L, m.ubim_uri <> None in
           let>? () =
             contract_updates_base

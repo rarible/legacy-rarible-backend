@@ -752,6 +752,7 @@ type 'a fa2_mint = {
   fa2m_token_id: string;
   fa2m_amount: 'a;
   fa2m_owner: string;
+  fa2m_metadata: (string * string) list
 } [@@deriving encoding]
 
 type ubi_mint = {

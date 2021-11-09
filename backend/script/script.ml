@@ -204,7 +204,7 @@ let hex s =
 let mint_tokens_repr ?(kind=`nft) ?(metadata=[]) ?(royalties=[]) ~owner id =
   Format.sprintf "{ %Ld; %S; %s{%s}; {%s} }" id owner
     (match kind with `nft -> "" | `mt supply -> Format.sprintf "%Ld; " supply)
-    (String.concat "; " @@ List.map (fun (k, v) -> Format.sprintf "Elt %s 0x%s" k (hex v)) metadata)
+    (String.concat "; " @@ List.map (fun (k, v) -> Format.sprintf "Elt %S 0x%s" k (hex v)) metadata)
     (String.concat "; " @@ List.map (fun (ad, am) -> Format.sprintf "Pair %S %Ld" ad  am) royalties)
 
 let mint_ubi_tokens_repr ~id ~owner =

@@ -48,17 +48,24 @@ let parse_transfer m =
 
 let parse_mint m =
   match Typed_mich.parse_value Contract_spec.mint_mt_entry m with
-  | Ok (`tuple [`nat id; `address fa2m_owner; `nat amount; `assoc _meta; `seq _royalties]) ->
+  | Ok (`tuple [`nat id; `address fa2m_owner; `nat amount; `assoc meta; `seq _royalties]) ->
     let fa2m_token_id = Z.to_string id in
-    let fa2m_amount = Z.to_int64 amount  in
+    let fa2m_amount = Z.to_int64 amount in
+    let fa2m_metadata = List.filter_map (function
+        | (`string k, `string v) -> Some (k, v)
+        | _ -> None) meta in
     Ok (Mint_tokens
-          (MTMint { fa2m_token_id ; fa2m_owner ; fa2m_amount }))
+          (MTMint { fa2m_token_id ; fa2m_owner ; fa2m_amount ; fa2m_metadata }))
   | _ ->
     match Typed_mich.parse_value Contract_spec.mint_nft_entry m with
-    | Ok (`tuple [`nat id; `address fa2m_owner; `assoc _meta; `seq _royalties]) ->
+    | Ok (`tuple [`nat id; `address fa2m_owner; `assoc meta; `seq _royalties]) ->
       let fa2m_token_id = Z.to_string id in
+      let fa2m_metadata = List.filter_map (function
+          | (`string k, `string v) -> Some (k, v)
+          | _ -> None) meta in
       Ok (Mint_tokens
-            (NFTMint { fa2m_token_id ; fa2m_owner ; fa2m_amount = () }))
+            (NFTMint
+               { fa2m_token_id ; fa2m_owner ; fa2m_amount = () ; fa2m_metadata }))
     | _ ->
       match Typed_mich.parse_value Contract_spec.mint_ubi_entry m with
       | Ok (`tuple [ `address ubim_owner; `nat id; uri ]) ->
@@ -87,7 +94,10 @@ let parse_token_metadata m =
   match Typed_mich.parse_value Contract_spec.set_token_metadata_entry m with
   | Ok (`tuple [ `nat id; `assoc l ]) ->
     let l = List.filter_map (function
-        | (`string k, `string v) -> Some (k, v)
+        | (`string k, `bytes v) ->
+          Some (k, (Tzfunc.Crypto.hex_to_raw v :> string))
+        | (`string k, `string v) ->
+          Some (k, v)
         | _ -> None) l in
     Ok (Token_metadata (Z.to_string id, l))
   | _ -> unexpected_michelson

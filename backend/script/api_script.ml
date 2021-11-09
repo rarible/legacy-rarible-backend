@@ -70,6 +70,16 @@ let royalties_contracts = [
 ]
 let royalties_contracts_len = List.length royalties_contracts
 
+let ipfs_metadatas = [
+  "ipfs://Qma11k6ahPRXGVV7RgHNuLuwB9PqQB2MVJUtNNXJ7dQeAr";
+  "ipfs://QmeaqRBUiw4cJiNKEcW2noc7egLd5GgBqLcHHqUhauJAHN";
+  "ipfs://QmUKCfBnpN4CurChDS96wMcQ1akUJXiKtkZtHgHmieZUyL";
+  "ipfs://QmTQdUJFn1yyRDcfZZVhUzbV8ucMEekihj42T7Pgua8SLe";
+  "ipfs://QmbjcmWWzUFnD1CvPjvt5ZcrUD7SrYDyk9jnXeTuHQamsU";
+  "ipfs://QmcAcT48iK6jgQpjTE8mhXeyM91xzPv5Sw3cRdDD3K7iTg";
+]
+let ipfs_metadatas_len = List.length ipfs_metadatas
+
 let exchange_contracts = [
 ]
 let exchange_contracts_len = List.length exchange_contracts
@@ -217,6 +227,9 @@ let generate_royalties () =
       | Some old ->
         aux ((a.edpk, v + old) :: (List.remove_assoc a.edpk royalties)) in
   List.map (fun (addr, v) -> pk_to_pkh_exn addr, Int64.of_int v) @@ aux []
+
+let generate_ipfs_metadata () =
+  [ "", List.nth ipfs_metadatas (Random.int ipfs_metadatas_len) ]
 
 let mk_order_form
     maker maker_edpk taker taker_edpk make take salt start_date end_date signature data_type payouts origin_fees =
@@ -397,14 +410,15 @@ let call_get_nft_item_by_id collection tid =
    * end ;
    * Lwt.return res *)
 
-let call_get_nft_items_by_owner owner =
+let call_get_nft_items_by_owner ?(verbose=0) owner =
   let open EzAPI in
+  let msg = if verbose > 0 then Some "debug" else None in
   let url = BASE !api in
   let rec aux ?continuation acc =
     let params = match continuation with
       | None -> [ Api.owner_param , S owner ]
       | Some c -> [ Api.owner_param , S owner ; Api.continuation_param, S c ] in
-    let> r = EzReq_lwt.get0 url ~params Api.get_nft_items_by_owner_s in
+    let> r = EzReq_lwt.get0 ?msg url ~params Api.get_nft_items_by_owner_s in
     let>? items = Lwt.return @@ handle_ezreq_result r in
     match items.nft_items_continuation with
     | None -> Lwt.return_ok @@ items.nft_items_items @ acc
@@ -975,9 +989,11 @@ let update_operators token_id owner operator source contract =
 let mint_tokens c it =
   if !js then Script_js.mint_tokens ~endpoint:!endpoint c it
   else
-    let cmd = Script.mint_tokens_aux ~endpoint:!endpoint ~id:it.it_token_id
+    let cmd = Script.mint_tokens_aux
+        ~endpoint:!endpoint ~id:it.it_token_id
         ~owner:it.it_owner.tz1 ~kind:it.it_kind
-        ~royalties:it.it_royalties c.col_admin.tz1 c.col_kt1 in
+        ~royalties:it.it_royalties ~metadata:it.it_metadata
+        c.col_admin.tz1 c.col_kt1 in
     let code, out, err = sys_command cmd in
     if code <> 0 then
       Lwt.return @@
@@ -1070,7 +1086,7 @@ let mint_with_token_id_from_api c =
       let amount = generate_amount ~max:10 () + 1 in
       `mt (Int64.of_int amount) in
   let it_royalties = generate_royalties () in
-  let it_metadata = [] in
+  let it_metadata = generate_ipfs_metadata () in
   let>? it_token_id = call_generate_token_id c.col_kt1 in
   let item = {it_owner; it_token_id; it_kind; it_royalties; it_metadata; it_collection=c.col_kt1} in
   let> () = mint_tokens c item in
@@ -1084,8 +1100,8 @@ let transfer_with_token_id it amount new_owner =
   Printf.eprintf "transfer_with_token_id for %s on %s\n%!" it.it_owner.tz1 it.it_collection ;
   transfer_tokens it amount new_owner
 
-let mint c =
-  let random = Random.bool () in
+let mint ?(with_token_id=false) c =
+  let random = if with_token_id then false else Random.bool () in
   if random then
     let> r = mint_with_random_token_id c in
     Lwt.return_ok r
@@ -1195,9 +1211,9 @@ let cancel_order ~source ~contract order =
       ~sign:(Tzfunc.Node.sign ~edsk:source.edsk)
       m
 
-let random_mint collections =
+let random_mint ?with_token_id collections =
   let c = List.nth collections (Random.int @@ List.length collections) in
-  mint c
+  mint ?with_token_id c
 
 let random_burn items =
   let selected = Random.int @@ List.length items in
@@ -1285,7 +1301,7 @@ let check_nft_ownership ow it =
   ow.nft_ownership_value = (match it.it_kind with `nft -> "1" | `mt a -> Int64.to_string a)(*  &&
    * check_creators ow.nft_ownership_creators metadata *)
 
-let check_item ?strict it =
+let check_item ?verbose ?strict it =
   let nft_item_exists ?verbose items =
     List.exists (fun i -> check_nft_item ?verbose ?strict i it) items in
   let nft_ownership_exists ownerships =
@@ -1300,9 +1316,9 @@ let check_item ?strict it =
     Printf.eprintf "[KO] API: get_nft_item_by_id (error : %s)\n%!" @@
     Api.Errors.string_of_error err
   end >>= fun () ->
-  call_get_nft_items_by_owner it.it_owner.tz1 >|= begin function
+  call_get_nft_items_by_owner ?verbose it.it_owner.tz1 >|= begin function
   | Ok nft_items ->
-    if nft_item_exists nft_items then
+    if nft_item_exists ?verbose nft_items then
       Printf.eprintf "[OK] API: get_nft_items_by_owner\n%!"
     else
       Printf.eprintf "[KO] API: get_nft_items_by_owner (no matching nft_item)\n%!"
@@ -1734,11 +1750,11 @@ let check_transfer_activity ?(from=false) it =
     Api.Errors.string_of_error err
   end
 
-let mint_check_random collections =
-  random_mint collections >>=? fun item ->
+let mint_check_random ?verbose ?with_token_id collections =
+  random_mint ?with_token_id collections >>=? fun item ->
   Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
   Unix.sleep 6 ;
-  check_item item >>= fun () ->
+  check_item ?verbose item >>= fun () ->
   check_mint_activity item >>= fun () ->
   Lwt.return_ok item
 
@@ -1764,12 +1780,12 @@ let transfer_check_random items =
   check_transfer_activity new_item >>= fun () ->
   Lwt.return_ok items
 
-let mints_check_random ?(max=30) collections =
+let mints_check_random ?verbose ?(max=30) ?with_token_id collections =
   let nb = Random.int max + 1 in
   let rec aux acc cpt =
     if cpt = 0 then Lwt.return_ok acc
     else
-      mint_check_random collections >>=? fun item ->
+      mint_check_random ?verbose ?with_token_id collections >>=? fun item ->
       aux (item :: acc) (cpt - 1) in
   aux [] nb
 
@@ -1941,7 +1957,7 @@ let random_test () =
   Lwt_unix.sleep 6. >>= fun () ->
   deploy_check_random_collections ~royalties ~max:1 () >>= fun collections ->
   (* let collections = [ "collection_19760", "KT1MvNHPsHpHZDJ7HfkUDx71qyYvU7nLi9N7", "tz1KiZygjrVaS1fjs9iW4YSKNiqoopHK8Hdj", r_kt1 ] in *)
-  mints_check_random ~max:1 collections >>= begin function
+  mints_check_random ~verbose:1 ~with_token_id:true ~max:1 collections >>= begin function
     | Error err ->
       Lwt.return @@
       Printf.eprintf "mint error %s" @@
