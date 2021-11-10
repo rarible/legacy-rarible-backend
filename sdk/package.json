@@ -2,8 +2,8 @@
   "scripts": {
     "serve": "vue-cli-service serve test/test-web.ts",
     "build": "tsc --project tsconfig.json",
-    "run-test": "ts-node test/test.ts",
-    "build-prod": "webpack --config webpack.config.js && tsc --declaration --emitDeclarationOnly"
+    "test": "ts-node test/test.ts",
+    "build-webpack": "webpack --config webpack.config.js"
   },
   "dependencies": {
     "@airgap/beacon-sdk": "^2.3.2",
