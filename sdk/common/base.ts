@@ -137,12 +137,12 @@ export function asset_to_json(a: Asset) : any {
 }
 
 export function asset_of_json(a: any) : Asset {
-  const factor = 1000000.
+  const factor = 1000000
     switch (a.assetType.assetClass) {
       case "XTZ":
         return {
           asset_type : asset_type_of_json(a.assetType),
-          value: new BigNumber(a.value * factor)
+          value: new BigNumber(a.value).multipliedBy(factor)
         }
       default:
         return {

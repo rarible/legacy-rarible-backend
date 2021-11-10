@@ -3,7 +3,7 @@
     "serve": "vue-cli-service serve test/test-web.ts",
     "build": "tsc --project tsconfig.json",
     "run-test": "ts-node test/test.ts",
-    "build-prod": "webpack --config webpack.config.build.js && tsc --declaration --emitDeclarationOnly"
+    "build-prod": "webpack --config webpack.config.js && tsc --declaration --emitDeclarationOnly"
   },
   "dependencies": {
     "@airgap/beacon-sdk": "^2.3.2",
@@ -20,7 +20,7 @@
     "yargs": "^17.2.1"
   },
   "name": "tezos-sdk-module",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "main": "dist/main/index.js",
   "types": "dist/main/index.d.ts",
   "directories": {
