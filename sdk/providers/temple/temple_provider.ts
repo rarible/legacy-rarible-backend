@@ -49,8 +49,7 @@ export async function temple_provider(endpoint: string, network: TempleDAppNetwo
   }
   const balance = async() => {
     const a = await address()
-    const b = await tk.tz.getBalance(a)
-    return BigInt(b.toString())
+    return tk.tz.getBalance(a)
   }
   return {
     kind: "temple",

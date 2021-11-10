@@ -1,0 +1,15 @@
+{
+  "$schema": "node_modules/@openapitools/openapi-generator-cli/config.schema.json",
+  "spaces": 2,
+  "generator-cli": {
+    "version": "5.2.1",
+    "generators": {
+      "tezos-api-client": {
+        "ignoreFileOverride": "./.openapi-generator-ignore",
+        "output": "./src",
+        "glob": "api-docs/*",
+        "generatorName": "typescript-fetch"
+      }
+    }
+  }
+}

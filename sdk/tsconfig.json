@@ -1,10 +1,13 @@
 {
   "compilerOptions": {
+    "lib": ["es5", "dom", "esnext"],
     "strict": true,
     "module": "commonjs",
     "moduleResolution": "node",
     "outDir": "dist",
-    "target": "es2020"
+    "target": "es5",
+    "downlevelIteration": true,
+    "declaration": true
   },
   "include": [ "main/*.ts", "test/*.ts", "providers/*/*.ts" ]
 }

@@ -1,8 +1,9 @@
 import { Provider, TokenAssetType } from "./base"
+import BigNumber from "@taquito/rpc/node_modules/bignumber.js"
 
 export interface UnknownTokenAssetType {
   contract: string;
-  token_id: bigint
+  token_id: BigNumber
 }
 
 export type ExtendedAssetType = TokenAssetType | UnknownTokenAssetType

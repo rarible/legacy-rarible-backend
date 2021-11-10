@@ -6,9 +6,10 @@ import { get_make_fee } from "./get-make-fee"
 import { add_fee } from "./add-fee"
 import { approve_arg } from "./approve"
 import { order_to_struct, some_struct, none_struct } from "./sign-order"
+import BigNumber from "@taquito/rpc/node_modules/bignumber.js"
 
 export interface FillOrderRequest {
-  amount: bigint;
+  amount: BigNumber;
   payouts?: Array<Part>;
   origin_fees?: Array<Part>;
   infinite?: boolean;
@@ -20,13 +21,15 @@ const zero_edpk = "edpkteDwHwoNPB18tKToFKeSCykvr1ExnoMV5nawTJy9Y9nLTfQ541"
 function get_make_asset(
   provider: Provider,
   order: OrderForm,
-  amount: bigint) {
-  const inverted = invert_order(order, amount, zero_edpk)
+  amount: BigNumber,
+  edpk: string
+  ) {
+  const inverted = invert_order(order, amount, edpk)
   const make_fee = get_make_fee(provider.config.fees, inverted)
   return add_fee(inverted.make, make_fee)
 }
 
-function get_real_value(provider: Provider, order: OrderForm) : bigint {
+function get_real_value(provider: Provider, order: OrderForm) : BigNumber {
   const fee = get_make_fee(provider.config.fees, order)
   const make = add_fee(order.make, fee)
   return make.value
@@ -51,14 +54,16 @@ export async function fill_order_arg(
   left: OrderForm,
   request: FillOrderRequest
 ): Promise<TransactionArg[]> {
-  const make = get_make_asset(provider, left, request.amount)
+  const pk = (request.edpk) ? request.edpk : await get_public_key(provider)
+  if (!pk) throw new Error("cannot get public key")
+
+  const make = get_make_asset(provider, left, request.amount, pk)
   const arg_approve =
     (make.asset_type.asset_class != "XTZ" )
     ? await approve_arg(provider, left.maker, left.make, request.infinite)
     : undefined
   const args = (arg_approve) ? [ arg_approve ] : []
-  const pk = (request.edpk) ? request.edpk : await get_public_key(provider)
-  if (!pk) throw new Error("cannot get public key")
+
   const right = {
     ...invert_order(left, request.amount, pk),
     data: {
@@ -68,9 +73,9 @@ export async function fill_order_arg(
     },
   }
   const amount =
-    (left.make.asset_type.asset_class === "XTZ" && left.salt === 0n)
+    (left.make.asset_type.asset_class === "XTZ" && new BigNumber(0).isEqualTo(left.salt))
     ? get_real_value(provider, left)
-    : (right.make.asset_type.asset_class === "XTZ" && right.salt === 0n)
+    : (right.make.asset_type.asset_class === "XTZ" && new BigNumber(0).isEqualTo(right.salt))
     ? get_real_value(provider, right)
     : undefined
   const parameter = match_order_to_struct(provider, left, right)

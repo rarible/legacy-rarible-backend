@@ -1,12 +1,13 @@
 import { MichelsonData } from "@taquito/michel-codec"
 import { Provider, send, StorageFA1_2, StorageFA2,
          Asset, TransactionArg, OperationResult } from "../common/base"
+import BigNumber from "@taquito/rpc/node_modules/bignumber.js"
 
 export async function approve_fa1_2_arg(
   provider: Provider,
   owner: string,
   contract: string,
-  value: bigint,
+  value: BigNumber,
   infinite: boolean = true
 ) : Promise<TransactionArg | undefined > {
   const spender = provider.config.exchange
@@ -29,7 +30,7 @@ export async function approve_fa1_2(
   provider: Provider,
   owner: string,
   contract: string,
-  value: bigint,
+  value: BigNumber,
   infinite: boolean = true,
 ) : Promise<OperationResult | undefined> {
   const arg = await approve_fa1_2_arg(provider, owner, contract, value, infinite)
@@ -43,7 +44,7 @@ export async function approve_fa2_arg(
   provider: Provider,
   owner: string,
   contract: string,
-  token_id?: bigint) : Promise<TransactionArg | undefined> {
+  token_id?: BigNumber) : Promise<TransactionArg | undefined> {
   const operator = provider.config.exchange
   const st : StorageFA2 = await provider.tezos.storage(contract)
   let key_exists = false
@@ -82,7 +83,7 @@ export async function approve_fa2(
   provider: Provider,
   owner: string,
   contract: string,
-  token_id?: bigint) : Promise<OperationResult | undefined> {
+  token_id?: BigNumber) : Promise<OperationResult | undefined> {
   const arg = await approve_fa2_arg(provider, owner, contract, token_id)
   if (arg) {
     return send(provider, arg)

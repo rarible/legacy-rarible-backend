@@ -59,8 +59,7 @@ export async function beacon_provider(network: Network, name = "rarible") : Prom
   }
   const balance = async() => {
     const a = await address()
-    const b = await tk.tz.getBalance(a)
-    return BigInt(b.toString())
+    return tk.tz.getBalance(a)
   }
 
   return {

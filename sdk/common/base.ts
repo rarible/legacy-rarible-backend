@@ -1,6 +1,7 @@
 import { BigMapAbstraction, TransferParams, OriginateParams } from "@taquito/taquito"
 import { Config } from "../config/type"
 import { MichelsonData } from "@taquito/michel-codec"
+import BigNumber from "@taquito/rpc/node_modules/bignumber.js"
 const bs58check = require("bs58check")
 
 export interface StorageFA2 {
@@ -13,7 +14,7 @@ export interface StorageFA2 {
 
 export interface StorageFA1_2 {
   initialholder: string,
-  totalsupply: bigint,
+  totalsupply: BigNumber,
   ledger: BigMapAbstraction;
   allowance: BigMapAbstraction;
 }
@@ -30,13 +31,13 @@ export interface FTAssetType {
 export interface NFTAssetType {
   asset_class: "NFT";
   contract?: string;
-  token_id: bigint;
+  token_id: BigNumber;
 }
 
 export interface MultipleAssetType {
   asset_class: "MT";
   contract?: string;
-  token_id: bigint;
+  token_id: BigNumber;
 }
 
 export type TokenAssetType = FTAssetType | NFTAssetType | MultipleAssetType
@@ -44,13 +45,13 @@ export type AssetType = XTZAssetType | TokenAssetType
 
 export interface Asset {
   asset_type: AssetType;
-  value: bigint;
+  value: BigNumber;
 }
 
 export interface OperationResult {
   hash: string;
   confirmation: () => Promise<void>;
-  token_id?: bigint;
+  token_id?: BigNumber;
   contract?: string;
 }
 
@@ -63,7 +64,7 @@ export interface TezosProvider {
   address: () => Promise<string>;
   public_key: () => Promise<string | undefined>;
   storage: (contract: string) => Promise<any>;
-  balance: () => Promise<bigint>
+  balance: () => Promise<BigNumber>
 }
 
 export interface Provider {
@@ -74,7 +75,7 @@ export interface Provider {
 
 export interface TransactionArg {
   destination: string,
-  amount?: bigint,
+  amount?: BigNumber,
   entrypoint?: string,
   parameter?: MichelsonData
 }
@@ -107,15 +108,15 @@ export function asset_type_of_json(a: any) : AssetType {
       return {
         asset_class: a.assetClass,
         contract: a.contract,
-        token_id: BigInt(a.tokenId)
+        token_id: new BigNumber(a.tokenId)
       }
     default: throw new Error("Unknown Asset Class")
   }
 }
 
-export function mutez_to_tez(mu: bigint) : number {
-  const factor = 1000000n
-  return Number(mu / factor) + Number(mu % factor) / Number(factor)
+export function mutez_to_tez(mu: BigNumber) : number {
+  const factor = new BigNumber(1000000)
+  return Number(mu.div(factor).plus(mu.mod(factor).div(factor)))
 }
 
 export function asset_to_json(a: Asset) : any {
@@ -136,17 +137,17 @@ export function asset_to_json(a: Asset) : any {
 }
 
 export function asset_of_json(a: any) : Asset {
-  const factor = 1000000.
+  const factor = 1000000
     switch (a.assetType.assetClass) {
       case "XTZ":
         return {
           asset_type : asset_type_of_json(a.assetType),
-          value: BigInt(a.value * factor)
+          value: new BigNumber(a.value).multipliedBy(factor)
         }
       default:
         return {
           asset_type : asset_type_of_json(a.assetType),
-          value: BigInt(a.value)
+          value: new BigNumber(a.value)
         }
     }
 }

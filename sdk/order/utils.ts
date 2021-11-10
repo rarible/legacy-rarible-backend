@@ -1,4 +1,5 @@
 import { Asset, asset_to_json, asset_of_json } from "../common/base"
+import BigNumber from "@taquito/rpc/node_modules/bignumber.js"
 const bs58check = require('bs58check')
 const blake = require('blakejs');
 
@@ -24,7 +25,7 @@ export function pk_to_pkh(edpk: string) : string {
 
 export interface Part {
   account: string;
-  value: bigint;
+  value: BigNumber;
 }
 
 export interface OrderRaribleV2DataV1 {
@@ -41,7 +42,7 @@ export declare type OrderForm = {
   taker_edpk?: string;
   make: Asset;
   take: Asset;
-  salt: bigint;
+  salt: BigNumber;
   start?: number;
   end?: number;
   signature?: string;
@@ -53,7 +54,7 @@ function part_to_json(p: Part) {
 }
 
 function part_of_json(p: any) : Part {
-  return { account: p.account, value: BigInt(p.value) }
+  return { account: p.account, value: new BigNumber(p.value) }
 }
 
 function data_to_json(d: OrderRaribleV2DataV1) {
@@ -91,7 +92,7 @@ export function order_to_json(order: OrderForm) : any {
 export function order_of_json(order: any ) : OrderForm {
   const { salt, make, take, data, makerEdpk, takerEdpk, ...rest } = order
   return {
-    salt: BigInt(salt),
+    salt: new BigNumber(salt),
     make: asset_of_json(order.make),
     take: asset_of_json(order.take),
     data: data_of_json(data),
@@ -100,9 +101,9 @@ export function order_of_json(order: any ) : OrderForm {
     ...rest }
 }
 
-export function salt() : bigint {
+export function salt() : BigNumber {
   let a = new Uint8Array(32)
   a = crypto.getRandomValues(a)
   let h = a.reduce((acc, x) => acc + x.toString(16).padStart(2, '0'), '')
-  return BigInt('0x'+h)
+  return new BigNumber('0x'+h)
 }
