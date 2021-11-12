@@ -9,6 +9,7 @@ type collection = {
   col_kt1: string;
   col_alias: string;
   col_kind: [ `nft | `mt ];
+  col_privacy: [ `pub | `priv ];
   col_admin: account;
   col_source: account;
   col_royalties_contract: string;
