@@ -59,7 +59,16 @@ let command_result ?(f=(fun l -> String.concat " " @@ List.map String.trim l)) c
   | _, Unix.WEXITED 0 -> s
   | _ -> failwith (Format.sprintf "Error processing %S" cmd)
 
-let storage_nft ?(expiry=31536000000L) admin =
+let storage_public_nft ?(expiry=31536000000L) admin =
+  Format.sprintf {|{ %S; {}; {}; {}; {}; {}; {}; {}; %Ld; False; {Elt "" 0x} }|} admin expiry
+
+let storage_private_nft ?(expiry=31536000000L) admin =
+  Format.sprintf {|{ %S; {}; {}; {}; {}; {}; {}; {}; {}; %Ld; False; {Elt "" 0x} }|} admin expiry
+
+let storage_public_multi ?(expiry=31536000000L) admin =
+  Format.sprintf {|{ %S; {}; {}; {}; {}; {}; {}; {}; %Ld; False; {Elt "" 0x} }|} admin expiry
+
+let storage_private_multi ?(expiry=31536000000L) admin =
   Format.sprintf {|{ %S; {}; {}; {}; {}; {}; {}; {}; {}; %Ld; False; {Elt "" 0x} }|} admin expiry
 
 let storage_ubi admin =
@@ -408,7 +417,7 @@ let main () =
     | [ "compile"; "contract"; filename ] -> Some (compile_contract filename)
     | [ "deploy"; filename; storage ] -> deploy ~filename storage
     | [ "deploy_nft"; admin ] ->
-      deploy ~filename:"contracts/arl/fa2.arl" (storage_nft admin)
+      deploy ~filename:"contracts/arl/fa2.arl" (storage_public_nft admin)
     | [ "deploy_royalties"; admin ] ->
       deploy ~filename:"contracts/arl/royalties.arl" (storage_royalties ~admin)
     | [ "deploy_exchange"; admin; receiver; fee ] ->

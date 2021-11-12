@@ -115,6 +115,24 @@ let spec = [
   "--js", Arg.Set js, "use js sdk";
 ]
 
+let wait_next_block () =
+  let rec aux level0 =
+    Db.get_level () >>= function
+    | Ok level ->
+      Printf.eprintf "wait_next_block level0 %d level %d\n%!" level0 level ;
+      if level <> level0 then Lwt.return_unit
+      else
+        Lwt_unix.sleep 20. >>= fun () ->
+        aux level0
+    | Error err ->
+      Lwt.return @@ Format.eprintf "ERROR %s\n%!" @@ Crp.string_of_error err
+  in
+  Db.get_level () >>= function
+  | Error err ->
+    Lwt.return @@ Format.eprintf "wait_next_block error %s\n%!" @@ Crp.string_of_error err
+  | Ok level ->
+    aux level
+
 let by_pk i =
   match List.find_opt (fun a -> a.edpk = i) accounts with
   | None -> failwith @@ Format.sprintf "Not_found by_pk %s\n%!" i
@@ -406,9 +424,10 @@ let call_search_nft_all_collections () =
       aux ~continuation (collections.nft_collections_collections @ acc) in
   aux []
 
-let call_get_nft_item_by_id collection tid =
+let call_get_nft_item_by_id ?(verbose=0) collection tid =
   let url = EzAPI.BASE !api in
-  let|> r = EzReq_lwt.get1 url Api.get_nft_item_by_id_s
+  let msg = if verbose > 0 then Some "debug" else None in
+  let|> r = EzReq_lwt.get1 ?msg url Api.get_nft_item_by_id_s
       (Printf.sprintf "%s:%s" collection tid) in
   handle_ezreq_result r
   (*  >>= fun res ->
@@ -800,14 +819,14 @@ let find_kt1 contract_alias =
       end
     | Unix.WSIGNALED _ | Unix.WSTOPPED _ -> failwith "list_known_address failure"
 
-let deploy ?verbose ?burn_cap ~filename ~storage ~source alias =
+let deploy ?verbose ?(burn_cap=42.1) ~filename ~storage ~source alias =
   ignore verbose;
   let cmd =
     Script.deploy_aux
       ~verbose:!Script.verbose
       ~endpoint:!endpoint
       ~force:true
-      ?burn_cap
+      ~burn_cap
       ~filename
       storage
       source.tz1
@@ -816,7 +835,7 @@ let deploy ?verbose ?burn_cap ~filename ~storage ~source alias =
   if code <> 0 then
     failwith (Printf.sprintf "deploy failure : out %S err %S" out err)
 
-let create_collection ?(royalties=pick_royalties ()) ?alias ?(kind=`nft) () =
+let create_collection ?(royalties=pick_royalties ()) ?alias ?(kind=`nft) ?(privacy=`priv) () =
   let col_alias = generate_alias "collection" in
   let col_admin = match alias with None -> generate_address () | Some a -> by_alias a in
   may_import_key col_admin;
@@ -832,7 +851,7 @@ let create_collection ?(royalties=pick_royalties ()) ?alias ?(kind=`nft) () =
       Json_encoding.(obj2 (req "name" string) (opt "symbol" string))
       (name, symbol) in
   {col_admin; col_source; col_alias; col_royalties_contract=royalties;
-   col_metadata; col_kt1=""; col_kind=kind}
+   col_metadata; col_kt1=""; col_kind=kind; col_privacy=privacy}
 
 let create_collections ?royalties nb =
   let rec aux acc cpt =
@@ -868,10 +887,12 @@ let deploy_collection c =
     let col_kt1 = Script_js.deploy_collection ~endpoint:!endpoint c in
     Lwt.return { c with col_kt1 }
   else
-    let filename = match c.col_kind with
-      | `nft -> "contracts/arl/nft-private.arl"
-      | `mt -> "contracts/arl/mt-private.arl" in
-    let storage = Script.storage_nft c.col_admin.tz1 in
+    let filename, storage = match c.col_kind, c.col_privacy with
+      | `nft, `priv -> "contracts/arl/nft-private.arl", Script.storage_private_nft c.col_admin.tz1
+      | `mt, `priv -> "contracts/arl/mt-private.arl", Script.storage_private_multi c.col_admin.tz1
+      | `nft, `pub -> "contracts/arl/nft-public.arl", Script.storage_public_nft c.col_admin.tz1
+      | `mt, `pub -> "contracts/arl/mt-public.arl", Script.storage_public_multi c.col_admin.tz1 in
+    (* let storage = Script.storage_public_nft c.col_admin.tz1 in *)
     deploy ~filename ~storage ~source:c.col_source c.col_alias;
     Printf.eprintf "  deployed collection %s\n%!" c.col_alias ;
     let col_kt1 = find_kt1 c.col_alias in
@@ -1063,9 +1084,10 @@ let mint_with_random_token_id c =
   Lwt.return_ok item
 
 let mint_one_with_token_id_from_api ?diff ?alias c =
-  Printf.eprintf "mint_one_with_token_id_from_api for %s on %s\n%!" c.col_admin.tz1 c.col_kt1 ;
   let it_owner =
     match alias with None -> generate_address ?diff () | Some a -> by_alias a in
+  Printf.eprintf "mint_one_with_token_id_from_api for %s with %s on %s\n%!"
+    it_owner.tz1 c.col_admin.tz1 c.col_kt1 ;
   let it_royalties = generate_royalties () in
   let it_metadata = generate_ipfs_metadata () in
   let>? it_token_id = call_generate_token_id c.col_kt1 in
@@ -1138,7 +1160,7 @@ let transfer it =
       if Random.bool () then
         None, { it with it_owner = new_owner }, max_amount
       else
-        let a = Random.int64 max_amount in
+        let a = Int64.(add (Random.int64 (sub max_amount 1L)) 1L) in
         Some { it with it_kind = `mt (Int64.sub max_amount a) },
         { it with it_kind = `mt a; it_owner = new_owner }, a in
   let|> () = transfer_with_token_id it amount new_owner in
@@ -1385,9 +1407,9 @@ let check_item ?verbose ?strict it =
     List.exists (fun i -> check_nft_item ?verbose ?strict i it) items in
   let nft_ownership_exists ownerships =
     List.exists (fun o ->  check_nft_ownership o it) ownerships in
-  call_get_nft_item_by_id it.it_collection (Int64.to_string it.it_token_id) >|= begin function
+  call_get_nft_item_by_id ?verbose it.it_collection (Int64.to_string it.it_token_id) >|= begin function
     | Ok nft_item ->
-      if check_nft_item nft_item it then
+      if check_nft_item ?strict nft_item it then
         Printf.eprintf "[OK] check_item : item_by_id\n%!"
       else
         Printf.eprintf "[KO] check_item : item_by_id\n%!"
@@ -1831,16 +1853,14 @@ let check_transfer_activity ?(from=false) it =
 
 let mint_check_random ?verbose ?with_token_id collections =
   random_mint ?with_token_id collections >>=? fun item ->
-  Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
-  Unix.sleep 6 ;
+  wait_next_block () >>= fun () ->
   check_item ?verbose item >>= fun () ->
   check_mint_activity item >>= fun () ->
   Lwt.return_ok item
 
 let burn_check_random items =
   let> (items, updated_item) = random_burn items in
-  Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
-  Unix.sleep 6 ;
+  wait_next_block () >>= fun () ->
   let> () = match updated_item with
     | None -> Lwt.return_unit (* todo: check if amount is 0 *)
     | Some it -> check_item it in
@@ -1848,18 +1868,21 @@ let burn_check_random items =
 
 let transfer_check_random items =
   Printf.eprintf "before [%s]\n%!" @@ String.concat " ; " @@
-  List.map (fun it -> Printf.sprintf "%Ld:%s" it.it_token_id it.it_owner.tz1) items ;
+  List.map (fun it ->
+      let am = match it.it_kind with `nft -> 1L | `mt am -> am in
+      Printf.sprintf "%Ld:%s-%Ld" it.it_token_id it.it_owner.tz1 am) items ;
   let> (items, updated_item, new_item) = random_transfer items in
   Printf.eprintf "after [%s]\n%!" @@ String.concat " ; " @@
-  List.map (fun it -> Printf.sprintf "%Ld:%s" it.it_token_id it.it_owner.tz1) items ;
-  Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
-  Unix.sleep 6 ;
+  List.map (fun it ->
+      let am = match it.it_kind with `nft -> 1L | `mt am -> am in
+      Printf.sprintf "%Ld:%s-%Ld" it.it_token_id it.it_owner.tz1 am) items ;
+  wait_next_block () >>= fun () ->
   let> () = match updated_item with
     | None -> Lwt.return_unit (* todo: check if amount is 0 *)
     | Some it ->
-      let> () = check_item it in
+      let> () = check_item ~verbose:1 ~strict:false it in
       check_transfer_activity ~from:true it in
-  let> () = check_item new_item in
+  let> () = check_item ~strict:false new_item in
   check_transfer_activity new_item >>= fun () ->
   Lwt.return_ok items
 
@@ -1886,9 +1909,9 @@ let transfers_check_random ?(max=30) items =
   let rec aux acc cpt =
     if cpt = 0 then Lwt.return_ok acc
     else
-      transfer_check_random items >>=? fun items ->
-      aux (items @ acc) (cpt - 1) in
-  aux [] nb
+      transfer_check_random acc >>=? fun items ->
+      aux items (cpt - 1) in
+  aux items nb
 
 let check_collection co =
   let owner = co.col_admin.tz1 in
@@ -2009,7 +2032,6 @@ let make_config admin_wallet validator exchange_v2 royalties contracts ft_contra
       close_out c ;
       Lwt.return (temp_fn, Some kafka_temp_fn)
 
-
 let start_crawler admin_wallet validator exchange_v2 royalties
     contracts ft_contracts kafka_broker kafka_username kafka_password =
   make_config
@@ -2060,21 +2082,23 @@ let clean_test_env () =
   begin match !api_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
   match !crawler_pid with None -> () | Some pid -> Unix.kill pid 9
 
-let transfer_test () =
-  let c = create_collection () in
+let transfer_test ~kind ~privacy () =
+  let c = create_collection ~kind ~privacy () in
   let> c = deploy_collection c in
   let>? () = check_collection c in
   Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
   let> () = Lwt_unix.sleep 6. in
-  let>? item1 = mint_one_with_token_id_from_api c in
-  Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
-  let> () = Lwt_unix.sleep 6. in
+  let>? item1 = match kind with
+    | `nft -> mint_one_with_token_id_from_api c
+    | `mt ->  mint_with_token_id_from_api c in
+  wait_next_block () >>= fun () ->
   let> () = check_item item1 in
-  let>? item2 = mint_one_with_token_id_from_api c in
-  Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
-  let> () = Lwt_unix.sleep 6. in
+  let>? item2 = match kind with
+    | `nft -> mint_one_with_token_id_from_api c
+    | `mt ->  mint_with_token_id_from_api c in
+  wait_next_block () >>= fun () ->
   let> () = check_item item2 in
-  transfers_check_random ~max:2 [item1 ; item2] >>= begin function
+  transfers_check_random ~max:5 [item1 ; item2] >>= begin function
     | Error err ->
       Lwt.return_ok @@
       Printf.eprintf "transfer error %s" @@
@@ -2082,19 +2106,17 @@ let transfer_test () =
     | Ok _items -> Lwt.return_ok ()
   end
 
-let burn_test () =
-  let c = create_collection () in
+let burn_test ~kind ~privacy () =
+  let c = create_collection ~kind ~privacy () in
   let> c = deploy_collection c in
   let>? () = check_collection c in
   Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
   let> () = Lwt_unix.sleep 6. in
   let>? item1 = mint_one_with_token_id_from_api c in
-  Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
-  let> () = Lwt_unix.sleep 6. in
+  wait_next_block () >>= fun () ->
   let> () = check_item item1 in
   let> new_item1 = burn item1 in
-  Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
-  let> () = Lwt_unix.sleep 6. in
+  wait_next_block () >>= fun () ->
   let> () = match new_item1 with
     | None -> check_not_item item1
     | Some it -> check_item it in
@@ -2136,24 +2158,6 @@ let get_source_from_item ((owner, owner_sk), _amount, _token_id, _royalties, _me
 
 let get_token_id_from_item (_owner, _amount, token_id, _royalties, _metadata) =
   token_id
-
-let wait_next_block () =
-  let rec aux level0 =
-    Db.get_level () >>= function
-    | Ok level ->
-      Printf.eprintf "wait_next_block level0 %d level %d\n%!" level0 level ;
-      if level <> level0 then Lwt.return_unit
-      else
-        Lwt_unix.sleep 20. >>= fun () ->
-        aux level0
-    | Error err ->
-      Lwt.return @@ Format.eprintf "ERROR %s\n%!" @@ Crp.string_of_error err
-  in
-  Db.get_level () >>= function
-  | Error err ->
-    Lwt.return @@ Format.eprintf "wait_next_block error %s\n%!" @@ Crp.string_of_error err
-  | Ok level ->
-    aux level
 
 let match_orders_nft () =
   reset_db () ;
@@ -2277,7 +2281,7 @@ let match_orders_lugh () =
   let contract =  "KT1KvxhtWWhEDQJjH6pENJA8HN5UjBLGHYSg" in
   let source = by_alias "rarible1" in
   let c = {
-    col_kt1 = contract; col_alias = contract; col_kind=`nft;
+    col_kt1 = contract; col_alias = contract; col_kind=`nft; col_privacy=`priv;
     col_admin=source; col_source=source; col_royalties_contract=""; col_metadata="" } in
   (* let (admin, source, contract, royalties, uri) =
    *   create_collection ~royalties:r_kt1 () in
@@ -2476,11 +2480,14 @@ let main () =
    *   transfer_nft contract token_id dest
    * | "transfer_multi" :: contract :: token_id :: dest :: amount :: [] ->
    *   transfer_multi contract token_id dest amount *)
+
   | [ "private_nft_transfer" ] ->
     Lwt_main.run (
       Lwt.catch (fun () ->
+          let kind = `nft in
+          let privacy = `priv in
           setup_test_env () >>= fun () ->
-          transfer_test () >>= fun _ ->
+          transfer_test ~kind ~privacy () >>= fun _ ->
           Lwt.return @@ clean_test_env ())
         (fun exn ->
            Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
@@ -2488,8 +2495,10 @@ let main () =
   | [ "private_nft_burn" ] ->
     Lwt_main.run (
       Lwt.catch (fun () ->
+          let kind = `nft in
+          let privacy = `priv in
           setup_test_env () >>= fun () ->
-          burn_test () >>= fun _ ->
+          burn_test ~kind ~privacy () >>= fun _ ->
           Lwt.return @@ clean_test_env ())
         (fun exn ->
            Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
@@ -2497,13 +2506,121 @@ let main () =
   | [ "private_nft" ] ->
     Lwt_main.run (
       Lwt.catch (fun () ->
+          let kind = `nft in
+          let privacy = `priv in
           setup_test_env () >>= fun () ->
-          transfer_test () >>= fun _ ->
-          burn_test () >>= fun _ ->
+          transfer_test ~kind ~privacy () >>= fun _ ->
+          burn_test ~kind ~privacy () >>= fun _ ->
           Lwt.return @@ clean_test_env ())
         (fun exn ->
            Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
            Lwt.return @@ clean_test_env ()))
+
+  | [ "private_multi_transfer" ] ->
+    Lwt_main.run (
+      Lwt.catch (fun () ->
+          let kind = `mt in
+          let privacy = `priv in
+          setup_test_env () >>= fun () ->
+          transfer_test ~kind ~privacy () >>= fun _ ->
+          Lwt.return @@ clean_test_env ())
+        (fun exn ->
+           Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
+           Lwt.return @@ clean_test_env ()))
+  | [ "private_multi_burn" ] ->
+    Lwt_main.run (
+      Lwt.catch (fun () ->
+          let kind = `mt in
+          let privacy = `priv in
+          setup_test_env () >>= fun () ->
+          burn_test ~kind ~privacy () >>= fun _ ->
+          Lwt.return @@ clean_test_env ())
+        (fun exn ->
+           Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
+           Lwt.return @@ clean_test_env ()))
+  | [ "private_multi" ] ->
+    Lwt_main.run (
+      Lwt.catch (fun () ->
+          let kind = `mt in
+          let privacy = `priv in
+          setup_test_env () >>= fun () ->
+          transfer_test ~kind ~privacy () >>= fun _ ->
+          burn_test ~kind ~privacy () >>= fun _ ->
+          Lwt.return @@ clean_test_env ())
+        (fun exn ->
+           Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
+           Lwt.return @@ clean_test_env ()))
+
+  | [ "public_nft_transfer" ] ->
+    Lwt_main.run (
+      Lwt.catch (fun () ->
+          let kind = `nft in
+          let privacy = `pub in
+          setup_test_env () >>= fun () ->
+          transfer_test ~kind ~privacy () >>= fun _ ->
+          Lwt.return @@ clean_test_env ())
+        (fun exn ->
+           Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
+           Lwt.return @@ clean_test_env ()))
+  | [ "public_nft_burn" ] ->
+    Lwt_main.run (
+      Lwt.catch (fun () ->
+          let kind = `nft in
+          let privacy = `pub in
+          setup_test_env () >>= fun () ->
+          burn_test ~kind ~privacy () >>= fun _ ->
+          Lwt.return @@ clean_test_env ())
+        (fun exn ->
+           Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
+           Lwt.return @@ clean_test_env ()))
+  | [ "public_nft" ] ->
+    Lwt_main.run (
+      Lwt.catch (fun () ->
+          let kind = `nft in
+          let privacy = `pub in
+          setup_test_env () >>= fun () ->
+          transfer_test ~kind ~privacy () >>= fun _ ->
+          burn_test ~kind ~privacy () >>= fun _ ->
+          Lwt.return @@ clean_test_env ())
+        (fun exn ->
+           Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
+           Lwt.return @@ clean_test_env ()))
+
+  | [ "public_multi_transfer" ] ->
+    Lwt_main.run (
+      Lwt.catch (fun () ->
+          let kind = `mt in
+          let privacy = `pub in
+          setup_test_env () >>= fun () ->
+          transfer_test ~kind ~privacy () >>= fun _ ->
+          Lwt.return @@ clean_test_env ())
+        (fun exn ->
+           Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
+           Lwt.return @@ clean_test_env ()))
+  | [ "public_multi_burn" ] ->
+    Lwt_main.run (
+      Lwt.catch (fun () ->
+          let kind = `mt in
+          let privacy = `pub in
+          setup_test_env () >>= fun () ->
+          burn_test ~kind ~privacy () >>= fun _ ->
+          Lwt.return @@ clean_test_env ())
+        (fun exn ->
+           Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
+           Lwt.return @@ clean_test_env ()))
+  | [ "public_multi" ] ->
+    Lwt_main.run (
+      Lwt.catch (fun () ->
+          let kind = `mt in
+          let privacy = `pub in
+          setup_test_env () >>= fun () ->
+          transfer_test ~kind ~privacy () >>= fun _ ->
+          burn_test ~kind ~privacy () >>= fun _ ->
+          Lwt.return @@ clean_test_env ())
+        (fun exn ->
+           Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
+           Lwt.return @@ clean_test_env ()))
+
   | [ "match_order_nft_bid" ] ->
     Lwt_main.run (
       Lwt.catch (fun () ->
