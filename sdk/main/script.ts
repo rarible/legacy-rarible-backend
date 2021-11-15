@@ -69,7 +69,7 @@ async function main() {
 
     case 'mint':
       console.log("mint")
-      const op_mint = await mint(provider, argv.contract, royalties, amount, token_id_opt, undefined, argv.owner)
+      const op_mint = await mint(provider, argv.contract, royalties, amount, token_id_opt, metadata, argv.owner)
       await op_mint.confirmation()
       console.log(op_mint.hash)
       break
