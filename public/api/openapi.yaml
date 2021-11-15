@@ -596,6 +596,45 @@ paths:
               schema:
                 $ref: '#/components/schemas/Order'
       security: []
+  /v0.1/orders/byIds:
+    description: Get order by ids
+    get:
+      tags:
+      - order-controller
+      description: Get order by ids
+      operationId: getOrderByIds
+      parameters: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ids:
+                  type: array
+                  items:
+                    type: string
+              required:
+              - ids
+              additionalProperties: false
+      responses:
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                oneOf:
+                - $ref: '#/components/schemas/UNEXPECTED_API_ERROR'
+                - $ref: '#/components/schemas/INVALID_ARGUMENT'
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Order'
+      security: []
   /v0.1/orders/sell/byMaker:
     description: Get sell order by maker
     get:

@@ -23,6 +23,7 @@ let docs = List.map (fun (n, t, d) -> (n, (t, d, None, None))) @@ [
     (* Order controller *)
     "orders_upsert", "upsertOrder", "Create or update an order" ;
     "orders_all", "getOrdersAll", "Get all orders" ;
+    "orders_by_ids", "getOrderByIds", "Get order by ids" ;
     "orders_by_hash", "getOrderByHash", "Get order by hash" ;
     "orders_by_maker", "getSellOrdersByMaker", "Get sell order by maker" ;
     "orders_sell_by_item", "getSellOrderByItem", "Get sell order by item" ;
