@@ -970,6 +970,28 @@ let get_order_by_hash (_req, hash) () =
    name="orders_by_hash";
    section=orders_section}]
 
+let get_order_by_ids _req ids =
+  Lwt_list.fold_left_s (fun res id -> match res with
+      | Ok list ->
+        Db.get_order id >>= begin function
+          | Ok (Some order) -> Lwt.return @@ Ok (order :: list)
+          | Ok None -> Lwt.return @@ Ok list
+          | Error db_err ->
+            let str = Crawlori.Rp.string_of_error db_err in
+            Lwt.return (Error (`UNEXPECTED_API_ERROR str))
+        end
+      | _ -> Lwt.return res)
+    (Ok []) ids >>= function
+  | Ok orders -> return_ok orders
+  | Error api_err -> return (Error api_err)
+[@@get
+  {path="/v0.1/orders/byIds";
+   input=Json_encoding.(obj1 @@ req "ids" (list string));
+   output=(Json_encoding.list order_enc);
+   errors=[invalid_argument_case; unexpected_api_error_case];
+   name="orders_by_ids";
+   section=orders_section}]
+
 (* let update_order_make_stock _req () =
  *   return (Error (unexpected_api_error ""))
  * [@@get

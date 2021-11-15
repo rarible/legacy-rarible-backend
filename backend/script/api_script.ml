@@ -10,7 +10,7 @@ let api = ref "http://localhost:8080"
 let sdk = ref false
 let endpoint = ref "http://granada.tz.functori.com"
 
-let royalties = "KT19cCmBCni8hRLX8zKd9uaxwQNwNRV98YY1"
+let royalties = "KT1JPYtEMv8PHXfmLoMuWRLsVykoEou5AqKG"
 let validator = "KT1JrWXMuHp7nkX7j3trtxckVBiTyggDNnU1"
 let exchange_v2 = "KT1CfvTiEz9EVBLBLLYYFvRTwqyLsCvoZtWm"
 let lugh_contract = "KT1HT3EbSPFA1MM2ZiMThB6P6Kky5jebNgAx"
@@ -976,16 +976,33 @@ let set_validator validator source contract =
       Printf.eprintf "set_validator failure (log %s err %s)\n%!" out err
     else Lwt.return_unit
 
-let set_royalties id royalties source contract =
+let set_royalties ~contract ~id ~royalties source contract_royalties =
+  Printf.eprintf "set_royalties %s %Ld [%s]\n%!"
+    contract
+    id
+    (String.concat ";" @@ List.map (fun (s, i) -> Printf.sprintf "%s : %Ld" s i) royalties) ;
   if !js then
     Lwt.fail_with "TODO"
   else
     let cmd =
-      Script.set_royalties_aux ~endpoint:!endpoint ~id ~royalties source.tz1 contract in
+      Script.set_royalties_aux
+        ~endpoint:!endpoint ~contract ~id ~royalties source.tz1 contract_royalties in
     let code, out, err = sys_command cmd in
     if code <> 0 then
       Lwt.return @@
-      Printf.eprintf "set_validator failure (log %s err %s)\n%!" out err
+      Printf.eprintf "set_royalties failure (log %s err %s)\n%!" out err
+    else Lwt.return_unit
+
+let ubi_set_royalties id royalties source contract =
+  if !js then
+    Lwt.fail_with "TODO"
+  else
+    let cmd =
+      Script.ubi_set_royalties_aux ~endpoint:!endpoint ~id ~royalties source.tz1 contract in
+    let code, out, err = sys_command cmd in
+    if code <> 0 then
+      Lwt.return @@
+      Printf.eprintf "set_royalties failure (log %s err %s)\n%!" out err
     else Lwt.return_unit
 
 let update_operators_for_all operator source contract =
@@ -1192,7 +1209,12 @@ let call ?entrypoint ?fee ?gas_limit ?storage_limit ?counter
     Printf.eprintf "forge_tr error %s" @@ Tzfunc.Rp.string_of_error e ;
     Lwt.return_error e
   | Ok (bytes, protocol, branch, ops) ->
-    Tzfunc.Node.inject ~base ~sign ~bytes ~branch ~protocol ops
+    let>? sbytes = sign bytes in
+    match Binary.Writer.concat [Ok bytes; Ok sbytes] with
+    | Ok bytes ->
+      Tzfunc.Node.silent_inject ~base bytes
+    | Error _ -> assert false
+    (* Tzfunc.Node.inject ~base ~sign ~bytes ~branch ~protocol ops *)
 
 let mich_order order =
   let maker = order.order_elt.order_elt_maker in
@@ -2067,7 +2089,8 @@ let setup_test_env ?(spawn_exchange_infra=false) () =
     crawler_pid := Some cpid ;
     set_validator v_kt1 ex_admin ex_kt1 >>= fun () ->
     Printf.eprintf "Waiting 6sec to let crawler catch up...\n%!" ;
-    Lwt_unix.sleep 6.
+    Lwt_unix.sleep 6. >>= fun () ->
+    Lwt.return (r_kt1, ex_kt1)
   else
     start_crawler ""
       validator exchange_v2 royalties
@@ -2076,14 +2099,15 @@ let setup_test_env ?(spawn_exchange_infra=false) () =
     api_pid := Some (start_api kafka_config) ;
     crawler_pid := Some cpid ;
     Printf.eprintf "Waiting 6sec to let crawler catch up...\n%!" ;
-    Lwt_unix.sleep 6.
+    Lwt_unix.sleep 6. >>= fun () ->
+    Lwt.return (royalties, exchange_v2)
 
 let clean_test_env () =
   begin match !api_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
   match !crawler_pid with None -> () | Some pid -> Unix.kill pid 9
 
-let transfer_test ~kind ~privacy () =
-  let c = create_collection ~kind ~privacy () in
+let transfer_test ?royalties ~kind ~privacy () =
+  let c = create_collection ?royalties ~kind ~privacy () in
   let> c = deploy_collection c in
   let>? () = check_collection c in
   Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
@@ -2106,8 +2130,8 @@ let transfer_test ~kind ~privacy () =
     | Ok _items -> Lwt.return_ok ()
   end
 
-let burn_test ~kind ~privacy () =
-  let c = create_collection ~kind ~privacy () in
+let burn_test ?royalties ~kind ~privacy () =
+  let c = create_collection ?royalties ~kind ~privacy () in
   let> c = deploy_collection c in
   let>? () = check_collection c in
   Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
@@ -2159,24 +2183,8 @@ let get_source_from_item ((owner, owner_sk), _amount, _token_id, _royalties, _me
 let get_token_id_from_item (_owner, _amount, token_id, _royalties, _metadata) =
   token_id
 
-let match_orders_nft () =
-  reset_db () ;
-  let r_alias, _r_source = create_royalties () in
-  let r_kt1 = find_kt1 r_alias in
-  Printf.eprintf "New royalties %s\n%!" r_kt1 ;
-  let ex_alias, ex_admin, _ex_receiver = create_exchange () in
-  let ex_kt1 = find_kt1 ex_alias in
-  Printf.eprintf "New exchange %s\n%!" ex_kt1 ;
-  let v_alias, _v_source = create_validator ~exchange:ex_kt1 ~royalties:r_kt1 in
-  let v_kt1 = find_kt1 v_alias in
-  Printf.eprintf "New validator %s\n%!" v_kt1 ;
-  start_crawler "" v_kt1 ex_kt1 r_kt1 SMap.empty SMap.empty "" "" "" >>= fun (cpid, kafka_config) ->
-  api_pid := Some (start_api kafka_config) ;
-  crawler_pid := Some cpid ;
-  set_validator v_kt1 ex_admin ex_kt1 >>= fun () ->
-  Printf.eprintf "Waiting 6sec to let crawler catch up...\n%!" ;
-  Lwt_unix.sleep 6. >>= fun () ->
-  let c = create_collection ~royalties:r_kt1 () in
+let match_orders_nft ?royalties ?(exchange=exchange_v2) ~kind ~privacy () =
+  let c = create_collection ?royalties ~kind ~privacy () in
   let> c = deploy_collection c in
   let>? () = check_collection c in
   Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
@@ -2185,18 +2193,24 @@ let match_orders_nft () =
   Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
   let> () = Lwt_unix.sleep 6. in
   let> () = check_item item1 in
-  let> () = update_operators_for_all ex_kt1 item1.it_owner item1.it_collection in
+  let> () =
+    update_operators
+      item1.it_token_id
+      item1.it_owner.tz1
+      exchange
+      (item1.it_owner.tz1, item1.it_owner.edsk)
+      item1.it_collection in
   let>? item2 = mint_one_with_token_id_from_api ~diff:item1.it_owner.tz1 c in
-  Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
-  let> () = Lwt_unix.sleep 6. in
+  wait_next_block () >>= fun () ->
   let> () = check_item item2 in
-  let> () = update_operators_for_all ex_kt1 item2.it_owner item2.it_collection in
+  let> () = update_operators_for_all exchange item2.it_owner item2.it_collection in
+  wait_next_block () >>= fun () ->
   (* let tid = get_token_id_from_item item1 in *)
   let>? order1 = sell_nft_for_nft c.col_kt1 item1 item2 in
   (* TODO : check order *)
   let>? order2 = sell_nft_for_nft ~salt:1 c.col_kt1 item2 item1 in
   (* TODO : check order *)
-  let> r = match_orders ~source:item1.it_owner ~contract:ex_kt1 order1 order2 in
+  let> r = match_orders ~source:item1.it_owner ~contract:exchange order1 order2 in
   let> () = match r with
     | Error err ->
       Printf.eprintf "match_orders error %s" @@ Tzfunc.Rp.string_of_error err ;
@@ -2213,39 +2227,36 @@ let match_orders_nft () =
   begin match !crawler_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
   Lwt.return_ok ()
 
-let match_orders_tezos () =
-  reset_db () ;
-  let r_alias, _r_source = create_royalties () in
-  let r_kt1 = find_kt1 r_alias in
-  Printf.eprintf "New royalties %s\n%!" r_kt1 ;
-  let ex_alias, ex_admin, _ex_receiver = create_exchange () in
-  let ex_kt1 = find_kt1 ex_alias in
-  Printf.eprintf "New exchange %s\n%!" ex_kt1 ;
-  let v_alias, _v_source = create_validator ~exchange:ex_kt1 ~royalties:r_kt1 in
-  let v_kt1 = find_kt1 v_alias in
-  Printf.eprintf "New validator %s\n%!" v_kt1 ;
-  start_crawler "" v_kt1 ex_kt1 r_kt1 SMap.empty SMap.empty "" "" "" >>= fun (cpid, kafka_config) ->
-  api_pid := Some (start_api kafka_config) ;
-  crawler_pid := Some cpid ;
-  set_validator v_kt1 ex_admin ex_kt1 >>= fun () ->
-  Printf.eprintf "Waiting 6sec to let crawler catch up...\n%!" ;
-  Lwt_unix.sleep 6. >>= fun () ->
-  let c = create_collection ~royalties:r_kt1 () in
+let match_orders_tezos ?royalties ?(exchange=exchange_v2) ~kind ~privacy () =
+  let c = create_collection ?royalties ~kind ~privacy () in
   let> c = deploy_collection c in
   Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
   Lwt_unix.sleep 6. >>= fun () ->
   let>? () = check_collection c in
   let>? item1 = mint_one_with_token_id_from_api c in
-  Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
-  let> () = Lwt_unix.sleep 6. in
+  wait_next_block () >>= fun () ->
   let> () = check_item item1 in
-  let> () = update_operators_for_all ex_kt1 item1.it_owner c.col_kt1 in
+  let> () =
+    update_operators
+      item1.it_token_id
+      item1.it_owner.tz1
+      exchange
+      (item1.it_owner.tz1, item1.it_owner.edsk)
+      item1.it_collection in
+  (* let> () = update_operators_for_all exchange item1.it_owner c.col_kt1 in *)
+  wait_next_block () >>= fun () ->
+  let> () = set_royalties
+      ~contract:c.col_kt1 ~id:item1.it_token_id ~royalties:[]
+      item1.it_owner c.col_royalties_contract in
+  wait_next_block () >>= fun () ->
   let>? order1 = sell_nft_for_tezos ~salt:1 c.col_kt1 item1 1 in
   (* TODO : check order *)
   let source2 = generate_address ~diff:item1.it_owner.tz1 () in
   let>? order2 = buy_nft_for_tezos c.col_kt1 source2 item1 1 in
   (* TODO : check order *)
-  begin match_orders ~amount:1L ~source:source2 ~contract:ex_kt1 order2 order1 >>= function
+  begin
+    match_orders ~amount:1L ~source:source2 ~contract:exchange order2 order1
+    >>= function
     | Error err ->
       Printf.eprintf "match_orders error %s" @@ Tzfunc.Rp.string_of_error err ;
       Lwt.return_unit
@@ -2295,7 +2306,7 @@ let match_orders_lugh () =
   let> () = Lwt_unix.sleep 6. in
   let> () = check_item item1 in
   let royalties = generate_royalties () in
-  let> () = set_royalties item1.it_token_id royalties item1.it_owner r_kt1 in
+  let> () = ubi_set_royalties item1.it_token_id royalties item1.it_owner r_kt1 in
   let> () = update_operators_for_all ex_kt1 item1.it_owner contract in
   let>? order1 = sell_nft_for_lugh ~salt:1 contract item1 1 in
   (* TODO : check order *)
@@ -2486,8 +2497,8 @@ let main () =
       Lwt.catch (fun () ->
           let kind = `nft in
           let privacy = `priv in
-          setup_test_env () >>= fun () ->
-          transfer_test ~kind ~privacy () >>= fun _ ->
+          setup_test_env () >>= fun( royalties, _exchange) ->
+          transfer_test ~royalties ~kind ~privacy () >>= fun _ ->
           Lwt.return @@ clean_test_env ())
         (fun exn ->
            Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
@@ -2497,8 +2508,8 @@ let main () =
       Lwt.catch (fun () ->
           let kind = `nft in
           let privacy = `priv in
-          setup_test_env () >>= fun () ->
-          burn_test ~kind ~privacy () >>= fun _ ->
+          setup_test_env () >>= fun (royalties, _exchange) ->
+          burn_test ~royalties ~kind ~privacy () >>= fun _ ->
           Lwt.return @@ clean_test_env ())
         (fun exn ->
            Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
@@ -2508,8 +2519,8 @@ let main () =
       Lwt.catch (fun () ->
           let kind = `nft in
           let privacy = `priv in
-          setup_test_env () >>= fun () ->
-          transfer_test ~kind ~privacy () >>= fun _ ->
+          setup_test_env () >>= fun (royalties, _exchange) ->
+          transfer_test ~royalties ~kind ~privacy () >>= fun _ ->
           burn_test ~kind ~privacy () >>= fun _ ->
           Lwt.return @@ clean_test_env ())
         (fun exn ->
@@ -2521,8 +2532,8 @@ let main () =
       Lwt.catch (fun () ->
           let kind = `mt in
           let privacy = `priv in
-          setup_test_env () >>= fun () ->
-          transfer_test ~kind ~privacy () >>= fun _ ->
+          setup_test_env () >>= fun (royalties, _exchange) ->
+          transfer_test ~royalties ~kind ~privacy () >>= fun _ ->
           Lwt.return @@ clean_test_env ())
         (fun exn ->
            Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
@@ -2532,8 +2543,8 @@ let main () =
       Lwt.catch (fun () ->
           let kind = `mt in
           let privacy = `priv in
-          setup_test_env () >>= fun () ->
-          burn_test ~kind ~privacy () >>= fun _ ->
+          setup_test_env () >>= fun (royalties, _exchange) ->
+          burn_test ~royalties ~kind ~privacy () >>= fun _ ->
           Lwt.return @@ clean_test_env ())
         (fun exn ->
            Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
@@ -2543,8 +2554,8 @@ let main () =
       Lwt.catch (fun () ->
           let kind = `mt in
           let privacy = `priv in
-          setup_test_env () >>= fun () ->
-          transfer_test ~kind ~privacy () >>= fun _ ->
+          setup_test_env () >>= fun (royalties, _exchange) ->
+          transfer_test ~royalties ~kind ~privacy () >>= fun _ ->
           burn_test ~kind ~privacy () >>= fun _ ->
           Lwt.return @@ clean_test_env ())
         (fun exn ->
@@ -2556,8 +2567,8 @@ let main () =
       Lwt.catch (fun () ->
           let kind = `nft in
           let privacy = `pub in
-          setup_test_env () >>= fun () ->
-          transfer_test ~kind ~privacy () >>= fun _ ->
+          setup_test_env () >>= fun (royalties, _exchange) ->
+          transfer_test ~royalties ~kind ~privacy () >>= fun _ ->
           Lwt.return @@ clean_test_env ())
         (fun exn ->
            Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
@@ -2567,8 +2578,8 @@ let main () =
       Lwt.catch (fun () ->
           let kind = `nft in
           let privacy = `pub in
-          setup_test_env () >>= fun () ->
-          burn_test ~kind ~privacy () >>= fun _ ->
+          setup_test_env () >>= fun (royalties, _exchange) ->
+          burn_test ~royalties ~kind ~privacy () >>= fun _ ->
           Lwt.return @@ clean_test_env ())
         (fun exn ->
            Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
@@ -2578,9 +2589,9 @@ let main () =
       Lwt.catch (fun () ->
           let kind = `nft in
           let privacy = `pub in
-          setup_test_env () >>= fun () ->
-          transfer_test ~kind ~privacy () >>= fun _ ->
-          burn_test ~kind ~privacy () >>= fun _ ->
+          setup_test_env () >>= fun (royalties, _exchange) ->
+          transfer_test ~royalties ~kind ~privacy () >>= fun _ ->
+          burn_test ~royalties ~kind ~privacy () >>= fun _ ->
           Lwt.return @@ clean_test_env ())
         (fun exn ->
            Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
@@ -2591,8 +2602,8 @@ let main () =
       Lwt.catch (fun () ->
           let kind = `mt in
           let privacy = `pub in
-          setup_test_env () >>= fun () ->
-          transfer_test ~kind ~privacy () >>= fun _ ->
+          setup_test_env () >>= fun (royalties, _exchange) ->
+          transfer_test ~royalties ~kind ~privacy () >>= fun _ ->
           Lwt.return @@ clean_test_env ())
         (fun exn ->
            Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
@@ -2602,8 +2613,8 @@ let main () =
       Lwt.catch (fun () ->
           let kind = `mt in
           let privacy = `pub in
-          setup_test_env () >>= fun () ->
-          burn_test ~kind ~privacy () >>= fun _ ->
+          setup_test_env () >>= fun (royalties, _exchange) ->
+          burn_test ~royalties ~kind ~privacy () >>= fun _ ->
           Lwt.return @@ clean_test_env ())
         (fun exn ->
            Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
@@ -2613,9 +2624,9 @@ let main () =
       Lwt.catch (fun () ->
           let kind = `mt in
           let privacy = `pub in
-          setup_test_env () >>= fun () ->
-          transfer_test ~kind ~privacy () >>= fun _ ->
-          burn_test ~kind ~privacy () >>= fun _ ->
+          setup_test_env () >>= fun (royalties, _exchange) ->
+          transfer_test ~royalties ~kind ~privacy () >>= fun _ ->
+          burn_test ~royalties ~kind ~privacy () >>= fun _ ->
           Lwt.return @@ clean_test_env ())
         (fun exn ->
            Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
@@ -2624,10 +2635,11 @@ let main () =
   | [ "match_order_nft_bid" ] ->
     Lwt_main.run (
       Lwt.catch (fun () ->
-          match_orders_nft () >>= function
-          | Ok _ -> Lwt.return_unit
-          | Error err ->
-            Lwt.fail_with @@ Api.Errors.string_of_error err)
+          let kind = `nft in
+          let privacy = `priv in
+          setup_test_env () >>= fun (royalties, exchange) ->
+          match_orders_nft ~royalties ~exchange ~kind ~privacy () >>= fun _ ->
+          Lwt.return @@ clean_test_env ())
         (fun exn ->
            Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
            begin match !api_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
@@ -2636,10 +2648,11 @@ let main () =
   | [ "match_order_tezos_bid" ] ->
     Lwt_main.run (
       Lwt.catch (fun () ->
-          match_orders_tezos () >>= function
-          | Ok _ -> Lwt.return_unit
-          | Error err ->
-            Lwt.fail_with @@ Api.Errors.string_of_error err)
+          let kind = `nft in
+          let privacy = `priv in
+          setup_test_env () >>= fun (royalties, exchange) ->
+          match_orders_tezos ~royalties ~exchange ~kind ~privacy () >>= fun _ ->
+          Lwt.return @@ clean_test_env ())
         (fun exn ->
            Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
            begin match !api_pid with None -> () | Some pid -> Unix.kill pid 9 end ;

@@ -26,7 +26,8 @@ let mint_tokens ?endpoint c it =
   let cmd = Filename.quote_command !node @@
     [ !script; "mint"; "--contract"; it.it_collection; "--royalties"; royalties;
       "--token_id"; Int64.to_string it.it_token_id; "--edsk"; c.col_admin.edsk;
-      "--owner"; it.it_owner.tz1 ]
+      "--owner"; it.it_owner.tz1;
+      "--metadata" ; EzEncoding.construct Json_encoding.(assoc string) it.it_metadata ]
     @ supply @ endpoint in
   try
     let _ = Script.command_result cmd in

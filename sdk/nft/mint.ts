@@ -1,5 +1,5 @@
 import { MichelsonData } from "@taquito/michel-codec"
-import { Provider, send, TransactionArg, get_address, OperationResult } from "../common/base"
+import { Provider, send, TransactionArg, get_address, OperationResult, to_hex } from "../common/base"
 import BigNumber from "@taquito/rpc/node_modules/bignumber.js"
 
 function mint_param(
@@ -8,7 +8,7 @@ function mint_param(
   metadata: { [key: string]: string },
   royalties: { [key: string]: BigNumber },
   amount?: BigNumber) : MichelsonData {
-  const meta : MichelsonData = Object.keys(metadata).map(function(k) { return {prim: 'Elt', args: [ {string : k}, {bytes: metadata[k] } ] } })
+  const meta : MichelsonData = Object.keys(metadata).map(function(k) { return {prim: 'Elt', args: [ {string : k}, {bytes: to_hex(metadata[k]) } ] } })
   const roya = Object.keys(royalties).map(function(k) { return [ {string : k}, {int: royalties[k].toString() }] })
   if (amount==undefined) return [ { int : token_id.toString() }, { string : owner }, meta, roya ]
   else return [ { int : token_id.toString() }, { string : owner }, { int: amount.toString() }, meta, roya ]
@@ -19,7 +19,7 @@ function metadata_param(
   metadata : { [key: string] : string }) : MichelsonData {
   return [
     { int: token_id.toString() },
-    Object.keys(metadata).sort().map(function(k) { return {prim: 'Elt', args: [ {string : k}, {string: metadata[k] }] }})
+    Object.keys(metadata).sort().map(function(k) { return {prim: 'Elt', args: [ {string : k}, {bytes: to_hex(metadata[k]) }] }})
   ]
 }
 
