@@ -4,5 +4,6 @@
   ],
   "out": "../public/sdk",
   "readme": "none",
-  "name": "Rarible Tezos SDK"
+  "name": "Rarible Tezos SDK",
+  "gitRemote": "hub"
 }

@@ -35,9 +35,6 @@ deps:
 	@opam update
 	PGDATABASE=$(DB) opam install --deps-only .
 
-ts-global-deps:
-	@sudo npm i -g typescript webpack webpack-cli
-
 ts-deps:
 	@npm --prefix sdk --no-audit --no-fund i
 
@@ -65,6 +62,9 @@ openapi:
 
 kafka_openapi:
 	@cp -f _build/default/backend/api/kafka_openapi.yaml public/kafka
+
+typedoc-deps:
+	@sudo npm install -g typedoc
 
 typedoc:
 	@npx typedoc --tsconfig sdk/tsconfig.json --options sdk/typedoc.json
