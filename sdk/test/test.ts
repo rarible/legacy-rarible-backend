@@ -1,4 +1,4 @@
-import { storage, StorageFA2, get_balance } from "../main"
+import { check_asset_type } from "../main"
 import { in_memory_provider } from '../providers/in_memory/in_memory_provider'
 import BigNumber from "@taquito/rpc/node_modules/bignumber.js"
 
@@ -18,7 +18,7 @@ async function main() {
 
     const provider = {
       tezos,
-      api: "https://localhost:8080/v0.1",
+      api: "https://rarible-api.functori.com/v0.1/",
       config
     }
 
@@ -37,7 +37,9 @@ async function main() {
     //  op.confirmation().then(() => console.log(op.hash))
     // })
 
-  get_balance(provider, await tezos.address(), { asset_class: 'XTZ' }).then(console.log)
+  // get_balance(provider, await tezos.address(), { asset_class: 'XTZ' }).then(console.log)
+
+    check_asset_type(provider, {contract:"KT18ewjrhWB9ZZFYZkBACHxVEPuTtCg2eXPF", token_id: new BigNumber(6)}).then(console.log)
 
   } catch (e) {
     console.error(e)
