@@ -33,7 +33,7 @@ let balance_section =
 let sections = [
   nft_section; ownerships_section; items_section; collections_section;
   orders_section; order_activities_section; aggregation_section; order_bid_section;
-  signature_section; balance_section]
+  signature_section; balance_section; Kafka_openapi.kafka_section ]
 
 let pstring ?enc ?required name =
   let schema = Option.map (Json_encoding.schema ~definitions_path:"/components/schemas/") enc in

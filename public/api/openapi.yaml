@@ -1187,6 +1187,70 @@ paths:
               schema:
                 $ref: '#/components/schemas/FTBalance'
       security: []
+  /kafka/item:
+    summary: kafka_item
+    get:
+      tags:
+      - kafka-controller
+      summary: kafka_item
+      operationId: kafka_item
+      parameters: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NftItemEvent'
+      security: []
+  /kafka/order:
+    summary: kafka_order
+    get:
+      tags:
+      - kafka-controller
+      summary: kafka_order
+      operationId: kafka_order
+      parameters: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderEvent'
+      security: []
+  /kafka/ownership:
+    summary: kafka_ownership
+    get:
+      tags:
+      - kafka-controller
+      summary: kafka_ownership
+      operationId: kafka_ownership
+      parameters: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NftOwnershipEvent'
+      security: []
+  /kafka/activity:
+    summary: kafka_activity
+    get:
+      tags:
+      - kafka-controller
+      summary: kafka_activity
+      operationId: kafka_activity
+      parameters: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActivityType'
+      security: []
 components:
   schemas:
     ActivitySort:
@@ -1194,6 +1258,26 @@ components:
       enum:
       - LATEST_FIRST
       - EARLIEST_FIRST
+    ActivityType:
+      type: object
+      properties:
+        id:
+          type: string
+        date:
+          type: string
+          format: date-time
+        source:
+          type: string
+        type:
+          oneOf:
+          - $ref: '#/components/schemas/OrderActivityType'
+          - $ref: '#/components/schemas/NftActivityType'
+      required:
+      - type
+      - source
+      - date
+      - id
+      additionalProperties: false
     Address:
       type: string
     Asset:
@@ -1683,6 +1767,26 @@ components:
       required:
       - key
       additionalProperties: false
+    NftItemEvent:
+      type: object
+      properties:
+        eventId:
+          type: string
+        itemId:
+          type: string
+        type:
+          type: string
+          enum:
+          - UPDATE
+          - DELETE
+        item:
+          $ref: '#/components/schemas/NftItem'
+      required:
+      - item
+      - type
+      - itemId
+      - eventId
+      additionalProperties: false
     NftItemMeta:
       type: object
       properties:
@@ -1753,6 +1857,26 @@ components:
       - tokenId
       - contract
       - id
+      additionalProperties: false
+    NftOwnershipEvent:
+      type: object
+      properties:
+        eventId:
+          type: string
+        ownershipId:
+          type: string
+        type:
+          type: string
+          enum:
+          - UPDATE
+          - DELETE
+        ownership:
+          $ref: '#/components/schemas/NftOwnership'
+      required:
+      - ownership
+      - type
+      - ownershipId
+      - eventId
       additionalProperties: false
     NftOwnerships:
       type: object
@@ -2221,6 +2345,25 @@ components:
       required:
       - currencies
       - order_type
+      additionalProperties: false
+    OrderEvent:
+      type: object
+      properties:
+        eventId:
+          type: string
+        orderId:
+          type: string
+        type:
+          type: string
+          enum:
+          - UPDATE
+        order:
+          $ref: '#/components/schemas/Order'
+      required:
+      - order
+      - type
+      - orderId
+      - eventId
       additionalProperties: false
     OrderForm:
       type: object

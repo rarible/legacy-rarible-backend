@@ -1,6 +1,6 @@
 (library
  (name api)
- (modules api errors)
+ (modules api errors kafka_openapi)
  (preprocess (pps ppx_deriving_encoding ez_api.ppx_err_case ez_api.ppx))
  (libraries db let rtypes ez_api.server))
 
@@ -15,20 +15,8 @@
  (modules doc openapi)
  (libraries api ez_api.openAPI))
 
-(executable
- (name kafka_openapi)
- (modules kafka_openapi)
- (preprocess (pps ez_api.ppx))
- (libraries api ez_api.openAPI))
-
 (rule
  (deps openapi.exe)
  (targets openapi.yaml)
  (action (with-stdout-to %{targets}
           (run %{project_root}/backend/api/openapi.exe --title "Tezos Rarible API" --version "0.1" --yaml))))
-
-(rule
- (deps kafka_openapi.exe)
- (targets kafka_openapi.yaml)
- (action (with-stdout-to %{targets}
-          (run %{project_root}/backend/api/kafka_openapi.exe --title "Tezos Rarible Kafka Types" --version "0.1" -o "kafka_openapi" --yaml))))
