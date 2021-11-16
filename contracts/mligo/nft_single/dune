@@ -1,85 +1,85 @@
-(library
- (name nft)
- (package rarible)
- (modules
-   errors
-   types
-   assets
-   admin
-   manager
-   nft
- )
- (preprocess (pps mligo.ppx)))
+; (library
+;  (name nft)
+;  (package rarible)
+;  (modules
+;    errors
+;    types
+;    assets
+;    admin
+;    manager
+;    nft
+;  )
+;  (preprocess (pps mligo.ppx)))
 
-(library
- (name nft_test)
- (package rarible)
- (modules nft_test)
- (libraries nft)
- (preprocess (pps mligo.ppx)))
+; (library
+;  (name nft_test)
+;  (package rarible)
+;  (modules nft_test)
+;  (libraries nft)
+;  (preprocess (pps mligo.ppx)))
 
-(rule
- (deps
-   errors.ml
-   types.ml
-   assets.ml
-   admin.ml
-   manager.ml
-   nft.ml
-   nft_test.ml
- )
- (targets
-   errors.mligo
-   types.mligo
-   assets.mligo
-   admin.mligo
-   manager.mligo
-   nft.mligo
-   nft_test.mligo
- )
- (action
-   (progn
-    (run to_mligo nft.ml)
-    (run to_mligo nft_test.ml))))
+; (rule
+;  (deps
+;    errors.ml
+;    types.ml
+;    assets.ml
+;    admin.ml
+;    manager.ml
+;    nft.ml
+;    nft_test.ml
+;  )
+;  (targets
+;    errors.mligo
+;    types.mligo
+;    assets.mligo
+;    admin.mligo
+;    manager.mligo
+;    nft.mligo
+;    nft_test.mligo
+;  )
+;  (action
+;    (progn
+;     (run to_mligo nft.ml)
+;     (run to_mligo nft_test.ml))))
 
-(rule
- (alias runtest)
- (deps nft.mligo)
- (action (with-stdout-to nft.tz (run ligo compile contract nft.mligo -e main))))
+; (rule
+;  (alias runtest)
+;  (deps nft.mligo)
+;  (action (with-stdout-to nft.tz (run ligo compile contract nft.mligo -e main))))
 
-(rule
- (deps
-   errors.ml
-   types.ml
-   assets.ml
-   admin.ml
-   manager.ml
-   nft.ml
- )
- (targets nft_interface.ml)
- (action (run mligo_interface -s -o nft_interface.ml nft.ml)))
+; (rule
+;  (deps
+;    errors.ml
+;    types.ml
+;    assets.ml
+;    admin.ml
+;    manager.ml
+;    nft.ml
+;  )
+;  (targets nft_interface.ml)
+;  (action (run mligo_interface -s -o nft_interface.ml nft.ml)))
 
-(rule
- (deps
-   errors.ml
-   types.ml
-   assets.ml
-   admin.ml
-   manager.ml
-   nft.ml
- )
- (targets nft_tzfunc.ml)
- (action (run mligo_interface -o nft_tzfunc.ml nft.ml)))
+; (rule
+;  (deps
+;    errors.ml
+;    types.ml
+;    assets.ml
+;    admin.ml
+;    manager.ml
+;    nft.ml
+;  )
+;  (targets nft_tzfunc.ml)
+;  (action (run mligo_interface -o nft_tzfunc.ml nft.ml)))
 
-(library
- (name nft_interface)
- (package rarible)
- (modules nft_interface)
- (libraries nft mligo.unix))
+; (library
+;  (name nft_interface)
+;  (package rarible)
+;  (modules nft_interface)
+;  (libraries nft mligo.unix))
 
-(library
- (name nft_tzfunc)
- (package rarible)
- (optional)
- (modules nft_tzfunc)
- (libraries nft mligo.tzfunc))
+; (library
+;  (name nft_tzfunc)
+;  (package rarible)
+;  (optional)
+;  (modules nft_tzfunc)
+;  (libraries nft mligo.tzfunc))

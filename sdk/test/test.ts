@@ -1,14 +1,13 @@
-import { check_asset_type } from "../main"
+import { deploy_nft_public, mint, make_permit, add_permit, send } from "../main"
 import { in_memory_provider } from '../providers/in_memory/in_memory_provider'
 import BigNumber from "@taquito/rpc/node_modules/bignumber.js"
 
+// edsk3UUamwmemNBJgDvS8jXCgKsvjL2NoTwYRFpGSRPut4Hmfs6dG8 Mxs
+// edsk4RqeRTrhdKfJKBTndA9x1RLp4A3wtNL1iMFRXDvfs5ANeZAncZ ibJ
+// edsk368NmXyps5vKts1TrFTTAgReC5VN9NtPmL9Er86XUdHm2yWiaU aMw
 async function main() {
 
   try {
-    const tezos = in_memory_provider(
-      'edsk3UUamwmemNBJgDvS8jXCgKsvjL2NoTwYRFpGSRPut4Hmfs6dG8',
-      'https://granada.tz.functori.com')
-
     const config = {
       exchange: "KT1C5kWbfzASApxCMHXFLbHuPtnRaJXE4WMu",
       fees: new BigNumber(0),
@@ -16,11 +15,23 @@ async function main() {
       mt_public: "",
     }
 
-    const provider = {
-      tezos,
+    const tezos_mxs = in_memory_provider(
+      'edsk3UUamwmemNBJgDvS8jXCgKsvjL2NoTwYRFpGSRPut4Hmfs6dG8',
+      'https://granada.tz.functori.com')
+    const tezos_ibj = in_memory_provider(
+      'edsk4RqeRTrhdKfJKBTndA9x1RLp4A3wtNL1iMFRXDvfs5ANeZAncZ',
+      'https://granada.tz.functori.com')
+    const tezos_amw = in_memory_provider(
+      'edsk368NmXyps5vKts1TrFTTAgReC5VN9NtPmL9Er86XUdHm2yWiaU',
+      'https://granada.tz.functori.com')
+
+    const provider_mxs = {
+      tezos: tezos_mxs,
       api: "https://rarible-api.functori.com/v0.1/",
       config
     }
+    const provider_ibj = {...provider_mxs, tezos: tezos_ibj}
+    const provider_amw = {...provider_mxs, tezos: tezos_amw}
 
   // await mint(provider, "KT1VYBd25dw5GjYqPM8T8My6b4g5c4cd4hwu", {tz1ibJRnL6hHjAfmEzM7QtGyTsS6ZtHdgE2S: 10000n}, 100n, 101n)
 
@@ -32,14 +43,23 @@ async function main() {
 
     // burn(provider, { asset_class: "FA_2", contract: "KT1MWv7oH8JJhxJJs8co21XiByBEAYx2QDjY", token_id: 1n }, 1n)
 
-    // deploy_fa2(provider, "tz1ibJRnL6hHjAfmEzM7QtGyTsS6ZtHdgE2S", "KT1EZBkhGkRDxP6N1opkN8ULvnssG7f3PWoH").then(function (op) {
-    //  console.log('op', op)
-    //  op.confirmation().then(() => console.log(op.hash))
-    // })
-
   // get_balance(provider, await tezos.address(), { asset_class: 'XTZ' }).then(console.log)
 
-    check_asset_type(provider, {contract:"KT18ewjrhWB9ZZFYZkBACHxVEPuTtCg2eXPF", token_id: new BigNumber(6)}).then(console.log)
+    // check_asset_type(provider, {contract:"KT18ewjrhWB9ZZFYZkBACHxVEPuTtCg2eXPF", token_id: new BigNumber(6)}).then(console.log)
+
+    // const op = await deploy_nft_public(provider_mxs, await provider_mxs.tezos.address())
+    // const op = await mint(
+    //   provider_mxs, "KT1GYa864wjMe61cdtW1UowweC7YHrH6rWb4", {}, undefined, new BigNumber(0))
+    const {transfer, permit} = await make_permit(
+      provider_mxs, "KT1GYa864wjMe61cdtW1UowweC7YHrH6rWb4",
+      [ { destination: "tz1ibJRnL6hHjAfmEzM7QtGyTsS6ZtHdgE2S", token_id: new BigNumber(0) } ])
+
+    // const op = await add_permit(provider_amw, permit)
+
+    const op = await send(provider_amw, transfer)
+
+    console.log(op)
+    await op.confirmation()
 
   } catch (e) {
     console.error(e)

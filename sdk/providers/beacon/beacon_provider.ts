@@ -61,6 +61,7 @@ export async function beacon_provider(network: Network, name = "rarible") : Prom
     const a = await address()
     return tk.tz.getBalance(a)
   }
+  const chain_id = async () => tk.rpc.getChainId()
 
   return {
     kind: "beacon",
@@ -71,6 +72,7 @@ export async function beacon_provider(network: Network, name = "rarible") : Prom
     address,
     public_key,
     storage,
-    balance
+    balance,
+    chain_id,
   }
 }
