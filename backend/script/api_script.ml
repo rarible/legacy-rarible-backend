@@ -1209,12 +1209,7 @@ let call ?entrypoint ?fee ?gas_limit ?storage_limit ?counter
     Printf.eprintf "forge_tr error %s" @@ Tzfunc.Rp.string_of_error e ;
     Lwt.return_error e
   | Ok (bytes, protocol, branch, ops) ->
-    let>? sbytes = sign bytes in
-    match Binary.Writer.concat [Ok bytes; Ok sbytes] with
-    | Ok bytes ->
-      Tzfunc.Node.silent_inject ~base bytes
-    | Error _ -> assert false
-    (* Tzfunc.Node.inject ~base ~sign ~bytes ~branch ~protocol ops *)
+    Tzfunc.Node.inject ~base ~sign ~bytes ~branch ~protocol ops
 
 let mich_order order =
   let maker = order.order_elt.order_elt_maker in

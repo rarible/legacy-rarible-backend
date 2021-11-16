@@ -40,8 +40,8 @@ paths:
             application/json:
               schema:
                 oneOf:
-                - $ref: '#/components/schemas/UNEXPECTED_API_ERROR'
-                - $ref: '#/components/schemas/INVALID_ARGUMENT'
+                - $ref: '#/components/schemas/UNKNOWN'
+                - $ref: '#/components/schemas/BAD_REQUEST'
         "200":
           description: OK
           content:
@@ -69,8 +69,14 @@ paths:
             application/json:
               schema:
                 oneOf:
-                - $ref: '#/components/schemas/UNEXPECTED_API_ERROR'
-                - $ref: '#/components/schemas/INVALID_ARGUMENT'
+                - $ref: '#/components/schemas/UNKNOWN'
+                - $ref: '#/components/schemas/BAD_REQUEST'
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OWNERSHIP_NOT_FOUND'
         "200":
           description: OK
           content:
@@ -115,8 +121,8 @@ paths:
             application/json:
               schema:
                 oneOf:
-                - $ref: '#/components/schemas/UNEXPECTED_API_ERROR'
-                - $ref: '#/components/schemas/INVALID_ARGUMENT'
+                - $ref: '#/components/schemas/UNKNOWN'
+                - $ref: '#/components/schemas/BAD_REQUEST'
         "200":
           description: OK
           content:
@@ -151,8 +157,8 @@ paths:
             application/json:
               schema:
                 oneOf:
-                - $ref: '#/components/schemas/UNEXPECTED_API_ERROR'
-                - $ref: '#/components/schemas/INVALID_ARGUMENT'
+                - $ref: '#/components/schemas/UNKNOWN'
+                - $ref: '#/components/schemas/BAD_REQUEST'
         "200":
           description: OK
           content:
@@ -180,8 +186,8 @@ paths:
             application/json:
               schema:
                 oneOf:
-                - $ref: '#/components/schemas/UNEXPECTED_API_ERROR'
-                - $ref: '#/components/schemas/INVALID_ARGUMENT'
+                - $ref: '#/components/schemas/UNKNOWN'
+                - $ref: '#/components/schemas/BAD_REQUEST'
         "200":
           description: OK
           content:
@@ -214,8 +220,14 @@ paths:
             application/json:
               schema:
                 oneOf:
-                - $ref: '#/components/schemas/UNEXPECTED_API_ERROR'
-                - $ref: '#/components/schemas/INVALID_ARGUMENT'
+                - $ref: '#/components/schemas/UNKNOWN'
+                - $ref: '#/components/schemas/BAD_REQUEST'
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ITEM_NOT_FOUND'
         "200":
           description: OK
           content:
@@ -260,8 +272,8 @@ paths:
             application/json:
               schema:
                 oneOf:
-                - $ref: '#/components/schemas/UNEXPECTED_API_ERROR'
-                - $ref: '#/components/schemas/INVALID_ARGUMENT'
+                - $ref: '#/components/schemas/UNKNOWN'
+                - $ref: '#/components/schemas/BAD_REQUEST'
         "200":
           description: OK
           content:
@@ -306,8 +318,8 @@ paths:
             application/json:
               schema:
                 oneOf:
-                - $ref: '#/components/schemas/UNEXPECTED_API_ERROR'
-                - $ref: '#/components/schemas/INVALID_ARGUMENT'
+                - $ref: '#/components/schemas/UNKNOWN'
+                - $ref: '#/components/schemas/BAD_REQUEST'
         "200":
           description: OK
           content:
@@ -352,8 +364,8 @@ paths:
             application/json:
               schema:
                 oneOf:
-                - $ref: '#/components/schemas/UNEXPECTED_API_ERROR'
-                - $ref: '#/components/schemas/INVALID_ARGUMENT'
+                - $ref: '#/components/schemas/UNKNOWN'
+                - $ref: '#/components/schemas/BAD_REQUEST'
         "200":
           description: OK
           content:
@@ -381,8 +393,8 @@ paths:
             application/json:
               schema:
                 oneOf:
-                - $ref: '#/components/schemas/UNEXPECTED_API_ERROR'
-                - $ref: '#/components/schemas/INVALID_ARGUMENT'
+                - $ref: '#/components/schemas/UNKNOWN'
+                - $ref: '#/components/schemas/BAD_REQUEST'
         "200":
           description: OK
           content:
@@ -410,8 +422,14 @@ paths:
             application/json:
               schema:
                 oneOf:
-                - $ref: '#/components/schemas/UNEXPECTED_API_ERROR'
-                - $ref: '#/components/schemas/INVALID_ARGUMENT'
+                - $ref: '#/components/schemas/UNKNOWN'
+                - $ref: '#/components/schemas/BAD_REQUEST'
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/COLLECTION_NOT_FOUND'
         "200":
           description: OK
           content:
@@ -451,8 +469,8 @@ paths:
             application/json:
               schema:
                 oneOf:
-                - $ref: '#/components/schemas/UNEXPECTED_API_ERROR'
-                - $ref: '#/components/schemas/INVALID_ARGUMENT'
+                - $ref: '#/components/schemas/UNKNOWN'
+                - $ref: '#/components/schemas/BAD_REQUEST'
         "200":
           description: OK
           content:
@@ -487,8 +505,8 @@ paths:
             application/json:
               schema:
                 oneOf:
-                - $ref: '#/components/schemas/UNEXPECTED_API_ERROR'
-                - $ref: '#/components/schemas/INVALID_ARGUMENT'
+                - $ref: '#/components/schemas/UNKNOWN'
+                - $ref: '#/components/schemas/BAD_REQUEST'
         "200":
           description: OK
           content:
@@ -515,10 +533,16 @@ paths:
           content:
             application/json:
               schema:
+                $ref: '#/components/schemas/UNKNOWN'
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
                 oneOf:
-                - $ref: '#/components/schemas/VALIDATION'
-                - $ref: '#/components/schemas/UNEXPECTED_API_ERROR'
-                - $ref: '#/components/schemas/INVALID_ARGUMENT'
+                - $ref: '#/components/schemas/ORDER_INVALID_UPDATE'
+                - $ref: '#/components/schemas/ORDER_CANCELED'
+                - $ref: '#/components/schemas/INCORRECT_SIGNATURE'
         "200":
           description: OK
           content:
@@ -558,8 +582,8 @@ paths:
             application/json:
               schema:
                 oneOf:
-                - $ref: '#/components/schemas/UNEXPECTED_API_ERROR'
-                - $ref: '#/components/schemas/INVALID_ARGUMENT'
+                - $ref: '#/components/schemas/UNKNOWN'
+                - $ref: '#/components/schemas/BAD_REQUEST'
         "200":
           description: OK
           content:
@@ -587,8 +611,14 @@ paths:
             application/json:
               schema:
                 oneOf:
-                - $ref: '#/components/schemas/UNEXPECTED_API_ERROR'
+                - $ref: '#/components/schemas/UNKNOWN'
                 - $ref: '#/components/schemas/INVALID_ARGUMENT'
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ORDER_NOT_FOUND'
         "200":
           description: OK
           content:
@@ -624,8 +654,8 @@ paths:
             application/json:
               schema:
                 oneOf:
-                - $ref: '#/components/schemas/UNEXPECTED_API_ERROR'
-                - $ref: '#/components/schemas/INVALID_ARGUMENT'
+                - $ref: '#/components/schemas/UNKNOWN'
+                - $ref: '#/components/schemas/BAD_REQUEST'
         "200":
           description: OK
           content:
@@ -672,8 +702,8 @@ paths:
             application/json:
               schema:
                 oneOf:
-                - $ref: '#/components/schemas/UNEXPECTED_API_ERROR'
-                - $ref: '#/components/schemas/INVALID_ARGUMENT'
+                - $ref: '#/components/schemas/UNKNOWN'
+                - $ref: '#/components/schemas/BAD_REQUEST'
         "200":
           description: OK
           content:
@@ -752,7 +782,7 @@ paths:
             application/json:
               schema:
                 oneOf:
-                - $ref: '#/components/schemas/UNEXPECTED_API_ERROR'
+                - $ref: '#/components/schemas/UNKNOWN'
                 - $ref: '#/components/schemas/INVALID_ARGUMENT'
         "200":
           description: OK
@@ -798,7 +828,7 @@ paths:
             application/json:
               schema:
                 oneOf:
-                - $ref: '#/components/schemas/UNEXPECTED_API_ERROR'
+                - $ref: '#/components/schemas/UNKNOWN'
                 - $ref: '#/components/schemas/INVALID_ARGUMENT'
         "200":
           description: OK
@@ -839,7 +869,7 @@ paths:
             application/json:
               schema:
                 oneOf:
-                - $ref: '#/components/schemas/UNEXPECTED_API_ERROR'
+                - $ref: '#/components/schemas/UNKNOWN'
                 - $ref: '#/components/schemas/INVALID_ARGUMENT'
         "200":
           description: OK
@@ -885,7 +915,7 @@ paths:
             application/json:
               schema:
                 oneOf:
-                - $ref: '#/components/schemas/UNEXPECTED_API_ERROR'
+                - $ref: '#/components/schemas/UNKNOWN'
                 - $ref: '#/components/schemas/INVALID_ARGUMENT'
         "200":
           description: OK
@@ -965,7 +995,7 @@ paths:
             application/json:
               schema:
                 oneOf:
-                - $ref: '#/components/schemas/UNEXPECTED_API_ERROR'
+                - $ref: '#/components/schemas/UNKNOWN'
                 - $ref: '#/components/schemas/INVALID_ARGUMENT'
         "200":
           description: OK
@@ -999,7 +1029,7 @@ paths:
             application/json:
               schema:
                 oneOf:
-                - $ref: '#/components/schemas/UNEXPECTED_API_ERROR'
+                - $ref: '#/components/schemas/UNKNOWN'
                 - $ref: '#/components/schemas/BAD_REQUEST'
         "200":
           description: OK
@@ -1033,7 +1063,7 @@ paths:
             application/json:
               schema:
                 oneOf:
-                - $ref: '#/components/schemas/UNEXPECTED_API_ERROR'
+                - $ref: '#/components/schemas/UNKNOWN'
                 - $ref: '#/components/schemas/BAD_REQUEST'
         "200":
           description: OK
@@ -1079,7 +1109,7 @@ paths:
             application/json:
               schema:
                 oneOf:
-                - $ref: '#/components/schemas/UNEXPECTED_API_ERROR'
+                - $ref: '#/components/schemas/UNKNOWN'
                 - $ref: '#/components/schemas/INVALID_ARGUMENT'
         "200":
           description: OK
@@ -1108,7 +1138,7 @@ paths:
             application/json:
               schema:
                 oneOf:
-                - $ref: '#/components/schemas/UNEXPECTED_API_ERROR'
+                - $ref: '#/components/schemas/UNKNOWN'
                 - $ref: '#/components/schemas/INVALID_ARGUMENT'
         "200":
           description: OK
@@ -1141,7 +1171,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UNEXPECTED_API_ERROR'
+                $ref: '#/components/schemas/UNKNOWN'
         "404":
           description: Not Found
           content:
@@ -1248,6 +1278,19 @@ components:
       - owner
       - '@type'
       additionalProperties: false
+    COLLECTION_NOT_FOUND:
+      type: object
+      properties:
+        code:
+          type: string
+          enum:
+          - COLLECTION_NOT_FOUND
+        message:
+          type: string
+      required:
+      - message
+      - code
+      additionalProperties: false
     Edpk:
       type: string
     Edsig:
@@ -1279,6 +1322,19 @@ components:
       - owner
       - contract
       additionalProperties: false
+    INCORRECT_SIGNATURE:
+      type: object
+      properties:
+        code:
+          type: string
+          enum:
+          - INCORRECT_SIGNATURE
+        message:
+          type: string
+      required:
+      - message
+      - code
+      additionalProperties: false
     INVALID_ARGUMENT:
       type: object
       properties:
@@ -1286,6 +1342,19 @@ components:
           type: string
           enum:
           - INVALID_ARGUMENT
+        message:
+          type: string
+      required:
+      - message
+      - code
+      additionalProperties: false
+    ITEM_NOT_FOUND:
+      type: object
+      properties:
+        code:
+          type: string
+          enum:
+          - ITEM_NOT_FOUND
         message:
           type: string
       required:
@@ -1725,6 +1794,58 @@ components:
           $ref: '#/components/schemas/NftSignature'
       required:
       - tokenId
+      additionalProperties: false
+    ORDER_CANCELED:
+      type: object
+      properties:
+        code:
+          type: string
+          enum:
+          - ORDER_CANCELED
+        message:
+          type: string
+      required:
+      - message
+      - code
+      additionalProperties: false
+    ORDER_INVALID_UPDATE:
+      type: object
+      properties:
+        code:
+          type: string
+          enum:
+          - ORDER_INVALID_UPDATE
+        message:
+          type: string
+      required:
+      - message
+      - code
+      additionalProperties: false
+    ORDER_NOT_FOUND:
+      type: object
+      properties:
+        code:
+          type: string
+          enum:
+          - ORDER_NOT_FOUND
+        message:
+          type: string
+      required:
+      - message
+      - code
+      additionalProperties: false
+    OWNERSHIP_NOT_FOUND:
+      type: object
+      properties:
+        code:
+          type: string
+          enum:
+          - OWNERSHIP_NOT_FOUND
+        message:
+          type: string
+      required:
+      - message
+      - code
       additionalProperties: false
     Order:
       type: object
@@ -2258,26 +2379,13 @@ components:
       - elt
       - '@type'
       additionalProperties: false
-    UNEXPECTED_API_ERROR:
+    UNKNOWN:
       type: object
       properties:
         code:
           type: string
           enum:
-          - UNEXPECTED_API_ERROR
-        message:
-          type: string
-      required:
-      - message
-      - code
-      additionalProperties: false
-    VALIDATION:
-      type: object
-      properties:
-        code:
-          type: string
-          enum:
-          - VALIDATION
+          - UNKNOWN
         message:
           type: string
       required:

@@ -541,9 +541,12 @@ let get_nft_ownership_by_id ?dbh ?(old=false) contract token_id owner =
        from tokens where \
        main and contract = $contract and token_id = $token_id and \
        owner = $owner and (amount > 0 or $old)"] in
-  let>? obj = one l in
-  let>? nft_ownership = mk_nft_ownership dbh obj in
-  Lwt.return_ok nft_ownership
+  match l with
+  | [] -> Lwt.return_error (`hook_error "not found")
+  | _ ->
+    let>? obj = one l in
+    let>? nft_ownership = mk_nft_ownership dbh obj in
+    Lwt.return_ok nft_ownership
 
 (* let get_nft_item_royalties ?dbh id =
  *   use dbh @@ fun dbh ->
@@ -756,7 +759,7 @@ let get_nft_item_by_id ?dbh ?include_meta contract token_id =
   | obj :: _ ->
     let>? nft_item = mk_nft_item dbh ?include_meta obj in
     Lwt.return_ok nft_item
-  | [] -> Lwt.return_error (`hook_error "nft_item not found")
+  | [] -> Lwt.return_error (`hook_error "not found")
 
 let produce_order_event_hash dbh hash =
   let>? order = get_order ~dbh hash in
