@@ -28,6 +28,3 @@ let kafka_section =
    name="kafka_activity";
    output=Rtypes.activity_type_enc;
    section=kafka_section}]
-
-let () =
-  EzOpenAPI.executable ~sections:[kafka_section] ~docs:[]

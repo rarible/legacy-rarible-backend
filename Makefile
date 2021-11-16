@@ -9,7 +9,7 @@ all: copy
 build:
 	@CRAWLORI_NO_UPDATE=true PGDATABASE=$(DB) PGCUSTOM_CONVERTERS_CONFIG=$(CONVERTERS) dune build backend
 
-copy: build openapi kafka_openapi
+copy: build openapi
 	@mkdir -p _bin
 	@cp -f _build/default/backend/crawler/crawler.exe _bin/crawler
 	@cp -f _build/default/backend/api/main_api.exe _bin/api
@@ -59,9 +59,6 @@ arl:
 
 openapi:
 	@cp -f _build/default/backend/api/openapi.yaml public/api
-
-kafka_openapi:
-	@cp -f _build/default/backend/api/kafka_openapi.yaml public/kafka
 
 typedoc-deps:
 	@sudo npm install -g typedoc
