@@ -409,6 +409,66 @@ paths:
               schema:
                 $ref: '#/components/schemas/NftItems'
       security: []
+  /v0.1/items/all:
+    description: Returns all NFT items
+    get:
+      tags:
+      - nft-item-controller
+      description: Returns all NFT items
+      operationId: getNftAllItems
+      parameters:
+      - name: lastUpdateFrom
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: lastUpdateTo
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: showDeleted
+        in: query
+        required: false
+        schema:
+          type: boolean
+      - name: includeMeta
+        in: query
+        required: false
+        schema:
+          type: boolean
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740992
+      - name: continuation
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadRequest'
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NftItems'
+      security: []
   /v0.1/collections/{collection}/generate_token_id:
     description: collections_generate_id
     get:

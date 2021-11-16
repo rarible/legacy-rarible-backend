@@ -721,7 +721,9 @@ let get_nft_all_items req () =
    params=[last_updated_from_param;last_updated_to_param;show_deleted_param;
            include_meta_param;size_param;continuation_param];
    output=nft_items_enc;
-   errors=[bad_request_case;unexpected_case]}]
+   errors=[bad_request_case;unexpected_case];
+   name="items_all";
+   section=items_section}]
 
 (* nft-collection-controller *)
 let generate_nft_token_id (_req, collection) () =
