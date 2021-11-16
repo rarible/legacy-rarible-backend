@@ -375,7 +375,7 @@ let buy_order_form_from_item ?(salt=0) collection item1 maker make =
 let handle_ezreq_result = function
   | Ok x -> Ok x
   | Error (EzReq_lwt_S.UnknownError {msg; _}) ->
-    Error (`UNKNOWN (match msg with None -> "" | Some s -> s))
+    Error {Api.Errors.code=`UNEXPECTED_API_ERROR; message=match msg with None -> "" | Some s -> s}
   | Error (EzReq_lwt_S.KnownError {error; _}) -> Error error
 
 let call_upsert_order order_form =
