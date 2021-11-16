@@ -1242,13 +1242,13 @@ let insert_token_metadata ~dbh ~op ~contract (token_id, l) =
       begin
         get_metadata_json meta >>= function
         | Ok (json, metadata) -> Lwt.return_ok (json, Some metadata)
-      | Error (code, str) ->
-        Printf.eprintf "Cannot get metadata from url: %d %s\n%!"
-          code (match str with None -> "None" | Some s -> s);
-        Lwt.return_ok (meta, None)
-    end
-  | None ->
-    Lwt.return_ok (EzEncoding.construct Rtypes.token_metadata_enc l, None) in
+        | Error (code, str) ->
+          Printf.eprintf "Cannot get metadata from url: %d %s\n%!"
+            code (match str with None -> "None" | Some s -> s);
+          Lwt.return_ok (EzEncoding.construct Rtypes.token_metadata_enc l, None)
+      end
+    | None ->
+      Lwt.return_ok (EzEncoding.construct Rtypes.token_metadata_enc l, None) in
   let source = op.bo_op.source in
   let block = op.bo_block in
   let level = op.bo_level in
