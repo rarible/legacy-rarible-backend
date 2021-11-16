@@ -39,9 +39,13 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
-                - $ref: '#/components/schemas/UNKNOWN'
-                - $ref: '#/components/schemas/BAD_REQUEST'
+                $ref: '#/components/schemas/ServerError'
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadRequest'
         "200":
           description: OK
           content:
@@ -68,15 +72,19 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
-                - $ref: '#/components/schemas/UNKNOWN'
-                - $ref: '#/components/schemas/BAD_REQUEST'
+                $ref: '#/components/schemas/ServerError'
         "404":
           description: Not Found
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/OWNERSHIP_NOT_FOUND'
+                $ref: '#/components/schemas/EntityNotFound'
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadRequest'
         "200":
           description: OK
           content:
@@ -120,9 +128,13 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
-                - $ref: '#/components/schemas/UNKNOWN'
-                - $ref: '#/components/schemas/BAD_REQUEST'
+                $ref: '#/components/schemas/ServerError'
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadRequest'
         "200":
           description: OK
           content:
@@ -156,9 +168,13 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
-                - $ref: '#/components/schemas/UNKNOWN'
-                - $ref: '#/components/schemas/BAD_REQUEST'
+                $ref: '#/components/schemas/ServerError'
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadRequest'
         "200":
           description: OK
           content:
@@ -185,9 +201,13 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
-                - $ref: '#/components/schemas/UNKNOWN'
-                - $ref: '#/components/schemas/BAD_REQUEST'
+                $ref: '#/components/schemas/ServerError'
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadRequest'
         "200":
           description: OK
           content:
@@ -219,15 +239,19 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
-                - $ref: '#/components/schemas/UNKNOWN'
-                - $ref: '#/components/schemas/BAD_REQUEST'
+                $ref: '#/components/schemas/ServerError'
         "404":
           description: Not Found
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ITEM_NOT_FOUND'
+                $ref: '#/components/schemas/EntityNotFound'
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadRequest'
         "200":
           description: OK
           content:
@@ -271,9 +295,13 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
-                - $ref: '#/components/schemas/UNKNOWN'
-                - $ref: '#/components/schemas/BAD_REQUEST'
+                $ref: '#/components/schemas/ServerError'
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadRequest'
         "200":
           description: OK
           content:
@@ -317,9 +345,13 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
-                - $ref: '#/components/schemas/UNKNOWN'
-                - $ref: '#/components/schemas/BAD_REQUEST'
+                $ref: '#/components/schemas/ServerError'
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadRequest'
         "200":
           description: OK
           content:
@@ -363,9 +395,13 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
-                - $ref: '#/components/schemas/UNKNOWN'
-                - $ref: '#/components/schemas/BAD_REQUEST'
+                $ref: '#/components/schemas/ServerError'
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadRequest'
         "200":
           description: OK
           content:
@@ -392,9 +428,13 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
-                - $ref: '#/components/schemas/UNKNOWN'
-                - $ref: '#/components/schemas/BAD_REQUEST'
+                $ref: '#/components/schemas/ServerError'
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadRequest'
         "200":
           description: OK
           content:
@@ -421,15 +461,19 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
-                - $ref: '#/components/schemas/UNKNOWN'
-                - $ref: '#/components/schemas/BAD_REQUEST'
+                $ref: '#/components/schemas/ServerError'
         "404":
           description: Not Found
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/COLLECTION_NOT_FOUND'
+                $ref: '#/components/schemas/EntityNotFound'
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadRequest'
         "200":
           description: OK
           content:
@@ -468,9 +512,13 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
-                - $ref: '#/components/schemas/UNKNOWN'
-                - $ref: '#/components/schemas/BAD_REQUEST'
+                $ref: '#/components/schemas/ServerError'
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadRequest'
         "200":
           description: OK
           content:
@@ -504,9 +552,13 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
-                - $ref: '#/components/schemas/UNKNOWN'
-                - $ref: '#/components/schemas/BAD_REQUEST'
+                $ref: '#/components/schemas/ServerError'
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadRequest'
         "200":
           description: OK
           content:
@@ -533,16 +585,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UNKNOWN'
+                $ref: '#/components/schemas/ServerError'
         "400":
           description: Bad Request
           content:
             application/json:
               schema:
-                oneOf:
-                - $ref: '#/components/schemas/ORDER_INVALID_UPDATE'
-                - $ref: '#/components/schemas/ORDER_CANCELED'
-                - $ref: '#/components/schemas/INCORRECT_SIGNATURE'
+                $ref: '#/components/schemas/OrderError'
         "200":
           description: OK
           content:
@@ -581,9 +630,13 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
-                - $ref: '#/components/schemas/UNKNOWN'
-                - $ref: '#/components/schemas/BAD_REQUEST'
+                $ref: '#/components/schemas/ServerError'
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadRequest'
         "200":
           description: OK
           content:
@@ -610,15 +663,19 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
-                - $ref: '#/components/schemas/UNKNOWN'
-                - $ref: '#/components/schemas/INVALID_ARGUMENT'
+                $ref: '#/components/schemas/ServerError'
         "404":
           description: Not Found
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ORDER_NOT_FOUND'
+                $ref: '#/components/schemas/EntityNotFound'
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadRequest'
         "200":
           description: OK
           content:
@@ -645,9 +702,13 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
-                - $ref: '#/components/schemas/UNKNOWN'
-                - $ref: '#/components/schemas/BAD_REQUEST'
+                $ref: '#/components/schemas/ServerError'
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadRequest'
         "200":
           description: OK
           content:
@@ -693,9 +754,13 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
-                - $ref: '#/components/schemas/UNKNOWN'
-                - $ref: '#/components/schemas/BAD_REQUEST'
+                $ref: '#/components/schemas/ServerError'
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadRequest'
         "200":
           description: OK
           content:
@@ -775,9 +840,13 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
-                - $ref: '#/components/schemas/UNKNOWN'
-                - $ref: '#/components/schemas/INVALID_ARGUMENT'
+                $ref: '#/components/schemas/ServerError'
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadRequest'
         "200":
           description: OK
           content:
@@ -821,9 +890,13 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
-                - $ref: '#/components/schemas/UNKNOWN'
-                - $ref: '#/components/schemas/INVALID_ARGUMENT'
+                $ref: '#/components/schemas/ServerError'
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadRequest'
         "200":
           description: OK
           content:
@@ -862,9 +935,13 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
-                - $ref: '#/components/schemas/UNKNOWN'
-                - $ref: '#/components/schemas/INVALID_ARGUMENT'
+                $ref: '#/components/schemas/ServerError'
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadRequest'
         "200":
           description: OK
           content:
@@ -908,9 +985,13 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
-                - $ref: '#/components/schemas/UNKNOWN'
-                - $ref: '#/components/schemas/INVALID_ARGUMENT'
+                $ref: '#/components/schemas/ServerError'
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadRequest'
         "200":
           description: OK
           content:
@@ -990,9 +1071,13 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
-                - $ref: '#/components/schemas/UNKNOWN'
-                - $ref: '#/components/schemas/INVALID_ARGUMENT'
+                $ref: '#/components/schemas/ServerError'
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadRequest'
         "200":
           description: OK
           content:
@@ -1024,9 +1109,13 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
-                - $ref: '#/components/schemas/UNKNOWN'
-                - $ref: '#/components/schemas/BAD_REQUEST'
+                $ref: '#/components/schemas/ServerError'
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadRequest'
         "200":
           description: OK
           content:
@@ -1058,9 +1147,13 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
-                - $ref: '#/components/schemas/UNKNOWN'
-                - $ref: '#/components/schemas/BAD_REQUEST'
+                $ref: '#/components/schemas/ServerError'
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadRequest'
         "200":
           description: OK
           content:
@@ -1104,9 +1197,13 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
-                - $ref: '#/components/schemas/UNKNOWN'
-                - $ref: '#/components/schemas/INVALID_ARGUMENT'
+                $ref: '#/components/schemas/ServerError'
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadRequest'
         "200":
           description: OK
           content:
@@ -1133,9 +1230,13 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
-                - $ref: '#/components/schemas/UNKNOWN'
-                - $ref: '#/components/schemas/INVALID_ARGUMENT'
+                $ref: '#/components/schemas/ServerError'
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadRequest'
         "200":
           description: OK
           content:
@@ -1143,7 +1244,7 @@ paths:
               schema:
                 type: boolean
       security: []
-  /v0.1/balances/{contrac}/{owne}:
+  /v0.1/balances/{contract}/{owner}:
     summary: ft_balance
     get:
       tags:
@@ -1151,12 +1252,12 @@ paths:
       summary: ft_balance
       operationId: ft_balance
       parameters:
-      - name: contrac
+      - name: contract
         in: path
         required: true
         schema:
           type: string
-      - name: owne
+      - name: owner
         in: path
         required: true
         schema:
@@ -1167,15 +1268,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UNKNOWN'
+                $ref: '#/components/schemas/ServerError'
         "404":
           description: Not Found
           content:
             application/json:
               schema:
-                oneOf:
-                - $ref: '#/components/schemas/BALANCE_NOT_FOUND'
-                - $ref: '#/components/schemas/TOKEN_NOT_FOUND'
+                $ref: '#/components/schemas/EntityNotFound'
         "200":
           description: OK
           content:
@@ -1255,25 +1354,312 @@ components:
       - LATEST_FIRST
       - EARLIEST_FIRST
     ActivityType:
-      type: object
-      properties:
-        id:
-          type: string
-        date:
-          type: string
-          format: date-time
-        source:
-          type: string
-        type:
-          oneOf:
-          - $ref: '#/components/schemas/OrderActivityType'
-          - $ref: '#/components/schemas/NftActivityType'
-      required:
-      - type
-      - source
-      - date
-      - id
-      additionalProperties: false
+      oneOf:
+      - type: object
+        properties:
+          id:
+            type: string
+          date:
+            type: string
+            format: date-time
+          source:
+            type: string
+          '@type':
+            type: string
+            enum:
+            - match
+          left:
+            $ref: '#/components/schemas/OrderActivitySideMatch'
+          right:
+            $ref: '#/components/schemas/OrderActivitySideMatch'
+          price:
+            $ref: '#/components/schemas/BigDecimal'
+          transactionHash:
+            $ref: '#/components/schemas/Word'
+          blockHash:
+            $ref: '#/components/schemas/Word'
+          blockNumber:
+            $ref: '#/components/schemas/BlockNumber'
+          logIndex:
+            type: integer
+            minimum: -1073741824
+            maximum: 1073741823
+        required:
+        - logIndex
+        - blockNumber
+        - blockHash
+        - transactionHash
+        - price
+        - right
+        - left
+        - '@type'
+        - source
+        - date
+        - id
+        additionalProperties: false
+      - type: object
+        properties:
+          id:
+            type: string
+          date:
+            type: string
+            format: date-time
+          source:
+            type: string
+          '@type':
+            type: string
+            enum:
+            - list
+          hash:
+            $ref: '#/components/schemas/Word'
+          maker:
+            $ref: '#/components/schemas/Address'
+          make:
+            $ref: '#/components/schemas/Asset'
+          take:
+            $ref: '#/components/schemas/Asset'
+          price:
+            $ref: '#/components/schemas/BigDecimal'
+        required:
+        - price
+        - take
+        - make
+        - maker
+        - hash
+        - '@type'
+        - source
+        - date
+        - id
+        additionalProperties: false
+      - type: object
+        properties:
+          id:
+            type: string
+          date:
+            type: string
+            format: date-time
+          source:
+            type: string
+          '@type':
+            type: string
+            enum:
+            - bid
+          hash:
+            $ref: '#/components/schemas/Word'
+          maker:
+            $ref: '#/components/schemas/Address'
+          make:
+            $ref: '#/components/schemas/Asset'
+          take:
+            $ref: '#/components/schemas/Asset'
+          price:
+            $ref: '#/components/schemas/BigDecimal'
+        required:
+        - price
+        - take
+        - make
+        - maker
+        - hash
+        - '@type'
+        - source
+        - date
+        - id
+        additionalProperties: false
+      - type: object
+        properties:
+          id:
+            type: string
+          date:
+            type: string
+            format: date-time
+          source:
+            type: string
+          '@type':
+            type: string
+            enum:
+            - cancel_bid
+          hash:
+            $ref: '#/components/schemas/Word'
+          maker:
+            $ref: '#/components/schemas/Address'
+          make:
+            $ref: '#/components/schemas/AssetType'
+          take:
+            $ref: '#/components/schemas/AssetType'
+          transactionHash:
+            $ref: '#/components/schemas/Word'
+          blockHash:
+            $ref: '#/components/schemas/Word'
+          blockNumber:
+            $ref: '#/components/schemas/BlockNumber'
+          logIndex:
+            type: integer
+            minimum: -1073741824
+            maximum: 1073741823
+        required:
+        - logIndex
+        - blockNumber
+        - blockHash
+        - transactionHash
+        - take
+        - make
+        - maker
+        - hash
+        - '@type'
+        - source
+        - date
+        - id
+        additionalProperties: false
+      - type: object
+        properties:
+          id:
+            type: string
+          date:
+            type: string
+            format: date-time
+          source:
+            type: string
+          '@type':
+            type: string
+            enum:
+            - cancel_list
+          hash:
+            $ref: '#/components/schemas/Word'
+          maker:
+            $ref: '#/components/schemas/Address'
+          make:
+            $ref: '#/components/schemas/AssetType'
+          take:
+            $ref: '#/components/schemas/AssetType'
+          transactionHash:
+            $ref: '#/components/schemas/Word'
+          blockHash:
+            $ref: '#/components/schemas/Word'
+          blockNumber:
+            $ref: '#/components/schemas/BlockNumber'
+          logIndex:
+            type: integer
+            minimum: -1073741824
+            maximum: 1073741823
+        required:
+        - logIndex
+        - blockNumber
+        - blockHash
+        - transactionHash
+        - take
+        - make
+        - maker
+        - hash
+        - '@type'
+        - source
+        - date
+        - id
+        additionalProperties: false
+      - type: object
+        properties:
+          id:
+            type: string
+          date:
+            type: string
+            format: date-time
+          source:
+            type: string
+          '@type':
+            type: string
+            enum:
+            - mint
+          owner:
+            $ref: '#/components/schemas/Address'
+          contract:
+            $ref: '#/components/schemas/Address'
+          tokenId:
+            $ref: '#/components/schemas/BigInteger'
+          value:
+            $ref: '#/components/schemas/BigInteger'
+          transactionHash:
+            $ref: '#/components/schemas/Word'
+          blockHash:
+            $ref: '#/components/schemas/Word'
+          blockNumber:
+            $ref: '#/components/schemas/BlockNumber'
+        required:
+        - blockNumber
+        - blockHash
+        - transactionHash
+        - value
+        - tokenId
+        - contract
+        - owner
+        - '@type'
+        - source
+        - date
+        - id
+        additionalProperties: false
+      - type: object
+        properties:
+          id:
+            type: string
+          date:
+            type: string
+            format: date-time
+          source:
+            type: string
+          '@type':
+            type: string
+            enum:
+            - burn
+          owner:
+            $ref: '#/components/schemas/Address'
+          contract:
+            $ref: '#/components/schemas/Address'
+          tokenId:
+            $ref: '#/components/schemas/BigInteger'
+          value:
+            $ref: '#/components/schemas/BigInteger'
+          transactionHash:
+            $ref: '#/components/schemas/Word'
+          blockHash:
+            $ref: '#/components/schemas/Word'
+          blockNumber:
+            $ref: '#/components/schemas/BlockNumber'
+        required:
+        - blockNumber
+        - blockHash
+        - transactionHash
+        - value
+        - tokenId
+        - contract
+        - owner
+        - '@type'
+        - source
+        - date
+        - id
+        additionalProperties: false
+      - type: object
+        properties:
+          id:
+            type: string
+          date:
+            type: string
+            format: date-time
+          source:
+            type: string
+          '@type':
+            type: string
+            enum:
+            - transfer
+          elt:
+            $ref: '#/components/schemas/NftActivityElt'
+          from:
+            $ref: '#/components/schemas/Address'
+        required:
+        - from
+        - elt
+        - '@type'
+        - source
+        - date
+        - id
+        additionalProperties: false
     Address:
       type: string
     Asset:
@@ -1293,26 +1679,14 @@ components:
       - $ref: '#/components/schemas/FTAssetType'
       - $ref: '#/components/schemas/NFTAssetType'
       - $ref: '#/components/schemas/MTAssetType'
-    BAD_REQUEST:
+    BadRequest:
       type: object
       properties:
         code:
           type: string
           enum:
           - BAD_REQUEST
-        message:
-          type: string
-      required:
-      - message
-      - code
-      additionalProperties: false
-    BALANCE_NOT_FOUND:
-      type: object
-      properties:
-        code:
-          type: string
-          enum:
-          - BALANCE_NOT_FOUND
+          - VALIDATION
         message:
           type: string
       required:
@@ -1358,23 +1732,29 @@ components:
       - owner
       - '@type'
       additionalProperties: false
-    COLLECTION_NOT_FOUND:
+    Edpk:
+      type: string
+    Edsig:
+      type: string
+    EntityNotFound:
       type: object
       properties:
         code:
           type: string
           enum:
+          - TOKEN_NOT_FOUND
+          - BALANCE_NOT_FOUND
+          - OWNERSHIP_NOT_FOUND
+          - ORDER_NOT_FOUND
+          - ITEM_NOT_FOUND
           - COLLECTION_NOT_FOUND
+          - NOT_FOUND
         message:
           type: string
       required:
       - message
       - code
       additionalProperties: false
-    Edpk:
-      type: string
-    Edsig:
-      type: string
     FTAssetType:
       type: object
       properties:
@@ -1401,45 +1781,6 @@ components:
       - balance
       - owner
       - contract
-      additionalProperties: false
-    INCORRECT_SIGNATURE:
-      type: object
-      properties:
-        code:
-          type: string
-          enum:
-          - INCORRECT_SIGNATURE
-        message:
-          type: string
-      required:
-      - message
-      - code
-      additionalProperties: false
-    INVALID_ARGUMENT:
-      type: object
-      properties:
-        code:
-          type: string
-          enum:
-          - INVALID_ARGUMENT
-        message:
-          type: string
-      required:
-      - message
-      - code
-      additionalProperties: false
-    ITEM_NOT_FOUND:
-      type: object
-      properties:
-        code:
-          type: string
-          enum:
-          - ITEM_NOT_FOUND
-        message:
-          type: string
-      required:
-      - message
-      - code
       additionalProperties: false
     MTAssetType:
       type: object
@@ -1915,58 +2256,6 @@ components:
       required:
       - tokenId
       additionalProperties: false
-    ORDER_CANCELED:
-      type: object
-      properties:
-        code:
-          type: string
-          enum:
-          - ORDER_CANCELED
-        message:
-          type: string
-      required:
-      - message
-      - code
-      additionalProperties: false
-    ORDER_INVALID_UPDATE:
-      type: object
-      properties:
-        code:
-          type: string
-          enum:
-          - ORDER_INVALID_UPDATE
-        message:
-          type: string
-      required:
-      - message
-      - code
-      additionalProperties: false
-    ORDER_NOT_FOUND:
-      type: object
-      properties:
-        code:
-          type: string
-          enum:
-          - ORDER_NOT_FOUND
-        message:
-          type: string
-      required:
-      - message
-      - code
-      additionalProperties: false
-    OWNERSHIP_NOT_FOUND:
-      type: object
-      properties:
-        code:
-          type: string
-          enum:
-          - OWNERSHIP_NOT_FOUND
-        message:
-          type: string
-      required:
-      - message
-      - code
-      additionalProperties: false
     Order:
       type: object
       properties:
@@ -2343,6 +2632,21 @@ components:
       - currencies
       - order_type
       additionalProperties: false
+    OrderError:
+      type: object
+      properties:
+        code:
+          type: string
+          enum:
+          - ORDER_INVALID_UPDATE
+          - ORDER_CANCELED
+          - INCORRECT_SIGNATURE
+        message:
+          type: string
+      required:
+      - message
+      - code
+      additionalProperties: false
     OrderEvent:
       type: object
       properties:
@@ -2486,6 +2790,19 @@ components:
       - value
       - account
       additionalProperties: false
+    ServerError:
+      type: object
+      properties:
+        code:
+          type: string
+          enum:
+          - UNEXPECTED_API_ERROR
+        message:
+          type: string
+      required:
+      - message
+      - code
+      additionalProperties: false
     SignatureValidationForm:
       type: object
       properties:
@@ -2499,19 +2816,6 @@ components:
       - signature
       - message
       - signer
-      additionalProperties: false
-    TOKEN_NOT_FOUND:
-      type: object
-      properties:
-        code:
-          type: string
-          enum:
-          - TOKEN_NOT_FOUND
-        message:
-          type: string
-      required:
-      - message
-      - code
       additionalProperties: false
     Transfer:
       type: object
@@ -2528,19 +2832,6 @@ components:
       - from
       - elt
       - '@type'
-      additionalProperties: false
-    UNKNOWN:
-      type: object
-      properties:
-        code:
-          type: string
-          enum:
-          - UNKNOWN
-        message:
-          type: string
-      required:
-      - message
-      - code
       additionalProperties: false
     Word:
       type: string
