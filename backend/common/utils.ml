@@ -283,7 +283,7 @@ let order_elt_from_order_form_elt elt =
     order_elt_hash = (hash :> string);
     order_elt_make_balance = None;
     order_elt_price_history = [];
-    order_elt_status = None
+    order_elt_status = OACTIVE ;
   }
 
 let order_from_order_form form =

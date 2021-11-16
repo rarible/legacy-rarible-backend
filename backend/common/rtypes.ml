@@ -489,7 +489,7 @@ type order_elt = {
   order_elt_hash: A.word;
   order_elt_make_balance: A.big_integer option; [@opt]
   order_elt_price_history: order_price_history_record list ; [@dft []]
-  order_elt_status : order_status option; [@opt]
+  order_elt_status : order_status;
 } [@@deriving encoding {camel; title="OrderElt"; def_title}]
 
 type order = {
@@ -1011,3 +1011,5 @@ type activity_sort =
   | LATEST_FIRST
   | EARLIEST_FIRST
 [@@deriving encoding {enum;title="ActivitySort"; def_title}]
+
+type ids = { ids : string list } [@@deriving encoding {title="OrderIds"; def_title}]
