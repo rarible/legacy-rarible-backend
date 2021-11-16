@@ -182,6 +182,33 @@ paths:
               schema:
                 $ref: '#/components/schemas/NftOwnerships'
       security: []
+  /v0.1/items/{itemId}/reset:
+    description: Deletes the NFT item meta by identifier
+    delete:
+      tags:
+      - nft-item-controller
+      description: Deletes the NFT item meta by identifier
+      operationId: resetNftItemMetaById
+      parameters:
+      - name: itemId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadRequest'
+      security: []
   /v0.1/items/{itemId}/meta:
     description: Get NFT item by meta id
     get:

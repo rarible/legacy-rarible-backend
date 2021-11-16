@@ -58,7 +58,7 @@ let upgrade_1_to_2 dbh version =
       main boolean not null default false,
       account varchar not null,
       value int not null,
-      primary key (contract, token_id))|};
+      primary key (account, contract, token_id))|};
 
     {|create table tzip21_formats(
       contract varchar not null,
@@ -76,7 +76,8 @@ let upgrade_1_to_2 dbh version =
       dimensions_value varchar,
       dimensions_unit varchar,
       data_rate_value varchar,
-      data_rate_unit varchar)|};
+      data_rate_unit varchar,
+      primary key (uri, contract, token_id))|};
 
     {|create table tzip21_attributes(
       contract varchar not null,
@@ -87,7 +88,8 @@ let upgrade_1_to_2 dbh version =
       main boolean not null default false,
       name varchar not null,
       value varchar not null,
-      type varchar)|};
+      type varchar,
+      primary key(name, contract, token_id))|};
 
     {|create table tzip21_metadata(
       contract varchar not null,

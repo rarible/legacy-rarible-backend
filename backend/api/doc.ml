@@ -8,6 +8,7 @@ let docs = List.map (fun (n, t, d) -> (n, (t, d, None, None))) @@ [
     "ownerships_all", "getNftAllOwnerships", "Get NFT all ownerships" ;
 
     (* NFT item controller *)
+    "item_reset_meta", "resetNftItemMetaById", "Deletes the NFT item meta by identifier" ;
     "items_meta", "getNftItemMetaById", "Get NFT item by meta id" ;
     "items_all", "getNftAllItems", "Returns all NFT items" ;
     "items_by_id", "getNftItemById", "Get NFT item by id" ;
