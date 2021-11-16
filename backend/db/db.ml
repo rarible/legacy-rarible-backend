@@ -461,7 +461,7 @@ let mk_order ?dbh order_obj =
     order_elt_hash = order_obj#hash ;
     order_elt_make_balance = Option.some @@ Int64.to_string make_balance ;
     order_elt_price_history = price_history ;
-    order_elt_status = Some status
+    order_elt_status = status
   } in
   let rarible_v2_order = {
     order_elt = order_elt ;
@@ -2602,7 +2602,7 @@ let filter_orders ?origin ?statuses orders =
       (match statuses with
        | None -> true
        | Some ss ->
-         List.exists (fun s -> order.order_elt.order_elt_status = Some s) ss) &&
+         List.exists (fun s -> order.order_elt.order_elt_status = s) ss) &&
       (int_of_string order.order_elt.order_elt_make_stock) > 0 &&
       match origin with
       | Some orig ->

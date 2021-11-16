@@ -638,15 +638,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                ids:
-                  type: array
-                  items:
-                    type: string
-              required:
-              - ids
-              additionalProperties: false
+              $ref: '#/components/schemas/OrderIds'
       responses:
         "500":
           description: Internal Server Error
@@ -748,7 +740,9 @@ paths:
         in: query
         required: false
         schema:
-          type: string
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderStatus'
       - name: startDate
         in: query
         required: true
@@ -961,7 +955,9 @@ paths:
         in: query
         required: false
         schema:
-          type: string
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderStatus'
       - name: startDate
         in: query
         required: true
@@ -2028,6 +2024,7 @@ components:
           - RARIBLE_V2
       required:
       - type
+      - status
       - hash
       - lastUpdateAt
       - createdAt
@@ -2407,6 +2404,16 @@ components:
       - makerEdpk
       - maker
       - data
+      additionalProperties: false
+    OrderIds:
+      type: object
+      properties:
+        ids:
+          type: array
+          items:
+            type: string
+      required:
+      - ids
       additionalProperties: false
     OrderPagination:
       type: object

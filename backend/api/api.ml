@@ -71,7 +71,7 @@ let start_date_param = pint ~required:true ~enc:A.uint53 "startDate"
 let end_date_param = pint ~required:true ~enc:A.uint53 "endDate"
 (* TODO : ALL | RARIBLE | OPEN_SEA *)
 let source_param = pstring "source"
-let status_param = pstring "status"
+let status_param = pstring ~enc:(Json_encoding.list order_status_enc) "status"
 let currency_param = pstring "currencyId"
 let sort_param = pstring ~enc:activity_sort_enc "sort"
 
@@ -985,12 +985,12 @@ let get_order_by_ids _req ids =
             Lwt.return (Error (`UNKNOWN str))
         end
       | _ -> Lwt.return res)
-    (Ok []) ids >>= function
+    (Ok []) ids.ids >>= function
   | Ok orders -> return_ok orders
   | Error api_err -> return (Error api_err)
 [@@get
   {path="/v0.1/orders/byIds";
-   input=Json_encoding.(obj1 @@ req "ids" (list string));
+   input=ids_enc;
    output=(Json_encoding.list order_enc);
    errors=[bad_request_case;unknown_case];
    name="orders_by_ids";
