@@ -10,10 +10,15 @@ export type ExtendedAssetType = TokenAssetType | UnknownTokenAssetType
 
 export async function get_asset_type(
   provider: Provider,
-  contract: string) : Promise<TokenAssetType> {
-  const r = await fetch(provider.api + '/' + contract + '/asset_type')
-  if (r.ok) { return r.json() }
-  else throw new Error("Cannot get asset type of contract " + contract)
+  asset: UnknownTokenAssetType) : Promise<TokenAssetType> {
+  const r = await fetch(provider.api + '/collections/' + asset.contract)
+  if (r.ok) {
+    let json = await r.json()
+    if (json.type = "NFT") return { ...asset, asset_class:"NFT" }
+    else if (json.type == "MT") return { ...asset, asset_class:"MT" }
+    else throw new Error("Contract " + asset.contract + " is not a collection")
+  }
+  else throw new Error("Cannot get asset type of contract " + asset.contract)
 }
 
 export async function check_asset_type(
@@ -21,5 +26,5 @@ export async function check_asset_type(
   asset: ExtendedAssetType,
 ): Promise<TokenAssetType> {
   if ("asset_class" in asset) return asset
-  else return get_asset_type(provider, asset.contract)
+  else return get_asset_type(provider, asset)
 }
