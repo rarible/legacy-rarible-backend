@@ -647,7 +647,8 @@ let mk_nft_item_meta dbh ~contract ~token_id =
        contract = $contract and token_id = $token_id and main"] in
   match l with
   | [] ->
-    Lwt.return_error (`hook_error ("metadata not found for " ^ contract ^ ":" ^ token_id))
+    Format.eprintf "metadata not found for %s:%s@." contract token_id ;
+    Lwt.return_ok None
   | r :: _ ->
     let tags =
       Option.bind r#tags (fun l -> Some (List.filter_map (fun x -> x) l)) in
