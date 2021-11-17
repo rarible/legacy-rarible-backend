@@ -76,6 +76,16 @@ let parse_mint m =
             Ok (Some (Tzfunc.Crypto.hex_to_raw uri :> string))
           | _ -> unexpected_michelson in
         Ok (Mint_tokens (UbiMint { ubim_owner ; ubim_token_id ; ubim_uri }))
+    | _ ->
+      match Typed_mich.parse_value Contract_spec.mint_ubi2_entry m with
+      | Ok (`tuple [ `tuple [ `address ubi2m_owner; `nat amount ]; `assoc meta; `nat id ]) ->
+        let ubi2m_token_id = Z.to_string id  in
+        let ubi2m_amount = Z.to_int64 amount in
+        let ubi2m_metadata =  List.filter_map (function
+            | (`string k, `bytes v) -> Some (k, (Tzfunc.Crypto.hex_to_raw v :> string))
+            | _ -> None) meta in
+        Ok (Mint_tokens
+              (UbiMint2 { ubi2m_owner ; ubi2m_amount ; ubi2m_token_id ; ubi2m_metadata }))
       | _ -> unexpected_michelson
 
 let parse_burn m =

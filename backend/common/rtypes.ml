@@ -780,8 +780,16 @@ type ubi_mint = {
   ubim_uri : string option ;
 } [@@deriving encoding]
 
+type ubi_mint2 = {
+  ubi2m_owner : string ;
+  ubi2m_amount : int64 ;
+  ubi2m_metadata: (string * string) list ;
+  ubi2m_token_id : string ;
+} [@@deriving encoding]
+
 type mint =
   | UbiMint of ubi_mint
+  | UbiMint2 of ubi_mint2
   | NFTMint of unit fa2_mint
   | MTMint of int64 fa2_mint
 [@@deriving encoding]

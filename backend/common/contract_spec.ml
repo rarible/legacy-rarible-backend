@@ -52,6 +52,7 @@ let update_operators_all_entry = `seq (`or_ (`address, `address))
 let mint_mt_entry = `tuple [ `nat; `address; `nat; `map (`string, `bytes); `seq (`tuple [`address; `nat]) ]
 let mint_nft_entry = `tuple [ `nat; `address; `map (`string, `bytes); `seq (`tuple [`address; `nat]) ]
 let mint_ubi_entry = `tuple [ `address; `nat; `option `bytes ]
+let mint_ubi2_entry = `tuple [ `tuple [ `address; `nat ]; `map (`string, `bytes); `nat ]
 let burn_nft_entry = `nat
 let burn_mt_entry = `tuple [ `nat; `nat ]
 let set_token_metadata_entry = `tuple [ `nat; `map (`string, `bytes) ]
