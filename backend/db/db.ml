@@ -918,6 +918,10 @@ let get_metadata meta =
   with _ ->
     None, None, None, None, None
 
+let get_or_timeout url =
+  let timeout = Lwt_unix.sleep 30. >>= fun () -> Lwt.return_error (-1, Some "timeout") in
+  Lwt.pick [ timeout ; EzReq_lwt.get url ]
+
 let get_metadata_json meta =
   (* 3 ways to recovers metadata :directly json, ipfs link and http(s) link *)
   try
@@ -925,10 +929,10 @@ let get_metadata_json meta =
   with _ ->
     begin
       let proto = String.sub meta 0 6 in
-      if proto = "https:" || proto = "http:/" then EzReq_lwt.get (EzAPI.URL meta)
+      if proto = "https:" || proto = "http:/" then get_or_timeout (EzAPI.URL meta)
       else if proto = "ipfs:/" then
         let url = String.sub meta 7 ((String.length meta) - 7) in
-        EzReq_lwt.get
+        get_or_timeout
           (EzAPI.URL (Printf.sprintf "https://cloudflare-ipfs.com/ipfs/%s" url))
       else Lwt.return_error (0, Some (Printf.sprintf "unknow scheme %s"proto))
     end >>= function
@@ -1069,7 +1073,10 @@ let insert_mint ~dbh ~op ~contract m =
   let token_id, owner, amount, uri = match m with
     | NFTMint m -> m.fa2m_token_id, m.fa2m_owner, 1L, None
     | MTMint m -> m.fa2m_token_id, m.fa2m_owner, m.fa2m_amount, None
-    | UbiMint m -> m.ubim_token_id, m.ubim_owner, 1L, m.ubim_uri in
+    | UbiMint m -> m.ubim_token_id, m.ubim_owner, 1L, m.ubim_uri
+    | UbiMint2 m ->
+      m.ubi2m_token_id, m.ubi2m_owner, m.ubi2m_amount,
+      List.assoc_opt "" m.ubi2m_metadata in
   let>? () = insert_account dbh owner ~block:op.bo_block ~level:op.bo_level ~tsp:op.bo_tsp in
   let>? () = match uri with
     | Some meta ->
@@ -1701,7 +1708,10 @@ let contract_updates dbh main l =
               m.fa2m_token_id, m.fa2m_owner, 1L, false
             | MTMint m ->
               m.fa2m_token_id, m.fa2m_owner, m.fa2m_amount, false
-            | UbiMint m -> m.ubim_token_id, m.ubim_owner, 1L, m.ubim_uri <> None in
+            | UbiMint m -> m.ubim_token_id, m.ubim_owner, 1L, m.ubim_uri <> None
+            | UbiMint2 m ->
+              m.ubi2m_token_id, m.ubi2m_owner, m.ubi2m_amount,
+              (List.assoc_opt "" m.ubi2m_metadata) <> None in
           let>? () =
             contract_updates_base
               dbh ~main ~contract ~block ~level ~tsp ~burn:false
