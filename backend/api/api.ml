@@ -106,7 +106,7 @@ let get_size_param req =
   | Some s ->
     try
       let s = int_of_string s in
-      if s < 1000 then Ok (Some s)
+      if s < 1001 then Ok (Some s)
       else mk_invalid_argument size_param "maximum is 1000"
     with _ ->
       mk_invalid_argument size_param "must be an int"
@@ -119,7 +119,7 @@ let get_continuation_last_update_param req =
       let l = String.split_on_char '_' s in
       match l with
       | ts :: h :: [] ->
-        let ts = CalendarLib.Calendar.from_unixfloat (float_of_string ts) in
+        let ts = CalendarLib.Calendar.from_unixfloat (float_of_string ts /. 1000.) in
         Ok (Some (ts, h))
       | _ ->
         mk_invalid_argument continuation_param "must be in format TIMETAMP_HASH"
@@ -242,18 +242,23 @@ let get_continuation_items_param req =
     try
       let l = String.split_on_char '_' s in
       match l with
-      | ts :: id:: [] ->
-        let ts = CalendarLib.Calendar.from_unixfloat (float_of_string ts) in
-        begin match parse_item_id id with
-          | Error _ ->
+      | ts :: id :: [] ->
+        begin
+          try
+            let ts = CalendarLib.Calendar.from_unixfloat (float_of_string ts /. 1000.) in
+            let l = String.split_on_char ':' id in
+            match l with
+            | _c :: _tid :: [] ->
+              Ok (Some (ts, id))
+            | _ ->
+              mk_invalid_argument continuation_param "must be in format TIMESTAMP_CONTRACT:TOKEN_ID"
+          with _ ->
             mk_invalid_argument continuation_param "must be in format TIMESTAMP_CONTRACT:TOKEN_ID"
-          | Ok (_contract, _token_id) ->
-            Ok (Some (ts, id))
         end
       | _ ->
         mk_invalid_argument continuation_param "must be in format TIMESTAMP_CONTRACT:TOKEN_ID"
     with _ ->
-      mk_invalid_argument continuation_param "must be in format TIMESTAMP_"
+      mk_invalid_argument continuation_param "must be in format TIMESTAMP_CONTRACT:TOKEN_ID"
 
 let get_required_creator_param req =
   let param = creator_param in
@@ -276,15 +281,7 @@ let parse_collection_id s =
     Error {code=`BAD_REQUEST; message="collection must be a tezos smart contract address"}
 
 let get_continuation_collections_param req =
-  match EzAPI.Req.find_param continuation_param req with
-  | None -> Ok None
-  | Some s ->
-    try
-      match parse_collection_id s with
-      | Error _ -> mk_invalid_argument continuation_param "must be a tezos smart contract address"
-      | Ok c -> Ok (Some c)
-    with _ ->
-      mk_invalid_argument continuation_param "must be a tezos smart contract address"
+  Ok (EzAPI.Req.find_param continuation_param req)
 
 let parse_ownership_id s =
   let open Tzfunc.Crypto in
@@ -308,13 +305,21 @@ let get_continuation_ownerships_param req =
       let l = String.split_on_char '_' s in
       match l with
       | ts :: id :: [] ->
-        let ts = CalendarLib.Calendar.from_unixfloat (float_of_string ts) in
-        begin match parse_ownership_id id with
-          | Error _ ->
+        let ts = CalendarLib.Calendar.from_unixfloat (float_of_string ts /. 1000.) in
+        begin
+          try
+            let l = String.split_on_char ':' id in
+            match l with
+            | _c :: _tid :: _owner :: [] ->
+              Ok (Some (ts, id))
+            | _ ->
+              mk_invalid_argument
+                continuation_param "must be in format TIMESTAMP_CONTRACT:TOKEN_ID:OWNER"
+
+          with _ ->
             mk_invalid_argument
               continuation_param "must be in format TIMESTAMP_CONTRACT:TOKEN_ID:OWNER"
-          | Ok (_contract, _token_id, _owner) ->
-            Ok (Some (ts, id))
+
         end
       | _ ->
         mk_invalid_argument
@@ -485,7 +490,7 @@ let get_nft_activities req input =
     match get_size_param req with
     | Error err -> return @@ Error err
     | Ok size ->
-      match get_continuation_ownerships_param req with
+      match get_continuation_last_update_param req with
       | Error err -> return @@ Error err
       | Ok continuation ->
         Db.get_nft_activities ?sort ?continuation ?size input >>= function
@@ -551,7 +556,7 @@ let get_nft_all_ownerships req () =
   match get_size_param req with
   | Error err -> return @@ Error err
   | Ok size ->
-    match get_continuation_items_param req with
+    match get_continuation_ownerships_param req with
     | Error err -> return @@ Error err
     | Ok continuation ->
       Db.get_nft_all_ownerships ?continuation ?size () >>= function

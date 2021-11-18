@@ -2034,7 +2034,7 @@ let get_level ?dbh () =
 
 let mk_nft_items_continuation nft_item =
   Printf.sprintf "%Ld_%s"
-    (Int64.of_float @@ CalendarLib.Calendar.to_unixfloat nft_item.nft_item_date)
+    (Int64.of_float @@ CalendarLib.Calendar.to_unixfloat nft_item.nft_item_date *. 1000.)
     nft_item.nft_item_id
 
 let get_nft_items_by_owner ?dbh ?include_meta ?continuation ?(size=50) owner =
@@ -2051,13 +2051,17 @@ let get_nft_items_by_owner ?dbh ?include_meta ?continuation ?(size=50) owner =
     continuation = None,
     (match continuation with None -> CalendarLib.Calendar.now (), "" | Some (ts, h) -> (ts, h)) in
   let>? l = [%pgsql.object dbh
-      "select concat(contract, ':', token_id) as id, contract, token_id, \
+      "select concat(contract, ':', token_id) as id, \
+       contract, token_id, \
        last, amount, supply, metadata, tsp from tokens where \
-       main and  metadata <> '{}' and owner = $owner and amount > 0 and \
+       main and metadata <> '{}' and owner = $owner and amount > 0 and \
        ($no_continuation or \
-       (last = $ts and concat(contract, ':', token_id) > $id) or \
+       (last = $ts and \
+       concat(contract, ':', token_id) collate \"C\" < $id) or \
        (last < $ts)) \
-       order by last desc, id asc limit $size64"] in
+       order by last desc, \
+       concat(contract, ':', token_id) collate \"C\" desc \
+       limit $size64"] in
   let>? nft_items_total = [%pgsql dbh
       "select count(distinct (contract, token_id)) from tokens where \
        main and owner = $owner and (amount > 0) and metadata <> '{}'"] in
@@ -2088,16 +2092,20 @@ let get_nft_items_by_creator ?dbh ?include_meta ?continuation ?(size=50) creator
     continuation = None,
     (match continuation with None -> CalendarLib.Calendar.now (), "" | Some (ts, h) -> (ts, h)) in
   let>? l = [%pgsql.object dbh
-      "select concat(contract, ':', token_id) as id, contract, token_id, \
+      "select concat(contract, ':', token_id) as id, \
+       contract, token_id, \
        last, amount, supply, metadata, tsp \
        from tokens, \
        jsonb_to_recordset((metadata -> 'creators')) as creators(account varchar, value int) \
        where creators.account = $creator and \
        main and metadata <> '{}' and amount > 0 and \
        ($no_continuation or \
-       (last = $ts and concat(contract, ':', token_id) > $id) or \
+       (last = $ts and \
+       concat(contract, ':', token_id) collate \"C\" < $id) or \
        (last < $ts)) \
-       order by last desc, id asc limit $size64"] in
+       order by last desc, \
+       concat(contract, ':', token_id) collate \"C\" desc \
+       limit $size64"] in
   let>? nft_items_total = [%pgsql dbh
       "select count(distinct (token_id, contract, owner)) from tokens, \
        jsonb_to_recordset((metadata -> 'creators')) as creators(account varchar, value int) \
@@ -2129,14 +2137,18 @@ let get_nft_items_by_collection ?dbh ?include_meta ?continuation ?(size=50) cont
     continuation = None,
     (match continuation with None -> CalendarLib.Calendar.now (), "" | Some (ts, h) -> (ts, h)) in
   let>? l = [%pgsql.object dbh
-      "select concat(contract, ':', token_id) as id, contract, token_id, \
+      "select concat(contract, ':', token_id) as id, \
+       contract, token_id, \
        last, amount, supply, metadata, tsp \
        from tokens where \
        main and metadata <> '{}' and contract = $contract and amount <> 0 and \
        ($no_continuation or \
-       (last = $ts and concat(contract, ':', token_id) > $id) or \
+       (last = $ts and \
+       concat(contract, ':', token_id) collate \"C\" < $id) or \
        (last < $ts)) \
-       order by last desc, id asc limit $size64"] in
+       order by last desc, \
+       concat(contract, ':', token_id) collate \"C\" desc \
+       limit $size64"] in
   let>? nft_items_total = [%pgsql dbh
       "select count(distinct (token_id, owner)) from tokens where \
        main and contract = $contract and amount > 0 and metadata <> '{}'"] in
@@ -2188,7 +2200,8 @@ let get_nft_all_items
     show_deleted = None,
     (match show_deleted with None -> false | Some b -> b) in
   let>? l = [%pgsql.object dbh
-      "select concat(contract, ':', token_id) as id, contract, token_id, \
+      "select concat(contract, ':', token_id) as id, \
+       contract, token_id, \
        last, amount, supply, metadata, tsp \
        from tokens where \
        main and metadata <> '{}' and \
@@ -2196,9 +2209,12 @@ let get_nft_all_items
        ($no_last_updated_to or (last <= $last_updated_to_v)) and \
        ($no_last_updated_from or (last >= $last_updated_from_v)) and \
        ($no_continuation or \
-       (last = $ts and concat(contract, ':', token_id) > $id) or \
+       (last = $ts and \
+       concat(contract, ':', token_id) collate \"C\" < $id) or \
        (last < $ts)) \
-       order by last desc, id asc limit $size64"] in
+       order by last desc, \
+       concat(contract, ':', token_id) collate \"C\" \
+       desc limit $size64"] in
   let>? nft_items_total = [%pgsql dbh
       "select count(distinct (owner, contract, token_id)) from tokens where \
        main and (amount > 0) and metadata <> '{}'"] in
@@ -2217,7 +2233,7 @@ let get_nft_all_items
 
 let mk_nft_activity_continuation obj =
   Printf.sprintf "%Ld_%s"
-    (Int64.of_float @@ CalendarLib.Calendar.to_unixfloat obj#date)
+    (Int64.of_float @@ CalendarLib.Calendar.to_unixfloat obj#date *. 1000.)
     obj#transaction
 
 let get_nft_activities_by_collection ?dbh ?(sort=LATEST_FIRST) ?continuation ?(size=50) filter =
@@ -2246,8 +2262,11 @@ let get_nft_activities_by_collection ?dbh ?(sort=LATEST_FIRST) ?continuation ?(s
            main and contract = $contract and \
            position(activity_type in $types) > 0 and \
            ($no_continuation or \
-           (date = $ts and transaction > $h) or (date < $ts)) \
-           order by date desc, transaction asc limit $size64"]
+           (date = $ts and transaction collate \"C\" < $h) or \
+           (date < $ts)) \
+           order by date desc, \
+           transaction collate \"C\" desc \
+           limit $size64"]
     | EARLIEST_FIRST ->
       [%pgsql.object dbh
           "select activity_type, transaction, block, level, date, contract, \
@@ -2255,8 +2274,11 @@ let get_nft_activities_by_collection ?dbh ?(sort=LATEST_FIRST) ?continuation ?(s
            main and contract = $contract and \
            position(activity_type in $types) > 0 and \
            ($no_continuation or \
-           (date = $ts and transaction > $h) or (date > $ts)) \
-           order by date asc, transaction asc limit $size64"]
+           (date = $ts and transaction collate \"C\" > $h) or \
+           (date > $ts)) \
+           order by date asc, \
+           transaction collate \"C\" asc \
+           limit $size64"]
   in
   map_rp (fun r -> let|>? a = mk_nft_activity r in a, r) l >>=? fun activities ->
   let len = List.length activities in
@@ -2295,8 +2317,10 @@ let get_nft_activities_by_item ?dbh ?(sort=LATEST_FIRST) ?continuation ?(size=50
            main and contract = $contract and token_id = $token_id and \
            position(activity_type in $types) > 0 and \
            ($no_continuation or \
-           (date = $ts and transaction > $h) or (date < $ts)) \
-           order by date desc, transaction asc limit $size64"]
+           (date = $ts and transaction collate \"C\" < $h) or \
+           (date < $ts)) \
+           order by date desc, \
+           transaction collate \"C\" desc limit $size64"]
     | EARLIEST_FIRST ->
       [%pgsql.object dbh
           "select activity_type, transaction, block, level, date, contract, \
@@ -2304,8 +2328,11 @@ let get_nft_activities_by_item ?dbh ?(sort=LATEST_FIRST) ?continuation ?(size=50
            main and contract = $contract and token_id = $token_id and \
            position(activity_type in $types) > 0 and \
            ($no_continuation or \
-           (date = $ts and transaction > $h) or (date > $ts)) \
-           order by date asc, transaction asc limit $size64"] in
+           (date = $ts and transaction collate \"C\" > $h) or \
+           (date > $ts)) \
+           order by date asc, \
+           transaction collate \"C\" asc \
+           limit $size64"] in
   map_rp (fun r -> let|>? a = mk_nft_activity r in a, r) l >>=? fun activities ->
   let len = List.length activities in
   let nft_activities_continuation =
@@ -2342,8 +2369,11 @@ let get_nft_activities_by_user ?dbh ?(sort=LATEST_FIRST) ?continuation ?(size=50
            (position(owner in $users) > 0 or position(tr_from in $users) > 0) and \
            position(activity_type in $types) > 0 and \
            ($no_continuation or \
-           (date = $ts and transaction > $h) or (date < $ts)) \
-           order by date desc, transaction asc limit $size64"]
+           (date = $ts and transaction collate \"C\" < $h) or \
+           (date < $ts)) \
+           order by date desc, \
+           transaction collate \"C\" desc \
+           limit $size64"]
     | EARLIEST_FIRST ->
       [%pgsql.object dbh
           "select activity_type, transaction, block, level, date, contract, \
@@ -2352,8 +2382,11 @@ let get_nft_activities_by_user ?dbh ?(sort=LATEST_FIRST) ?continuation ?(size=50
            (position(owner in $users) > 0 or position(tr_from in $users) > 0) and \
            position(activity_type in $types) > 0 and \
            ($no_continuation or \
-           (date = $ts and transaction > $h) or (date > $ts)) \
-           order by date asc, transaction asc limit $size64"]
+           (date = $ts and transaction collate \"C\" > $h) or \
+           (date > $ts)) \
+           order by date asc, \
+           transaction collate \"C\" asc \
+           limit $size64"]
   in
   map_rp (fun r -> let|>? a = mk_nft_activity r in a, r) l >>=? fun activities ->
   let len = List.length activities in
@@ -2385,16 +2418,21 @@ let get_nft_activities_all ?dbh ?(sort=LATEST_FIRST) ?continuation ?(size=50) ty
            token_id, owner, amount, tr_from from nft_activities where \
            main and position(activity_type in $types) > 0 and \
            ($no_continuation or \
-           (date = $ts and transaction > $h) or (date < $ts)) \
-           order by date desc, transaction asc limit $size64"]
+           (date = $ts and transaction collate \"C\" < $h) or \
+           (date < $ts)) \
+           order by date desc, \
+           transaction collate \"C\" desc limit $size64"]
     | EARLIEST_FIRST ->
       [%pgsql.object dbh "show"
           "select activity_type, transaction, block, level, date, contract, \
            token_id, owner, amount, tr_from from nft_activities where \
            main and position(activity_type in $types) > 0 and \
            ($no_continuation or \
-           (date = $ts and transaction > $h) or (date > $ts)) \
-           order by date asc, transaction asc limit $size64"]
+           (date = $ts and transaction collate \"C\" > $h) or \
+           (date > $ts)) \
+           order by date asc, \
+           transaction collate \"C\" asc \
+           limit $size64"]
   in
   map_rp (fun r -> let|>? a = mk_nft_activity r in a, r) l >>=? fun activities ->
   let len = List.length activities in
@@ -2417,7 +2455,7 @@ let get_nft_activities ?dbh ?sort ?continuation ?size = function
 
 let mk_nft_ownerships_continuation nft_ownership =
   Printf.sprintf "%Ld_%s"
-    (Int64.of_float @@ CalendarLib.Calendar.to_unixfloat nft_ownership.nft_ownership_date)
+    (Int64.of_float @@ (CalendarLib.Calendar.to_unixfloat nft_ownership.nft_ownership_date *. 1000.))
     nft_ownership.nft_ownership_id
 
 let get_nft_ownerships_by_item ?dbh ?continuation ?(size=50) contract token_id =
@@ -2439,9 +2477,11 @@ let get_nft_ownerships_by_item ?dbh ?continuation ?(size=50) contract token_id =
        from tokens where \
        main and contract = $contract and token_id = $token_id and amount <> 0 and \
        ($no_continuation or \
-       (last = $ts and concat(contract, ':', token_id, ':', owner) > $id) or \
+       (last = $ts and concat(contract, ':', token_id, ':', owner) collate \"C\" < $id) or \
        (last < $ts)) \
-       order by last desc, id asc limit $size64"] in
+       order by last desc, \
+       concat(contract, ':', token_id, ':', owner) collate \"C\" desc \
+       limit $size64"] in
   let>? nft_ownerships_total = [%pgsql dbh
       "select count(distinct owner) from tokens where \
        main and contract = $contract and token_id = $token_id and \
@@ -2476,9 +2516,11 @@ let get_nft_all_ownerships ?dbh ?continuation ?(size=50) () =
        from tokens where \
        main and amount > 0 and \
        ($no_continuation or \
-       (last = $ts and concat(contract, ':', token_id, ':', owner) > $id) or \
+       (last = $ts and concat(contract, ':', token_id, ':', owner) collate \"C\" < $id) or \
        (last < $ts)) \
-       order by last desc, id asc limit $size64"] in
+       order by last desc, \
+       concat(contract, ':', token_id, ':', owner) collate \"C\" desc \
+       limit $size64"] in
   let>? nft_ownerships_total = [%pgsql dbh
       "select count(distinct owner) from tokens where main and amount > 0"] in
   let>? nft_ownerships_total = match nft_ownerships_total with
@@ -2550,8 +2592,9 @@ let search_nft_collections_by_owner ?dbh ?continuation ?(size=50) owner =
       "select address, owner, metadata, name, symbol, kind \
        from contracts where \
        main and owner = $owner and \
-       ($no_continuation or (address > $collection)) \
-       order by address asc limit $size64"] in
+       ($no_continuation or \
+       (address collate \"C\" > $collection)) \
+       order by address collate \"C\" asc limit $size64"] in
   let>? nft_collections_total = [%pgsql dbh
       "select count(distinct address) from contracts where main and owner = $owner "] in
   let>? nft_collections_total = match nft_collections_total with
@@ -2577,8 +2620,8 @@ let get_nft_all_collections ?dbh ?continuation ?(size=50) () =
   let>? l = [%pgsql.object dbh
       "select address, owner, metadata, name, symbol, kind \
        from contracts where main and \
-       ($no_continuation or (address > $collection)) \
-       order by address asc limit $size64"] in
+       ($no_continuation or address collate \"C\" > $collection) \
+       order by address collate \"C\" asc limit $size64"] in
   let>? nft_collections_total = [%pgsql dbh
       "select count(distinct address) from contracts where main "] in
   let>? nft_collections_total = match nft_collections_total with
@@ -2595,7 +2638,13 @@ let get_nft_all_collections ?dbh ?continuation ?(size=50) () =
 
 let mk_order_continuation order =
   Printf.sprintf "%Ld_%s"
-    (Int64.of_float @@ CalendarLib.Calendar.to_unixfloat order.order_elt.order_elt_last_update_at)
+    (Int64.of_float @@
+     CalendarLib.Calendar.to_unixfloat order.order_elt.order_elt_last_update_at *. 1000.)
+    order.order_elt.order_elt_hash
+
+let mk_price_continuation order =
+  Printf.sprintf "%s_%s"
+    order.order_elt.order_elt_make.asset_value
     order.order_elt.order_elt_hash
 
 let filter_orders ?origin ?statuses orders =
@@ -2627,12 +2676,16 @@ let rec get_orders_all_aux ?dbh ?origin ?continuation ~size acc =
   if len < size  then
     use dbh @@ fun dbh ->
     let>? l =
-      [%pgsql.object dbh "select hash, last_update_at from orders \
-                   where \
-                   ($no_continuation or \
-                   (last_update_at < $ts) or \
-                   (last_update_at = $ts and hash < $h)) \
-                   order by last_update_at desc, hash desc limit $size"] in
+      [%pgsql.object dbh
+          "select hash, last_update_at from orders \
+           where \
+           ($no_continuation or \
+           (last_update_at < $ts) or \
+           (last_update_at = $ts and \
+           hash collate \"C\"  < $h)) \
+           order by last_update_at desc, \
+           hash collate \"C\" desc \
+           limit $size"] in
     let continuation = match List.rev l with
       | [] -> None
       | hd :: _ -> Some (hd#last_update_at, hd#hash) in
@@ -2683,13 +2736,17 @@ let rec get_sell_orders_by_maker_aux ?dbh ?origin ?continuation ~size ~maker acc
   if len < size  then
     use dbh @@ fun dbh ->
     let>? l =
-      [%pgsql.object dbh "select hash, last_update_at from orders \
-                   where \
-                   maker = $maker and \
-                   ($no_continuation or \
-                   (last_update_at < $ts) or \
-                   (last_update_at = $ts and hash < $h)) \
-                   order by last_update_at desc, hash desc limit $size"] in
+      [%pgsql.object dbh
+          "select hash, last_update_at from orders \
+           where \
+           maker = $maker and \
+           ($no_continuation or \
+           (last_update_at < $ts) or \
+           (last_update_at = $ts and \
+           hash collate \"C\" < $h)) \
+           order by last_update_at desc, \
+           hash collate \"C\" desc \
+           limit $size"] in
     let continuation = match List.rev l with
       | [] -> None
       | hd :: _ -> Some (hd#last_update_at, hd#hash) in
@@ -2817,8 +2874,11 @@ let rec get_sell_orders_by_item_aux
            ($no_end_date or created_at <= $end_date_v) and \
            ($no_continuation or \
            (make_asset_value > $p) or \
-           (make_asset_value = $p and hash < $h)) \
-           order by make_asset_value asc, hash desc limit $size"] in
+           (make_asset_value = $p and \
+           hash collate \"C\" > $h)) \
+           order by make_asset_value asc, \
+           hash collate \"C\" asc \
+           limit $size"] in
     let continuation = match List.rev l with
       | [] -> None
       | hd :: _ -> Some (hd#make_asset_value, hd#hash) in
@@ -2856,7 +2916,7 @@ let get_sell_orders_by_item
   let orders_pagination_continuation =
     if len = 0L || len < size then None
     else Some
-        (mk_order_continuation @@ List.hd @@ List.rev orders) in
+        (mk_price_continuation @@ List.hd @@ List.rev orders) in
   Lwt.return_ok
     { orders_pagination_orders = orders ; orders_pagination_continuation }
 
@@ -2876,13 +2936,17 @@ let rec get_sell_orders_by_collection_aux ?dbh ?origin ?continuation ~size colle
   if len < size  then
     use dbh @@ fun dbh ->
     let>? l =
-      [%pgsql.object dbh "select hash, last_update_at from orders \
-                   where make_asset_type_contract = $collection and \
-                   make_asset_type_class = 'FA_2' and \
-                   ($no_continuation or \
-                   (last_update_at < $ts) or \
-                   (last_update_at = $ts and hash < $h)) \
-                   order by last_update_at desc, hash desc limit $size"] in
+      [%pgsql.object dbh
+          "select hash, last_update_at from orders \
+           where make_asset_type_contract = $collection and \
+           make_asset_type_class = 'FA_2' and \
+           ($no_continuation or \
+           (last_update_at < $ts) or \
+           (last_update_at = $ts and \
+           hash collate \"C\" < $h)) \
+           order by last_update_at desc, \
+           hash collate \"C\" desc \
+           limit $size"] in
     let continuation = match List.rev l with
       | [] -> None
       | hd :: _ -> Some (hd#last_update_at, hd#hash) in
@@ -2934,12 +2998,16 @@ let rec get_sell_orders_aux ?dbh ?origin ?continuation ~size acc =
   if len < size  then
     use dbh @@ fun dbh ->
     let>? l =
-      [%pgsql.object dbh "select hash, last_update_at from orders \
-                   where make_asset_type_class = 'FA_2' and \
-                   ($no_continuation or \
-                   (last_update_at < $ts) or \
-                   (last_update_at = $ts and hash < $h)) \
-                   order by last_update_at desc, hash desc limit $size"] in
+      [%pgsql.object dbh
+          "select hash, last_update_at from orders \
+           where make_asset_type_class = 'FA_2' and \
+           ($no_continuation or \
+           (last_update_at < $ts) or \
+           (last_update_at = $ts and \
+           hash collate \"C\" < $h)) \
+           order by last_update_at desc, \
+           hash collate \"C\" desc \
+           limit $size"] in
     let continuation = match List.rev l with
       | [] -> None
       | hd :: _ -> Some (hd#last_update_at, hd#hash) in
@@ -2990,14 +3058,18 @@ let rec get_bid_orders_by_maker_aux ?dbh ?origin ?continuation ~size ~maker acc 
   if len < size  then
     use dbh @@ fun dbh ->
     let>? l =
-      [%pgsql.object dbh "select hash, last_update_at from orders \
-                   where \
-                   maker = $maker and \
-                   take_asset_type_class = 'FA_2' and \
-                   ($no_continuation or \
-                   (last_update_at < $ts) or \
-                   (last_update_at = $ts and hash < $h)) \
-                   order by last_update_at desc, hash desc limit $size"] in
+      [%pgsql.object dbh
+          "select hash, last_update_at from orders \
+           where \
+           maker = $maker and \
+           take_asset_type_class = 'FA_2' and \
+           ($no_continuation or \
+           (last_update_at < $ts) or \
+           (last_update_at = $ts and \
+           hash collate \"C\" < $h)) \
+           order by last_update_at desc, \
+           hash collate \"C\" desc \
+           limit $size"] in
     let continuation = match List.rev l with
       | [] -> None
       | hd :: _ -> Some (hd#last_update_at, hd#hash) in
@@ -3146,8 +3218,11 @@ let rec get_bid_orders_by_item_aux
            ($no_end_date or created_at <= $end_date_v) and \
            ($no_continuation or \
            (take_asset_value < $p) or \
-           (take_asset_value = $p and hash < $h)) \
-           order by take_asset_value desc, hash desc limit $size"] in
+           (take_asset_value = $p and \
+           hash collate \"C\" < $h)) \
+           order by take_asset_value desc, \
+           hash collate \"C\" desc \
+           limit $size"] in
     let continuation = match List.rev l with
       | [] -> None
       | hd :: _ -> Some (hd#take_asset_value, hd#hash) in
@@ -3190,7 +3265,7 @@ let get_bid_orders_by_item
   let orders_pagination_continuation =
     if len = 0L || len < size then None
     else Some
-        (mk_order_continuation @@ List.hd @@ List.rev orders) in
+        (mk_price_continuation @@ List.hd @@ List.rev orders) in
   Lwt.return_ok
     { orders_pagination_orders = orders ; orders_pagination_continuation }
 
@@ -3380,8 +3455,11 @@ let get_order_activities_by_collection ?dbh ?(sort=LATEST_FIRST) ?continuation ?
            oright.make_asset_type_contract = $contract or \
            oright.take_asset_type_contract = $contract) and \
            ($no_continuation or \
-           (date = $ts and transaction > $h) or (date < $ts)) \
-           order by date desc, transaction asc limit $size64"]
+           (date = $ts and transaction collate \"C\" < $h) or \
+           (date < $ts)) \
+           order by date desc, \
+           transaction collate \"C\" desc \
+           limit $size64"]
     | EARLIEST_FIRST ->
       [%pgsql.object dbh
           "select order_activity_type, \
@@ -3427,8 +3505,11 @@ let get_order_activities_by_collection ?dbh ?(sort=LATEST_FIRST) ?continuation ?
            oright.make_asset_type_contract = $contract or \
            oright.take_asset_type_contract = $contract) and \
            ($no_continuation or \
-           (date = $ts and transaction > $h) or (date > $ts)) \
-           order by date asc, transaction asc limit $size64"] in
+           (date = $ts and transaction collate \"C\" > $h) or \
+           (date > $ts)) \
+           order by date asc, \
+           transaction collate \"C\" asc \
+           limit $size64"] in
   map_rp (fun r -> let|>? a = mk_order_activity r in a, r) l >>=? fun activities ->
   let len = List.length activities in
   let order_activities_continuation =
@@ -3508,8 +3589,11 @@ let get_order_activities_by_item ?dbh ?(sort=LATEST_FIRST) ?continuation ?(size=
            (oright.take_asset_type_contract = $contract and
          oright.take_asset_type_token_id = $token_id)) and \
            ($no_continuation or \
-           (date = $ts and transaction > $h) or (date < $ts)) \
-           order by date desc, transaction asc limit $size64"]
+           (date = $ts and transaction collate \"C\" < $h) or \
+           (date < $ts)) \
+           order by date desc, \
+           transaction collate \"C\" desc \
+           limit $size64"]
     | EARLIEST_FIRST ->
       [%pgsql.object dbh
           "select order_activity_type, \
@@ -3559,8 +3643,11 @@ let get_order_activities_by_item ?dbh ?(sort=LATEST_FIRST) ?continuation ?(size=
            (oright.take_asset_type_contract = $contract and
          oright.take_asset_type_token_id = $token_id)) and \
            ($no_continuation or \
-           (date = $ts and transaction > $h) or (date > $ts)) \
-           order by date asc, transaction asc limit $size64"] in
+           (date = $ts and transaction collate \"C\" > $h) or \
+           (date > $ts)) \
+           order by date asc, \
+           transaction collate \"C\" asc \
+           limit $size64"] in
   map_rp (fun r -> let|>? a = mk_order_activity r in a, r) l >>=? fun activities ->
   let len = List.length activities in
   let order_activities_continuation =
@@ -3625,8 +3712,11 @@ let get_order_activities_all ?dbh ?(sort=LATEST_FIRST) ?continuation ?(size=50) 
            left join orders as oright on oright.hash = a.match_right where \
            main and position(order_activity_type in $types) > 0 and \
            ($no_continuation or \
-           (date = $ts and transaction > $h) or (date < $ts)) \
-           order by date desc, transaction asc limit $size64"]
+           (date = $ts and transaction collate \"C\" < $h) or \
+           (date < $ts)) \
+           order by date desc, \
+           transaction collate \"C\" desc \
+           limit $size64"]
     | EARLIEST_FIRST ->
       [%pgsql.object dbh
           "select order_activity_type, \
@@ -3666,8 +3756,10 @@ let get_order_activities_all ?dbh ?(sort=LATEST_FIRST) ?continuation ?(size=50) 
            left join orders as oright on oright.hash = a.match_right where \
            main and position(order_activity_type in $types) > 0 and \
            ($no_continuation or \
-           (date = $ts and transaction > $h) or (date > $ts)) \
-           order by date asc, transaction asc limit $size64"] in
+           (date = $ts and transaction collate \"C\" > $h) or \
+           (date > $ts)) \
+           order by date asc, \
+           transaction collate \"C\" asc limit $size64"] in
   map_rp (fun r -> let|>? a = mk_order_activity r in a, r) l >>=? fun activities ->
   let len = List.length activities in
   let order_activities_continuation =
@@ -3738,8 +3830,11 @@ let get_order_activities_by_user ?dbh ?(sort=LATEST_FIRST) ?continuation ?(size=
            (position(oleft.maker in $users) > 0 or position(oleft.taker in $users) > 0) or \
            (position(oright.maker in $users) > 0 or position(oright.taker in $users) > 0)) and \
            ($no_continuation or \
-           (date = $ts and transaction > $h) or (date < $ts)) \
-           order by date desc, transaction asc limit $size64"]
+           (date = $ts and transaction collate \"C\" < $h) or \
+           (date < $ts)) \
+           order by date desc, \
+           transaction collate \"C\" desc \
+           limit $size64"]
     | EARLIEST_FIRST ->
       [%pgsql.object dbh
           "select order_activity_type, \
@@ -3782,8 +3877,11 @@ let get_order_activities_by_user ?dbh ?(sort=LATEST_FIRST) ?continuation ?(size=
            (position(oleft.maker in $users) > 0 or position(oleft.taker in $users) > 0) or \
            (position(oright.maker in $users) > 0 or position(oright.taker in $users) > 0)) and \
            ($no_continuation or \
-           (date = $ts and transaction > $h) or (date > $ts)) \
-           order by date asc, transaction asc limit $size64"] in
+           (date = $ts and transaction collate \"C\" > $h) or \
+           (date > $ts)) \
+           order by date asc, \
+           transaction collate \"C\" asc \
+           limit $size64"] in
   map_rp (fun r -> let|>? a = mk_order_activity r in a, r) l >>=? fun activities ->
   let len = List.length activities in
   let order_activities_continuation =
