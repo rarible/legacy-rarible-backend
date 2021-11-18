@@ -64,7 +64,8 @@ export interface TezosProvider {
   address: () => Promise<string>;
   public_key: () => Promise<string | undefined>;
   storage: (contract: string) => Promise<any>;
-  balance: () => Promise<BigNumber>
+  balance: () => Promise<BigNumber>;
+  chain_id: () => Promise<string>;
 }
 
 export interface Provider {
@@ -226,8 +227,20 @@ export async function get_transaction(
   else throw new Error("/transaction/" + op_hash + " failed")
 }
 
+export function uint8array_to_hex(a: Uint8Array) : string {
+  return a.reduce((acc, x) => acc + x.toString(16).padStart(2, '0'), '')
+}
+
+export function hex_to_uint8array(s: string) : Uint8Array {
+  const a = new Uint8Array(s.length / 2)
+  for (let i = 0; i < s.length; i += 2) {
+    a[i / 2] = parseInt(s.substring(i, i + 2), 16)
+  }
+  return a
+}
+
 export function to_hex(s: string) : string {
   const encoder = new TextEncoder();
   const a = encoder.encode(s)
-  return a.reduce((acc, x) => acc + x.toString(16).padStart(2, '0'), '')
+  return uint8array_to_hex(a)
 }

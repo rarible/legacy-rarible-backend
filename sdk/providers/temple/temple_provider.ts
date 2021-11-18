@@ -51,6 +51,7 @@ export async function temple_provider(endpoint: string, network: TempleDAppNetwo
     const a = await address()
     return tk.tz.getBalance(a)
   }
+  const chain_id = async () => tk.rpc.getChainId()
   return {
     kind: "temple",
     transfer,
@@ -60,6 +61,7 @@ export async function temple_provider(endpoint: string, network: TempleDAppNetwo
     address,
     public_key,
     storage,
-    balance
+    balance,
+    chain_id,
   }
 }

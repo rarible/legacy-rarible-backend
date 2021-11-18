@@ -44,6 +44,7 @@ export function in_memory_provider(edsk: string, endpoint: string) : TezosProvid
     const a = await address()
     return tk.tz.getBalance(a)
   }
+  const chain_id = async () => tk.rpc.getChainId()
   return {
     kind: "in_memory",
     transfer,
@@ -53,6 +54,7 @@ export function in_memory_provider(edsk: string, endpoint: string) : TezosProvid
     address,
     public_key,
     storage,
-    balance
+    balance,
+    chain_id,
   }
 }
