@@ -8,7 +8,7 @@
  (name main_api)
  (modules main_api)
  (preprocess (pps ez_api.ppx_server))
- (libraries api))
+ (libraries api ez_api.icurl_lwt))
 
 (executable
  (name openapi)

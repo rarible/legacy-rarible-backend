@@ -923,6 +923,7 @@ let get_or_timeout url =
   Lwt.pick [ timeout ; EzReq_lwt.get url ]
 
 let get_metadata_json meta =
+  Format.eprintf "get_metadata_json %s@." meta ;
   (* 3 ways to recovers metadata :directly json, ipfs link and http(s) link *)
   try
     Lwt.return_ok (meta, EzEncoding.destruct token_metadata_enc meta)
@@ -943,6 +944,37 @@ let get_metadata_json meta =
         with _ -> Lwt.return_error (-1, None)
       end
     | Error (c, str) -> Lwt.return_error (c, str)
+
+let reset_mint_metadata_creators  dbh ~contract ~token_id ~metadata =
+  match metadata.tzip21_tm_creators with
+  | Some (CParts l) ->
+    iter_rp (fun p ->
+        [%pgsql dbh
+            "update tzip21_creators set \
+             account = ${p.part_account}, \
+             value = ${p.part_value} \
+             where contract = $contract and $token_id = $token_id"])
+      l
+  | Some (CAssoc l) ->
+    iter_rp (fun (part_account, part_value) ->
+        [%pgsql dbh
+            "update tzip21_creators set \
+             account = $part_account, \
+             value = $part_value \
+             where contract = $contract and token_id = $token_id"])
+      l
+  | Some (CTZIP12 l) ->
+    let len = List.length l in
+    let value = Int32.of_int (10000 / len) in
+    iter_rp (fun part_account ->
+        [%pgsql dbh
+            "update tzip21_creators set \
+             account = $part_account, \
+             value = $value \
+             where contract = $contract and token_id = $token_id"])
+      l
+  | None ->
+    Lwt.return_ok ()
 
 let insert_mint_metadata_creators  dbh ~contract ~token_id ~block ~level ~tsp ~metadata =
   match metadata.tzip21_tm_creators with
@@ -999,7 +1031,18 @@ let insert_mint_metadata_formats dbh ~contract ~token_id ~block ~level ~tsp ~met
            $?{f.format_hash}, $?{f.format_mime_type}, $?size, \
            $?{f.format_file_name}, $?{f.format_duration}, $?dim_value, \
            $?dim_unit, $?dr_value, $?dr_unit) \
-           on conflict do nothing"])
+           on conflict (uri, contract, token_id) do update set \
+           uri = ${f.format_uri}, hash = $?{f.format_hash}, \
+           mime_type = $?{f.format_mime_type}, file_size = $?size, \
+           file_name = $?{f.format_file_name}, \
+           duration = $?{f.format_duration}, \
+           dimensions_value = $?dim_value, \
+           dimensions_unit = $?dim_unit, \
+           data_rate_value = $?dr_value, \
+           data_rate_unit = $?dr_unit \
+           where tzip21_formats.contract = $contract and \
+           tzip21_formats.token_id = $token_id and \
+           tzip21_formats.uri = ${f.format_uri}"])
     formats
   | None -> Lwt.return_ok ()
 
@@ -1012,7 +1055,12 @@ let insert_mint_metadata_attributes dbh ~contract ~token_id ~block ~level ~tsp ~
              tsp, name, value, type) \
              values($contract, $token_id, $block, $level, $tsp, \
              ${a.attribute_name}, ${a.attribute_value}, $?{a.attribute_type}) \
-             on conflict do nothing"])
+             on conflict (name, contract, token_id) do update set \
+             value = ${a.attribute_value}, \
+             type = $?{a.attribute_type} \
+             where tzip21_attributes.contract = $contract and \
+             tzip21_attributes.token_id = $token_id and \
+             tzip21_attributes.name = ${a.attribute_name}"])
       attributes
   | None -> Lwt.return_ok ()
 
@@ -1064,7 +1112,18 @@ let insert_mint_metadata dbh ~contract ~token_id ~block ~level ~tsp ~metadata =
        $?description, $?minter, $?is_boolean_amount, $?tags, $?contributors, \
        $?publishers, $?date, $?block_level, $?genres, $?language, $?rights, \
        $?right_uri, $?is_transferable, $?should_prefer_symbol) \
-       on conflict do nothing"]
+       on conflict (contract, token_id) do update set \
+       name = $?name, symbol = $?symbol, decimals = $?decimals, \
+       artifact_uri = $?artifact_uri, display_uri = $?display_uri, \
+       thumbnail_uri = $?thumbnail_uri, description = $?description, \
+       minter = $?minter, is_boolean_amount = $?is_boolean_amount, \
+       tags = $?tags, contributors = $?contributors, publishers = $?publishers, \
+       date = $?date, block_level = $?block_level, genres = $?genres, \
+       language = $?language, rights = $?rights, right_uri = $?right_uri, \
+       is_transferable = $?is_transferable, \
+       should_prefer_symbol = $?should_prefer_symbol \
+       where tzip21_metadata.contract = $contract and \
+       tzip21_metadata.token_id = $token_id"]
 
 let insert_mint ~dbh ~op ~contract m =
   let block = op.bo_block in
@@ -1249,7 +1308,8 @@ let insert_token_metadata ~dbh ~op ~contract (token_id, l) =
     | Some meta ->
       begin
         get_metadata_json meta >>= function
-        | Ok (json, metadata) -> Lwt.return_ok (json, Some metadata)
+        | Ok (_json, metadata) ->
+          Lwt.return_ok (EzEncoding.construct Rtypes.token_metadata_enc l, Some metadata)
         | Error (code, str) ->
           Printf.eprintf "Cannot get metadata from url: %d %s\n%!"
             code (match str with None -> "None" | Some s -> s);
@@ -1270,6 +1330,39 @@ let insert_token_metadata ~dbh ~op ~contract (token_id, l) =
   match tzip21_meta with
   | None -> Lwt.return_ok ()
   | Some metadata -> insert_mint_metadata dbh ~contract ~token_id ~block ~level ~tsp ~metadata
+
+let reset_nft_item_meta_by_id ?dbh contract token_id =
+  Printf.eprintf "reset_nft_item_meta_by_id %s %s\n%!" contract token_id ;
+  use dbh @@ fun dbh ->
+  let>? l = [%pgsql dbh
+      "select block, level, tsp, metadata from token_updates where \
+       main and contract = $contract and token_id = $token_id ORDER BY block desc LIMIT 1"] in
+  match l with
+  | [] -> Lwt.return_error (`hook_error (Printf.sprintf "no %s:%s item" contract token_id))
+  | [ _, _, _, None ] ->
+    Lwt.return_error (`hook_error (Printf.sprintf "no metadata for %s:%s item" contract token_id))
+  | [ block, level, tsp, Some json ] ->
+    begin
+      try
+        let l = EzEncoding.destruct Rtypes.token_metadata_enc json in
+        match List.assoc_opt "" l with
+        | Some meta ->
+          begin
+            get_metadata_json meta >>= function
+            | Ok (_json, metadata) ->
+              insert_mint_metadata dbh ~contract ~token_id ~block ~level ~tsp ~metadata
+            | Error (code, str) ->
+              Lwt.return_error
+                (`hook_error
+                   (Printf.sprintf "fetch metadata error %d:%s" code @@
+                    Option.value ~default:"None" str))
+          end
+        | None -> Lwt.return_ok ()
+      with _ ->
+        Lwt.return_error (`hook_error (Printf.sprintf "wrong json for %s:%s item" contract token_id))
+    end
+  | _ ->
+    Lwt.return_error (`hook_error (Printf.sprintf "several results on LIMIT 1"))
 
 let insert_royalties ~dbh ~op roy =
   let royalties = EzEncoding.(construct token_royalties_enc roy.roy_royalties) in
@@ -1819,27 +1912,14 @@ let transfer_updates dbh main ~contract ~block ~level ~tsp ~token_id ~source amo
        where address = $destination"]
 
 let token_metadata_update dbh ~main ~contract ~block ~level ~tsp ~token_id meta =
-  get_metadata_json meta >>= begin function
-    | Ok (json, metadata) ->
-      let>? () = insert_mint_metadata dbh ~contract ~token_id ~block ~level ~tsp ~metadata in
-      [%pgsql dbh
-          "update tokens set metadata = $json,  \
-           last_block = case when $main then $block else last_block end, \
-           last_level = case when $main then $level else last_level end, \
-           last = case when $main then $tsp else last end \
-           where contract = $contract and \
-           token_id = $token_id returning supply"]
-    | Error (code, str) ->
-      Printf.eprintf "Cannot get metadata from url: %d %s\n%!"
-        code (match str with None -> "None" | Some s -> s);
-      [%pgsql dbh
-          "update tokens set metadata = $meta,  \
-           last_block = case when $main then $block else last_block end, \
-           last_level = case when $main then $level else last_level end, \
-           last = case when $main then $tsp else last end \
-           where contract = $contract and \
-           token_id = $token_id returning supply"]
-  end >>=? fun supply ->
+  [%pgsql dbh
+      "update tokens set metadata = $meta, \
+       last_block = case when $main then $block else last_block end, \
+       last_level = case when $main then $level else last_level end, \
+       last = case when $main then $tsp else last end \
+       where contract = $contract and \
+       token_id = $token_id returning supply"]
+  >>=? fun supply ->
   if main then
     match supply with
     | [ i64 ] when i64 > 0L ->

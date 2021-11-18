@@ -568,6 +568,21 @@ let get_nft_all_ownerships req () =
    section=ownerships_section}]
 
 (* nft-item-controller *)
+let reset_nft_item_meta_by_id (_req, item_id) () =
+  match parse_item_id item_id with
+  | Error err -> return @@ Error err
+  | Ok (contract, token_id) ->
+    Db.reset_nft_item_meta_by_id contract token_id >>= function
+    | Error db_err ->
+      let message = Crawlori.Rp.string_of_error db_err in
+      return (Error {code=`UNEXPECTED_API_ERROR; message})
+    | Ok res -> return_ok res
+[@@delete
+  {path="/v0.1/items/{item_id_arg}/reset";
+   errors=[bad_request_case;unexpected_case];
+   name="item_reset_meta";
+   section=items_section}]
+
 let get_nft_item_meta_by_id (_req, item_id) () =
   match parse_item_id item_id with
   | Error err -> return @@ Error err

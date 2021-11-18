@@ -255,8 +255,11 @@ let generate_royalties () =
         aux ((a.edpk, v + old) :: (List.remove_assoc a.edpk royalties)) in
   List.map (fun (addr, v) -> pk_to_pkh_exn addr, Int64.of_int v) @@ aux []
 
-let generate_ipfs_metadata () =
-  [ "", List.nth ipfs_metadatas (Random.int ipfs_metadatas_len) ]
+let generate_ipfs_metadata ?metadata_link () =
+  let metadata_link = match metadata_link with
+    | None -> List.nth ipfs_metadatas (Random.int ipfs_metadatas_len)
+    | Some link -> link in
+  [ "", metadata_link ]
 
 let mk_order_form
     maker maker_edpk taker taker_edpk make take salt start_date end_date signature data_type payouts origin_fees =
@@ -389,6 +392,13 @@ let call_generate_token_id collection =
   let|>? {nft_token_id; _} = Lwt.return @@ handle_ezreq_result r in
   Int64.of_string nft_token_id
 
+let call_reset_nft_item_meta_by_id collection tid =
+  let url = EzAPI.BASE !api in
+  let> r =
+    EzReq_lwt.get1 url Api.reset_nft_item_meta_by_id_s
+      (Printf.sprintf "%s:%s" collection tid) in
+  Lwt.return @@ handle_ezreq_result r
+
 let call_get_nft_collection_by_id collection =
   let url = EzAPI.BASE !api in
   let|> r = EzReq_lwt.get1 url Api.get_nft_collection_by_id_s collection in
@@ -424,10 +434,14 @@ let call_search_nft_all_collections () =
       aux ~continuation (collections.nft_collections_collections @ acc) in
   aux []
 
-let call_get_nft_item_by_id ?(verbose=0) collection tid =
-  let url = EzAPI.BASE !api in
+let call_get_nft_item_by_id ?(verbose=0) ?include_meta collection tid =
+  let open EzAPI in
+  let url = BASE !api in
+  let params = match include_meta with
+    | None -> []
+    | Some b -> [ Api.include_meta_param, B b ] in
   let msg = if verbose > 0 then Some "debug" else None in
-  let|> r = EzReq_lwt.get1 ?msg url Api.get_nft_item_by_id_s
+  let|> r = EzReq_lwt.get1 ?msg ~params url Api.get_nft_item_by_id_s
       (Printf.sprintf "%s:%s" collection tid) in
   handle_ezreq_result r
   (*  >>= fun res ->
@@ -1100,13 +1114,13 @@ let mint_with_random_token_id c =
   mint_tokens c item >>= fun () ->
   Lwt.return_ok item
 
-let mint_one_with_token_id_from_api ?diff ?alias c =
+let mint_one_with_token_id_from_api ?metadata_link ?diff ?alias c =
   let it_owner =
     match alias with None -> generate_address ?diff () | Some a -> by_alias a in
   Printf.eprintf "mint_one_with_token_id_from_api for %s with %s on %s\n%!"
     it_owner.tz1 c.col_admin.tz1 c.col_kt1 ;
   let it_royalties = generate_royalties () in
-  let it_metadata = generate_ipfs_metadata () in
+  let it_metadata = generate_ipfs_metadata ?metadata_link () in
   let>? it_token_id = call_generate_token_id c.col_kt1 in
   let it_kind = match c.col_kind with `nft -> `nft | `mt -> `mt 1L in
   let item = {it_owner; it_token_id; it_kind; it_royalties; it_metadata; it_collection=c.col_kt1} in
@@ -2141,6 +2155,52 @@ let burn_test ?royalties ~kind ~privacy () =
     | Some it -> check_item it in
   Lwt.return_ok ()
 
+let reset_meta_test ?royalties ~kind ~privacy () =
+  let c = create_collection ?royalties ~kind ~privacy () in
+  let> c = deploy_collection c in
+  let>? () = check_collection c in
+  Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
+  let> () = Lwt_unix.sleep 6. in
+  let>? item1 = match kind with
+    | `nft -> mint_one_with_token_id_from_api ~metadata_link:"http://localhost:8888/meta.json" c
+    | `mt ->  mint_with_token_id_from_api c in
+  wait_next_block () >>= fun () ->
+  Lwt_unix.sleep 60.0 >>= fun () ->
+  let>? nft_item_1 =
+    call_get_nft_item_by_id ~include_meta:true
+      item1.it_collection
+      (Int64.to_string item1.it_token_id) in
+  begin match nft_item_1.nft_item_meta with
+    | None ->
+      Format.eprintf "meta None@." ;
+    | Some m ->
+      Format.eprintf "meta %S@." @@ EzEncoding.construct nft_item_meta_enc m
+  end ;
+  call_reset_nft_item_meta_by_id
+    item1.it_collection
+    (Int64.to_string item1.it_token_id) >>= function
+  | Ok () ->
+    wait_next_block () >>= fun () ->
+    let>? nft_item_2 =
+      call_get_nft_item_by_id ~include_meta:true
+        item1.it_collection
+        (Int64.to_string item1.it_token_id) in
+    if nft_item_1.nft_item_meta <> nft_item_2.nft_item_meta then
+      Printf.eprintf "[OK] different meta\n%!"
+    else
+      Printf.eprintf "[KO] same meta\n%!" ;
+    begin match nft_item_2.nft_item_meta with
+      | None ->
+        Format.eprintf "meta None@." ;
+      | Some m ->
+        Format.eprintf "meta %S@." @@ EzEncoding.construct nft_item_meta_enc m
+    end ;
+    Lwt.return_ok ()
+  | Error err ->
+    Lwt.return_ok @@
+    Printf.eprintf "reset error %s" @@
+    Api.Errors.string_of_error err
+
 let sell_nft_for_nft ?salt collection item1 item2 =
   match order_form_from_items ?salt collection item1 item2 with
   | Error _err -> Lwt.fail_with "order_from"
@@ -2684,6 +2744,20 @@ let main () =
           | Ok _ -> Lwt.return_unit
           | Error err ->
             Lwt.fail_with @@ Api.Errors.string_of_error err)
+        (fun exn ->
+           Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
+           begin match !api_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
+           begin match !crawler_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
+           Lwt.return_unit))
+
+  | [ "reset_metadata" ] ->
+    Lwt_main.run (
+      Lwt.catch (fun () ->
+          let kind = `nft in
+          let privacy = `priv in
+          setup_test_env () >>= fun (royalties, _exchange) ->
+          reset_meta_test ~royalties ~kind ~privacy () >>= fun _ ->
+          Lwt.return @@ clean_test_env ())
         (fun exn ->
            Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
            begin match !api_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
