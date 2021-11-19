@@ -18,7 +18,7 @@ let upgrade_1_to_2 dbh version =
       exchange_v2_contract varchar not null default '',
       validator_contract varchar not null default '',
       fees_receiver jsonb[] not null default '{}',
-      protocol_fee bigint)|};
+      protocol_fee varchar)|};
 
     {|create table ft_contracts(
       address varchar primary key,
@@ -41,7 +41,7 @@ let upgrade_1_to_2 dbh version =
       last_level int not null,
       last timestamp not null,
       tokens_number bigint not null default 0,
-      next_token_id varchar not null default 0,
+      next_token_id varchar not null default '0',
       ledger_id varchar not null,
       ledger_key jsonb,
       ledger_value jsonb,
@@ -142,9 +142,9 @@ let upgrade_1_to_2 dbh version =
       last_level int not null,
       last timestamp not null,
       owner varchar not null,
-      amount bigint not null,
-      supply bigint not null,
-      balance bigint,
+      amount varchar not null,
+      supply varchar not null,
+      balance varchar,
       operators varchar[] not null default '{}',
       metadata jsonb not null default '{}',
       royalties jsonb not null default '{}',
@@ -185,7 +185,7 @@ let upgrade_1_to_2 dbh version =
       add boolean,
       contract varchar not null,
       token_id varchar,
-      amount bigint,
+      amount varchar,
       metadata jsonb,
       royalties jsonb,
       primary key (block, index, transfer_index))|};
@@ -201,7 +201,7 @@ let upgrade_1_to_2 dbh version =
       contract varchar not null,
       token_id varchar not null,
       account varchar,
-      balance bigint,
+      balance varchar,
       unique (block, index, contract, token_id, account))|};
 
     {|create table orders(
@@ -213,10 +213,12 @@ let upgrade_1_to_2 dbh version =
       make_asset_type_contract varchar,
       make_asset_type_token_id varchar,
       make_asset_value varchar not null,
+      make_asset_decimals int,
       take_asset_type_class varchar not null,
       take_asset_type_contract varchar,
       take_asset_type_token_id varchar,
       take_asset_value varchar not null,
+      take_asset_decimals int,
       start_date timestamp,
       end_date timestamp,
       salt varchar not null,
@@ -253,7 +255,7 @@ let upgrade_1_to_2 dbh version =
       contract varchar not null,
       token_id varchar not null,
       owner varchar not null,
-      amount bigint not null,
+      amount varchar not null,
       tr_from varchar,
       primary key (transaction, block))|};
 
@@ -267,8 +269,8 @@ let upgrade_1_to_2 dbh version =
       source varchar not null,
       hash_left varchar not null,
       hash_right varchar not null,
-      fill_make_value bigint not null,
-      fill_take_value bigint not null,
+      fill_make_value varchar not null,
+      fill_take_value varchar not null,
       primary key (block, index))|};
 
     {|create table order_cancel(
@@ -296,7 +298,7 @@ let upgrade_1_to_2 dbh version =
     {|create table ft_tokens(
       contract varchar not null,
       account varchar not null,
-      balance bigint not null,
+      balance varchar not null,
       primary key (contract, account))|};
 
     {|create table ft_token_updates(
@@ -310,7 +312,7 @@ let upgrade_1_to_2 dbh version =
       source varchar,
       destination varchar,
       contract varchar not null,
-      amount bigint not null,
+      amount varchar not null,
       primary key (block, index, transfer_index))|};
 
   ]

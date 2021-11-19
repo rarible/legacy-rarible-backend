@@ -202,30 +202,30 @@ let generate_maker () =
 let generate_taker () =
   generate_option generate_address
 
-let tezos_asset () = {asset_type=ATXTZ; asset_value=Int64.to_string @@ Random.int64 10000000000L}
+let tezos_asset () = {asset_type=ATXTZ; asset_value=Z.of_int64 @@ Random.int64 10000000000L}
 
 let generate_ft_asset () =
   let contract = List.nth ft_contracts (Random.int ft_contracts_len) in
-  {asset_type=ATFT contract; asset_value=Int64.to_string @@ Random.int64 100L}
+  {asset_type=ATFT contract; asset_value=Z.of_int64 @@ Random.int64 100L}
 
 let generate_nft_asset () =
   let asset_contract = List.nth nft_contracts (Random.int nft_contracts_len) in
-  let asset_token_id = string_of_int @@ (Random.int 1000) + 1 in
-  {asset_type=ATNFT { asset_contract ; asset_token_id }; asset_value="1"}
+  let asset_token_id = Z.of_int @@ (Random.int 1000) + 1 in
+  {asset_type=ATNFT { asset_contract ; asset_token_id }; asset_value=Z.one}
 
 let generate_asset () =
   match Random.int 3 with
-  | 0 -> tezos_asset ()
-  | 1 -> generate_ft_asset ()
-  | 2 -> generate_nft_asset ()
+  | 0 -> tezos_asset (), Some 6l
+  | 1 -> generate_ft_asset (), None
+  | 2 -> generate_nft_asset (), None
   | _ -> assert false
 
 let generate_salt () =
-  string_of_int @@ (Random.int 10000) + 1
+  Z.of_int @@ (Random.int 10000) + 1
 
 let generate_amount ?(max=100_000) () = Random.int max
 
-let generate_token_id () = Int64.of_int @@ generate_amount ~max:1_000_000 ()
+let generate_token_id () = Z.of_int @@ generate_amount ~max:1_000_000 ()
 
 let generate_part () =
   let part_account = generate_origin () in
@@ -289,8 +289,8 @@ let generate_order () =
   let maker = generate_maker () in
   (* let maker = maker_account.edpk in *)
   let taker = generate_taker () in
-  let make = generate_asset () in
-  let take = generate_asset () in
+  let make, maked = generate_asset () in
+  let take, taked = generate_asset () in
   let salt = generate_salt () in
   let start_date = None in
   let end_date = None in
@@ -305,25 +305,25 @@ let generate_order () =
   let order_form =
     mk_order_form
       maker.tz1 maker.edpk taker taker_edpk make take salt start_date end_date signature data_type payouts origin_fees in
-  Ok order_form
+  Ok (order_form, (maked, taked))
 
 let maker_from_item it = it.it_owner
 
 let asset_from_item asset_contract it =
-  let asset_token_id = Int64.to_string it.it_token_id in
+  let asset_token_id = it.it_token_id in
   match it.it_kind with
     | `nft ->
-      { asset_type = ATNFT { asset_contract; asset_token_id }; asset_value = "1" }
+      { asset_type = ATNFT { asset_contract; asset_token_id }; asset_value = Z.one }
     | `mt amount ->
       { asset_type = ATMT { asset_contract; asset_token_id };
-        asset_value = Int64.to_string amount }
+        asset_value = amount }
 
 let order_form_from_items ?(salt=0) collection item1 item2 =
   let maker = maker_from_item item1 in
   let taker, taker_pk = None, None in
   let make = asset_from_item collection item1 in
   let take = asset_from_item collection item2 in
-  let salt = string_of_int salt in
+  let salt = Z.of_int salt in
   let start_date = None in
   let end_date = None in
   let data_type = "V1" in
@@ -342,7 +342,7 @@ let sell_order_form_from_item ?(salt=0) collection item1 take =
   let maker = maker_from_item item1 in
   let taker, taker_pk = None, None in
   let make = asset_from_item collection item1 in
-  let salt = string_of_int salt in
+  let salt = Z.of_int salt in
   let start_date = None in
   let end_date = None in
   let data_type = "V1" in
@@ -360,7 +360,7 @@ let sell_order_form_from_item ?(salt=0) collection item1 take =
 let buy_order_form_from_item ?(salt=0) collection item1 maker make =
   let taker, taker_pk = None, None in
   let take = asset_from_item collection item1 in
-  let salt = string_of_int salt in
+  let salt = Z.of_int salt in
   let start_date = None in
   let end_date = None in
   let data_type = "V1" in
@@ -381,8 +381,9 @@ let handle_ezreq_result = function
     Error {Api.Errors.code=`UNEXPECTED_API_ERROR; message=match msg with None -> "" | Some s -> s}
   | Error (EzReq_lwt_S.KnownError {error; _}) -> Error error
 
-let call_upsert_order order_form =
+let call_upsert_order ~d:(maked, taked) order_form =
   let url = EzAPI.BASE !api in
+  let order_form = Common.Balance.dec_order_form ?maked ?taked order_form in
   let|> r = EzReq_lwt.post0 ~input:order_form url Api.upsert_order_s in
   handle_ezreq_result r
 
@@ -390,7 +391,7 @@ let call_generate_token_id collection =
   let url = EzAPI.BASE !api in
   let> r = EzReq_lwt.get1 url Api.generate_nft_token_id_s collection in
   let|>? {nft_token_id; _} = Lwt.return @@ handle_ezreq_result r in
-  Int64.of_string nft_token_id
+  nft_token_id
 
 let call_reset_nft_item_meta_by_id collection tid =
   let url = EzAPI.BASE !api in
@@ -635,8 +636,8 @@ let call_get_nft_activities_by_collection_transfer collection =
 
 let upsert_order () =
   match generate_order () with
-  | Ok order_form ->
-    call_upsert_order order_form
+  | Ok (order_form, d) ->
+    call_upsert_order ~d order_form
   | Error err ->
     Lwt.fail_with (Printf.sprintf "error : %s" @@ Let.string_of_error err)
 
@@ -888,7 +889,7 @@ let set_token_metadata c it =
   if !js then
     Script_js.set_token_metadata ~endpoint:!endpoint it
   else
-    let cmd = Script.set_token_metadata_aux ~endpoint:!endpoint ~id:it.it_token_id
+    let cmd = Script.set_token_metadata_aux ~endpoint:!endpoint ~id:(Z.to_int64 it.it_token_id)
         ~metadata:it.it_metadata c.col_admin.tz1 it.it_collection in
     let code, out, err = sys_command cmd in
     if code <> 0 then
@@ -970,11 +971,11 @@ let create_exchange () =
   may_import_key receiver ;
   if !js then
     let kt1_exchange = Script_js.deploy_exchange ~endpoint:!endpoint ~admin
-        ~receiver ~fee:300L source in
+        ~receiver ~fee:(Z.of_int 300) source in
     kt1_exchange, admin, receiver
   else
     let filename = "contracts/arl/exchangeV2.arl" in
-    let storage = Script.storage_exchange ~admin:admin.tz1 ~receiver:receiver.tz1 ~fee:300L in
+    let storage = Script.storage_exchange ~admin:admin.tz1 ~receiver:receiver.tz1 ~fee:(Z.of_int 300) in
     let alias = generate_alias "exchange" in
     deploy ~burn_cap:42.1 ~filename ~storage ~source alias ;
     alias, admin, receiver
@@ -991,9 +992,9 @@ let set_validator validator source contract =
     else Lwt.return_unit
 
 let set_royalties ~contract ~id ~royalties source contract_royalties =
-  Printf.eprintf "set_royalties %s %Ld [%s]\n%!"
+  Printf.eprintf "set_royalties %s %s [%s]\n%!"
     contract
-    id
+    (Z.to_string id)
     (String.concat ";" @@ List.map (fun (s, i) -> Printf.sprintf "%s : %Ld" s i) royalties) ;
   if !js then
     Lwt.fail_with "TODO"
@@ -1107,7 +1108,7 @@ let mint_with_random_token_id c =
   let it_token_id = generate_token_id () in
   let it_kind = match c.col_kind with
     | `nft -> `nft
-    | `mt -> `mt (Int64.of_int @@ generate_amount ~max:10 () + 1) in
+    | `mt -> `mt (Z.of_int @@ generate_amount ~max:10 () + 1) in
   let it_royalties = generate_royalties () in
   let it_metadata = generate_ipfs_metadata () in
   let item = {it_owner; it_token_id; it_kind; it_royalties; it_metadata; it_collection=c.col_kt1} in
@@ -1122,7 +1123,7 @@ let mint_one_with_token_id_from_api ?metadata_link ?diff ?alias c =
   let it_royalties = generate_royalties () in
   let it_metadata = generate_ipfs_metadata ?metadata_link () in
   let>? it_token_id = call_generate_token_id c.col_kt1 in
-  let it_kind = match c.col_kind with `nft -> `nft | `mt -> `mt 1L in
+  let it_kind = match c.col_kind with `nft -> `nft | `mt -> `mt Z.one in
   let item = {it_owner; it_token_id; it_kind; it_royalties; it_metadata; it_collection=c.col_kt1} in
   let> () = mint_tokens c item in
   Lwt.return_ok item
@@ -1134,7 +1135,7 @@ let mint_ubi_with_token_id_from_api ?diff ?alias c =
   let name = Filename.basename @@ Filename.temp_file "item" "name" in
   let it_metadata = [ "name", name ] in
   let>? it_token_id = call_generate_token_id c.col_kt1 in
-  let it_kind = match c.col_kind with `nft -> `nft | `mt -> `mt 1L in
+  let it_kind = match c.col_kind with `nft -> `nft | `mt -> `mt Z.one in
   let item =
     {it_owner; it_token_id; it_kind; it_royalties=[]; it_metadata; it_collection=c.col_kt1} in
   let> () = mint_ubi_tokens c item in
@@ -1148,7 +1149,7 @@ let mint_with_token_id_from_api c =
     | `nft -> `nft
     | `mt ->
       let amount = generate_amount ~max:10 () + 1 in
-      `mt (Int64.of_int amount) in
+      `mt (Z.of_int amount) in
   let it_royalties = generate_royalties () in
   let it_metadata = generate_ipfs_metadata () in
   let>? it_token_id = call_generate_token_id c.col_kt1 in
@@ -1161,8 +1162,8 @@ let burn_with_token_id it kind =
   burn_tokens it kind
 
 let transfer_with_token_id it amount new_owner =
-  Printf.eprintf "transfer_with_token_id %Ld from %s to %s on %s\n%!"
-    it.it_token_id it.it_owner.tz1 new_owner.tz1 it.it_collection ;
+  Printf.eprintf "transfer_with_token_id %s from %s to %s on %s\n%!"
+    (Z.to_string it.it_token_id) it.it_owner.tz1 new_owner.tz1 it.it_collection ;
   transfer_tokens it amount new_owner
 
 let mint ?(with_token_id=false) c =
@@ -1178,21 +1179,22 @@ let burn it =
     | `mt max_amount ->
       if Random.bool () then `mt max_amount, None
       else
-        let a = Random.int64 max_amount in
-        `mt a, Some (`mt (Int64.sub max_amount a)) in
+        let a = Z.of_int64 @@ Random.int64 (Z.to_int64 max_amount) in
+        `mt a, Some (`mt (Z.sub max_amount a)) in
   let|> () = burn_with_token_id it kind in
   match new_kind with None -> None | Some it_kind -> Some { it with it_kind }
 
 let transfer it =
   let new_owner = generate_address ~diff:(it.it_owner.tz1) () in
   let old_item, new_item, amount = match it.it_kind with
-    | `nft -> None, { it with it_owner = new_owner }, 1L
+    | `nft -> None, { it with it_owner = new_owner }, Z.one
     | `mt max_amount ->
       if Random.bool () then
         None, { it with it_owner = new_owner }, max_amount
       else
-        let a = Int64.(add (Random.int64 (sub max_amount 1L)) 1L) in
-        Some { it with it_kind = `mt (Int64.sub max_amount a) },
+        let a = Z.succ @@ Z.of_int64 @@
+          Random.int64 Int64.(sub (Z.to_int64 max_amount) 1L) in
+        Some { it with it_kind = `mt (Z.sub max_amount a) },
         { it with it_kind = `mt a; it_owner = new_owner }, a in
   let|> () = transfer_with_token_id it amount new_owner in
   old_item, new_item
@@ -1318,12 +1320,12 @@ let check_strict_owners item_owners owner = match item_owners with
   | _ -> false
 
 let check_supply item_supply kind =
-  let amount = match kind with `nft -> 1L | `mt a -> a in
-  Int64.of_string item_supply >= amount
+  let amount = match kind with `nft -> Z.one | `mt a -> a in
+  item_supply >= amount
 
 let check_strict_supply item_supply kind =
-  let amount = match kind with `nft -> 1L | `mt a -> a in
-  Int64.of_string item_supply = amount
+  let amount = match kind with `nft -> Z.one | `mt a -> a in
+  item_supply = amount
 
 let check_metadata itm_metadata metadata = match itm_metadata, metadata with
   | Some im, Some m ->
@@ -1336,21 +1338,21 @@ let check_metadata itm_metadata metadata = match itm_metadata, metadata with
 
 let check_nft_item ?(verbose=0) ?(strict=true) itm it =
   if verbose > 0 then
-    Printf.eprintf "%s\n%s %s %Ld %s\n%!"
-      (EzEncoding.construct nft_item_enc itm) it.it_collection it.it_owner.tz1 it.it_token_id
-      (match it.it_kind with `nft -> "NFT" | `mt amount -> Format.sprintf "MT(%Ld)" amount);
+    Printf.eprintf "%s\n%s %s %s %s\n%!"
+      (EzEncoding.construct nft_item_enc itm) it.it_collection it.it_owner.tz1 (Z.to_string it.it_token_id)
+      (match it.it_kind with `nft -> "NFT" | `mt amount -> Format.sprintf "MT(%s)" (Z.to_string amount));
   if verbose > 0 then
   Printf.eprintf "%b %b %b %b %b\n%!"
-    (itm.nft_item_id = (Printf.sprintf "%s:%Ld" it.it_collection it.it_token_id))
+    (itm.nft_item_id = (Printf.sprintf "%s:%s" it.it_collection (Z.to_string it.it_token_id)))
     (itm.nft_item_contract = it.it_collection)
-    (itm.nft_item_token_id = Int64.to_string it.it_token_id)
+    (itm.nft_item_token_id = it.it_token_id)
     (if strict then check_strict_owners itm.nft_item_owners it.it_owner.tz1
      else check_owners itm.nft_item_owners it.it_owner.tz1)
     (if strict then check_strict_supply itm.nft_item_supply it.it_kind
      else check_supply itm.nft_item_supply it.it_kind) ;
-  itm.nft_item_id = (Printf.sprintf "%s:%Ld" it.it_collection it.it_token_id) &&
+  itm.nft_item_id = (Printf.sprintf "%s:%s" it.it_collection (Z.to_string it.it_token_id)) &&
   itm.nft_item_contract = it.it_collection &&
-  itm.nft_item_token_id = Int64.to_string it.it_token_id &&
+  itm.nft_item_token_id = it.it_token_id &&
   (* check_royalties itm.nft_item_royalties royalties && *)
   (if strict then check_strict_owners itm.nft_item_owners it.it_owner.tz1
    else check_owners itm.nft_item_owners it.it_owner.tz1) &&
@@ -1359,11 +1361,11 @@ let check_nft_item ?(verbose=0) ?(strict=true) itm it =
    * check_metadata itm.nft_item_meta metadata *)
 
 let check_nft_ownership ow it =
-  ow.nft_ownership_id = (Printf.sprintf "%s:%Ld:%s" it.it_collection it.it_token_id it.it_owner.tz1) &&
+  ow.nft_ownership_id = (Printf.sprintf "%s:%s:%s" it.it_collection (Z.to_string it.it_token_id) it.it_owner.tz1) &&
   ow.nft_ownership_contract = it.it_collection &&
-  ow.nft_ownership_token_id = Int64.to_string it.it_token_id &&
+  ow.nft_ownership_token_id = it.it_token_id &&
   ow.nft_ownership_owner = it.it_owner.tz1 &&
-  ow.nft_ownership_value = (match it.it_kind with `nft -> "1" | `mt a -> Int64.to_string a)(*  &&
+  ow.nft_ownership_value = (match it.it_kind with `nft -> Z.one | `mt a -> a)(*  &&
    * check_creators ow.nft_ownership_creators metadata *)
 
 let check_not_item ?verbose ?strict it =
@@ -1371,7 +1373,7 @@ let check_not_item ?verbose ?strict it =
     List.exists (fun i -> check_nft_item ?verbose ?strict i it) items in
   let nft_ownership_exists ownerships =
     List.exists (fun o ->  check_nft_ownership o it) ownerships in
-  call_get_nft_item_by_id it.it_collection (Int64.to_string it.it_token_id) >|= begin function
+  call_get_nft_item_by_id it.it_collection (Z.to_string it.it_token_id) >|= begin function
     | Error _err -> Printf.eprintf "[OK] check_not_item : item_by_id\n%!"
     | Ok nft_item ->
       if not @@ check_nft_item nft_item it then
@@ -1404,7 +1406,7 @@ let check_not_item ?verbose ?strict it =
       else
         Printf.eprintf "[KO] check_not_item : all_items\n%!"
   end >>= fun () ->
-  call_get_nft_ownership_by_id it.it_collection (Int64.to_string it.it_token_id) it.it_owner.tz1
+  call_get_nft_ownership_by_id it.it_collection (Z.to_string it.it_token_id) it.it_owner.tz1
   >|= begin function
     | Error _err -> Printf.eprintf "[OK] check_not_item : ownership_by_id\n%!"
     | Ok nft_ownership ->
@@ -1413,7 +1415,7 @@ let check_not_item ?verbose ?strict it =
       else
         Printf.eprintf "[KO] check_not _item : ownership_by_id\n%!"
   end >>= fun () ->
-  call_get_nft_ownerships_by_item it.it_collection (Int64.to_string it.it_token_id)
+  call_get_nft_ownerships_by_item it.it_collection (Z.to_string it.it_token_id)
   >|= begin function
     | Error _err -> Printf.eprintf "[OK] check_not_item : ownerships_by_item\n%!"
     | Ok nft_ownerships ->
@@ -1438,7 +1440,7 @@ let check_item ?verbose ?strict it =
     List.exists (fun i -> check_nft_item ?verbose ?strict i it) items in
   let nft_ownership_exists ownerships =
     List.exists (fun o ->  check_nft_ownership o it) ownerships in
-  call_get_nft_item_by_id ?verbose it.it_collection (Int64.to_string it.it_token_id) >|= begin function
+  call_get_nft_item_by_id ?verbose it.it_collection (Z.to_string it.it_token_id) >|= begin function
     | Ok nft_item ->
       if check_nft_item ?strict nft_item it then
         Printf.eprintf "[OK] check_item : item_by_id\n%!"
@@ -1478,7 +1480,7 @@ let check_item ?verbose ?strict it =
       Printf.eprintf "[KO] check_item : all_items (error : %s)\n%!" @@
       Api.Errors.string_of_error err
   end >>= fun () ->
-  call_get_nft_ownership_by_id it.it_collection (Int64.to_string it.it_token_id) it.it_owner.tz1 >|= begin function
+  call_get_nft_ownership_by_id it.it_collection (Z.to_string it.it_token_id) it.it_owner.tz1 >|= begin function
     | Ok nft_ownership ->
       if check_nft_ownership nft_ownership it then
         Printf.eprintf "[OK] check_item : ownership_by_id\n%!"
@@ -1488,7 +1490,7 @@ let check_item ?verbose ?strict it =
       Printf.eprintf "[KO] check_item : ownership_by_id (error : %s)\n%!" @@
       Api.Errors.string_of_error err
   end >>= fun () ->
-  call_get_nft_ownerships_by_item it.it_collection (Int64.to_string it.it_token_id) >|= begin function
+  call_get_nft_ownerships_by_item it.it_collection (Z.to_string it.it_token_id) >|= begin function
     | Ok nft_ownerships ->
       if nft_ownership_exists nft_ownerships then
         Printf.eprintf "[OK] check_item : ownerships_by_item\n%!"
@@ -1516,17 +1518,17 @@ let check_nft_activity ?(from=false) activity it =
   if from then
     activity.nft_activity_contract = it.it_collection &&
     activity.nft_activity_owner <> it.it_owner.tz1 &&
-    activity.nft_activity_token_id = Int64.to_string it.it_token_id
+    activity.nft_activity_token_id = it.it_token_id
   else
     activity.nft_activity_contract = it.it_collection &&
     activity.nft_activity_owner = it.it_owner.tz1 &&
-    activity.nft_activity_value = (match it.it_kind with `nft -> "1" | `mt a -> Int64.to_string a) &&
-    activity.nft_activity_token_id = Int64.to_string it.it_token_id
+    activity.nft_activity_value = (match it.it_kind with `nft -> Z.one | `mt a -> a) &&
+    activity.nft_activity_token_id = it.it_token_id
 
 let check_mint_activity it =
   let owner = it.it_owner.tz1 in
   let kt1 = it.it_collection in
-  let tid = Int64.to_string it.it_token_id in
+  let tid = it.it_token_id in
   let mint_activity_exists activities =
     List.exists (fun act -> match act with
         | NftActivityMint elt -> check_nft_activity elt it
@@ -1534,7 +1536,7 @@ let check_mint_activity it =
   (* MINT ONLY ACTIVITIES *)
   call_get_nft_activities_by_item_mint kt1 tid >|= begin function
   | Ok nft_activities ->
-    if mint_activity_exists nft_activities then
+    if mint_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_activities_by_item_mint\n%!"
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_item_mint (no matching mint activity)\n%!"
@@ -1544,7 +1546,7 @@ let check_mint_activity it =
   end >>= fun () ->
   call_get_nft_activities_by_user_mint owner >|= begin function
   | Ok nft_activities ->
-    if mint_activity_exists nft_activities then
+    if mint_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_activities_by_user_mint\n%!"
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_user_mint (no matching mint activity)\n%!"
@@ -1554,7 +1556,7 @@ let check_mint_activity it =
   end >>= fun () ->
   call_get_nft_activities_by_collection_mint kt1 >|= begin function
   | Ok nft_activities ->
-    if mint_activity_exists nft_activities then
+    if mint_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_activities_by_collection_mint\n%!"
     else
       Printf.eprintf
@@ -1565,7 +1567,7 @@ let check_mint_activity it =
   end >>= fun () ->
   call_get_nft_all_activities_mint () >|= begin function
   | Ok nft_activities ->
-    if mint_activity_exists nft_activities then
+    if mint_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_all_activities_mint\n%!"
     else
       Printf.eprintf "[KO] API: get_nft_all_activities_mint (no matching mint activity)\n%!"
@@ -1577,7 +1579,7 @@ let check_mint_activity it =
   (* ALL ACTIVITIES *)
   call_get_nft_activities_by_item_all kt1 tid >|= begin function
   | Ok nft_activities ->
-    if mint_activity_exists nft_activities then
+    if mint_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_activities_by_item_all\n%!"
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_item_all (no matching mint activity)\n%!"
@@ -1587,7 +1589,7 @@ let check_mint_activity it =
   end >>= fun () ->
   call_get_nft_activities_by_user_all owner >|= begin function
   | Ok nft_activities ->
-    if mint_activity_exists nft_activities then
+    if mint_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_activities_by_user_all\n%!"
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_user_all (no matching mint activity)\n%!"
@@ -1597,7 +1599,7 @@ let check_mint_activity it =
   end >>= fun () ->
   call_get_nft_activities_by_collection_all kt1 >|= begin function
   | Ok nft_activities ->
-    if mint_activity_exists nft_activities then
+    if mint_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_activities_by_collection_all\n%!"
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_collection_all (no matching mint activity)\n%!"
@@ -1607,7 +1609,7 @@ let check_mint_activity it =
   end >>= fun () ->
   call_get_nft_all_activities_all () >|= begin function
   | Ok nft_activities ->
-    if mint_activity_exists nft_activities then
+    if mint_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_all_activities_all\n%!"
     else
       Printf.eprintf "[KO] API: get_nft_all_activities_all (no matching mint activity)\n%!"
@@ -1619,7 +1621,7 @@ let check_mint_activity it =
   (* BURN ONLY ACTIVITIES *)
   call_get_nft_activities_by_item_burn kt1 tid >|= begin function
   | Ok nft_activities ->
-    if not @@ mint_activity_exists nft_activities then
+    if not @@ mint_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_activities_by_item_burn\n%!"
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_item_burn (matching mint activity)\n%!"
@@ -1629,7 +1631,7 @@ let check_mint_activity it =
   end >>= fun () ->
   call_get_nft_activities_by_user_burn owner >|= begin function
   | Ok nft_activities ->
-    if not @@ mint_activity_exists nft_activities then
+    if not @@ mint_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_activities_by_user_burn\n%!"
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_user_burn (matching mint activity)\n%!"
@@ -1639,7 +1641,7 @@ let check_mint_activity it =
   end >>= fun () ->
   call_get_nft_activities_by_collection_burn kt1 >|= begin function
   | Ok nft_activities ->
-    if not @@ mint_activity_exists nft_activities then
+    if not @@ mint_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_activities_by_collection_burn\n%!"
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_collection_burn (matching mint activity)\n%!"
@@ -1649,7 +1651,7 @@ let check_mint_activity it =
   end >>= fun () ->
   call_get_nft_all_activities_burn () >|= begin function
   | Ok nft_activities ->
-    if not @@ mint_activity_exists nft_activities then
+    if not @@ mint_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_all_activities_burn\n%!"
     else
       Printf.eprintf "[KO] API: get_nft_all_activities_burn (matching mint activity)\n%!"
@@ -1661,7 +1663,7 @@ let check_mint_activity it =
   (* TRANSFER ONLY ACTIVITIES *)
   call_get_nft_activities_by_item_transfer kt1 tid >|= begin function
   | Ok nft_activities ->
-    if not @@ mint_activity_exists nft_activities then
+    if not @@ mint_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_activities_by_item_transfer\n%!"
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_item_transfer (matching mint activity)\n%!"
@@ -1671,7 +1673,7 @@ let check_mint_activity it =
   end >>= fun () ->
   call_get_nft_activities_by_user_transfer owner >|= begin function
   | Ok nft_activities ->
-    if not @@ mint_activity_exists nft_activities then
+    if not @@ mint_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_activities_by_user_transfer\n%!"
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_user_transfer (matching mint activity)\n%!"
@@ -1681,7 +1683,7 @@ let check_mint_activity it =
   end >>= fun () ->
   call_get_nft_activities_by_collection_transfer kt1 >|= begin function
   | Ok nft_activities ->
-    if not @@ mint_activity_exists nft_activities then
+    if not @@ mint_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_activities_by_collection_transfer\n%!"
     else
       Printf.eprintf
@@ -1692,7 +1694,7 @@ let check_mint_activity it =
   end >>= fun () ->
   call_get_nft_all_activities_transfer () >|= begin function
   | Ok nft_activities ->
-    if not @@ mint_activity_exists nft_activities then
+    if not @@ mint_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_all_activities_transfer\n%!"
     else
       Printf.eprintf "[KO] API: get_nft_all_activities_transfer (matching mint activity)\n%!"
@@ -1704,7 +1706,7 @@ let check_mint_activity it =
 let check_transfer_activity ?(from=false) it =
   let owner = it.it_owner.tz1 in
   let kt1 = it.it_collection in
-  let tid = Int64.to_string it.it_token_id in
+  let tid = it.it_token_id in
   let transfer_activity_exists activities =
     List.exists (fun act -> match act with
         | NftActivityTransfer {from=addr; elt} ->
@@ -1715,7 +1717,7 @@ let check_transfer_activity ?(from=false) it =
   (* MINT ONLY ACTIVITIES *)
   call_get_nft_activities_by_item_mint kt1 tid >|= begin function
   | Ok nft_activities ->
-    if not @@ transfer_activity_exists nft_activities then
+    if not @@ transfer_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_activities_by_item_mint\n%!"
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_item_mint (matching transfer activity)\n%!"
@@ -1725,7 +1727,7 @@ let check_transfer_activity ?(from=false) it =
   end >>= fun () ->
   call_get_nft_activities_by_user_mint owner >|= begin function
   | Ok nft_activities ->
-    if not @@ transfer_activity_exists nft_activities then
+    if not @@ transfer_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_activities_by_user_mint\n%!"
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_user_mint (matching transfer activity)\n%!"
@@ -1735,7 +1737,7 @@ let check_transfer_activity ?(from=false) it =
   end >>= fun () ->
   call_get_nft_activities_by_collection_mint kt1 >|= begin function
   | Ok nft_activities ->
-    if not @@ transfer_activity_exists nft_activities then
+    if not @@ transfer_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_activities_by_collection_mint\n%!"
     else
       Printf.eprintf
@@ -1746,7 +1748,7 @@ let check_transfer_activity ?(from=false) it =
   end >>= fun () ->
   call_get_nft_all_activities_mint () >|= begin function
   | Ok nft_activities ->
-    if not @@ transfer_activity_exists nft_activities then
+    if not @@ transfer_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_all_activities_mint\n%!"
     else
       Printf.eprintf "[KO] API: get_nft_all_activities_mint (matching transfer activity)\n%!"
@@ -1758,7 +1760,7 @@ let check_transfer_activity ?(from=false) it =
   (* ALL ACTIVITIES *)
   call_get_nft_activities_by_item_all kt1 tid >|= begin function
   | Ok nft_activities ->
-    if transfer_activity_exists nft_activities then
+    if transfer_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_activities_by_item_all\n%!"
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_item_all (no matching transfer activity)\n%!"
@@ -1768,7 +1770,7 @@ let check_transfer_activity ?(from=false) it =
   end >>= fun () ->
   call_get_nft_activities_by_user_all owner >|= begin function
   | Ok nft_activities ->
-    if transfer_activity_exists nft_activities then
+    if transfer_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_activities_by_user_all\n%!"
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_user_all (no matching transfer activity)\n%!"
@@ -1778,7 +1780,7 @@ let check_transfer_activity ?(from=false) it =
   end >>= fun () ->
   call_get_nft_activities_by_collection_all kt1 >|= begin function
   | Ok nft_activities ->
-    if transfer_activity_exists nft_activities then
+    if transfer_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_activities_by_collection_all\n%!"
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_collection_all (no matching transfer activity)\n%!"
@@ -1788,7 +1790,7 @@ let check_transfer_activity ?(from=false) it =
   end >>= fun () ->
   call_get_nft_all_activities_all () >|= begin function
   | Ok nft_activities ->
-    if transfer_activity_exists nft_activities then
+    if transfer_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_all_activities_all\n%!"
     else
       Printf.eprintf "[KO] API: get_nft_all_activities_all (no matching transfer activity)\n%!"
@@ -1800,7 +1802,7 @@ let check_transfer_activity ?(from=false) it =
   (* BURN ONLY ACTIVITIES *)
   call_get_nft_activities_by_item_burn kt1 tid >|= begin function
   | Ok nft_activities ->
-    if not @@ transfer_activity_exists nft_activities then
+    if not @@ transfer_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_activities_by_item_burn\n%!"
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_item_burn (matching transfer activity)\n%!"
@@ -1810,7 +1812,7 @@ let check_transfer_activity ?(from=false) it =
   end >>= fun () ->
   call_get_nft_activities_by_user_burn owner >|= begin function
   | Ok nft_activities ->
-    if not @@ transfer_activity_exists nft_activities then
+    if not @@ transfer_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_activities_by_user_burn\n%!"
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_user_burn (matching transfer activity)\n%!"
@@ -1820,7 +1822,7 @@ let check_transfer_activity ?(from=false) it =
   end >>= fun () ->
   call_get_nft_activities_by_collection_burn kt1 >|= begin function
   | Ok nft_activities ->
-    if not @@ transfer_activity_exists nft_activities then
+    if not @@ transfer_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_activities_by_collection_burn\n%!"
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_collection_burn (matching transfer activity)\n%!"
@@ -1830,7 +1832,7 @@ let check_transfer_activity ?(from=false) it =
   end >>= fun () ->
   call_get_nft_all_activities_burn () >|= begin function
   | Ok nft_activities ->
-    if not @@ transfer_activity_exists nft_activities then
+    if not @@ transfer_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_all_activities_burn\n%!"
     else
       Printf.eprintf "[KO] API: get_nft_all_activities_burn (matching transfer activity)\n%!"
@@ -1842,7 +1844,7 @@ let check_transfer_activity ?(from=false) it =
   (* TRANSFER ONLY ACTIVITIES *)
   call_get_nft_activities_by_item_transfer kt1 tid >|= begin function
   | Ok nft_activities ->
-    if transfer_activity_exists nft_activities then
+    if transfer_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_activities_by_item_transfer\n%!"
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_item_transfer (no matching transfer activity)\n%!"
@@ -1852,7 +1854,7 @@ let check_transfer_activity ?(from=false) it =
   end >>= fun () ->
   call_get_nft_activities_by_user_transfer owner >|= begin function
   | Ok nft_activities ->
-    if transfer_activity_exists nft_activities then
+    if transfer_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_activities_by_user_transfer\n%!"
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_user_transfer (no matching transfer activity)\n%!"
@@ -1862,7 +1864,7 @@ let check_transfer_activity ?(from=false) it =
   end >>= fun () ->
   call_get_nft_activities_by_collection_transfer kt1 >|= begin function
   | Ok nft_activities ->
-    if transfer_activity_exists nft_activities then
+    if transfer_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_activities_by_collection_transfer\n%!"
     else
       Printf.eprintf
@@ -1873,7 +1875,7 @@ let check_transfer_activity ?(from=false) it =
   end >>= fun () ->
   call_get_nft_all_activities_transfer () >|= begin function
   | Ok nft_activities ->
-    if transfer_activity_exists nft_activities then
+    if transfer_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_all_activities_transfer\n%!"
     else
       Printf.eprintf "[KO] API: get_nft_all_activities_transfer (no matching transfer activity)\n%!"
@@ -1900,13 +1902,13 @@ let burn_check_random items =
 let transfer_check_random items =
   Printf.eprintf "before [%s]\n%!" @@ String.concat " ; " @@
   List.map (fun it ->
-      let am = match it.it_kind with `nft -> 1L | `mt am -> am in
-      Printf.sprintf "%Ld:%s-%Ld" it.it_token_id it.it_owner.tz1 am) items ;
+      let am = match it.it_kind with `nft -> Z.one | `mt am -> am in
+      Printf.sprintf "%s:%s-%s" (Z.to_string it.it_token_id) it.it_owner.tz1 (Z.to_string am)) items ;
   let> (items, updated_item, new_item) = random_transfer items in
   Printf.eprintf "after [%s]\n%!" @@ String.concat " ; " @@
   List.map (fun it ->
-      let am = match it.it_kind with `nft -> 1L | `mt am -> am in
-      Printf.sprintf "%Ld:%s-%Ld" it.it_token_id it.it_owner.tz1 am) items ;
+      let am = match it.it_kind with `nft -> Z.one | `mt am -> am in
+      Printf.sprintf "%s:%s-%s" (Z.to_string it.it_token_id) it.it_owner.tz1 (Z.to_string am)) items ;
   wait_next_block () >>= fun () ->
   let> () = match updated_item with
     | None -> Lwt.return_unit (* todo: check if amount is 0 *)
@@ -2169,7 +2171,7 @@ let reset_meta_test ?royalties ~kind ~privacy () =
   let>? nft_item_1 =
     call_get_nft_item_by_id ~include_meta:true
       item1.it_collection
-      (Int64.to_string item1.it_token_id) in
+      (Z.to_string item1.it_token_id) in
   begin match nft_item_1.nft_item_meta with
     | None ->
       Format.eprintf "meta None@." ;
@@ -2178,13 +2180,13 @@ let reset_meta_test ?royalties ~kind ~privacy () =
   end ;
   call_reset_nft_item_meta_by_id
     item1.it_collection
-    (Int64.to_string item1.it_token_id) >>= function
+    (Z.to_string item1.it_token_id) >>= function
   | Ok () ->
     wait_next_block () >>= fun () ->
     let>? nft_item_2 =
       call_get_nft_item_by_id ~include_meta:true
         item1.it_collection
-        (Int64.to_string item1.it_token_id) in
+        (Z.to_string item1.it_token_id) in
     if nft_item_1.nft_item_meta <> nft_item_2.nft_item_meta then
       Printf.eprintf "[OK] different meta\n%!"
     else
@@ -2204,33 +2206,33 @@ let reset_meta_test ?royalties ~kind ~privacy () =
 let sell_nft_for_nft ?salt collection item1 item2 =
   match order_form_from_items ?salt collection item1 item2 with
   | Error _err -> Lwt.fail_with "order_from"
-  | Ok form -> call_upsert_order form
+  | Ok form -> call_upsert_order ~d:(None, None) form
 
 let sell_nft_for_tezos ?(salt=0) collection item1 amount =
-  let take = { asset_type = ATXTZ ; asset_value = string_of_int amount } in
+  let take = { asset_type = ATXTZ ; asset_value = Z.of_int amount } in
   match sell_order_form_from_item ~salt collection item1 take with
   | Error _err -> Lwt.fail_with "order_from"
-  | Ok form -> call_upsert_order form
+  | Ok form -> call_upsert_order ~d:(None, Some 6l) form
 
 let sell_nft_for_lugh ?(salt=0) collection item1 amount =
-  let lugh = ATNFT { asset_contract = lugh_contract ; asset_token_id = "0" } in
-  let take = { asset_type = lugh ; asset_value = string_of_int amount } in
+  let lugh = ATNFT { asset_contract = lugh_contract ; asset_token_id = Z.zero } in
+  let take = { asset_type = lugh ; asset_value = Z.of_int amount } in
   match sell_order_form_from_item ~salt collection item1 take with
   | Error _err -> Lwt.fail_with "order_from"
-  | Ok form -> call_upsert_order form
+  | Ok form -> call_upsert_order ~d:(None, None) form
 
 let buy_nft_for_tezos ?(salt=0) collection maker item1 amount =
-  let make = { asset_type = ATXTZ ; asset_value = string_of_int amount } in
+  let make = { asset_type = ATXTZ ; asset_value = Z.of_int amount } in
   match buy_order_form_from_item ~salt collection item1 maker make with
   | Error _err -> Lwt.fail_with "order_from"
-  | Ok form -> call_upsert_order form
+  | Ok form -> call_upsert_order ~d:(Some 6l, None) form
 
 let buy_nft_for_lugh ?(salt=0) collection maker item1 amount =
-  let lugh = ATNFT { asset_contract = lugh_contract ; asset_token_id = "0" } in
-  let make = { asset_type = lugh ; asset_value = string_of_int amount } in
+  let lugh = ATNFT { asset_contract = lugh_contract ; asset_token_id = Z.zero } in
+  let make = { asset_type = lugh ; asset_value = Z.of_int amount } in
   match buy_order_form_from_item ~salt collection item1 maker make with
   | Error _err -> Lwt.fail_with "order_from"
-  | Ok form -> call_upsert_order form
+  | Ok form -> call_upsert_order ~d:(None, None) form
 
 let get_source_from_item ((owner, owner_sk), _amount, _token_id, _royalties, _metadata) =
   (owner, owner_sk)
@@ -2262,8 +2264,10 @@ let match_orders_nft ?royalties ?(exchange=exchange_v2) ~kind ~privacy () =
   wait_next_block () >>= fun () ->
   (* let tid = get_token_id_from_item item1 in *)
   let>? order1 = sell_nft_for_nft c.col_kt1 item1 item2 in
+  let order1 = Common.Balance.z_order order1 in
   (* TODO : check order *)
   let>? order2 = sell_nft_for_nft ~salt:1 c.col_kt1 item2 item1 in
+  let order2 = Common.Balance.z_order order2 in
   (* TODO : check order *)
   let> r = match_orders ~source:item1.it_owner ~contract:exchange order1 order2 in
   let> () = match r with
@@ -2305,9 +2309,11 @@ let match_orders_tezos ?royalties ?(exchange=exchange_v2) ~kind ~privacy () =
       item1.it_owner c.col_royalties_contract in
   wait_next_block () >>= fun () ->
   let>? order1 = sell_nft_for_tezos ~salt:1 c.col_kt1 item1 1 in
+  let order1 = Common.Balance.z_order ~taked:6l order1 in
   (* TODO : check order *)
   let source2 = generate_address ~diff:item1.it_owner.tz1 () in
   let>? order2 = buy_nft_for_tezos c.col_kt1 source2 item1 1 in
+  let order2 = Common.Balance.z_order ~maked:6l order2 in
   (* TODO : check order *)
   begin
     match_orders ~amount:1L ~source:source2 ~contract:exchange order2 order1
@@ -2364,9 +2370,11 @@ let match_orders_lugh () =
   let> () = ubi_set_royalties item1.it_token_id royalties item1.it_owner r_kt1 in
   let> () = update_operators_for_all ex_kt1 item1.it_owner contract in
   let>? order1 = sell_nft_for_lugh ~salt:1 contract item1 1 in
+  let order1 = Common.Balance.z_order order1 in
   (* TODO : check order *)
   let source2 = generate_address ~alias:"rarible1" () in
   let>? order2 = buy_nft_for_lugh contract source2 item1 1 in
+  let order2 = Common.Balance.z_order order2 in
   (* TODO : check order *)
   begin match_orders ~amount:1L ~source:source2 ~contract:ex_kt1 order2 order1 >>= function
     | Error err ->
@@ -2479,6 +2487,7 @@ let cancel_order () =
   let> () = Lwt_unix.sleep 6. in
   let> () = check_item item1 in
   let>? order = sell_nft_for_tezos ~salt:1 c.col_kt1 item1 1 in
+  let order = Common.Balance.z_order ~taked:6l order in
   (* TODO : check order *)
   begin cancel_order ~source:item1.it_owner ~contract:ex_kt1 order >>= function
     | Error err ->

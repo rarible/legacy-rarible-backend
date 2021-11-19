@@ -2,6 +2,22 @@ open Proto
 open Rtypes
 open Let
 
+let decimal_balance ?(decimals=0l) z =
+  let factor = Z.(pow (of_int 10) (Int32.to_int decimals)) in
+  let dec = Z.rem z factor in
+  let dec_str =
+    if dec = Z.zero then ""
+    else
+      let s = Z.to_string dec in
+      Format.sprintf ".%s%s" (String.make ((Int32.to_int decimals) - (String.length s)) '0') s in
+  let num = Z.(to_string @@ div z factor) in
+  Format.sprintf "%s%s" num dec_str
+
+let absolute_balance ?(decimals=0l) s =
+  let factor = Z.(pow (of_int 10) (Int32.to_int decimals)) in
+  let {Q.num; den} = Q.of_string s in
+  Z.(mul (div factor den) num)
+
 let unexpected_michelson = Error `unexpected_michelson_value
 
 let prim ?(args=[]) ?(annots=[]) prim = Mprim {prim; args; annots}
@@ -37,7 +53,7 @@ let asset_data = function
   | ATNFT { asset_contract; asset_token_id }
   | ATMT { asset_contract; asset_token_id } ->
     Tzfunc.Forge.pack (prim `pair ~args:[ prim `address; prim `nat ])
-      (prim `Pair ~args:[ Mstring asset_contract; Mint (Z.of_string asset_token_id) ])
+      (prim `Pair ~args:[ Mstring asset_contract; Mint asset_token_id ])
 
 let asset_type_mich a =
   let$ data = asset_data a in
@@ -50,7 +66,7 @@ let asset_mich a =
   let$ asset_type = asset_type_mich a.asset_type in
   Ok (prim `Pair ~args:[
       asset_type;
-      Mint (Z.of_string a.asset_value)
+      Mint a.asset_value
     ])
 
 let asset_type_type = prim `pair ~args:[ asset_class_type; prim `bytes]
@@ -72,7 +88,7 @@ let hash_key maker_edpk make_asset_type take_asset_type salt =
   let$ take_asset_type_mich = asset_type_mich take_asset_type in
   let$ take_asset_type =
     Tzfunc.Forge.pack asset_type_type take_asset_type_mich in
-  let salt = Tzfunc.Forge.pack (prim `nat) @@ Mint (Z.of_string salt) in
+  let salt = Tzfunc.Forge.pack (prim `nat) @@ Mint salt in
   let$ b = Tzfunc.Binary.Writer.concat [
       maker;
       Ok (keccak make_asset_type);
@@ -138,7 +154,7 @@ let flat_order_type
         make;
         taker;
         take;
-        Mint (Z.of_string salt);
+        Mint salt;
         sdate;
         edate;
         Mbytes (Tzfunc.Crypto.hex_of_raw @@ keccak data_type);
@@ -183,7 +199,7 @@ let mich_order_form
           prim `Pair ~args:[
             asset_take;
             prim `Pair ~args:[
-              Mint (Z.of_string salt);
+              Mint salt;
               prim `Pair ~args:[
                 option_mich (fun c -> Mstring (Proto.A.cal_to_str c)) start_date;
                 prim `Pair ~args:[
@@ -218,28 +234,29 @@ let hash_order_form maker make taker take salt start_date end_date data_type pay
  * } *)
 
 let calculate_remaining make_value take_value fill cancelled =
-  if cancelled then 0L, 0L
+  if cancelled then Z.zero, Z.zero
   else
-    let take = Int64.sub take_value fill in
-    let make = Int64.(div (mul take make_value) take_value) in
+    let take = Z.sub take_value fill in
+    let make = Z.(div (mul take make_value) take_value) in
     make, take
 
 let calculate_fee data protocol_commission =
-  List.fold_left (fun acc p -> Int64.(add acc (of_int32 p.part_value)))
+  List.fold_left (fun acc p -> Z.(add acc (of_int32 p.part_value)))
     protocol_commission
     data.order_rarible_v2_data_v1_origin_fees
 
 let calculate_rounded_make_balance make_value take_value make_balance =
-  let max_take = Int64.(div (mul make_balance take_value) make_value) in
-  Int64.(div (mul make_value max_take) take_value)
+  let max_take = Z.(div (mul make_balance take_value) make_value) in
+  Z.(div (mul make_value max_take) take_value)
 
 let calculate_make_stock
     make_value take_value fill data make_balance protocol_commission fee_side cancelled =
+  let factor = Z.of_int 10000 in
   let make, _take = calculate_remaining make_value take_value fill cancelled in
   let fee = match fee_side with
-    | None | Some FeeSideTake -> 0L
+    | None | Some FeeSideTake -> Z.zero
     | Some FeeSideMake -> calculate_fee data protocol_commission in
-  let make_balance = Int64.(div (mul make_balance 10000L) (add fee 10000L)) in
+  let make_balance = Z.(div (mul make_balance factor) (add fee factor)) in
   let rounded_make_balance = calculate_rounded_make_balance make_value take_value make_balance in
   min make rounded_make_balance
 
@@ -271,10 +288,10 @@ let order_elt_from_order_form_elt elt =
     order_elt_taker_edpk = elt.order_form_elt_taker_edpk;
     order_elt_make = make_asset;
     order_elt_take = take_asset;
-    order_elt_fill = "0";
+    order_elt_fill = Z.zero;
     order_elt_start = elt.order_form_elt_start;
     order_elt_end = elt.order_form_elt_end;
-    order_elt_make_stock = "0";
+    order_elt_make_stock = Z.zero;
     order_elt_cancelled = false;
     order_elt_salt = elt.order_form_elt_salt;
     order_elt_signature = elt.order_form_elt_signature;

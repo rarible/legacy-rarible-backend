@@ -19,13 +19,13 @@ let deploy_royalties ?endpoint source =
   Script.command_result ~f:(fun l -> List.hd @@ List.rev l) cmd
 
 let mint_tokens ?endpoint c it =
-  let supply = match it.it_kind with `nft -> [] | `mt a -> [ "--amount"; Int64.to_string a ] in
+  let supply = match it.it_kind with `nft -> [] | `mt a -> [ "--amount"; Z.to_string a ] in
   let royalties = Format.sprintf "{%s}" @@ String.concat "," @@
     List.map (fun (account, value) -> Format.sprintf "%S: %Ld" account value) it.it_royalties in
   let endpoint = match endpoint with None -> [] | Some e -> ["--endpoint"; e] in
   let cmd = Filename.quote_command !node @@
     [ !script; "mint"; "--contract"; it.it_collection; "--royalties"; royalties;
-      "--token_id"; Int64.to_string it.it_token_id; "--edsk"; c.col_admin.edsk;
+      "--token_id"; Z.to_string it.it_token_id; "--edsk"; c.col_admin.edsk;
       "--owner"; it.it_owner.tz1;
       "--metadata" ; EzEncoding.construct Json_encoding.(assoc string) it.it_metadata ]
     @ supply @ endpoint in
@@ -36,10 +36,10 @@ let mint_tokens ?endpoint c it =
 
 let burn_tokens ?endpoint it kind =
   let endpoint = match endpoint with None -> [] | Some e -> ["--endpoint"; e] in
-  let amount = match kind with `nft -> [] | `mt a -> [ "--amount"; Int64.to_string a ] in
+  let amount = match kind with `nft -> [] | `mt a -> [ "--amount"; Z.to_string a ] in
   let cmd = Filename.quote_command !node @@
     [ !script; "burn"; "--contract"; it.it_collection;
-      "--token_id"; Int64.to_string it.it_token_id; "--edsk"; it.it_owner.edsk ]
+      "--token_id"; Z.to_string it.it_token_id; "--edsk"; it.it_owner.edsk ]
     @ amount @ endpoint in
   try
     let _ = Script.command_result cmd in
@@ -50,8 +50,8 @@ let transfer_tokens ?endpoint it ~amount destination =
   let endpoint = match endpoint with None -> [] | Some e -> ["--endpoint"; e] in
   let cmd = Filename.quote_command !node @@
     [ !script; "transfer"; "--contract"; it.it_collection;
-      "--amount"; Int64.to_string amount; "--token_id";
-      Int64.to_string it.it_token_id; "--edsk"; it.it_owner.edsk; "--to"; destination.tz1 ]
+      "--amount"; Z.to_string amount; "--token_id";
+      Z.to_string it.it_token_id; "--edsk"; it.it_owner.edsk; "--to"; destination.tz1 ]
     @ endpoint in
   try
     let _ = Script.command_result cmd in
@@ -64,7 +64,7 @@ let set_token_metadata ?endpoint it =
       Format.sprintf "%S: %S" k v) it.it_metadata in
   let cmd = Filename.quote_command !node @@
     [ !script; "set_token_metadata"; "--contract"; it.it_collection;
-      "--token_id"; Int64.to_string it.it_token_id; "--edsk"; it.it_owner.edsk; "--metadata"; metadata ]
+      "--token_id"; Z.to_string it.it_token_id; "--edsk"; it.it_owner.edsk; "--metadata"; metadata ]
     @ endpoint in
   try
     let _ = Script.command_result cmd in
@@ -94,7 +94,7 @@ let deploy_exchange ?endpoint ~admin ~receiver ~fee source =
   let endpoint = match endpoint with None -> [] | Some e -> ["--endpoint"; e] in
   let cmd = Filename.quote_command !node @@
     [ !script; "deploy_exchange"; "--edsk"; source.edsk; "--owner"; admin.tz1;
-      "--receiver"; receiver.tz1; "--fee"; Int64.to_string fee ] @
+      "--receiver"; receiver.tz1; "--fee"; Z.to_string fee ] @
     endpoint in
   Script.command_result ~f:(fun l -> List.hd @@ List.rev l) cmd
 

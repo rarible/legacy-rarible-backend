@@ -88,7 +88,7 @@ let produce_ownership_event ownership_event =
     |> kafka_produce ~key:ownership_event.Rtypes.nft_ownership_event_event_id t
   | _ -> Lwt.return ()
 
-let produce_order_event order_event =
+let produce_order_event ~decs:(maked, taked) order_event  =
   match !kafka_config with
   | Some _c ->
     begin match !topic_order with
@@ -98,7 +98,8 @@ let produce_order_event order_event =
         Lwt.return t
       | Some t -> Lwt.return t
     end >>= fun t ->
-    EzEncoding.construct Rtypes.order_event_enc order_event
+    let order_event = Common.Balance.dec_order_event ?maked ?taked order_event in
+    EzEncoding.construct Rtypes.(order_event_enc A.big_decimal_enc) order_event
     |> kafka_produce ~key:order_event.Rtypes.order_event_order_id t
   | _ -> Lwt.return ()
 
@@ -119,11 +120,12 @@ let produce_nft_activity id date nft_activity =
       activity_source = "RARIBLE";
       activity_type = NftActivityType nft_activity ;
     } in
-    EzEncoding.construct Rtypes.activity_type_enc activity
+    let activity = Common.Balance.dec_activity_type activity in
+    EzEncoding.construct Rtypes.(activity_type_enc A.big_decimal_enc) activity
     |> kafka_produce ~key:id t
   | None -> Lwt.return ()
 
-let produce_order_activity id date activity =
+let produce_order_activity ~decs:(maked, taked) id date activity =
   let open Rtypes in
   match !kafka_config with
   | Some _c ->
@@ -140,7 +142,8 @@ let produce_order_activity id date activity =
       activity_source = "RARIBLE";
       activity_type = OrderActivityType activity ;
     } in
-    EzEncoding.construct Rtypes.activity_type_enc activity
+    let activity = Common.Balance.dec_activity_type ?maked ?taked activity in
+    EzEncoding.construct Rtypes.(activity_type_enc A.big_decimal_enc) activity
     |> kafka_produce ~key:id t
   | None -> Lwt.return ()
 

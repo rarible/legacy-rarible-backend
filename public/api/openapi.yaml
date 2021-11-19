@@ -1515,7 +1515,7 @@ components:
         tokenId:
           $ref: '#/components/schemas/BigInteger'
         value:
-          $ref: '#/components/schemas/BigInteger'
+          $ref: '#/components/schemas/BigDecimal'
         transactionHash:
           $ref: '#/components/schemas/Word'
         blockHash:
@@ -1612,7 +1612,7 @@ components:
         tokenId:
           $ref: '#/components/schemas/BigInteger'
         value:
-          $ref: '#/components/schemas/BigInteger'
+          $ref: '#/components/schemas/BigDecimal'
         transactionHash:
           $ref: '#/components/schemas/Word'
         blockHash:
@@ -1667,7 +1667,7 @@ components:
         tokenId:
           $ref: '#/components/schemas/BigInteger'
         value:
-          $ref: '#/components/schemas/BigInteger'
+          $ref: '#/components/schemas/BigDecimal'
         transactionHash:
           $ref: '#/components/schemas/Word'
         blockHash:
@@ -2088,7 +2088,7 @@ components:
         cancelled:
           type: boolean
         salt:
-          $ref: '#/components/schemas/Word'
+          $ref: '#/components/schemas/BigInteger'
         signature:
           $ref: '#/components/schemas/Edsig'
         createdAt:

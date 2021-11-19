@@ -3,7 +3,7 @@
  (modules script script_types)
  (name script)
  (wrapped false)
- (libraries unix hex))
+ (libraries unix hex zarith))
 
 (library
  (name script_js)
