@@ -200,7 +200,7 @@ let get_last_updated_to_param req =
   | None -> Ok None
   | Some s ->
     try
-      Ok (Some (CalendarLib.Calendar.from_unixfloat (float_of_string s)))
+      Ok (Some (CalendarLib.Calendar.from_unixfloat (float_of_string s /. 1000.)))
     with _ ->
       mk_invalid_argument last_updated_to_param "must be a date"
 
@@ -209,7 +209,7 @@ let get_last_updated_from_param req =
   | None -> Ok None
   | Some s ->
     try
-      Ok (Some (CalendarLib.Calendar.from_unixfloat (float_of_string s)))
+      Ok (Some (CalendarLib.Calendar.from_unixfloat (float_of_string s /. 1000.)))
     with _ ->
       mk_invalid_argument last_updated_from_param "must be a date"
 
@@ -333,7 +333,7 @@ let get_required_start_date_param req =
   | None -> mk_invalid_argument start_date_param "param is required"
   | Some ts ->
     try
-      let ts = CalendarLib.Calendar.from_unixfloat (float_of_string ts) in
+      let ts = CalendarLib.Calendar.from_unixfloat (float_of_string ts /. 1000.) in
       Ok ts
     with _ ->
       mk_invalid_argument owner_param "must be a date"
@@ -343,7 +343,7 @@ let get_end_date_param req =
   | None -> Ok None
   | Some ts ->
     try
-      let ts = CalendarLib.Calendar.from_unixfloat (float_of_string ts) in
+      let ts = CalendarLib.Calendar.from_unixfloat (float_of_string ts /. 1000.) in
       Ok (Some ts)
     with _ ->
       mk_invalid_argument owner_param "must be a date"
@@ -353,7 +353,7 @@ let get_start_date_param req =
   | None -> Ok None
   | Some ts ->
     try
-      let ts = CalendarLib.Calendar.from_unixfloat (float_of_string ts) in
+      let ts = CalendarLib.Calendar.from_unixfloat (float_of_string ts /. 1000.) in
       Ok (Some ts)
     with _ ->
       mk_invalid_argument owner_param "must be a date"
@@ -363,7 +363,7 @@ let get_required_end_date_param req =
   | None -> mk_invalid_argument end_date_param "param is required"
   | Some ts ->
     try
-      let ts = CalendarLib.Calendar.from_unixfloat (float_of_string ts) in
+      let ts = CalendarLib.Calendar.from_unixfloat (float_of_string ts /. 1000.) in
       Ok ts
     with _ ->
       mk_invalid_argument owner_param "must be a date"
