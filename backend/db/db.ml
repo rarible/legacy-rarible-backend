@@ -2639,9 +2639,11 @@ let get_nft_collection_by_id ?dbh collection =
   let>? l = [%pgsql.object dbh
       "select address, owner, metadata, name, symbol, kind \
        from contracts where address = $collection and main"] in
-  let>? obj = one l in
-  let nft_item = mk_nft_collection obj in
-  Lwt.return_ok nft_item
+  match l with
+  | obj :: _ ->
+    let nft_item = mk_nft_collection obj in
+    Lwt.return_ok nft_item
+  | [] -> Lwt.return_error (`hook_error "not found")
 
 let search_nft_collections_by_owner ?dbh ?continuation ?(size=50) owner =
   Format.eprintf "search_nft_collections_by_owner %s %s %d@."
