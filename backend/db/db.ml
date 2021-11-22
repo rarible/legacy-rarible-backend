@@ -889,10 +889,10 @@ let get_metadata_json meta =
     Lwt.return_ok (meta, EzEncoding.destruct token_metadata_enc meta)
   with _ ->
     begin
-      let proto = String.sub meta 0 6 in
+      let proto = try String.sub meta 0 6 with _ -> "" in
       if proto = "https:" || proto = "http:/" then get_or_timeout (EzAPI.URL meta)
       else if proto = "ipfs:/" then
-        let url = String.sub meta 7 ((String.length meta) - 7) in
+        let url = try String.sub meta 7 ((String.length meta) - 7) with _ -> "" in
         get_or_timeout
           (EzAPI.URL (Printf.sprintf "https://cloudflare-ipfs.com/ipfs/%s" url))
       else Lwt.return_error (0, Some (Printf.sprintf "unknow scheme %s"proto))
