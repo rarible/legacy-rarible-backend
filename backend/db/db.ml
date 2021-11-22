@@ -2156,24 +2156,24 @@ let get_nft_items_by_creator ?dbh ?include_meta ?continuation ?(size=50) creator
     continuation = None,
     (match continuation with None -> CalendarLib.Calendar.now (), "" | Some (ts, h) -> (ts, h)) in
   let>? l = [%pgsql.object dbh
-      "select concat(contract, ':', token_id) as id, \
-       contract, token_id, \
-       last, amount, supply, metadata, tsp \
-       from tokens, \
-       jsonb_to_recordset((metadata -> 'creators')) as creators(account varchar, value int) \
-       where creators.account = $creator and \
-       main and metadata <> '{}' and amount > '0' and \
+      "select concat(t.contract, ':', t.token_id) as id, \
+       t.contract, t.token_id, \
+       last, amount, supply, metadata, t.tsp \
+       from tokens as t \
+       left join tzip21_creators as c on t.token_id = c.token_id and t.contract = c.contract \
+       where c.account = $creator and \
+       t.main and metadata <> '{}' and amount > '0' and \
        ($no_continuation or \
        (last = $ts and \
-       concat(contract, ':', token_id) collate \"C\" < $id) or \
+       concat(t.contract, ':', t.token_id) collate \"C\" < $id) or \
        (last < $ts)) \
        order by last desc, \
-       concat(contract, ':', token_id) collate \"C\" desc \
+       concat(t.contract, ':', t.token_id) collate \"C\" desc \
        limit $size64"] in
   let>? nft_items_total = [%pgsql dbh
-      "select count(distinct (token_id, contract, owner)) from tokens, \
-       jsonb_to_recordset((metadata -> 'creators')) as creators(account varchar, value int) \
-       where main and creators.account = $creator and amount > '0' and metadata <> '{}'"] in
+      "select count(distinct (t.token_id, t.contract, t,owner)) from tokens as t \
+       left join tzip21_creators as c on t.token_id = c.token_id and t.contract = c.contract \
+       where t.main and c.account = $creator and t.amount > '0' and t.metadata <> '{}'"] in
   let>? nft_items_total = match nft_items_total with
     | [ None ] -> Lwt.return_ok 0L
     | [ Some i64 ] -> Lwt.return_ok i64
