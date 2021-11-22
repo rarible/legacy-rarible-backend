@@ -15,10 +15,10 @@ let parse_update_operators m =
   | Ok (`seq l) ->
     Ok (Operator_updates (
         List.filter_map (function
-            | `left (`tuple [ `address op_owner; `address op_operator; `nat id]) ->
-              Some {op_owner; op_operator; op_token_id = Z.to_string id; op_add=true}
-            | `right (`tuple [ `address op_owner; `address op_operator; `nat id]) ->
-              Some {op_owner; op_operator; op_token_id = Z.to_string id; op_add=false}
+            | `left (`tuple [ `address op_owner; `address op_operator; `nat op_token_id]) ->
+              Some {op_owner; op_operator; op_token_id; op_add=true}
+            | `right (`tuple [ `address op_owner; `address op_operator; `nat op_token_id]) ->
+              Some {op_owner; op_operator; op_token_id; op_add=false}
             | _ -> None) l))
   | _ -> unexpected_michelson
 
@@ -39,8 +39,8 @@ let parse_transfer m =
         List.filter_map (function
             | `tuple [ `address tr_source; `seq l ] ->
               let tr_txs = List.filter_map (function
-                  | `tuple [ `address tr_destination; `nat id; `nat amount ] ->
-                    Some {tr_destination; tr_token_id = Z.to_string id; tr_amount = Z.to_int64 amount}
+                  | `tuple [ `address tr_destination; `nat tr_token_id; `nat tr_amount ] ->
+                    Some {tr_destination; tr_token_id; tr_amount}
                   | _ -> None) l in
               Some {tr_source; tr_txs}
             | _ -> None) l))
@@ -48,9 +48,8 @@ let parse_transfer m =
 
 let parse_mint m =
   match Typed_mich.parse_value Contract_spec.mint_mt_entry m with
-  | Ok (`tuple [`nat id; `address fa2m_owner; `nat amount; `assoc meta; `seq _royalties]) ->
-    let fa2m_token_id = Z.to_string id in
-    let fa2m_amount = Z.to_int64 amount in
+  | Ok (`tuple [`nat fa2m_token_id; `address fa2m_owner; `nat fa2m_amount;
+                `assoc meta; `seq _royalties]) ->
     let fa2m_metadata = List.filter_map (function
         | (`string k, `string v) -> Some (k, v)
         | _ -> None) meta in
@@ -58,8 +57,7 @@ let parse_mint m =
           (MTMint { fa2m_token_id ; fa2m_owner ; fa2m_amount ; fa2m_metadata }))
   | _ ->
     match Typed_mich.parse_value Contract_spec.mint_nft_entry m with
-    | Ok (`tuple [`nat id; `address fa2m_owner; `assoc meta; `seq _royalties]) ->
-      let fa2m_token_id = Z.to_string id in
+    | Ok (`tuple [`nat fa2m_token_id; `address fa2m_owner; `assoc meta; `seq _royalties]) ->
       let fa2m_metadata = List.filter_map (function
           | (`string k, `string v) -> Some (k, v)
           | _ -> None) meta in
@@ -68,8 +66,7 @@ let parse_mint m =
                { fa2m_token_id ; fa2m_owner ; fa2m_amount = () ; fa2m_metadata }))
     | _ ->
       match Typed_mich.parse_value Contract_spec.mint_ubi_entry m with
-      | Ok (`tuple [ `address ubim_owner; `nat id; uri ]) ->
-        let ubim_token_id = Z.to_string id  in
+      | Ok (`tuple [ `address ubim_owner; `nat ubim_token_id; uri ]) ->
         let$ ubim_uri = match uri with
           | `none -> Ok None
           | `some (`bytes uri) ->
@@ -78,9 +75,7 @@ let parse_mint m =
         Ok (Mint_tokens (UbiMint { ubim_owner ; ubim_token_id ; ubim_uri }))
     | _ ->
       match Typed_mich.parse_value Contract_spec.mint_ubi2_entry m with
-      | Ok (`tuple [ `tuple [ `address ubi2m_owner; `nat amount ]; `assoc meta; `nat id ]) ->
-        let ubi2m_token_id = Z.to_string id  in
-        let ubi2m_amount = Z.to_int64 amount in
+      | Ok (`tuple [ `tuple [ `address ubi2m_owner; `nat ubi2m_amount ]; `assoc meta; `nat ubi2m_token_id ]) ->
         let ubi2m_metadata =  List.filter_map (function
             | (`string k, `bytes v) -> Some (k, (Tzfunc.Crypto.hex_to_raw v :> string))
             | _ -> None) meta in
@@ -90,10 +85,10 @@ let parse_mint m =
 
 let parse_burn m =
   match Typed_mich.parse_value Contract_spec.burn_mt_entry m with
-  | Ok (`tuple [ `nat id; `nat amount ]) ->
-    Ok (Burn_tokens (MTBurn { token_id = Z.to_string id; amount = Z.to_int64 amount }))
+  | Ok (`tuple [ `nat token_id; `nat amount ]) ->
+    Ok (Burn_tokens (MTBurn { token_id; amount }))
   | _ -> match Typed_mich.parse_value Contract_spec.burn_mt_entry m with
-    | Ok (`nat id) -> Ok (Burn_tokens (NFTBurn (Z.to_string id)))
+    | Ok (`nat id) -> Ok (Burn_tokens (NFTBurn id))
     | _ -> unexpected_michelson
 
 let parse_metadata_uri = function
@@ -109,7 +104,7 @@ let parse_token_metadata m =
         | (`string k, `string v) ->
           Some (k, v)
         | _ -> None) l in
-    Ok (Token_metadata (Z.to_string id, l))
+    Ok (Token_metadata (id, l))
   | _ -> unexpected_michelson
 
 let rec parse_fa2 e p =
@@ -158,7 +153,7 @@ let parse_set_royalties m =
   | Ok (`tuple [ `address roy_contract; `nat id; `assoc l ]) ->
     let roy_royalties =
       List.filter_map (function
-          | (`address account, `nat value) -> Some (account, Z.to_int64 value)
+          | (`address account, `nat value) -> Some (account, value)
           | _ -> None) l in
     Ok {roy_contract; roy_token_id = Z.to_string id; roy_royalties}
   | _ -> unexpected_michelson
@@ -197,8 +192,7 @@ let parse_asset_type (mclass : micheline_value) (mdata : micheline_value) = matc
     begin match
         Tzfunc.Read.unpack (Forge.prim `pair ~args:[ Forge.prim `address; Forge.prim `nat ])
           (Tzfunc.Crypto.hex_to_raw h) with
-    | Ok (Mprim { prim = `Pair; args = [ Mstring asset_contract; Mint token_id ]; _}) ->
-      let asset_token_id = Z.to_string token_id in
+    | Ok (Mprim { prim = `Pair; args = [ Mstring asset_contract; Mint asset_token_id ]; _}) ->
       Ok (ATNFT {asset_contract; asset_token_id}) (* todo separate nft and mt *)
     | _ -> unexpected_michelson
     end
@@ -218,7 +212,6 @@ let parse_cancel m =
       | _ -> unexpected_michelson in
     let$ mat = parse_asset_type make_asset_class make_asset_data in
     let$ tat = parse_asset_type take_asset_class take_asset_data in
-    let salt = Z.to_string salt in
     let$ hash = Utils.hash_key maker mat tat salt in
     Ok (Cancel hash)
   | _ -> unexpected_michelson
@@ -228,7 +221,7 @@ let parse_do_transfers m =
   match Typed_mich.(parse_value do_transfers_type m) with
   | Ok (`tuple [
       _make_asset_type; _take_asset_type;
-      `nat fill_m_value; `nat fill_t_value;
+      `nat fill_make_value; `nat fill_take_value;
       `tuple [
         left_maker;
         `tuple [ `tuple [ left_m_asset_class; left_m_asset_data ]; `nat left_m_asset_value ];
@@ -246,18 +239,14 @@ let parse_do_transfers m =
     let left_maker = Option.map pk_to_pkh_exn left_maker_edpk in
     let$ left_mat = parse_asset_type left_m_asset_class left_m_asset_data in
     let$ left_tat = parse_asset_type left_t_asset_class left_t_asset_data in
-    let left_salt = Z.to_string left_salt in
     let$ left = Utils.hash_key left_maker_edpk left_mat left_tat left_salt in
-    let left_asset = { asset_type = left_mat ; asset_value = Z.to_string left_m_asset_value } in
+    let left_asset = { asset_type = left_mat ; asset_value = left_m_asset_value } in
     let$ right_maker_edpk = parse_option_key right_maker in
     let right_maker = Option.map pk_to_pkh_exn right_maker_edpk in
     let$ right_mat = parse_asset_type right_m_asset_class right_m_asset_data in
     let$ right_tat = parse_asset_type right_t_asset_class right_t_asset_data in
-    let right_salt = Z.to_string right_salt in
     let$ right = Utils.hash_key right_maker_edpk right_mat right_tat right_salt in
-    let right_asset = { asset_type = right_mat ; asset_value = Z.to_string right_m_asset_value } in
-    let fill_make_value = Z.to_int64 fill_m_value in
-    let fill_take_value = Z.to_int64 fill_t_value in
+    let right_asset = { asset_type = right_mat ; asset_value = right_m_asset_value } in
     Ok (DoTransfers
           {left; left_maker; left_asset;
            right; right_maker; right_asset;
@@ -321,8 +310,8 @@ let rec parse_exchange e p =
 
 let parse_ft_fa1_transfer m =
   match Typed_mich.parse_value (`tuple [ `address; `address; `nat ]) m with
-  | Ok (`tuple [ `address tr_source; `address tr_destination; `nat am ]) ->
-    Ok (FT_transfers [ {tr_source; tr_txs = [{tr_destination; tr_amount = Z.to_int64 am; tr_token_id = "0"}] } ])
+  | Ok (`tuple [ `address tr_source; `address tr_destination; `nat tr_amount ]) ->
+    Ok (FT_transfers [ {tr_source; tr_txs = [{tr_destination; tr_amount; tr_token_id = Z.zero}] } ])
   | _ -> unexpected_michelson
 
 let parse_ft_fa2_transfer m =
@@ -330,7 +319,7 @@ let parse_ft_fa2_transfer m =
   | Ok (Transfers l) ->
     let filter trs =
       List.filter_map (fun tr ->
-          let tr_txs = List.filter (fun tr -> tr.tr_token_id = "0") tr.tr_txs in
+          let tr_txs = List.filter (fun tr -> tr.tr_token_id = Z.zero) tr.tr_txs in
           if tr_txs = [] then None else Some {tr with tr_txs}) trs in
     Ok (FT_transfers (filter l))
   | _ -> unexpected_michelson
@@ -339,7 +328,7 @@ let parse_ft_mint m =
   match Typed_mich.parse_value (`tuple [ `address; `nat; `nat ]) m with
   | Ok (`tuple [ `address owner; `nat amount; `nat id ]) ->
     if id = Z.zero then
-      Ok (FT_mint { owner; amount = Z.to_int64 amount})
+      Ok (FT_mint { owner; amount })
     else unexpected_michelson
   | _ -> unexpected_michelson
 
@@ -347,7 +336,7 @@ let parse_ft_burn m =
   match Typed_mich.parse_value (`tuple [ `address; `nat; `nat ]) m with
   | Ok (`tuple [ `address owner; `nat amount; `nat id ]) ->
     if id = Z.zero then
-      Ok (FT_burn { owner; amount = Z.to_int64 amount })
+      Ok (FT_burn { owner; amount })
     else unexpected_michelson
   | _ -> unexpected_michelson
 
@@ -367,13 +356,13 @@ let parse_ft_fa2 e p =
 
 let parse_process_transfer_lugh m =
   match Typed_mich.parse_value (`tuple [ `tuple [`nat; `address];  `nat; `address; `nat ]) m with
-  | Ok (`tuple [ `tuple [`nat amount; `address tr_source]; `nat fees;
+  | Ok (`tuple [ `tuple [`nat tr_amount; `address tr_source]; `nat fees;
                  `address tr_destination; `nat id ]) ->
     if id = Z.zero  then
       Ok (FT_transfers [
           { tr_source; tr_txs = [
-                {tr_token_id = "0"; tr_amount = Z.to_int64 amount; tr_destination};
-                {tr_token_id = "0"; tr_amount = Z.to_int64 fees; tr_destination = ""}
+                {tr_token_id = Z.zero; tr_amount; tr_destination};
+                {tr_token_id = Z.zero; tr_amount = fees; tr_destination = ""}
               ]
           }
         ])

@@ -19,8 +19,8 @@ type collection = {
 type item = {
   it_collection: string;
   it_owner: account;
-  it_kind: [`nft | `mt of int64 ];
-  it_token_id: int64;
+  it_kind: [`nft | `mt of Z.t ];
+  it_token_id: Z.t;
   it_royalties: (string * int64) list;
   it_metadata: (string * string) list;
 }

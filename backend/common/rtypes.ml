@@ -1,5 +1,20 @@
 type z = Z.t [@encoding Json_encoding.(conv Z.to_string Z.of_string string)] [@@deriving encoding]
 
+(* module ZQ = struct
+ *   type t =
+ *     | Q of {v: Z.t; d: int}
+ *     | Z of Q.t
+ *   let add t1 t2 = {v=Z.add t1.v t2.v; d=t1.d}
+ *   let sub t1 t2 = {v=Z.sub t1.v t2.v; d=t1.d}
+ *   let div t1 t2 = {v=Z.div t1.v t2.v; d=t1.d}
+ *   let mul t1 t2 = {v=Z.mul t1.v t2.v; d=t1.d}
+ *   let pow t n = Z.pow t.v n
+ *
+ *   let enc = Json_encoding.(conv to_string of_string string)
+ *   let encd decimals = Json_encoding.(conv to_string (of_string ~decimals) string)
+ * end *)
+
+
 module A = struct
   let uint53 =
     Json_encoding.ranged_int53 ~minimum:0L ~maximum:(Int64.shift_left 1L 53) "uint53"
@@ -8,7 +23,7 @@ module A = struct
   let uint32_enc =
     Json_encoding.ranged_int32 ~minimum:0l ~maximum:Int32.max_int "uint32"
 
-  type big_integer = string [@@deriving encoding {title="BigInteger"; def_title}]
+  type big_integer = z [@@deriving encoding {title="BigInteger"; def_title}]
 
   (* TODO : B58CHECK ? *)
   type address = string [@@deriving encoding {title="Address"; def_title}]
@@ -212,25 +227,25 @@ type nft_activity_filter =
       nft_activity_by_collection [@kind "by_collection"] [@kind_label "@type"] [@title "NftActivityFilterByCollection"] [@def_title]
 [@@deriving encoding {title="NftActivityFilter"; def_title}]
 
-type nft_activity_elt = {
+type 'a nft_activity_elt = {
   nft_activity_owner : A.address;
   nft_activity_contract : A.address ;
   nft_activity_token_id : A.big_integer ;
-  nft_activity_value : A.big_integer ;
+  nft_activity_value : 'a ;
   nft_activity_transaction_hash : A.word ;
   nft_activity_block_hash : A.word ;
   nft_activity_block_number : A.block_number ;
 } [@@deriving encoding {camel; title="NftActivityElt"; def_title}]
 
-type nft_activity_type =
-  | NftActivityMint of nft_activity_elt [@kind "mint"] [@kind_label "@type"] [@title "Mint"] [@def_title]
-  | NftActivityBurn of nft_activity_elt [@kind "burn"] [@kind_label "@type"] [@title "Burn"] [@def_title]
-  | NftActivityTransfer of {elt: nft_activity_elt; from: A.address} [@kind "transfer"] [@kind_label "@type"] [@title "Transfer"] [@def_title]
+type 'a nft_activity_type =
+  | NftActivityMint of 'a nft_activity_elt [@kind "mint"] [@kind_label "@type"] [@title "Mint"] [@def_title]
+  | NftActivityBurn of 'a nft_activity_elt [@kind "burn"] [@kind_label "@type"] [@title "Burn"] [@def_title]
+  | NftActivityTransfer of {elt: 'a nft_activity_elt; from: A.address} [@kind "transfer"] [@kind_label "@type"] [@title "Transfer"] [@def_title]
 [@@deriving encoding {title="NftActivityType"; def_title}]
 
-type nft_activities = {
+type 'a nft_activities = {
   nft_activities_continuation : string option ; [@opt]
-  nft_activities_items : nft_activity_type list
+  nft_activities_items : 'a nft_activity_type list
 } [@@deriving encoding {title="NftActivities"; def_title}]
 
 type item_history_elt = {
@@ -324,55 +339,40 @@ type asset_type =
   | ATMT of asset_type_gen [@kind_label "assetClass"] [@kind "MT"] [@title "MTAssetType"] [@def_title]
 [@@deriving encoding {title="AssetType"; def_title}]
 
-type asset = {
+type 'a asset = {
   asset_type : asset_type [@key "assetType"] ;
-  asset_value : A.big_decimal [@key "value"] ;
-} [@@deriving encoding {title="Asset"; def_title} ]
+  asset_value : 'a [@key "value"] ;
+} [@@deriving encoding {title="Asset"; def_title}]
 
-let pp_balance ~decimals b =
-  let factor = Z.(pow (of_int 10) decimals) in
-  let b = Z.of_string b in
-  let dec = Z.(to_string @@ rem b factor) in
-  let dec_str =
-    if dec = "0" then ""
-    else Format.sprintf ".%s%s"
-        (String.make (decimals - String.length dec) '0') dec in
-  let num = Z.(to_string @@ div b factor) in
-  Format.sprintf "%s%s" num dec_str
+(* let asset_enc =
+ *   (\* todo different factor for fa12 *\)
+ *   let open Json_encoding in
+ *   conv
+ *     (fun a -> match a.asset_type with
+ *        | ATXTZ ->
+ *          let asset_value = decimal_balance ~decimals:6 a.asset_value in
+ *          { a with asset_value }
+ *        | _ -> a)
+ *     (fun a -> match a.asset_type with
+ *        | ATXTZ ->
+ *          let asset_value = absolute_balance ~decimals:6 a.asset_value in
+ *          { a with asset_value }
+ *        | _ -> a)
+ *     asset_enc *)
 
-let absolute_balance ~decimals b =
-  let factor = Z.(pow (of_int 10) decimals) in
-  let {Q.num; den} = Q.of_string b in
-  Z.(to_string @@ mul (div factor den) num)
-
-let asset_enc =
-  (* todo different factor for fa12 *)
-  let open Json_encoding in
-  conv
-    (fun a -> match a.asset_type with
-       | ATXTZ ->
-         let asset_value = pp_balance ~decimals:6 a.asset_value in
-         { a with asset_value }
-       | _ -> a)
-    (fun a -> match a.asset_type with
-       | ATXTZ ->
-         let asset_value = absolute_balance ~decimals:6 a.asset_value in
-         { a with asset_value }
-       | _ -> a)
-    asset_enc
-
-type order_form_elt = {
+type 'a order_form_elt = {
   order_form_elt_maker : A.address ;
   order_form_elt_maker_edpk : A.edpk ;
   order_form_elt_taker : A.address option ; [@opt]
   order_form_elt_taker_edpk : A.edpk option ; [@opt]
-  order_form_elt_make : asset ;
-  order_form_elt_take : asset ;
+  order_form_elt_make : 'a asset ;
+  order_form_elt_take : 'a asset ;
   order_form_elt_salt : A.big_integer ;
   order_form_elt_start : A.date_int64 option ; [@opt]
   order_form_elt_end : A.date_int64 option ; [@opt]
   order_form_elt_signature : A.edsig ;
 } [@@deriving encoding {title="OrderFormElt"; def_title; camel}]
+
 
 (* type order_open_sea_v1_data_v1_fee_method =
  *   | OSPROTOCOL_FEE
@@ -424,16 +424,16 @@ type order_rarible_v2_data_v1 = {
   order_rarible_v2_data_v1_origin_fees : part list ;
 } [@@deriving encoding {camel; title="OrderRaribleV2DataV1"; def_title}]
 
-type order_form = {
+type 'a order_form = {
   order_form_data: order_rarible_v2_data_v1;
-  order_form_elt: order_form_elt [@merge];
+  order_form_elt: 'a order_form_elt [@merge];
   order_form_type: unit [@encoding Json_encoding.constant "RARIBLE_V2"]
 } [@@deriving encoding {title="OrderForm"; def_title}]
 
-type order_exchange_history_elt = {
+type 'a order_exchange_history_elt = {
   order_exchange_history_elt_hash : A.word ;
-  order_exchange_history_elt_make : asset option; [@opt]
-  order_exchange_history_elt_take : asset option ; [@opt]
+  order_exchange_history_elt_make : 'a asset option; [@opt]
+  order_exchange_history_elt_take : 'a asset option ; [@opt]
   order_exchange_history_elt_date : A.date ;
   order_exchange_history_elt_maker : A.address option ; [@opt]
 } [@@deriving encoding {title="OrderExchangeHistoryElt"; def_title; camel}]
@@ -443,23 +443,23 @@ type order_side =
   | OSRIGHT
 [@@deriving encoding {enum; title="OrderSide"; def_title}]
 
-type order_side_match = {
-  order_side_match_elt : order_exchange_history_elt [@merge];
+type 'a order_side_match = {
+  order_side_match_elt : 'a order_exchange_history_elt [@merge];
   order_side_match_side : order_side option ; [@opt]
   order_side_match_fill : A.big_integer ;
   order_side_match_taker : A.address option ; [@opt]
   order_side_match_counter_hash : A.word option ; [@opt]
 } [@@deriving encoding {camel; title="OrderSideMatch"; def_title}]
 
-type order_exchange_history =
-  | OrderCancel of order_exchange_history_elt [@kind_label "type"] [@kind "CANCEL"] [@title "OrderCancel"] [@def_title]
-  | OrderSideMatch of order_side_match [@kind_label "type"] [@kind "ORDER_SIDE_MATCH"] [@title "OrderSideMatch"] [@def_title]
+type 'a order_exchange_history =
+  | OrderCancel of 'a order_exchange_history_elt [@kind_label "type"] [@kind "CANCEL"] [@title "OrderCancel"] [@def_title]
+  | OrderSideMatch of 'a order_side_match [@kind_label "type"] [@kind "ORDER_SIDE_MATCH"] [@title "OrderSideMatch"] [@def_title]
 [@@deriving encoding {title="OrderExchangeHistory"; def_title}]
 
-type order_price_history_record = {
+type 'a order_price_history_record = {
   order_price_history_record_date : A.date ;
-  order_price_history_record_make_value : A.big_decimal ;
-  order_price_history_record_take_value : A.big_decimal ;
+  order_price_history_record_make_value : 'a ;
+  order_price_history_record_take_value : 'a ;
 } [@@deriving encoding {camel; title="OrderPriceHistoryRecord"; def_title}]
 
 type order_status =
@@ -470,31 +470,31 @@ type order_status =
   | OCANCELLED
 [@@deriving encoding {enum; title="OrderStatus"; def_title}]
 
-type order_elt = {
+type 'a order_elt = {
   order_elt_maker : A.address;
   order_elt_maker_edpk : A.edpk;
   order_elt_taker: A.address option; [@opt]
   order_elt_taker_edpk: A.edpk option; [@opt]
-  order_elt_make: asset;
-  order_elt_take: asset;
+  order_elt_make: 'a asset;
+  order_elt_take: 'a asset;
   order_elt_fill: A.big_integer;
   order_elt_start: A.date_int64 option; [@opt]
   order_elt_end: A.date_int64 option; [@opt]
   order_elt_make_stock: A.big_integer;
   order_elt_cancelled: bool ;
-  order_elt_salt: A.word;
+  order_elt_salt: A.big_integer;
   order_elt_signature: A.edsig;
   order_elt_created_at: A.date;
   order_elt_last_update_at: A.date;
   order_elt_hash: A.word;
   order_elt_make_balance: A.big_integer option; [@opt]
-  order_elt_price_history: order_price_history_record list ; [@dft []]
+  order_elt_price_history: 'a order_price_history_record list ; [@dft []]
   order_elt_status : order_status;
 } [@@deriving encoding {camel; title="OrderElt"; def_title}]
 
-type order = {
+type 'a order = {
   order_data: order_rarible_v2_data_v1;
-  order_elt: order_elt [@merge];
+  order_elt: 'a order_elt [@merge];
   order_type: unit [@encoding Json_encoding.constant "RARIBLE_V2"]
 } [@@deriving encoding {title="Order"; def_title}]
 
@@ -523,8 +523,8 @@ type order = {
  *   invert_order_form_origin_fees : part list ;
  * } [@@deriving encoding {camel}] *)
 
-type orders_pagination = {
-  orders_pagination_orders : order list ;
+type 'a orders_pagination = {
+  orders_pagination_orders : 'a order list ;
   orders_pagination_continuation : string option ; [@opt]
 } [@@deriving encoding {title="OrderPagination"; def_title}]
 
@@ -594,29 +594,29 @@ type order_activity_side_type =
   | STBID
 [@@deriving encoding {enum; title="OrderActivitySideType"; def_title}]
 
-type order_activity_match_side = {
+type 'a order_activity_match_side = {
   order_activity_match_side_maker : A.address ;
   order_activity_match_side_hash : A.word ;
-  order_activity_match_side_asset : asset ;
+  order_activity_match_side_asset : 'a asset ;
   order_activity_match_side_type : order_activity_side_type ;
 } [@@deriving encoding {title="OrderActivitySideMatch"; def_title}]
 
-type order_activity_match = {
-  order_activity_match_left: order_activity_match_side ;
-  order_activity_match_right: order_activity_match_side ;
-  order_activity_match_price: A.big_decimal ;
+type 'a order_activity_match = {
+  order_activity_match_left: 'a order_activity_match_side ;
+  order_activity_match_right: 'a order_activity_match_side ;
+  order_activity_match_price: 'a ;
   order_activity_match_transaction_hash: A.word ;
   order_activity_match_block_hash: A.word ;
   order_activity_match_block_number: A.block_number ;
   order_activity_match_log_index: int ;
 } [@@deriving encoding {camel; title="OrderActivityMatch"; def_title}]
 
-type order_activity_bid = {
+type 'a order_activity_bid = {
   order_activity_bid_hash : A.word ;
   order_activity_bid_maker : A.address ;
-  order_activity_bid_make : asset ;
-  order_activity_bid_take : asset ;
-  order_activity_bid_price : A.big_decimal ;
+  order_activity_bid_make : 'a asset ;
+  order_activity_bid_take : 'a asset ;
+  order_activity_bid_price : 'a ;
 } [@@deriving encoding {camel; title="OrderActivityBid"; def_title}]
 
 type order_activity_cancel_bid = {
@@ -630,28 +630,28 @@ type order_activity_cancel_bid = {
   order_activity_cancel_bid_log_index : int ;
 } [@@deriving encoding {camel; title="OrderActivityCancelBid"; def_title}]
 
-type order_activity_type =
-  | OrderActivityMatch of order_activity_match [@kind "match"] [@kind_label "@type"] [@title "OrderActivityMatch"] [@def_title]
-  | OrderActivityList of order_activity_bid [@kind "list"] [@kind_label "@type"] [@title "OrderActivityList"] [@def_title]
-  | OrderActivityBid of order_activity_bid [@kind "bid"] [@kind_label "@type"] [@title "OrderActivityBid"] [@def_title]
+type 'a order_activity_type =
+  | OrderActivityMatch of 'a order_activity_match [@kind "match"] [@kind_label "@type"] [@title "OrderActivityMatch"] [@def_title]
+  | OrderActivityList of 'a order_activity_bid [@kind "list"] [@kind_label "@type"] [@title "OrderActivityList"] [@def_title]
+  | OrderActivityBid of 'a order_activity_bid [@kind "bid"] [@kind_label "@type"] [@title "OrderActivityBid"] [@def_title]
   | OrderActivityCancelBid of order_activity_cancel_bid [@kind "cancel_bid"] [@kind_label "@type"] [@title "OrderActivityCancelBid"] [@def_title]
   | OrderActivityCancelList of order_activity_cancel_bid [@kind "cancel_list"] [@kind_label "@type"] [@title "OrderActivityCancelList"] [@def_title]
 [@@deriving encoding {title="OrderActivityType"; def_title}]
 
-type all_activity_type =
-  | OrderActivityType of order_activity_type
-  | NftActivityType of nft_activity_type
+type 'a all_activity_type =
+  | OrderActivityType of 'a order_activity_type
+  | NftActivityType of 'a nft_activity_type
 [@@deriving encoding]
 
-type activity_type = {
+type 'a activity_type = {
   activity_id : string ;
   activity_date : A.date ;
   activity_source : string ;
-  activity_type : all_activity_type ;
+  activity_type : 'a all_activity_type ;
 } [@@deriving encoding {title="ActivityType"; def_title}]
 
-type order_activities = {
-  order_activities_items : order_activity_type list [@title "OrderActivitiesItems"];
+type 'a order_activities = {
+  order_activities_items : 'a order_activity_type list [@title "OrderActivitiesItems"];
   order_activities_continuation : string option ; [@opt]
 } [@@deriving encoding {title="OrderActivities"; def_title}]
 
@@ -663,13 +663,13 @@ type order_bid_status =
   | BSCANCELLED
 [@@deriving encoding {enum; title="OrderBidStatus"; def_title}]
 
-type order_bid_elt = {
+type 'a order_bid_elt = {
   order_bid_elt_order_hash : A.word ;
   order_bid_elt_status : order_bid_status ;
   order_bid_elt_maker : A.address ;
   order_bid_elt_taker : A.address option ; [@opt]
-  order_bid_elt_make : asset ;
-  order_bid_elt_take : asset ;
+  order_bid_elt_make : 'a asset ;
+  order_bid_elt_take : 'a asset ;
   order_bid_elt_make_balance : A.big_integer option ;
   order_bid_elt_fill : A.big_integer ;
   order_bid_elt_make_stock : A.big_integer ;
@@ -679,14 +679,14 @@ type order_bid_elt = {
   order_bid_elt_created_at : A.date;
 } [@@deriving encoding {camel; title="OrderBidElt"; def_title}]
 
-type order_bid = {
+type 'a order_bid = {
   order_bid_data: order_rarible_v2_data_v1;
-  order_bid_elt: order_bid_elt [@merge];
+  order_bid_elt: 'a order_bid_elt [@merge];
   order_bid_type: unit [@encoding Json_encoding.constant "RARIBLE_V2"]
 } [@@deriving encoding {title="OrderBid"; def_title}]
 
-type order_bids_pagination = {
-  order_bids_pagination_items : order_bid list ;
+type 'a order_bids_pagination = {
+  order_bids_pagination_items : 'a order_bid list ;
   order_bids_pagination_continuation : string option ; [@opt]
 } [@@deriving encoding {title="OrderBidsPagination"; def_title}]
 
@@ -697,11 +697,11 @@ type order_bids_pagination = {
 
 type fee_side = FeeSideMake | FeeSideTake
 
-type order_event = {
+type 'a order_event = {
   order_event_event_id : string ;
   order_event_order_id : string ;
   order_event_type : unit ; [@encoding Json_encoding.constant "UPDATE"]
-  order_event_order : order ;
+  order_event_order : 'a order ;
 } [@@deriving encoding {camel; title="OrderEvent"; def_title}]
 
 type nft_item_event = {
@@ -724,19 +724,18 @@ type signature_validation_form = {
   svf_signature: A.edsig;
 } [@@deriving encoding {title="SignatureValidationForm"; def_title}]
 
-
-type ft_balance = {
+type 'a ft_balance = {
   ft_contract: string;
   ft_owner: A.address;
-  ft_balance: A.big_decimal
+  ft_balance: 'a
 } [@@deriving encoding {title="FTBalance"; def_title}]
 
 (** Interaction with Tezos contract *)
 
 type transfer_destination = {
   tr_destination: string;
-  tr_token_id: string;
-  tr_amount: int64;
+  tr_token_id: A.big_integer;
+  tr_amount: z;
 } [@@deriving encoding]
 
 type transfer = {
@@ -747,19 +746,19 @@ type transfer = {
 type operator_update = {
   op_owner: string;
   op_operator: string;
-  op_token_id: string;
+  op_token_id: A.big_integer;
   op_add: bool;
 } [@@deriving encoding]
 
 type token_metadata = ((string * string) list [@assoc])
 [@@deriving encoding]
 
-type token_royalties = ((string * int64) list [@assoc])
+type token_royalties = ((string * A.big_integer) list [@assoc])
 [@@deriving encoding]
 
 type token_op = {
   tk_token_id: string;
-  tk_amount: int64;
+  tk_amount: A.big_integer;
 } [@@deriving encoding]
 
 type token_op_owner = {
@@ -768,7 +767,7 @@ type token_op_owner = {
 } [@@deriving encoding {remove_prefix=3}]
 
 type 'a fa2_mint = {
-  fa2m_token_id: string;
+  fa2m_token_id: A.big_integer;
   fa2m_amount: 'a;
   fa2m_owner: string;
   fa2m_metadata: (string * string) list
@@ -776,33 +775,33 @@ type 'a fa2_mint = {
 
 type ubi_mint = {
   ubim_owner : string ;
-  ubim_token_id : string ;
+  ubim_token_id : A.big_integer ;
   ubim_uri : string option ;
 } [@@deriving encoding]
 
 type ubi_mint2 = {
   ubi2m_owner : string ;
-  ubi2m_amount : int64 ;
+  ubi2m_amount : A.big_integer ;
   ubi2m_metadata: (string * string) list ;
-  ubi2m_token_id : string ;
+  ubi2m_token_id : A.big_integer ;
 } [@@deriving encoding]
 
 type mint =
   | UbiMint of ubi_mint
   | UbiMint2 of ubi_mint2
   | NFTMint of unit fa2_mint
-  | MTMint of int64 fa2_mint
+  | MTMint of A.big_integer fa2_mint
 [@@deriving encoding]
 
 type burn =
-  | MTBurn of { amount: int64; token_id: string }
-  | NFTBurn of string
+  | MTBurn of { amount: A.big_integer; token_id: A.big_integer }
+  | NFTBurn of A.big_integer
 [@@deriving encoding]
 
 type account_token = {
-  at_token_id : string;
+  at_token_id : A.big_integer;
   at_contract : string;
-  at_amount : int64;
+  at_amount : A.big_integer;
 } [@@deriving encoding]
 
 type nft_param =
@@ -812,13 +811,13 @@ type nft_param =
   | Mint_tokens of mint
   | Burn_tokens of burn
   | Metadata_uri of string
-  | Token_metadata of (string * (string * string) list)
+  | Token_metadata of (A.big_integer * (string * string) list)
 [@@deriving encoding]
 
 type ft_param =
   | FT_transfers of transfer list
-  | FT_mint of { owner: string; amount: int64 }
-  | FT_burn of { owner: string; amount: int64 }
+  | FT_mint of { owner: string; amount: A.big_integer }
+  | FT_burn of { owner: string; amount: A.big_integer }
 [@@deriving encoding]
 
 type set_royalties = {
@@ -830,9 +829,9 @@ type set_royalties = {
 type exchange_param =
   | Cancel of Tzfunc.H.t
   | DoTransfers of
-      {left: Tzfunc.H.t; left_maker : string option; left_asset: asset ;
-       right: Tzfunc.H.t ; right_maker: string option; right_asset: asset ;
-       fill_make_value: int64; fill_take_value: int64}
+      {left: Tzfunc.H.t; left_maker : string option; left_asset: A.big_integer asset ;
+       right: Tzfunc.H.t ; right_maker: string option; right_asset: A.big_integer asset ;
+       fill_make_value: A.big_integer; fill_take_value: A.big_integer}
 
 type micheline_value = [
   | `address of string

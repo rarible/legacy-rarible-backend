@@ -78,8 +78,8 @@ let storage_royalties ~admin =
   Format.sprintf "{ %S; None; None; {}; {} }" admin
 
 let storage_exchange ~admin ~receiver ~fee =
-  Format.sprintf {|(Pair %S (Pair %S (Pair %Ld (Pair None (Pair {} (Pair None {Elt "" 0x}))))))|}
-    admin receiver fee
+  Format.sprintf {|(Pair %S (Pair %S (Pair %s (Pair None (Pair {} (Pair None {Elt "" 0x}))))))|}
+    admin receiver (Z.to_string fee)
 
 let storage_validator ~exchange ~royalties =
   Format.sprintf {|(Pair %S (Pair %S (Pair {} (Pair {} (Pair {} {Elt "" 0x})))))|}
@@ -211,32 +211,32 @@ let hex s =
       else shift @@ (Char.code (String.get s pos)) mod 16)
 
 let mint_tokens_repr ?(kind=`nft) ?(metadata=[]) ?(royalties=[]) ~owner id =
-  Format.sprintf "{ %Ld; %S; %s{%s}; {%s} }" id owner
-    (match kind with `nft -> "" | `mt supply -> Format.sprintf "%Ld; " supply)
+  Format.sprintf "{ %s; %S; %s{%s}; {%s} }" (Z.to_string id) owner
+    (match kind with `nft -> "" | `mt supply -> Format.sprintf "%s; " (Z.to_string supply))
     (String.concat "; " @@ List.map (fun (k, v) -> Format.sprintf "Elt %S 0x%s" k (hex v)) metadata)
     (String.concat "; " @@ List.map (fun (ad, am) -> Format.sprintf "Pair %S %Ld" ad  am) royalties)
 
 let mint_ubi_tokens_repr ~id ~owner =
-  Format.sprintf "{%S; %Ld; None}" owner id
+  Format.sprintf "{%S; %s; None}" owner (Z.to_string id)
 
 let burn_tokens_repr ~id ~kind =
   match kind with
-    | `nft -> Format.sprintf "%Ld" id
+    | `nft -> Z.to_string id
     | _ ->
-      Format.sprintf "{%Ld%s}" id
-        (match kind with `nft -> "" | `mt amount -> Format.sprintf "; %Ld" amount)
+      Format.sprintf "{%s%s}" (Z.to_string id)
+        (match kind with `nft -> "" | `mt amount -> Format.sprintf "; %s" (Z.to_string amount))
 
 let set_royalties_repr ~contract ~id ~royalties =
-  Format.sprintf "{%S; Some %Ld; {%s}}" contract id
+  Format.sprintf "{%S; Some %s; {%s}}" contract (Z.to_string id)
     (String.concat "; " @@ List.map (fun (ad, am) -> Format.sprintf "{%S; %Ld}" ad  am) royalties)
 
 let ubi_set_royalties_repr ~id ~royalties =
-  Format.sprintf "{%Ld; {%s}}" id
+  Format.sprintf "{%s; {%s}}" (Z.to_string id)
     (String.concat "; " @@ List.map (fun (ad, am) -> Format.sprintf "{%S; %Ld}" ad  am) royalties)
 
 type transfer_dest = {
-  trd_id: int64;
-  trd_amount: int64;
+  trd_id: Z.t;
+  trd_amount: Z.t;
   trd_dst: string
 }
 
@@ -250,11 +250,11 @@ let transfer_repr l =
   List.map (fun {tr_src; tr_txs} ->
       Format.sprintf "{%S; {%s}}" tr_src @@
       String.concat "; " @@ List.map (fun {trd_id; trd_amount; trd_dst} ->
-          Format.sprintf "{%S; %Ld; %Ld}" trd_dst trd_id trd_amount) tr_txs)
+          Format.sprintf "{%S; %s; %s}" trd_dst (Z.to_string trd_id) (Z.to_string trd_amount)) tr_txs)
     l
 
 type update_operator = {
-  uo_id: int64;
+  uo_id: Z.t;
   uo_owner: string;
   uo_operator: string;
   uo_add: bool
@@ -263,8 +263,8 @@ type update_operator = {
 let update_operators_repr l =
   Format.sprintf "{%s}" @@ String.concat "; " @@
   List.map (fun {uo_id; uo_owner; uo_operator; uo_add} ->
-      Format.sprintf "%s {%S; %S; %Ld}"
-        (if uo_add then "Left" else "Right") uo_owner uo_operator uo_id) l
+      Format.sprintf "%s {%S; %S; %s}"
+        (if uo_add then "Left" else "Right") uo_owner uo_operator (Z.to_string uo_id)) l
 
 let update_operators_for_all_repr l =
   Format.sprintf "{%s}" @@ String.concat "; " @@
@@ -294,7 +294,7 @@ let mint_ubi_tokens_aux ?endpoint id owner source contract =
 
 let mint_tokens ~id ~owner ~kind royalties =
   let kind = match String.split_on_char '=' kind with
-    | [ "mt"; supply ] -> `mt (Int64.of_string supply)
+    | [ "mt"; supply ] -> `mt (Z.of_string supply)
     | [ "nft" ] -> `nft
     | _ -> failwith "kind of token not understood" in
   let royalties = List.fold_left (fun acc s ->
@@ -302,7 +302,7 @@ let mint_tokens ~id ~owner ~kind royalties =
       | [ ad; v ] -> acc @ [ ad, Int64.of_string v ]
       | _ -> acc) [] royalties in
   call ~entrypoint:"mint" @@
-  mint_tokens_repr ~owner ~kind ~royalties (Int64.of_string id)
+  mint_tokens_repr ~owner ~kind ~royalties (Z.of_string id)
 
 let set_royalties_aux ?endpoint ~contract ~id ~royalties source contract_royalties =
   let param = set_royalties_repr ~id ~contract ~royalties in
@@ -318,11 +318,11 @@ let burn_tokens_aux ?endpoint ~id ~kind source contract =
 
 let burn_tokens ~id ~kind =
   let kind = match String.split_on_char '=' kind with
-    | [ "mt"; amount ] -> `mt (Int64.of_string amount)
+    | [ "mt"; amount ] -> `mt (Z.of_string amount)
     | [ "nft" ] -> `nft
     | _ -> failwith "kind of token not understood" in
   call ~entrypoint:"burn" @@
-  burn_tokens_repr ~id:(Int64.of_string id) ~kind
+  burn_tokens_repr ~id:(Z.of_string id) ~kind
 
 let transfer_aux ?endpoint l source contract =
   let param = transfer_repr l in
@@ -335,11 +335,11 @@ let transfer l =
         begin match String.split_on_char '*' id with
           | [ id; amount ] ->
             {tr_src; tr_txs = tr_txs @ [
-                 {trd_id = Int64.of_string id;
-                  trd_amount = Int64.of_string amount; trd_dst } ]} :: t
+                 {trd_id = Z.of_string id;
+                  trd_amount = Z.of_string amount; trd_dst } ]} :: t
           | _ ->
             {tr_src; tr_txs = tr_txs @ [
-                 { trd_id = Int64.of_string id; trd_amount = 1L; trd_dst }]} :: t
+                 { trd_id = Z.of_string id; trd_amount = Z.one; trd_dst }]} :: t
         end
       | _ -> {tr_src=s; tr_txs = []} :: acc) [] l in
   call ~entrypoint:"transfer" @@ transfer_repr (List.rev l)
@@ -351,7 +351,7 @@ let update_operators_aux ?endpoint l source contract =
 let update_operators l =
   let l = List.map (fun s ->
       let i = String.index s '=' in
-      let uo_id = Int64.of_string (String.sub s 0 i) in
+      let uo_id = Z.of_string (String.sub s 0 i) in
       let s = String.sub s (i+1) (String.length s - i - 1) in
       let uo_add, i = match String.index_opt s '+' with
         | Some i -> true, i
@@ -430,7 +430,7 @@ let main () =
       deploy ~filename:"contracts/arl/royalties.arl" (storage_royalties ~admin)
     | [ "deploy_exchange"; admin; receiver; fee ] ->
       deploy ~filename:"contracts/arl/exchangeV2.arl"
-        (storage_exchange ~admin ~receiver ~fee:(Int64.of_string fee))
+        (storage_exchange ~admin ~receiver ~fee:(Z.of_string fee))
     | [ "deploy_validator"; exchange; royalties ] ->
       deploy ~filename:"contracts/arl/validator.arl"
         (storage_validator ~exchange ~royalties)

@@ -12,7 +12,7 @@ let kafka_section =
   {register=true;
    path="/kafka/order";
    name="kafka_order";
-   output=Rtypes.order_event_enc;
+   output=Rtypes.order_event_enc Rtypes.A.big_decimal_enc;
    section=kafka_section}]
 
 [@@@get
@@ -26,5 +26,5 @@ let kafka_section =
   {register=true;
    path="/kafka/activity";
    name="kafka_activity";
-   output=Rtypes.activity_type_enc;
+   output=Rtypes.activity_type_enc Rtypes.A.big_decimal_enc;
    section=kafka_section}]

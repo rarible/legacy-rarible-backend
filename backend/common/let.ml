@@ -14,6 +14,7 @@ let (>>=?) p f = Lwt.bind p (function Error e -> Lwt.return_error e | Ok x -> f 
 let (>|=?) p f = Lwt.map (function Error e -> Error e| Ok x -> Ok (f x)) p
 
 let (let$) = Result.bind
+let (let|$) e f = Result.map f e
 
 let fold_rp f acc l =
   let rec aux acc = function

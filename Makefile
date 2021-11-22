@@ -19,14 +19,14 @@ copy: build openapi
 
 clean:
 	@dune clean
-	@rm -rf _bin sdk/dist build/default/backend/db/.rarible_witness
+	@rm -rf _bin sdk/dist
 
 dev:
 	@CRAWLORI_NO_UPDATE=true PGDATABASE=$(DB) PGCUSTOM_CONVERTERS_CONFIG=$(CONVERTERS) dune build
 
 drop:
 	@dropdb $(DB)
-	@rm -f _build/default/backend/db/.rarible_witness
+	@dune clean
 
 opam-switch:
 	@opam switch create . 4.13.1 --no-install
