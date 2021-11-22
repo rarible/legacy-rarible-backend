@@ -893,8 +893,17 @@ let get_metadata_json meta =
       if proto = "https:" || proto = "http:/" then get_or_timeout (EzAPI.URL meta)
       else if proto = "ipfs:/" then
         let url = try String.sub meta 7 ((String.length meta) - 7) with _ -> "" in
+        let fs, url = try
+            let may_fs = String.sub url 0 5 in
+            if may_fs = "ipfs/" then
+              "ipfs/", String.sub url 5 ((String.length meta) - 5)
+            else if may_fs = "ipns/" then
+              "ipns/", String.sub url 5 ((String.length meta) - 5)
+            else "ipfs/", url
+          with _ -> "", url in
+        Format.eprintf "get_metadata_json %s %s@." fs url ;
         get_or_timeout
-          (EzAPI.URL (Printf.sprintf "https://cloudflare-ipfs.com/ipfs/%s" url))
+          (EzAPI.URL (Printf.sprintf "https://cloudflare-ipfs.com/%s%s" fs url))
       else Lwt.return_error (0, Some (Printf.sprintf "unknow scheme %s"proto))
     end >>= function
     | Ok json ->
