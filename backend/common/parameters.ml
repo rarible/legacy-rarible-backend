@@ -272,8 +272,8 @@ let parse_do_transfers m =
     let$ right = Utils.hash_key right_maker_edpk right_mat right_tat right_salt in
     let right_asset = { asset_type = right_mat ; asset_value = right_m_asset_value } in
     Ok (DoTransfers
-          {left; left_maker; left_asset;
-           right; right_maker; right_asset;
+          {left; left_maker; left_asset; left_salt;
+           right; right_maker; right_asset; right_salt;
            fill_make_value; fill_take_value})
   | _ -> unexpected_michelson
 

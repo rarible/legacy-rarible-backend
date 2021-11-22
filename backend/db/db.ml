@@ -227,6 +227,18 @@ let mk_order_activity_match obj =
     order_activity_match_left = left ;
     order_activity_match_right = right ;
     order_activity_match_price = price ;
+    order_activity_match_type =
+      if Z.of_string obj#oleft_salt <> Z.zero then
+        begin match left.order_activity_match_side_asset.asset_type with
+          | ATNFT _ | ATMT _ -> MTSELL
+          | _ -> MTACCEPT_BID
+        end
+      else if Z.of_string obj#oright_salt <> Z.zero then
+        begin match right.order_activity_match_side_asset.asset_type with
+          | ATNFT _ | ATMT _ -> MTSELL
+          | _ -> MTACCEPT_BID
+        end
+      else MTSELL ;
     order_activity_match_transaction_hash = Option.get obj#transaction ;
     order_activity_match_block_hash = Option.get obj#block ;
     order_activity_match_block_number = Int64.of_int32 @@ Option.get obj#level ;
@@ -1472,8 +1484,8 @@ let get_decimals ?dbh = function
 
 let insert_order_activity_match
     dbh transaction block index level date
-    hash_left left_maker left_asset
-    hash_right right_maker right_asset  =
+    hash_left left_maker left_asset left_salt
+    hash_right right_maker right_asset right_salt =
   let id = Printf.sprintf "%s_%ld" block index in
   let match_left = {
     order_activity_match_side_maker = (match left_maker with Some s -> s | None -> "");
@@ -1493,6 +1505,18 @@ let insert_order_activity_match
       order_activity_match_left = match_left ;
       order_activity_match_right = match_right ;
       order_activity_match_price = price ;
+      order_activity_match_type =
+        if left_salt <> Z.zero then
+          begin match left_asset.asset_type with
+            | ATNFT _ | ATMT _ -> MTSELL
+            | _ -> MTACCEPT_BID
+          end
+        else if right_salt <> Z.zero then
+          begin match right_asset.asset_type with
+            | ATNFT _ | ATMT _ -> MTSELL
+            | _ -> MTACCEPT_BID
+          end
+        else MTSELL ;
       order_activity_match_transaction_hash = transaction ;
       order_activity_match_block_hash = block ;
       order_activity_match_block_number = Int64.of_int32 level ;
@@ -1514,8 +1538,8 @@ let insert_cancel ~dbh ~op (hash : Tzfunc.H.t) =
     dbh op.bo_hash op.bo_block op.bo_index op.bo_level op.bo_tsp hash
 
 let insert_do_transfers ~dbh ~op
-    ~(left : Tzfunc.H.t) ~left_maker ~left_asset
-    ~(right : Tzfunc.H.t) ~right_maker ~right_asset
+    ~(left : Tzfunc.H.t) ~left_maker ~left_asset ~left_salt
+    ~(right : Tzfunc.H.t) ~right_maker ~right_asset ~right_salt
     ~fill_make_value ~fill_take_value =
   let left = ( left :> string ) in
   let right = ( right :> string ) in
@@ -1531,8 +1555,8 @@ let insert_do_transfers ~dbh ~op
        on conflict do nothing"] >>=? fun () ->
   insert_order_activity_match
     dbh op.bo_hash op.bo_block op.bo_index op.bo_level op.bo_tsp
-    left left_maker left_asset
-    right right_maker right_asset
+    left left_maker left_asset left_salt
+    right right_maker right_asset right_salt
 
 let check_ft_status ~dbh ~config ~crawled contract =
   if crawled then Lwt.return_ok true
@@ -1584,15 +1608,15 @@ let insert_transaction ~config ~dbh ~op tr =
             (short op.bo_hash) op.bo_index (hash :> string);
           insert_cancel ~dbh ~op hash
         | Ok (DoTransfers
-                {left; left_maker; left_asset;
-                 right; right_maker; right_asset;
+                {left; left_maker; left_asset; left_salt;
+                 right; right_maker; right_asset; right_salt;
                  fill_make_value; fill_take_value}) ->
           Format.printf "\027[0;35mapply orders %s %ld %s %s\027[0m@."
             (short op.bo_hash) op.bo_index (left :> string) (right :> string);
           insert_do_transfers
             ~dbh ~op
-            ~left ~left_maker ~left_asset
-            ~right ~right_maker ~right_asset
+            ~left ~left_maker ~left_asset ~left_salt
+            ~right ~right_maker ~right_asset ~right_salt
             ~fill_make_value ~fill_take_value
         | _ ->
           (* todo : match order *)
@@ -3579,6 +3603,8 @@ let get_order_activities_by_collection ?dbh ?(sort=LATEST_FIRST) ?continuation ?
            transaction, block, level, date, \
            \
            oleft.hash as oleft_hash, oleft.maker as oleft_maker, \
+
+           oleft.salt as oleft_salt, \
            oleft.taker as oleft_taker, \
            oleft.make_asset_type_class as oleft_make_asset_type_class, \
            oleft.make_asset_type_contract as oleft_make_asset_type_contract, \
@@ -3592,6 +3618,7 @@ let get_order_activities_by_collection ?dbh ?(sort=LATEST_FIRST) ?continuation ?
            oleft.take_asset_decimals as oleft_take_asset_decimals, \
            \
            oright.hash as oright_hash, oright.maker as oright_maker, \
+           oright.salt as oright_salt, \
            oright.taker as oright_taker, \
            oright.make_asset_type_class as oright_make_asset_type_class, \
            oright.make_asset_type_contract as oright_make_asset_type_contract, \
@@ -3633,6 +3660,7 @@ let get_order_activities_by_collection ?dbh ?(sort=LATEST_FIRST) ?continuation ?
            transaction, block, level, date, \
            \
            oleft.hash as oleft_hash, oleft.maker as oleft_maker, \
+           oleft.salt as oleft_salt, \
            oleft.taker as oleft_taker, \
            oleft.make_asset_type_class as oleft_make_asset_type_class, \
            oleft.make_asset_type_contract as oleft_make_asset_type_contract, \
@@ -3646,6 +3674,7 @@ let get_order_activities_by_collection ?dbh ?(sort=LATEST_FIRST) ?continuation ?
            oleft.take_asset_decimals as oleft_take_asset_decimals, \
            \
            oright.hash as oright_hash, oright.maker as oright_maker, \
+           oright.salt as oright_salt, \
            oright.taker as oright_taker, \
            oright.make_asset_type_class as oright_make_asset_type_class, \
            oright.make_asset_type_contract as oright_make_asset_type_contract, \
@@ -3720,6 +3749,7 @@ let get_order_activities_by_item ?dbh ?(sort=LATEST_FIRST) ?continuation ?(size=
            transaction, block, level, date, \
            \
            oleft.hash as oleft_hash, oleft.maker as oleft_maker, \
+           oleft.salt as oleft_salt, \
            oleft.taker as oleft_taker, \
            oleft.make_asset_type_class as oleft_make_asset_type_class, \
            oleft.make_asset_type_contract as oleft_make_asset_type_contract, \
@@ -3733,6 +3763,7 @@ let get_order_activities_by_item ?dbh ?(sort=LATEST_FIRST) ?continuation ?(size=
            oleft.take_asset_decimals as oleft_take_asset_decimals, \
            \
            oright.hash as oright_hash, oright.maker as oright_maker, \
+           oright.salt as oright_salt, \
            oright.taker as oright_taker, \
            oright.make_asset_type_class as oright_make_asset_type_class, \
            oright.make_asset_type_contract as oright_make_asset_type_contract, \
@@ -3778,6 +3809,7 @@ let get_order_activities_by_item ?dbh ?(sort=LATEST_FIRST) ?continuation ?(size=
            transaction, block, level, date, \
            \
            oleft.hash as oleft_hash, oleft.maker as oleft_maker, \
+           oleft.salt as oleft_salt, \
            oleft.taker as oleft_taker, \
            oleft.make_asset_type_class as oleft_make_asset_type_class, \
            oleft.make_asset_type_contract as oleft_make_asset_type_contract, \
@@ -3791,6 +3823,7 @@ let get_order_activities_by_item ?dbh ?(sort=LATEST_FIRST) ?continuation ?(size=
            oleft.take_asset_decimals as oleft_take_asset_decimals, \
            \
            oright.hash as oright_hash, oright.maker as oright_maker, \
+           oright.salt as oright_salt, \
            oright.taker as oright_taker, \
            oright.make_asset_type_class as oright_make_asset_type_class, \
            oright.make_asset_type_contract as oright_make_asset_type_contract, \
@@ -3864,6 +3897,7 @@ let get_order_activities_all ?dbh ?(sort=LATEST_FIRST) ?continuation ?(size=50) 
            transaction, block, level, date, \
            \
            oleft.hash as oleft_hash, oleft.maker as oleft_maker, \
+           oleft.salt as oleft_salt, \
            oleft.taker as oleft_taker, \
            oleft.make_asset_type_class as oleft_make_asset_type_class, \
            oleft.make_asset_type_contract as oleft_make_asset_type_contract, \
@@ -3877,6 +3911,7 @@ let get_order_activities_all ?dbh ?(sort=LATEST_FIRST) ?continuation ?(size=50) 
            oleft.take_asset_decimals as oleft_take_asset_decimals, \
            \
            oright.hash as oright_hash, oright.maker as oright_maker, \
+           oright.salt as oright_salt, \
            oright.taker as oright_taker, \
            oright.make_asset_type_class as oright_make_asset_type_class, \
            oright.make_asset_type_contract as oright_make_asset_type_contract, \
@@ -3912,6 +3947,7 @@ let get_order_activities_all ?dbh ?(sort=LATEST_FIRST) ?continuation ?(size=50) 
            transaction, block, level, date, \
            \
            oleft.hash as oleft_hash, oleft.maker as oleft_maker, \
+           oleft.salt as oleft_salt, \
            oleft.taker as oleft_taker, \
            oleft.make_asset_type_class as oleft_make_asset_type_class, \
            oleft.make_asset_type_contract as oleft_make_asset_type_contract, \
@@ -3925,6 +3961,7 @@ let get_order_activities_all ?dbh ?(sort=LATEST_FIRST) ?continuation ?(size=50) 
            oleft.take_asset_decimals as oleft_take_asset_decimals, \
            \
            oright.hash as oright_hash, oright.maker as oright_maker, \
+           oright.salt as oright_salt, \
            oright.taker as oright_taker, \
            oright.make_asset_type_class as oright_make_asset_type_class, \
            oright.make_asset_type_contract as oright_make_asset_type_contract, \
@@ -3990,6 +4027,7 @@ let get_order_activities_by_user ?dbh ?(sort=LATEST_FIRST) ?continuation ?(size=
            transaction, block, level, date, \
            \
            oleft.hash as oleft_hash, oleft.maker as oleft_maker, \
+           oleft.salt as oleft_salt, \
            oleft.taker as oleft_taker, \
            oleft.make_asset_type_class as oleft_make_asset_type_class, \
            oleft.make_asset_type_contract as oleft_make_asset_type_contract, \
@@ -4003,6 +4041,7 @@ let get_order_activities_by_user ?dbh ?(sort=LATEST_FIRST) ?continuation ?(size=
            oleft.take_asset_decimals as oleft_take_asset_decimals, \
            \
            oright.hash as oright_hash, oright.maker as oright_maker, \
+           oright.salt as oright_salt, \
            oright.taker as oright_taker, \
            oright.make_asset_type_class as oright_make_asset_type_class, \
            oright.make_asset_type_contract as oright_make_asset_type_contract, \
@@ -4041,6 +4080,7 @@ let get_order_activities_by_user ?dbh ?(sort=LATEST_FIRST) ?continuation ?(size=
            transaction, block, level, date, \
            \
            oleft.hash as oleft_hash, oleft.maker as oleft_maker, \
+           oleft.salt as oleft_salt, \
            oleft.taker as oleft_taker, \
            oleft.make_asset_type_class as oleft_make_asset_type_class, \
            oleft.make_asset_type_contract as oleft_make_asset_type_contract, \
@@ -4054,6 +4094,7 @@ let get_order_activities_by_user ?dbh ?(sort=LATEST_FIRST) ?continuation ?(size=
            oleft.take_asset_decimals as oleft_take_asset_decimals, \
            \
            oright.hash as oright_hash, oright.maker as oright_maker, \
+           oright.salt as oright_salt, \
            oright.taker as oright_taker, \
            oright.make_asset_type_class as oright_make_asset_type_class, \
            oright.make_asset_type_contract as oright_make_asset_type_contract, \
