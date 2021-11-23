@@ -436,12 +436,10 @@ let get_sort_param req =
   match EzAPI.Req.find_param sort_param req with
   | None -> Ok None
   | Some str ->
-    begin
-      try
-        Ok (Some (EzEncoding.destruct activity_sort_enc str))
-      with _ ->
-        mk_invalid_argument sort_param "must be LATEST_FIRST or EARLIEST_FIRST"
-    end
+    try
+      Ok (Some (EzEncoding.destruct activity_sort_enc (Format.sprintf "%S" str)))
+    with _ ->
+      mk_invalid_argument sort_param "must be LATEST_FIRST or EARLIEST_FIRST"
 
 (* (\* gateway-controller *\)
  * let create_gateway_pending_transactions _req _input =
