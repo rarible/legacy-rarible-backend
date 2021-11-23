@@ -111,7 +111,7 @@ let parse_burn m =
   match Typed_mich.parse_value Contract_spec.burn_mt_entry m with
   | Ok (`tuple [ `nat token_id; `nat amount ]) ->
     Ok (Burn_tokens (MTBurn { token_id; amount }))
-  | _ -> match Typed_mich.parse_value Contract_spec.burn_mt_entry m with
+  | _ -> match Typed_mich.parse_value Contract_spec.burn_nft_entry m with
     | Ok (`nat id) -> Ok (Burn_tokens (NFTBurn id))
     | _ -> unexpected_michelson
 

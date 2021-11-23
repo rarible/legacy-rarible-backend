@@ -2628,10 +2628,15 @@ let mk_nft_collection_name_symbol r =
 
 let mk_nft_collection obj =
   let name, symbol = mk_nft_collection_name_symbol obj in
-  let nft_collection_type = match obj#kind with
-    | "mt" -> CTMT
-    | _ -> CTNFT in
-  {
+  let$ nft_collection_type = match obj#ledger_key, obj#ledger_value with
+    | None, _ | _, None -> Error (`hook_error "unknown_token_kind")
+    | Some k, Some v -> match
+        EzEncoding.destruct micheline_type_short_enc k,
+        EzEncoding.destruct micheline_type_short_enc v with
+    | `nat, `address -> Ok CTNFT
+    | `tuple [`nat; `address], `nat -> Ok CTMT
+    | _ -> Error (`hook_error "unknown_token_kind") in
+  Ok {
     nft_collection_id = obj#address ;
     nft_collection_owner = obj#owner ;
     nft_collection_type ;
@@ -2646,13 +2651,13 @@ let get_nft_collection_by_id ?dbh collection =
   Format.eprintf "get_nft_collection_by_id %s@." collection ;
   use dbh @@ fun dbh ->
   let>? l = [%pgsql.object dbh
-      "select address, owner, metadata, name, symbol, kind \
+      "select address, owner, metadata, name, symbol, kind, ledger_key, ledger_value \
        from contracts where address = $collection and main"] in
   match l with
-  | obj :: _ ->
-    let nft_item = mk_nft_collection obj in
-    Lwt.return_ok nft_item
   | [] -> Lwt.return_error (`hook_error "not found")
+  | obj :: _ ->
+    Lwt.return @@ mk_nft_collection obj
+
 
 let search_nft_collections_by_owner ?dbh ?continuation ?(size=50) owner =
   Format.eprintf "search_nft_collections_by_owner %s %s %d@."
@@ -2664,7 +2669,7 @@ let search_nft_collections_by_owner ?dbh ?continuation ?(size=50) owner =
   let no_continuation, collection =
     continuation = None, (match continuation with None -> "" | Some c -> c) in
   let>? l = [%pgsql.object dbh
-      "select address, owner, metadata, name, symbol, kind \
+      "select address, owner, metadata, name, symbol, kind, ledger_key, ledger_value \
        from contracts where \
        main and owner = $owner and \
        ($no_continuation or \
@@ -2676,7 +2681,7 @@ let search_nft_collections_by_owner ?dbh ?continuation ?(size=50) owner =
     | [ None ] -> Lwt.return_ok 0L
     | [ Some i64 ] -> Lwt.return_ok i64
     | _ -> Lwt.return_error (`hook_error "count with more then one row") in
-  let nft_collections_collections = List.map (fun r -> mk_nft_collection r) l in
+  let nft_collections_collections = List.filter_map (fun r -> Result.to_option (mk_nft_collection r)) l in
   let len = List.length nft_collections_collections in
   let nft_collections_continuation =
     if len <> size then None
@@ -2693,7 +2698,7 @@ let get_nft_all_collections ?dbh ?continuation ?(size=50) () =
   let no_continuation, collection =
     continuation = None, (match continuation with None -> "" | Some c -> c) in
   let>? l = [%pgsql.object dbh
-      "select address, owner, metadata, name, symbol, kind \
+      "select address, owner, metadata, name, symbol, kind, ledger_key, ledger_value \
        from contracts where main and \
        ($no_continuation or address collate \"C\" > $collection) \
        order by address collate \"C\" asc limit $size64"] in
@@ -2703,7 +2708,7 @@ let get_nft_all_collections ?dbh ?continuation ?(size=50) () =
     | [ None ] -> Lwt.return_ok 0L
     | [ Some i64 ] -> Lwt.return_ok i64
     | _ -> Lwt.return_error (`hook_error "count with more then one row") in
-  let nft_collections_collections = List.map (fun r -> mk_nft_collection r) l in
+  let nft_collections_collections = List.filter_map (fun r -> Result.to_option (mk_nft_collection r)) l in
   let len = List.length nft_collections_collections in
   let nft_collections_continuation =
     if len <> size then None
