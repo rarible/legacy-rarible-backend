@@ -1,6 +1,6 @@
 {
   "nodes": [ "https://granadanet.smartpy.io" ],
-  "start": 581688,
+  "start": 719000,
   "db_kind": "pg",
   "step_forward": 30,
   "ft_contracts": {
