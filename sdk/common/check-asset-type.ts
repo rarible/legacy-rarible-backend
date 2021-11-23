@@ -14,7 +14,7 @@ export async function get_asset_type(
   const r = await fetch(provider.api + '/collections/' + asset.contract)
   if (r.ok) {
     let json = await r.json()
-    if (json.type = "NFT") return { ...asset, asset_class:"NFT" }
+    if (json.type == "NFT") return { ...asset, asset_class:"NFT" }
     else if (json.type == "MT") return { ...asset, asset_class:"MT" }
     else throw new Error("Contract " + asset.contract + " is not a collection")
   }

@@ -1,4 +1,4 @@
-import { Provider, XTZAssetType, FTAssetType, mutez_to_tez } from "./base"
+import { Provider, XTZAssetType, FTAssetType } from "./base"
 
 export async function get_balance(
   provider: Provider,
@@ -7,7 +7,7 @@ export async function get_balance(
   switch (asset_type.asset_class) {
     case "XTZ":
       const b_tz = await provider.tezos.balance()
-      return mutez_to_tez(b_tz).toString()
+      return b_tz.toString()
     case "FT":
       const r = await fetch(provider.api + '/v0.1/balances/' + asset_type.contract + '/' + owner)
       if (r.ok) {

@@ -73,9 +73,9 @@ export async function fill_order_arg(
     },
   }
   const amount =
-    (left.make.asset_type.asset_class === "XTZ" && new BigNumber(0).isEqualTo(left.salt))
+    (left.make.asset_type.asset_class === "XTZ" && left.salt == '0')
     ? get_real_value(provider, left)
-    : (right.make.asset_type.asset_class === "XTZ" && new BigNumber(0).isEqualTo(right.salt))
+    : (right.make.asset_type.asset_class === "XTZ" && right.salt == '0')
     ? get_real_value(provider, right)
     : undefined
   const parameter = match_order_to_struct(provider, left, right)

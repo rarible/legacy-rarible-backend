@@ -55,15 +55,10 @@ function parse_asset_type(r : RawAssetType) : AssetType | ExtendedAssetType | un
   } else return undefined
 }
 
-function parse_asset_value(r: RawAssetType, value: number) : BigNumber {
-  if (r.asset_class == 'XTZ') return new BigNumber(value * 1000000.)
-  else return new BigNumber(value)
-}
-
 async function provider(node: string, api:string) : Promise<Provider> {
   const tezos = await beacon_provider({node})
   const config = {
-    exchange: "KT1XgQ52NeNdjo3jLpbsPBRfg8YhWoQ5LB7g",
+    exchange: "KT1CfvTiEz9EVBLBLLYYFvRTwqyLsCvoZtWm",
     fees: new BigNumber(300),
     nft_public: "",
     mt_public: "",
@@ -394,8 +389,8 @@ export default new Vue({
       } else {
         const make_asset_type = parse_asset_type(this.upsert.make.asset_type) as AssetType
         const take_asset_type = parse_asset_type(this.upsert.take.asset_type) as AssetType
-        const make_value = parse_asset_value(this.upsert.make.asset_type, this.upsert.make.value)
-        const take_value = parse_asset_value(this.upsert.take.asset_type, this.upsert.take.value)
+        const make_value = new BigNumber(this.upsert.make.value)
+        const take_value = new BigNumber(this.upsert.take.value)
         let payouts = parse_parts(this.upsert.payouts)
         if (payouts.length == 0) payouts = [ { account: pk_to_pkh(maker_edpk), value: new BigNumber(10000)} ]
         const origin_fees = parse_parts(this.upsert.origin_fees)
@@ -449,7 +444,7 @@ export default new Vue({
         const make_asset_type = parse_asset_type(this.sell.make_asset_type) as ExtendedAssetType
         const take_asset_type = parse_asset_type(this.sell.take_asset_type) as XTZAssetType | FTAssetType
         const amount = new BigNumber(this.sell.amount)
-        const price = new BigNumber(this.sell.price * 1000000.)
+        const price = new BigNumber(this.sell.price)
         let payouts = parse_parts(this.sell.payouts)
         if (payouts.length == 0) payouts = [ { account: maker, value: new BigNumber(10000)} ]
         const origin_fees = parse_parts(this.sell.origin_fees)
@@ -501,7 +496,7 @@ export default new Vue({
         const make_asset_type = parse_asset_type(this.bid.make_asset_type) as XTZAssetType | FTAssetType
         const take_asset_type = parse_asset_type(this.bid.take_asset_type) as ExtendedAssetType
         const amount = new BigNumber(this.bid.amount)
-        const price = new BigNumber(this.bid.price).multipliedBy(1000000)
+        const price = new BigNumber(this.bid.price)
         let payouts = parse_parts(this.bid.payouts)
         if (payouts.length == 0) payouts = [ { account: pk_to_pkh(maker), value: new BigNumber(10000)} ]
         const origin_fees = parse_parts(this.bid.origin_fees)

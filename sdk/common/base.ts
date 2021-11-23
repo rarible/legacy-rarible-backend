@@ -115,42 +115,18 @@ export function asset_type_of_json(a: any) : AssetType {
   }
 }
 
-export function mutez_to_tez(mu: BigNumber) : number {
-  const factor = new BigNumber(1000000)
-  return Number(mu.div(factor).plus(mu.mod(factor).div(factor)))
-}
-
 export function asset_to_json(a: Asset) : any {
-  // todo handle different decimal for FA_1_2
-  switch (a.asset_type.asset_class) {
-    case "XTZ":
-      const value = mutez_to_tez(a.value)
-      return {
-        assetType : asset_type_to_json(a.asset_type),
-        value: value.toString()
-      }
-    default:
-      return {
-        assetType : asset_type_to_json(a.asset_type),
-        value: a.value.toString()
-      }
+  return {
+    assetType : asset_type_to_json(a.asset_type),
+    value: a.value.toString()
   }
 }
 
 export function asset_of_json(a: any) : Asset {
-  const factor = 1000000
-    switch (a.assetType.assetClass) {
-      case "XTZ":
-        return {
-          asset_type : asset_type_of_json(a.assetType),
-          value: new BigNumber(a.value).multipliedBy(factor)
-        }
-      default:
-        return {
-          asset_type : asset_type_of_json(a.assetType),
-          value: new BigNumber(a.value)
-        }
-    }
+  return {
+    asset_type : asset_type_of_json(a.assetType),
+    value: new BigNumber(a.value)
+  }
 }
 
 export function get_address(p: Provider) : Promise<string> {
@@ -186,13 +162,13 @@ export async function send(
 ) : Promise<OperationResult> {
   if (arg.entrypoint && arg.parameter) {
     return provider.tezos.transfer({
-      amount: (arg.amount!=undefined) ? mutez_to_tez(arg.amount) : 0,
+      amount: (arg.amount!=undefined) ? Number(arg.amount) : 0,
       to: arg.destination,
       parameter: { entrypoint: arg.entrypoint, value: arg.parameter }
     })
   } else {
     return provider.tezos.transfer({
-      amount: (arg.amount!=undefined) ? mutez_to_tez(arg.amount) : 0,
+      amount: (arg.amount!=undefined) ? Number(arg.amount) : 0,
       to: arg.destination
     })
   }
@@ -205,13 +181,13 @@ export async function send_batch(
   const params = args.map(function(p) {
     if (p.entrypoint && p.parameter) {
       return {
-        amount: (p.amount!=undefined) ? mutez_to_tez(p.amount) : 0,
+        amount: (p.amount!=undefined) ? Number(p.amount) : 0,
         to: p.destination,
         parameter: { entrypoint: p.entrypoint, value: p.parameter }
       }
     } else {
       return {
-        amount: (p.amount!=undefined) ? mutez_to_tez(p.amount) : 0,
+        amount: (p.amount!=undefined) ? Number(p.amount) : 0,
         to: p.destination,
       }
     }

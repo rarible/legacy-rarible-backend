@@ -3460,7 +3460,7 @@ let db_from_asset ?dbh asset =
   match asset.asset_type with
   | ATXTZ ->
     Lwt.return_ok (string_of_asset_type asset.asset_type, None, None,
-                   Z.to_string asset.asset_value, None)
+                   Z.to_string asset.asset_value, Some 6l)
   | ATFT c ->
     use dbh @@ fun dbh ->
     let>? l = [%pgsql dbh "select decimals from ft_contracts where address = $c"] in
