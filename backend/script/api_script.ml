@@ -8,7 +8,7 @@ let exe = Sys.argv.(0)
 
 let api = ref "http://localhost:8080"
 let sdk = ref false
-let endpoint = ref "http://granada.tz.functori.com"
+let endpoint = ref "http://hangzhou.tz.functori.com"
 
 let royalties = "KT1JPYtEMv8PHXfmLoMuWRLsVykoEou5AqKG"
 let validator = "KT1JrWXMuHp7nkX7j3trtxckVBiTyggDNnU1"
@@ -849,6 +849,8 @@ let deploy ?verbose ?(burn_cap=42.1) ~filename ~storage ~source alias =
   let code, out, err = sys_command ~verbose:!Script.verbose ~retry:1 cmd in
   if code <> 0 then
     failwith (Printf.sprintf "deploy failure : out %S err %S" out err)
+  else
+    wait_next_block ()
 
 let create_collection ?(royalties=pick_royalties ()) ?alias ?(kind=`nft) ?(privacy=`priv) () =
   let col_alias = generate_alias "collection" in
@@ -908,7 +910,7 @@ let deploy_collection c =
       | `nft, `pub -> "contracts/arl/nft-public.arl", Script.storage_public_nft c.col_admin.tz1
       | `mt, `pub -> "contracts/arl/mt-public.arl", Script.storage_public_multi c.col_admin.tz1 in
     (* let storage = Script.storage_public_nft c.col_admin.tz1 in *)
-    deploy ~filename ~storage ~source:c.col_source c.col_alias;
+    let> () = deploy ~filename ~storage ~source:c.col_source c.col_alias in
     Printf.eprintf "  deployed collection %s\n%!" c.col_alias ;
     let col_kt1 = find_kt1 c.col_alias in
     let c = { c with col_kt1 } in
@@ -922,7 +924,7 @@ let deploy_ubi_collection c =
   else
     let filename = "contracts/mich/ubi.tz" in
     let storage = Script.storage_ubi c.col_admin.tz1 in
-    deploy ~filename ~storage ~source:c.col_source c.col_alias;
+    let> () = deploy ~filename ~storage ~source:c.col_source c.col_alias in
     Printf.eprintf "  deployed collection %s\n%!" c.col_alias ;
     let col_kt1 = find_kt1 c.col_alias in
     let c = { c with col_kt1 } in
@@ -935,7 +937,7 @@ let create_royalties () =
   let admin = generate_address () in
   if !js then
     let kt1 = Script_js.deploy_royalties ~endpoint:!endpoint admin in
-    kt1, admin
+    Lwt.return (kt1, admin)
   else
     let alias = generate_alias "royalties" in
     may_import_key admin ;
@@ -943,8 +945,8 @@ let create_royalties () =
     may_import_key source ;
     let filename = "contracts/arl/royalties.arl" in
     let storage = Script.storage_royalties ~admin:admin.tz1 in
-    deploy ~filename ~storage ~source alias ;
-    alias, admin
+    let> () = deploy ~filename ~storage ~source alias in
+    Lwt.return (alias, admin)
 
 let create_validator ~exchange ~royalties =
   Printf.eprintf "Creating new validator\n%!" ;
@@ -952,14 +954,14 @@ let create_validator ~exchange ~royalties =
   if !js then
     let kt1_validator =
       Script_js.deploy_validator ~endpoint:!endpoint ~exchange ~royalties source in
-    kt1_validator, source
+    Lwt.return (kt1_validator, source)
   else
     let alias = generate_alias "validator" in
     may_import_key source ;
     let filename = "contracts/arl/validator.arl" in
     let storage = Script.storage_validator ~exchange ~royalties in
-    deploy ~burn_cap:4.67575 ~filename ~storage ~source alias ;
-    alias, source
+    let> () = deploy ~burn_cap:4.67575 ~filename ~storage ~source alias in
+    Lwt.return (alias, source)
 
 let create_exchange () =
   Printf.eprintf "Creating new exchange\n%!" ;
@@ -972,13 +974,13 @@ let create_exchange () =
   if !js then
     let kt1_exchange = Script_js.deploy_exchange ~endpoint:!endpoint ~admin
         ~receiver ~fee:(Z.of_int 300) source in
-    kt1_exchange, admin, receiver
+    Lwt.return (kt1_exchange, admin, receiver)
   else
     let filename = "contracts/arl/exchangeV2.arl" in
     let storage = Script.storage_exchange ~admin:admin.tz1 ~receiver:receiver.tz1 ~fee:(Z.of_int 300) in
     let alias = generate_alias "exchange" in
-    deploy ~burn_cap:42.1 ~filename ~storage ~source alias ;
-    alias, admin, receiver
+    let> () = deploy ~burn_cap:42.1 ~filename ~storage ~source alias in
+    Lwt.return (alias, admin, receiver)
 
 let set_validator validator source contract =
   if !js then
@@ -1060,7 +1062,7 @@ let mint_tokens c it =
     if code <> 0 then
       Lwt.return @@
       Printf.eprintf "mint failure (log %s err %s)\n%!" out err
-    else Lwt.return_unit
+    else wait_next_block ()
 
 let mint_ubi_tokens c it =
   if !js then
@@ -1913,7 +1915,7 @@ let transfer_check_random items =
   let> () = match updated_item with
     | None -> Lwt.return_unit (* todo: check if amount is 0 *)
     | Some it ->
-      let> () = check_item ~verbose:1 ~strict:false it in
+      let> () = check_item ~strict:false it in
       check_transfer_activity ~from:true it in
   let> () = check_item ~strict:false new_item in
   check_transfer_activity new_item >>= fun () ->
@@ -2022,7 +2024,7 @@ let start_api kafka_config =
 
 let get_head () =
   EzReq_lwt.get
-    (EzAPI.URL "https://api.granadanet.tzkt.io/v1/blocks/count")
+    (EzAPI.URL "https://api.hangzhou2net.tzkt.io/v1/blocks/count")
 
 let make_config admin_wallet validator exchange_v2 royalties contracts ft_contracts
     kafka_broker kafka_username kafka_password =
@@ -2032,7 +2034,7 @@ let make_config admin_wallet validator exchange_v2 royalties contracts ft_contra
     failwith (Printf.sprintf "get_head error %d %s" code (Option.value ~default:"" str))
   | Ok level ->
     let config = {
-      nodes = [ "https://granadanet.smartpy.io" ] ;
+      nodes = [ "https://hangzhou.tz.functori.com" ] ;
       start =  Some Int32.(sub (of_string level) 30l)  ;
       db_kind = `pg ;
       step_forward = 30 ;
@@ -2085,13 +2087,13 @@ let start_crawler admin_wallet validator exchange_v2 royalties
 let setup_test_env ?(spawn_exchange_infra=false) () =
   reset_db () ;
   if spawn_exchange_infra then
-    let r_alias, _r_source = create_royalties () in
+    let> r_alias, _r_source = create_royalties () in
     let r_kt1 = find_kt1 r_alias in
     Printf.eprintf "New royalties %s\n%!" r_kt1 ;
-    let ex_alias, ex_admin, _ex_receiver = create_exchange () in
+    let> ex_alias, ex_admin, _ex_receiver = create_exchange () in
     let ex_kt1 = find_kt1 ex_alias in
     Printf.eprintf "New exchange %s\n%!" ex_kt1 ;
-    let v_alias, _v_source = create_validator ~exchange:ex_kt1 ~royalties:r_kt1 in
+    let> v_alias, _v_source = create_validator ~exchange:ex_kt1 ~royalties:r_kt1 in
     let v_kt1 = find_kt1 v_alias in
     Printf.eprintf "New validator %s\n%!" v_kt1 ;
     start_crawler "" v_kt1 ex_kt1 r_kt1 SMap.empty SMap.empty "" "" ""
@@ -2120,9 +2122,8 @@ let clean_test_env () =
 let transfer_test ?royalties ~kind ~privacy () =
   let c = create_collection ?royalties ~kind ~privacy () in
   let> c = deploy_collection c in
+  let> () = wait_next_block () in
   let>? () = check_collection c in
-  Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
-  let> () = Lwt_unix.sleep 6. in
   let>? item1 = match kind with
     | `nft -> mint_one_with_token_id_from_api c
     | `mt ->  mint_with_token_id_from_api c in
@@ -2144,9 +2145,8 @@ let transfer_test ?royalties ~kind ~privacy () =
 let burn_test ?royalties ~kind ~privacy () =
   let c = create_collection ?royalties ~kind ~privacy () in
   let> c = deploy_collection c in
+  let> () = wait_next_block () in
   let>? () = check_collection c in
-  Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
-  let> () = Lwt_unix.sleep 6. in
   let>? item1 = mint_one_with_token_id_from_api c in
   wait_next_block () >>= fun () ->
   let> () = check_item item1 in
@@ -2436,13 +2436,13 @@ let fill_orders_db r_kt1 ex_kt1 =
 
 let fill_orders () =
   reset_db () ;
-  let r_alias, _r_source = create_royalties () in
+  let> r_alias, _r_source = create_royalties () in
   let r_kt1 = find_kt1 r_alias in
   Printf.eprintf "New royalties %s\n%!" r_kt1 ;
-  let ex_alias, ex_admin, _ex_receiver = create_exchange () in
+  let> ex_alias, ex_admin, _ex_receiver = create_exchange () in
   let ex_kt1 = find_kt1 ex_alias in
   Printf.eprintf "New exchange %s\n%!" ex_kt1 ;
-  let v_alias, _v_source = create_validator ~exchange:ex_kt1 ~royalties:r_kt1 in
+  let> v_alias, _v_source = create_validator ~exchange:ex_kt1 ~royalties:r_kt1 in
   let v_kt1 = find_kt1 v_alias in
   Printf.eprintf "New validator %s\n%!" v_kt1 ;
   start_crawler "" v_kt1 ex_kt1 r_kt1 SMap.empty SMap.empty "" "" "" >>= fun (cpid, kafka_config) ->
@@ -2462,13 +2462,13 @@ let fill_orders () =
 
 let cancel_order () =
   reset_db () ;
-  let r_alias, _r_source = create_royalties () in
+  let> r_alias, _r_source = create_royalties () in
   let r_kt1 = find_kt1 r_alias in
   Printf.eprintf "New royalties %s\n%!" r_kt1 ;
-  let ex_alias, ex_admin, _ex_receiver = create_exchange () in
+  let> ex_alias, ex_admin, _ex_receiver = create_exchange () in
   let ex_kt1 = find_kt1 ex_alias in
   Printf.eprintf "New exchange %s\n%!" ex_kt1 ;
-  let v_alias, _v_source = create_validator ~exchange:ex_kt1 ~royalties:r_kt1 in
+  let> v_alias, _v_source = create_validator ~exchange:ex_kt1 ~royalties:r_kt1 in
   let v_kt1 = find_kt1 v_alias in
   Printf.eprintf "New validator %s\n%!" v_kt1 ;
   start_crawler "" v_kt1 ex_kt1 r_kt1 SMap.empty SMap.empty "" "" "" >>= fun (cpid, kafka_config) ->

@@ -101,9 +101,9 @@ let deploy_aux
     let endpoint = match endpoint with None -> [] | Some e -> [ "-E"; e ] in
     let force = if force then [ "--force" ] else [] in
     let s = Filename.quote_command !client ( endpoint @ [
-        "originate"; "contract"; contract; "transferring"; "0";
+        "-w"; "none" ; "originate"; "contract"; contract; "transferring"; "0";
         "from"; source; "running"; mich; "--init"; storage; "--burn-cap";
-        Format.sprintf "%F" burn_cap] @ fee @ log @ dry_run @ force) in
+        Format.sprintf "%F" burn_cap ; ] @ fee @ log @ dry_run @ force) in
     if verbose > 0 then Format.printf "Command:\n%s@." s;
     s
 
@@ -183,7 +183,7 @@ let call_aux
   let dry_run = if dry_run then [ "--dry-run" ] else [] in
   let endpoint = match endpoint with None -> [] | Some e -> [ "-E"; e ] in
   let s = Filename.quote_command !client (endpoint @ [
-      "call"; contract; "from"; source;
+      "-w" ; "none"; "call"; contract; "from"; source;
       "--entrypoint"; entrypoint;
       "--arg"; param; "--burn-cap";
       Format.sprintf "%F" burn_cap ] @ fee @ log @ dry_run) in
