@@ -1,6 +1,7 @@
 import { MichelsonData, MichelsonType, packDataBytes } from "@taquito/michel-codec"
 import { Provider, sign, AssetType, Asset } from "../common/base"
 import { OrderForm, OrderRaribleV2DataV1 } from "./utils"
+import BigNumber from "@taquito/rpc/node_modules/bignumber.js"
 const keccak_base = require("keccak")
 
 export function keccak(s : string) : string {
@@ -82,7 +83,17 @@ export function asset_type_to_struct(p: Provider, a : AssetType) : MichelsonData
 }
 
 export function asset_to_struct(p: Provider, a: Asset) : MichelsonData {
-  return { prim: "Pair", args: [ asset_type_to_struct(p, a.asset_type), { int: a.value.toString() } ] }
+  let value : string
+  switch (a.asset_type.asset_class) {
+    case "XTZ":
+      value = a.value.multipliedBy(new BigNumber(1000000)).toString()
+      break
+    default:
+      value = a.value.toString()
+      break
+  }
+  let b : MichelsonData = { prim: "Pair", args: [ asset_type_to_struct(p, a.asset_type), { int: value } ] }
+  return b
 }
 
 export function data_to_struct(data: OrderRaribleV2DataV1) : MichelsonData {
@@ -108,7 +119,7 @@ export function order_to_struct(p: Provider, order: OrderForm) : MichelsonData {
           { prim: "Pair", args: [
             asset_to_struct(p, order.take),
             { prim: "Pair", args: [
-              { int: order.salt.toString() },
+              { int: order.salt },
               { prim: "Pair", args: [
                 (order.start) ? some_struct({int: order.start.toString()}) : none_struct(),
                 { prim: "Pair", args: [
@@ -121,7 +132,8 @@ export function order_to_struct(p: Provider, order: OrderForm) : MichelsonData {
 export async function sign_order(
   provider: Provider,
   order: OrderForm) : Promise<string> {
-  let h = pack(order_to_struct(provider, order), order_type)
+  let o = order_to_struct(provider, order)
+  let h = pack(o, order_type)
   const signature = sign(provider, h)
   return signature
 }
@@ -132,6 +144,6 @@ export async function order_key(
   const maker = pack({string: order.maker_edpk}, { prim: "key" })
   const make_asset = keccak(pack(asset_type_to_struct(provider, order.make.asset_type), asset_type_type))
   const take_asset = keccak(pack(asset_type_to_struct(provider, order.take.asset_type), asset_type_type))
-  const salt = pack({int: order.salt.toString()}, {prim:"nat"})
+  const salt = pack({int: order.salt}, {prim:"nat"})
   return keccak(maker + make_asset + take_asset + salt)
 }

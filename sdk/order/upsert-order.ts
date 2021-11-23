@@ -2,7 +2,7 @@ import { Provider } from "../common/base"
 import { OrderForm, order_to_json } from "./utils"
 import { get_make_fee } from "./get-make-fee"
 import { add_fee } from "./add-fee"
-import { approve } from "./approve"
+import { approve_token } from "./approve"
 import { sign_order } from "./sign-order"
 
 export async function upsert_order(
@@ -12,7 +12,7 @@ export async function upsert_order(
   const make_fee = get_make_fee(provider.config.fees, order)
   const make = add_fee(order.make, make_fee)
   if (make.asset_type.asset_class != "XTZ" ) {
-    await approve(provider, order.maker, order.make, infinite)
+    await approve_token(provider, order.maker, order.make, infinite)
   }
   const signature = await sign_order(provider, order)
   const r = await fetch(provider.api + '/orders', {

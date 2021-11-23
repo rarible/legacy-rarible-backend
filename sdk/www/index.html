@@ -239,7 +239,7 @@
                 <b-input-group-text>Class</b-input-group-text>
                 <b-form-select v-model="sell.take_asset_type.asset_class" :options="['XTZ', 'FT']"></b-form-select>
                 <b-input-group-text>Contract</b-input-group-text>
-                <b-form-select v-model="sell.take_asset_type.contract" :options="fa2_contracts_options" :disabled="sell.take_asset_type.asset_class=='XTZ'"></b-form-select>
+                <b-form-select v-model="sell.take_asset_type.contract" :options="nft_contracts_options" :disabled="sell.take_asset_type.asset_class=='XTZ'"></b-form-select>
                 <b-form-input v-if="sell.take_asset_type.contract=='custom'" v-model="sell.take_asset_type.contract_custom" :disabled="sell.take_asset_type.asset_class=='XTZ'"></b-form-input>
               </b-input-group>
             </b-form-group>
@@ -322,7 +322,8 @@
                 {{ (data.item.make.asset_type.token_id==undefined) ? '--' : data.item.make.asset_type.token_id }}
               </template>
               <template #cell(make_value)="data">
-                {{ (data.item.make.asset_type.asset_class!='XTZ') ? data.item.make.value : Number(data.item.make.value / 1000000n) + Number(data.item.make.value % 1000000n) / Number(1000000n) }}
+                <!-- {{ (data.item.make.asset_type.asset_class!='XTZ') ? data.item.make.value : Number(data.item.make.value / 1000000n) + Number(data.item.make.value % 1000000n) / Number(1000000n) }} -->
+                {{ data.item.make.value }}
               </template>
               <template #cell(take_class)="data">
                 {{ data.item.take.asset_type.asset_class }}
@@ -334,7 +335,8 @@
                 {{ (data.item.take.asset_type.token_id==undefined) ? '--' : data.item.take.asset_type.token_id }}
               </template>
               <template #cell(take_value)="data">
-                {{ (data.item.take.asset_type.asset_class!='XTZ') ? data.item.take.value : Number(data.item.take.value / 1000000n) + Number(data.item.take.value % 1000000n) / Number(1000000n) }}
+                {{ data.item.take.value }}
+                <!-- {{ (data.item.take.asset_type.asset_class!='XTZ') ? data.item.take.value : Number(data.item.take.value / 1000000n) + Number(data.item.take.value % 1000000n) / Number(1000000n) }} -->
               </template>
             </b-table>
             <div v-if="fill.get_result!=''" class="text-center text-danger">{{ fill.get_result }}</div>

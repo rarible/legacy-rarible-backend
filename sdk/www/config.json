@@ -1,5 +1,5 @@
 {
-  "api_url": "https://rarible-api.functori.com/v0.1/",
+  "api_url": "http://localhost:8080/v0.1/",
   "node": "https://granada.tz.functori.com",
-  "nft_contracts": [ {"contract": "KT1CVDVCQzREqoV6M97EkaPUSV2wVgT7Zdne", "owner":"tz1iA1KggftRjKtAxQs9QbGra2YdsB5MZmgX"} ]
+  "nft_contracts": [ ]
 }

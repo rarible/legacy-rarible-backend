@@ -42,7 +42,7 @@ export declare type OrderForm = {
   taker_edpk?: string;
   make: Asset;
   take: Asset;
-  salt: BigNumber;
+  salt: string;
   start?: number;
   end?: number;
   signature?: string;
@@ -78,9 +78,8 @@ function data_of_json(d: any) : OrderRaribleV2DataV1 {
 }
 
 export function order_to_json(order: OrderForm) : any {
-  const { salt, make, take, data, maker_edpk, taker_edpk, ...rest } = order
+  const { make, take, data, maker_edpk, taker_edpk, ...rest } = order
   return {
-    salt: salt.toString(),
     make: asset_to_json(order.make),
     take: asset_to_json(order.take),
     data: data_to_json(data),
@@ -90,9 +89,8 @@ export function order_to_json(order: OrderForm) : any {
 }
 
 export function order_of_json(order: any ) : OrderForm {
-  const { salt, make, take, data, makerEdpk, takerEdpk, ...rest } = order
+  const { make, take, data, makerEdpk, takerEdpk, ...rest } = order
   return {
-    salt: new BigNumber(salt),
     make: asset_of_json(order.make),
     take: asset_of_json(order.take),
     data: data_of_json(data),
@@ -101,9 +99,8 @@ export function order_of_json(order: any ) : OrderForm {
     ...rest }
 }
 
-export function salt() : BigNumber {
+export function salt() : string {
   let a = new Uint8Array(32)
   a = crypto.getRandomValues(a)
-  let h = a.reduce((acc, x) => acc + x.toString(16).padStart(2, '0'), '')
-  return new BigNumber('0x'+h)
+  return a.reduce((acc, x) => acc + x.toString(10).padStart(2, '0'), '')
 }
