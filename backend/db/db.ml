@@ -467,6 +467,7 @@ let get_nft_item_creators dbh ~contract ~token_id =
     [%pgsql.object dbh
         "select account, value FROM tzip21_creators where main and \
          contract = $contract and token_id = ${Z.to_string token_id}"] in
+  filter_creators @@
   List.map (fun r -> { part_account = r#account ; part_value = r#value} ) r
 
 let get_nft_item_owners dbh ~contract ~token_id =
