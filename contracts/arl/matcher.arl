@@ -1,24 +1,4 @@
-archetype matcher(
-  owner     : address,
-  validator : address
-)
-
-variable owner_candidate : option<address> = none
-
-entry transferOwnership(candidate : address) {
-  called by owner
-  effect {
-    owner_candidate := some(candidate);
-  }
-}
-
-entry claimOwnership() {
-  called by opt_get(owner_candidate)
-  effect {
-    owner := opt_get(owner_candidate);
-    owner_candidate := none
-  }
-}
+archetype matcher
 
 enum asset_class =
 | XTZ
@@ -54,15 +34,7 @@ record res {
   takeMatch : option<asset_type>;
 }
 
-entry setValidator(ivalidator : address) {
-  called by owner
-  effect {
-    validator := ivalidator
-  }
-}
-
 getter matchAssets(orderLeft : order, orderRight : order) : res {
-  dorequire(caller = validator, "caller must be validator");
   var left_make  : asset_type = orderLeft.makeAsset.assetType;
   var left_take  : asset_type = orderLeft.makeAsset.assetType;
   var right_make : asset_type = orderRight.takeAsset.assetType;

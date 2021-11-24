@@ -1,7 +1,7 @@
 archetype exchangeV2(
-  owner : address,
+  owner              : address,
   defaultFeeReceiver : address,
-  protocolFee : nat
+  protocolFee        : nat
 )
 with metadata ""
 
@@ -93,11 +93,16 @@ entry setRoyaltiesContract(iroyaltiesContract : address) {
   }
 }
 
+enum fa2_class =
+| Fungible
+| NonFungible
+| Unknown
+
 enum asset_class =
 | XTZ
 | FA_1_2
-| FA_2
-| FA_2_LAZY
+| FA_2<fa2_class>
+| FA_2_LAZY<fa2_class>
 | OTHER<bytes>
 
 record asset_type {
@@ -137,9 +142,18 @@ record part {
   partValue   : nat;
 }
 
+constant V1 : bytes = keccak(pack("V1"))
+constant V2 : bytes = keccak(pack("V2"))
+
 record DataV1 {
-  payouts : list<part>;
-  originFees : list<part>;
+  v1_payouts : list<part>;
+  v1_originFees : list<part>;
+}
+
+record DataV2 {
+  v2_payouts : list<part>;
+  v2_originFees : list<part>;
+  v2_isMakeFill : bool
 }
 
 entry setAssetMatcher(k : asset_class, v : address) {
@@ -147,39 +161,6 @@ entry setAssetMatcher(k : asset_class, v : address) {
   effect {
     transfer transferred to opt_get(validator) call setAssetMatcher<asset_class * address>((k, v))
   }
-}
-
-// constant TO_MAKER : bytes = keccak(pack("TO_MAKER"))
-// constant TO_TAKER : bytes = keccak(pack("TO_TAKER"))
-// constant PROTOCOL : bytes = keccak(pack("PROTOCOL"))
-// constant ROYALTY  : bytes = keccak(pack("ROYALTY"))
-// constant ORIGIN   : bytes = keccak(pack("ORIGIN"))
-// constant PAYOUT   : bytes = keccak(pack("PAYOUT"))
-
-constant V1 : bytes = keccak(pack("V1"))
-
-function payoutSet(orderAddress : address, dataOrderOnePayoutIn : DataV1) : DataV1 {
-  return { dataOrderOnePayoutIn with payouts = [{ partAccount = orderAddress; partValue = 10000 }] }
-}
-
-function parse(iorder : order) : DataV1 {
-  var addr_maker : address = key_address(opt_get(iorder.maker));
-  if (iorder.dataType = V1) then (
-    match unpack<DataV1>(iorder.data) with
-    | some(dataOrder) -> begin
-       var res = dataOrder;
-       if (length(dataOrder.payouts) = 0) then (
-         res := payoutSet(addr_maker, dataOrder);
-       );
-    return res
-    end
-    | none -> fail("unable to unpack DataV1")
-    end
-  ) else if (iorder.dataType = 0xffffffff) then (
-    return payoutSet(addr_maker, {[]; []})
-  ) else (
-    fail("Unknown Order data type")
-  )
 }
 
 function bp(value : nat, bpValue : nat) : nat {
@@ -204,13 +185,13 @@ function get_transfer(
       var e = require_entrypoint<address * address * nat>("%transfer", addr_fa_1_2, "entry transfer FA_1_2 not found");
       return mkoperation(0tz, e, (ifrom, ito, iasset.assetValue));
     end
-    | FA_2 -> begin
+    | FA_2(fa2t) -> begin
       var u = require_some(unpack<address * nat>(iasset.assetType.assetData), "cannot unpack addr fa_2");
       var e = require_entrypoint<list<address * list<address * nat * nat>>>("%transfer", u[0], "entry transfer FA_2 not found");
       var arg : list<address * list<address * nat * nat>> = [(ifrom, [(ito, u[1], iasset.assetValue)])];
       return mkoperation(0tz, e, arg);
     end
-    | FA_2_LAZY -> fail ("Unsupported")
+    | FA_2_LAZY(fa2t) -> fail ("Unsupported")
     | OTHER(v) -> fail ("Unsupported")
     end
 }
@@ -270,7 +251,7 @@ function get_tokenAddress(matchCalculate : asset_type) : option<address> {
   return
   match matchCalculate.assetClass with
   | FA_1_2 -> unpack<address>(matchCalculate.assetData)
-  | FA_2 -> begin
+  | FA_2(fa2t) -> begin
       match unpack<address * nat>(matchCalculate.assetData) with
       | some(v) -> some(v[0])
       | none -> none<address>
@@ -340,22 +321,22 @@ function transferRoyalties(
 function doTransfersWithFees(
   iamount : nat,
   ifrom : address,
-  dataCalculate : DataV1,
-  dataNft : DataV1,
+  dataCalculate : DataV2,
+  dataNft : DataV2,
   matchCalculate : asset_type,
   matchNft : asset_type,
   /* transferDirection : bytes,*/
   iroyalties : list<part>) : nat * list<operation> {
-    var totalAmount = calculateTotalAmount(iamount, protocolFee, dataCalculate.originFees);
+    var totalAmount = calculateTotalAmount(iamount, protocolFee, dataCalculate.v2_originFees);
     var restpf = transferProtocolFee(totalAmount, iamount, ifrom, matchCalculate/*, transferDirection*/);
     var ops_rest = restpf[1];
     var restr = transferRoyalties(matchCalculate, matchNft, restpf[0], iamount, ifrom/*, transferDirection*/, iroyalties);
     var ops_restr = restr[1];
-    var r = transferFees(matchCalculate, restr[0], iamount, dataCalculate.originFees, ifrom/*, transferDirection, ORIGIN*/);
+    var r = transferFees(matchCalculate, restr[0], iamount, dataCalculate.v2_originFees, ifrom/*, transferDirection, ORIGIN*/);
     var ops_r = r[2];
-    var p = transferFees(matchCalculate, r[0], iamount, dataNft.originFees, ifrom/*, transferDirection, ORIGIN*/);
+    var p = transferFees(matchCalculate, r[0], iamount, dataNft.v2_originFees, ifrom/*, transferDirection, ORIGIN*/);
     var ops_p = p[2];
-    var ops_payouts = transferPayouts(matchCalculate, p[0], ifrom, dataNft.payouts/*, transferDirection*/);
+    var ops_payouts = transferPayouts(matchCalculate, p[0], ifrom, dataNft.v2_payouts/*, transferDirection*/);
     var ops = concat(ops_rest, concat(ops_restr, concat(ops_r, concat(ops_p, ops_payouts))));
     return ((totalAmount, ops))
 }
@@ -363,6 +344,8 @@ function doTransfersWithFees(
 entry doTransfers(
   makeMatch  : asset_type,
   takeMatch  : asset_type,
+  leftOrderData  : DataV2,
+  rightOrderData : DataV2,
   ifill      : fill_result,
   leftOrder  : order,
   rightOrder : order,
@@ -372,8 +355,6 @@ entry doTransfers(
     effect {
       var totalMakeValue = ifill.fr_makeValue;
       var totalTakeValue = ifill.fr_takeValue;
-      var leftOrderData  = parse(leftOrder);
-      var rightOrderData = parse(rightOrder);
 
       var ops1 : list<operation> = [];
       var ops2 : list<operation> = [];
@@ -383,15 +364,15 @@ entry doTransfers(
         var r = doTransfersWithFees(ifill.fr_makeValue, leftOrderMaker, leftOrderData, rightOrderData, makeMatch, takeMatch, /*TO_TAKER,*/ iroyalties);
         totalMakeValue := r[0];
         ops1 := r[1];
-        ops2 := transferPayouts(takeMatch, ifill.fr_takeValue, rightOrderMaker, leftOrderData.payouts/*, TO_MAKER*/);
+        ops2 := transferPayouts(takeMatch, ifill.fr_takeValue, rightOrderMaker, leftOrderData.v2_payouts/*, TO_MAKER*/);
       ) else if (feeSide = TAKE) then (
         var r = doTransfersWithFees(ifill.fr_takeValue, rightOrderMaker, rightOrderData, leftOrderData, takeMatch, makeMatch/*, TO_MAKER*/, iroyalties);
         totalTakeValue := r[0];
         ops1 := r[1];
-        ops2 := transferPayouts(makeMatch, ifill.fr_makeValue, leftOrderMaker, rightOrderData.payouts/*, TO_TAKER*/);
+        ops2 := transferPayouts(makeMatch, ifill.fr_makeValue, leftOrderMaker, rightOrderData.v2_payouts/*, TO_TAKER*/);
       ) else (
-        ops1 := transferPayouts(makeMatch, ifill.fr_makeValue, leftOrderMaker, rightOrderData.payouts/*, TO_TAKER*/);
-        ops2 := transferPayouts(takeMatch, ifill.fr_takeValue, rightOrderMaker, leftOrderData.payouts/*, TO_MAKER*/);
+        ops1 := transferPayouts(makeMatch, ifill.fr_makeValue, leftOrderMaker, rightOrderData.v2_payouts/*, TO_TAKER*/);
+        ops2 := transferPayouts(takeMatch, ifill.fr_takeValue, rightOrderMaker, leftOrderData.v2_payouts/*, TO_MAKER*/);
       );
 
       var ops3 : list<operation> = [];

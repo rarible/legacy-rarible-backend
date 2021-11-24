@@ -9,32 +9,20 @@ async function main() {
 
   try {
     const config = {
-      exchange: "KT1C5kWbfzASApxCMHXFLbHuPtnRaJXE4WMu",
+      exchange: "KT1KkUufmRPjK6SBNZVvAYniAY5F9czYmgwu",
       fees: new BigNumber(0),
       nft_public: "",
       mt_public: "",
     }
 
-    const tezos_mxs = in_memory_provider(
-      'edsk3UUamwmemNBJgDvS8jXCgKsvjL2NoTwYRFpGSRPut4Hmfs6dG8',
-      'https://granada.tz.functori.com')
-    const tezos_ibj = in_memory_provider(
-      'edsk4RqeRTrhdKfJKBTndA9x1RLp4A3wtNL1iMFRXDvfs5ANeZAncZ',
-      'https://granada.tz.functori.com')
-    const tezos_amw = in_memory_provider(
-      'edsk368NmXyps5vKts1TrFTTAgReC5VN9NtPmL9Er86XUdHm2yWiaU',
-      'https://granada.tz.functori.com')
-    const tezos_ia1 = in_memory_provider(
-      "edskRsg6YnXooVuL1mdBfiJYkH2sAbeVTLUxBGNiqhbAc76QwStLg61QDHoxV6F2ckfmWv7uBFSmQgRhoDVfhmGZ4CRnvKLG7W",
-      'https://granada.tz.functori.com')
-    const provider_mxs = {
-      tezos: tezos_mxs,
+    const tezos_u6h = in_memory_provider(
+      'edsk4CmgW9r4fwqtsT6x2bB7BdVcERxLPt6poFXGpk1gTKbqR43G5H',
+      'https://hangzhou.tz.functori.com')
+    const provider_u6h = {
+      tezos: tezos_u6h,
       api: "https://rarible-api.functori.com/v0.1/",
       config
     }
-    const provider_ibj = {...provider_mxs, tezos: tezos_ibj}
-    const provider_amw = {...provider_mxs, tezos: tezos_amw}
-    const provider_ia1 = {...provider_mxs, tezos: tezos_ia1}
 
   // await mint(provider, "KT1VYBd25dw5GjYqPM8T8My6b4g5c4cd4hwu", {tz1ibJRnL6hHjAfmEzM7QtGyTsS6ZtHdgE2S: 10000n}, 100n, 101n)
 
@@ -59,7 +47,7 @@ async function main() {
 
     // const op = await add_permit(provider_amw, permit)
 
-    const op = await send(provider_ia1, {
+    const op = await send(provider_u6h, {
       destination: "KT1JPYtEMv8PHXfmLoMuWRLsVykoEou5AqKG",
       entrypoint: 'setRoyalties',
       parameter: [ {string: 'KT1Ex1FBFh8JeGwNU3uZNrV4afU7LoUgLWEK' }, {prim: "Some", args: [{int: '0'}]}, [] ]

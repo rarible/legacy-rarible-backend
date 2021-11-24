@@ -10,9 +10,10 @@ let api = ref "http://localhost:8080"
 let sdk = ref false
 let endpoint = ref "http://hangzhou.tz.functori.com"
 
-let royalties = "KT1JPYtEMv8PHXfmLoMuWRLsVykoEou5AqKG"
-let validator = "KT1JrWXMuHp7nkX7j3trtxckVBiTyggDNnU1"
-let exchange_v2 = "KT1CfvTiEz9EVBLBLLYYFvRTwqyLsCvoZtWm"
+let royalties = "KT1Ebv7msgzT9tRGjcWHMnnb6Rm8mAy6b9dq"
+let validator = "KT1U8NoG9oiBYWtszvQ6WiSJyvmeDxo8ZcoT"
+let exchange_v2 = "KT1AguExF32Z9UEKzD5nuixNmqrNs1jBKPT8"
+let fill = "KT1GwQQ2HL8JW931AMod49fmNmS2kfjqAtS7"
 let lugh_contract = "KT1HT3EbSPFA1MM2ZiMThB6P6Kky5jebNgAx"
 
 let config = {
@@ -66,7 +67,7 @@ let origins = [
 let origins_len = List.length origins
 
 let royalties_contracts = [
-  "KT1JPYtEMv8PHXfmLoMuWRLsVykoEou5AqKG"
+  royalties
 ]
 let royalties_contracts_len = List.length royalties_contracts
 
@@ -206,7 +207,7 @@ let tezos_asset () = {asset_type=ATXTZ; asset_value=Z.of_int64 @@ Random.int64 1
 
 let generate_ft_asset () =
   let contract = List.nth ft_contracts (Random.int ft_contracts_len) in
-  {asset_type=ATFT contract; asset_value=Z.of_int64 @@ Random.int64 100L}
+  {asset_type=ATFT {contract; token_id=None}; asset_value=Z.of_int64 @@ Random.int64 100L}
 
 let generate_nft_asset () =
   let asset_contract = List.nth nft_contracts (Random.int nft_contracts_len) in
@@ -935,31 +936,32 @@ let deploy_ubi_collection c =
 let create_royalties () =
   Printf.eprintf "Creating new royalties\n%!" ;
   let admin = generate_address () in
+  let source = generate_address () in
   if !js then
-    let kt1 = Script_js.deploy_royalties ~endpoint:!endpoint admin in
+    let kt1 = Script_js.deploy_royalties ~endpoint:!endpoint ~source ~admin () in
     Lwt.return (kt1, admin)
   else
     let alias = generate_alias "royalties" in
     may_import_key admin ;
-    let source = generate_address () in
     may_import_key source ;
     let filename = "contracts/arl/royalties.arl" in
     let storage = Script.storage_royalties ~admin:admin.tz1 in
     let> () = deploy ~filename ~storage ~source alias in
     Lwt.return (alias, admin)
 
-let create_validator ~exchange ~royalties =
+let create_validator ~exchange ~royalties ~fill =
   Printf.eprintf "Creating new validator\n%!" ;
   let source = generate_address () in
+  let admin = generate_address () in
   if !js then
     let kt1_validator =
-      Script_js.deploy_validator ~endpoint:!endpoint ~exchange ~royalties source in
+      Script_js.deploy_validator ~endpoint:!endpoint ~exchange ~royalties ~fill ~admin ~source () in
     Lwt.return (kt1_validator, source)
   else
     let alias = generate_alias "validator" in
     may_import_key source ;
     let filename = "contracts/arl/validator.arl" in
-    let storage = Script.storage_validator ~exchange ~royalties in
+    let storage = Script.storage_validator ~admin:admin.tz1 ~exchange ~royalties ~fill in
     let> () = deploy ~burn_cap:4.67575 ~filename ~storage ~source alias in
     Lwt.return (alias, source)
 
@@ -982,7 +984,23 @@ let create_exchange () =
     let> () = deploy ~burn_cap:42.1 ~filename ~storage ~source alias in
     Lwt.return (alias, admin, receiver)
 
-let set_validator validator source contract =
+let create_fill () =
+  Printf.eprintf "Creating new fill\n%!" ;
+  let admin = generate_address () in
+  if !js then
+    let kt1 = Script_js.deploy_fill ~endpoint:!endpoint admin in
+    Lwt.return (kt1, admin)
+  else
+    let alias = generate_alias "fill" in
+    may_import_key admin ;
+    let source = generate_address () in
+    may_import_key source ;
+    let filename = "contracts/arl/fill.arl" in
+    let storage = Script.storage_fill admin.tz1 in
+    let|> () = deploy ~filename ~storage ~source alias in
+    alias, admin
+
+let set_validator ~validator ~source ~contract =
   if !js then
     Script_js.set_validator ~endpoint:!endpoint ~source ~contract validator
   else
@@ -2093,14 +2111,19 @@ let setup_test_env ?(spawn_exchange_infra=false) () =
     let> ex_alias, ex_admin, _ex_receiver = create_exchange () in
     let ex_kt1 = find_kt1 ex_alias in
     Printf.eprintf "New exchange %s\n%!" ex_kt1 ;
-    let> v_alias, _v_source = create_validator ~exchange:ex_kt1 ~royalties:r_kt1 in
+    let> fill_alias, fill_admin = create_fill () in
+    let fill_kt1 = find_kt1 fill_alias in
+    Printf.eprintf "New fill %s\n%!" fill_kt1 ;
+    let> v_alias, _v_source =
+      create_validator ~exchange:ex_kt1 ~royalties:r_kt1 ~fill:fill_kt1 in
     let v_kt1 = find_kt1 v_alias in
     Printf.eprintf "New validator %s\n%!" v_kt1 ;
     start_crawler "" v_kt1 ex_kt1 r_kt1 SMap.empty SMap.empty "" "" ""
     >>= fun (cpid, kafka_config) ->
     api_pid := Some (start_api kafka_config) ;
     crawler_pid := Some cpid ;
-    set_validator v_kt1 ex_admin ex_kt1 >>= fun () ->
+    set_validator ~validator:v_kt1 ~source:ex_admin ~contract:ex_kt1 >>= fun () ->
+    set_validator ~validator:v_kt1 ~source:fill_admin ~contract:fill_kt1 >>= fun () ->
     Printf.eprintf "Waiting 6sec to let crawler catch up...\n%!" ;
     Lwt_unix.sleep 6. >>= fun () ->
     Lwt.return (r_kt1, ex_kt1)
@@ -2345,7 +2368,7 @@ let match_orders_lugh () =
   Printf.eprintf "Validator %s\n%!" v_kt1 ;
   let>  (cpid, kafka_config) = start_crawler "" v_kt1 ex_kt1 r_kt1 SMap.empty
       (SMap.singleton "KT1HT3EbSPFA1MM2ZiMThB6P6Kky5jebNgAx"
-         {ft_kind=Lugh; ft_crawled=true; ft_id=Z.of_int 94594}) "" "" "" in
+         {ft_kind=Lugh; ft_crawled=true; ft_ledger_id=Z.of_int 94594; ft_token_id=None}) "" "" "" in
   api_pid := Some (start_api kafka_config) ;
   crawler_pid := Some cpid ;
   Printf.eprintf "Waiting 30sec to let crawler catch up...\n%!" ;
@@ -2442,13 +2465,17 @@ let fill_orders () =
   let> ex_alias, ex_admin, _ex_receiver = create_exchange () in
   let ex_kt1 = find_kt1 ex_alias in
   Printf.eprintf "New exchange %s\n%!" ex_kt1 ;
-  let> v_alias, _v_source = create_validator ~exchange:ex_kt1 ~royalties:r_kt1 in
+  let> fill_alias, fill_admin = create_fill () in
+  let fill_kt1 = find_kt1 fill_alias in
+  Printf.eprintf "New fill %s\n%!" fill_kt1 ;
+  let> v_alias, _v_source = create_validator ~exchange:ex_kt1 ~royalties:r_kt1 ~fill:fill_kt1 in
   let v_kt1 = find_kt1 v_alias in
   Printf.eprintf "New validator %s\n%!" v_kt1 ;
   start_crawler "" v_kt1 ex_kt1 r_kt1 SMap.empty SMap.empty "" "" "" >>= fun (cpid, kafka_config) ->
   api_pid := Some (start_api kafka_config) ;
   crawler_pid := Some cpid ;
-  set_validator v_kt1 ex_admin ex_kt1 >>= fun () ->
+  set_validator ~validator:v_kt1 ~source:ex_admin ~contract:ex_kt1 >>= fun () ->
+  set_validator ~validator:v_kt1 ~source:fill_admin ~contract:fill_kt1 >>= fun () ->
   Printf.eprintf "Waiting 6sec to let crawler catch up...\n%!" ;
   Lwt_unix.sleep 6. >>= fun () ->
   fill_orders_db r_kt1 ex_kt1 >>=? fun () ->
@@ -2468,13 +2495,17 @@ let cancel_order () =
   let> ex_alias, ex_admin, _ex_receiver = create_exchange () in
   let ex_kt1 = find_kt1 ex_alias in
   Printf.eprintf "New exchange %s\n%!" ex_kt1 ;
-  let> v_alias, _v_source = create_validator ~exchange:ex_kt1 ~royalties:r_kt1 in
+  let> fill_alias, fill_admin = create_fill () in
+  let fill_kt1 = find_kt1 fill_alias in
+  Printf.eprintf "New fill %s\n%!" fill_kt1 ;
+  let> v_alias, _v_source = create_validator ~exchange:ex_kt1 ~royalties:r_kt1 ~fill:fill_kt1 in
   let v_kt1 = find_kt1 v_alias in
   Printf.eprintf "New validator %s\n%!" v_kt1 ;
   start_crawler "" v_kt1 ex_kt1 r_kt1 SMap.empty SMap.empty "" "" "" >>= fun (cpid, kafka_config) ->
   api_pid := Some (start_api kafka_config) ;
   crawler_pid := Some cpid ;
-  set_validator v_kt1 ex_admin ex_kt1 >>= fun () ->
+  set_validator ~validator:v_kt1 ~source:ex_admin ~contract:ex_kt1 >>= fun () ->
+  set_validator ~validator:v_kt1 ~source:fill_admin ~contract:fill_kt1 >>= fun () ->
   Printf.eprintf "Waiting 6sec to let crawler catch up...\n%!" ;
   Lwt_unix.sleep 6. >>= fun () ->
   let c = create_collection ~royalties:r_kt1 () in

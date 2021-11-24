@@ -27,7 +27,8 @@ let upgrade_1_to_2 dbh version =
       ledger_key jsonb,
       ledger_value jsonb,
       crawled boolean not null default false,
-      decimals int not null default 0)|};
+      decimals int not null default 0,
+      token_id varchar)|};
 
     {|create table contracts(
       kind varchar not null,

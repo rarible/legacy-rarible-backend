@@ -58,7 +58,7 @@ function parse_asset_type(r : RawAssetType) : AssetType | ExtendedAssetType | un
 async function provider(node: string, api:string) : Promise<Provider> {
   const tezos = await beacon_provider({node})
   const config = {
-    exchange: "KT1CfvTiEz9EVBLBLLYYFvRTwqyLsCvoZtWm",
+    exchange: "KT1AguExF32Z9UEKzD5nuixNmqrNs1jBKPT8",
     fees: new BigNumber(300),
     nft_public: "",
     mt_public: "",
@@ -70,7 +70,7 @@ export default new Vue({
   el: "#app",
   data: {
     api_url: "http://localhost:8080/v0.1/",
-    node: 'https://granada.tz.functori.com',
+    node: 'https://hangzhou.tz.functori.com',
     provider: undefined as Provider | undefined,
     path: "home",
     transfer : {
@@ -221,9 +221,8 @@ export default new Vue({
       if (r2.api_url) { this.api_url = r2.api_url }
       if (r2.node) { this.node = r2.node }
     }
-    const nft_contracts_s = localStorage.getItem('nft_contracts')
-    if (nft_contracts_s && Array.isArray(nft_contracts_s))
-      JSON.parse(nft_contracts_s).forEach((c : StorageContract) => this.nft_contracts.add(c))
+    let nft_contracts_s = JSON.parse(localStorage.getItem('nft_contracts') || '[]')
+    nft_contracts_s.forEach((c : StorageContract) => this.nft_contracts.add(c))
     localStorage.setItem('nft_contracts', JSON.stringify(Array.from(this.nft_contracts)))
   },
 
@@ -318,6 +317,8 @@ export default new Vue({
           if (op.contract) {
             this.deploy.result = `operation ${op.hash} confirmed -> new contract: ${op.contract}`
             this.nft_contracts.add({contract: op.contract, owner: this.deploy.owner })
+            console.log(this.nft_contracts)
+            console.log(JSON.stringify(Array.from(this.nft_contracts)))
             localStorage.setItem('nft_contracts', JSON.stringify(Array.from(this.nft_contracts)))
           } else {
             this.deploy.result = `operation ${op.hash} confirmed`

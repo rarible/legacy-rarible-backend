@@ -39,17 +39,19 @@ let string_of_asset_type = function
 
 let asset_class_mich = function
   | ATXTZ -> prim `Left ~args:[prim `Unit]
-  | ATFT _ -> prim `Right ~args:[prim `Left ~args:[ prim `Unit ]]
+  | ATFT {token_id=None; _} -> prim `Right ~args:[prim `Left ~args:[ prim `Unit ]]
+  | ATFT _ -> prim `Right ~args:[prim `Right ~args:[ prim `Left ~args:[ Mint Z.zero ] ]]
   | ATNFT _ | ATMT _ ->
-    prim `Right ~args:[prim `Right ~args:[ prim `Left ~args:[ prim `Unit ] ]]
+    prim `Right ~args:[prim `Right ~args:[ prim `Left ~args:[ Mint Z.one ] ]]
 
 let asset_class_type =
   (prim `or_ ~args:[prim `unit; prim `or_ ~args:[prim `unit; prim `or_ ~args:[
-       prim `unit; prim `or_ ~args:[prim `unit; prim `bytes ]]]])
+       prim `nat; prim `or_ ~args:[prim `unit; prim `bytes ]]]])
 
 let asset_data = function
   | ATXTZ -> Ok (Tzfunc.Raw.mk "\000")
-  | ATFT a -> Tzfunc.Forge.pack (prim `address) (Mstring a)
+  | ATFT {token_id=None; contract} -> Tzfunc.Forge.pack (prim `address) (Mstring contract)
+  | ATFT {token_id=Some asset_token_id; contract=asset_contract}
   | ATNFT { asset_contract; asset_token_id }
   | ATMT { asset_contract; asset_token_id } ->
     Tzfunc.Forge.pack (prim `pair ~args:[ prim `address; prim `nat ])

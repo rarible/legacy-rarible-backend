@@ -1,0 +1,34 @@
+archetype fill_storage(admin : address, validator : option<address>)
+
+variable fill : big_map<bytes, nat> = []
+
+entry setValidator(v : address) {
+  called by admin
+  effect {
+      validator := some(v)
+  }
+}
+
+// READ
+view get(k : bytes) : nat {
+  return fill[k]
+}
+
+view contains(k : bytes) : bool {
+  return fill.contains(k)
+}
+
+// WRITE
+entry remove(k : bytes) {
+  called by opt_get(validator)
+  effect {
+    fill.remove(k)
+  }
+}
+
+entry put(k : bytes, v : nat) {
+  called by opt_get(validator)
+  effect {
+    fill.put(k, v)
+  }
+}

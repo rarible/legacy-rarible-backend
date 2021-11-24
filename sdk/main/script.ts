@@ -1,15 +1,15 @@
-import { transfer, mint, burn, deploy_nft_public, deploy_royalties, set_token_metadata, set_metadata, deploy_exchangeV2, deploy_validator, send, TransactionArg} from "."
+import { transfer, mint, burn, deploy_nft_public, deploy_royalties, set_token_metadata, set_metadata, deploy_exchangeV2, deploy_validator, deploy_fill, send, TransactionArg} from "."
 import { in_memory_provider } from '../providers/in_memory/in_memory_provider'
 import yargs from 'yargs'
 import BigNumber from "@taquito/rpc/node_modules/bignumber.js"
 
 async function main() {
   const argv = yargs(process.argv.slice(2)).options({
-    edsk: {type: 'string', default: 'edsk4RqeRTrhdKfJKBTndA9x1RLp4A3wtNL1iMFRXDvfs5ANeZAncZ'},
-    endpoint: {type: 'string', default: 'https://granada.tz.functori.com'},
-    exchange: {type: 'string', default: 'KT1XgQ52NeNdjo3jLpbsPBRfg8YhWoQ5LB7g'},
-    contract: {type: 'string', default: 'KT1MWv7oH8JJhxJJs8co21XiByBEAYx2QDjY'},
-    royalties_contract: {type: 'string', default: 'KT1KrzCSQs6XMMRsQ7dqCVcYQeGs7d512zzb'},
+    edsk: {type: 'string', default: 'edsk4CmgW9r4fwqtsT6x2bB7BdVcERxLPt6poFXGpk1gTKbqR43G5H'},
+    endpoint: {type: 'string', default: 'https://hangzhou.tz.functori.com'},
+    exchange: {type: 'string', default: 'KT1AguExF32Z9UEKzD5nuixNmqrNs1jBKPT8'},
+    contract: {type: 'string', default: ''},
+    royalties_contract: {type: 'string', default: 'KT1Ebv7msgzT9tRGjcWHMnnb6Rm8mAy6b9dq'},
     token_id: {type : 'number'},
     royalties: {type: 'string', default: '{}'},
     amount: {type: 'number'},
@@ -20,9 +20,9 @@ async function main() {
     owner: {type: 'string'},
     receiver: {type: 'string'},
     fee: {type: 'number', default: 0},
-    validator: {type: 'string', default: 'KT1RtsevY6b6izV12QMxvVZviSTy4Mcu2apg'},
-    operator: {type: 'string', default: 'KT1XgQ52NeNdjo3jLpbsPBRfg8YhWoQ5LB7g'},
-
+    validator: {type: 'string', default: 'KT1U8NoG9oiBYWtszvQ6WiSJyvmeDxo8ZcoT'},
+    operator: {type: 'string', default: ''},
+    fill: {type: 'string', default: 'KT1GwQQ2HL8JW931AMod49fmNmS2kfjqAtS7'},
   }).argv
 
   const token_id_opt = (argv.token_id!=undefined) ? new BigNumber(argv.token_id) : undefined
@@ -111,9 +111,16 @@ async function main() {
 
     case 'deploy_validator':
       console.log("deploy validator")
-      const op_deploy_validator = await deploy_validator(provider, argv.exchange, argv.royalties_contract)
+      const op_deploy_validator = await deploy_validator(provider, owner, argv.exchange, argv.royalties_contract, argv.fill)
       await op_deploy_validator.confirmation()
       console.log(op_deploy_validator.contract)
+      break
+
+    case 'deploy_fill':
+      console.log("deploy fill")
+      const op_deploy_fill = await deploy_fill(provider, owner)
+      await op_deploy_fill.confirmation()
+      console.log(op_deploy_fill.contract)
       break
 
     case 'deploy_exchange':

@@ -3,195 +3,57 @@ import { Provider, OperationResult } from "../common/base"
 export const matcher_code : any =
   [  {  "prim": "storage",
         "args": [
-          {  "prim": "pair",
-             "args": [
-               {  "prim": "address",
-                  "annots": [
-                    "%owner"
-                  ]
-               },
-               {  "prim": "pair",
-                  "args": [
-                    {  "prim": "address",
-                       "annots": [
-                         "%validator"
-                       ]
-                    },
-                    {  "prim": "option",
-                       "args": [
-                         {  "prim": "address"  }
-                       ]
-                       ,
-                       "annots": [
-                         "%owner_candidate"
-                       ]
-                    }
-                  ]
-               }
-             ]
-          }
+          {  "prim": "unit"  }
         ]
   },
   {  "prim": "parameter",
      "args": [
-       {  "prim": "or",
+       {  "prim": "pair",
           "args": [
-            {  "prim": "or",
+            {  "prim": "pair",
                "args": [
                  {  "prim": "pair",
                     "args": [
+                      {  "prim": "option",
+                         "args": [
+                           {  "prim": "key"  }
+                         ]
+                         ,
+                         "annots": [
+                           "%maker"
+                         ]
+                      },
                       {  "prim": "pair",
                          "args": [
                            {  "prim": "pair",
                               "args": [
-                                {  "prim": "option",
+                                {  "prim": "pair",
                                    "args": [
-                                     {  "prim": "key"  }
+                                     {  "prim": "int",
+                                        "annots": [
+                                          "%assetClass"
+                                        ]
+                                     },
+                                     {  "prim": "bytes",
+                                        "annots": [
+                                          "%assetData"
+                                        ]
+                                     }
                                    ]
                                    ,
                                    "annots": [
-                                     "%maker"
+                                     "%assetType"
                                    ]
                                 },
-                                {  "prim": "pair",
-                                   "args": [
-                                     {  "prim": "pair",
-                                        "args": [
-                                          {  "prim": "pair",
-                                             "args": [
-                                               {  "prim": "nat",
-                                                  "annots": [
-                                                    "%assetClass"
-                                                  ]
-                                               },
-                                               {  "prim": "bytes",
-                                                  "annots": [
-                                                    "%assetData"
-                                                  ]
-                                               }
-                                             ]
-                                             ,
-                                             "annots": [
-                                               "%assetType"
-                                             ]
-                                          },
-                                          {  "prim": "nat",
-                                             "annots": [
-                                               "%assetValue"
-                                             ]
-                                          }
-                                        ]
-                                        ,
-                                        "annots": [
-                                          "%makeAsset"
-                                        ]
-                                     },
-                                     {  "prim": "pair",
-                                        "args": [
-                                          {  "prim": "option",
-                                             "args": [
-                                               {  "prim": "key"  }
-                                             ]
-                                             ,
-                                             "annots": [
-                                               "%taker"
-                                             ]
-                                          },
-                                          {  "prim": "pair",
-                                             "args": [
-                                               {  "prim": "pair",
-                                                  "args": [
-                                                    {  "prim": "pair",
-                                                       "args": [
-                                                         {  "prim": "nat",
-                                                            "annots": [
-                                                              "%assetClass"
-                                                            ]
-                                                         },
-                                                         {  "prim": "bytes",
-                                                            "annots": [
-                                                              "%assetData"
-                                                            ]
-                                                         }
-                                                       ]
-                                                       ,
-                                                       "annots": [
-                                                         "%assetType"
-                                                       ]
-                                                    },
-                                                    {  "prim": "nat",
-                                                       "annots": [
-                                                         "%assetValue"
-                                                       ]
-                                                    }
-                                                  ]
-                                                  ,
-                                                  "annots": [
-                                                    "%takeAsset"
-                                                  ]
-                                               },
-                                               {  "prim": "pair",
-                                                  "args": [
-                                                    {  "prim": "nat",
-                                                       "annots": [
-                                                         "%salt"
-                                                       ]
-                                                    },
-                                                    {  "prim": "pair",
-                                                       "args": [
-                                                         {  "prim": "option",
-                                                            "args": [
-                                                              {  "prim": "timestamp"  }
-                                                            ]
-                                                            ,
-                                                            "annots": [
-                                                              "%start"
-                                                            ]
-                                                         },
-                                                         {  "prim": "pair",
-                                                            "args": [
-                                                              {  "prim": "option",
-                                                                 "args": [
-                                                                   {  "prim": "timestamp"  }
-                                                                 ]
-                                                                 ,
-                                                                 "annots": [
-                                                                   "%end"
-                                                                 ]
-                                                              },
-                                                              {  "prim": "pair",
-                                                                 "args": [
-                                                                   {
-                                                                   "prim": "bytes",
-                                                                   "annots": [
-
-                                                                   "%dataType"
-                                                                   ]
-                                                                   },
-                                                                   {
-                                                                   "prim": "bytes",
-                                                                   "annots": [
-                                                                     "%data"
-                                                                   ]
-                                                                   }
-                                                                 ]
-                                                              }
-                                                            ]
-                                                         }
-                                                       ]
-                                                    }
-                                                  ]
-                                               }
-                                             ]
-                                          }
-                                        ]
-                                     }
+                                {  "prim": "nat",
+                                   "annots": [
+                                     "%assetValue"
                                    ]
                                 }
                               ]
                               ,
                               "annots": [
-                                "%orderLeft"
+                                "%makeAsset"
                               ]
                            },
                            {  "prim": "pair",
@@ -202,7 +64,7 @@ export const matcher_code : any =
                                    ]
                                    ,
                                    "annots": [
-                                     "%maker"
+                                     "%taker"
                                    ]
                                 },
                                 {  "prim": "pair",
@@ -211,7 +73,7 @@ export const matcher_code : any =
                                         "args": [
                                           {  "prim": "pair",
                                              "args": [
-                                               {  "prim": "nat",
+                                               {  "prim": "int",
                                                   "annots": [
                                                     "%assetClass"
                                                   ]
@@ -235,99 +97,48 @@ export const matcher_code : any =
                                         ]
                                         ,
                                         "annots": [
-                                          "%makeAsset"
+                                          "%takeAsset"
                                         ]
                                      },
                                      {  "prim": "pair",
                                         "args": [
-                                          {  "prim": "option",
-                                             "args": [
-                                               {  "prim": "key"  }
-                                             ]
-                                             ,
+                                          {  "prim": "nat",
                                              "annots": [
-                                               "%taker"
+                                               "%salt"
                                              ]
                                           },
                                           {  "prim": "pair",
                                              "args": [
-                                               {  "prim": "pair",
+                                               {  "prim": "option",
                                                   "args": [
-                                                    {  "prim": "pair",
-                                                       "args": [
-                                                         {  "prim": "nat",
-                                                            "annots": [
-                                                              "%assetClass"
-                                                            ]
-                                                         },
-                                                         {  "prim": "bytes",
-                                                            "annots": [
-                                                              "%assetData"
-                                                            ]
-                                                         }
-                                                       ]
-                                                       ,
-                                                       "annots": [
-                                                         "%assetType"
-                                                       ]
-                                                    },
-                                                    {  "prim": "nat",
-                                                       "annots": [
-                                                         "%assetValue"
-                                                       ]
-                                                    }
+                                                    {  "prim": "timestamp"  }
                                                   ]
                                                   ,
                                                   "annots": [
-                                                    "%takeAsset"
+                                                    "%start"
                                                   ]
                                                },
                                                {  "prim": "pair",
                                                   "args": [
-                                                    {  "prim": "nat",
+                                                    {  "prim": "option",
+                                                       "args": [
+                                                         {  "prim": "timestamp"  }
+                                                       ]
+                                                       ,
                                                        "annots": [
-                                                         "%salt"
+                                                         "%end"
                                                        ]
                                                     },
                                                     {  "prim": "pair",
                                                        "args": [
-                                                         {  "prim": "option",
-                                                            "args": [
-                                                              {  "prim": "timestamp"  }
-                                                            ]
-                                                            ,
+                                                         {  "prim": "bytes",
                                                             "annots": [
-                                                              "%start"
+                                                              "%dataType"
                                                             ]
                                                          },
-                                                         {  "prim": "pair",
-                                                            "args": [
-                                                              {  "prim": "option",
-                                                                 "args": [
-                                                                   {  "prim": "timestamp"  }
-                                                                 ]
-                                                                 ,
-                                                                 "annots": [
-                                                                   "%end"
-                                                                 ]
-                                                              },
-                                                              {  "prim": "pair",
-                                                                 "args": [
-                                                                   {
-                                                                   "prim": "bytes",
-                                                                   "annots": [
-
-                                                                   "%dataType"
-                                                                   ]
-                                                                   },
-                                                                   {
-                                                                   "prim": "bytes",
-                                                                   "annots": [
-                                                                     "%data"
-                                                                   ]
-                                                                   }
-                                                                 ]
-                                                              }
+                                                         {  "prim": "bytes",
+                                                            "annots": [
+                                                              "%data"
                                                             ]
                                                          }
                                                        ]
@@ -341,17 +152,214 @@ export const matcher_code : any =
                                    ]
                                 }
                               ]
-                              ,
-                              "annots": [
-                                "%orderRight"
-                              ]
                            }
                          ]
+                      }
+                    ]
+                    ,
+                    "annots": [
+                      "%orderLeft"
+                    ]
+                 },
+                 {  "prim": "pair",
+                    "args": [
+                      {  "prim": "option",
+                         "args": [
+                           {  "prim": "key"  }
+                         ]
+                         ,
+                         "annots": [
+                           "%maker"
+                         ]
                       },
-                      {  "prim": "contract",
+                      {  "prim": "pair",
                          "args": [
                            {  "prim": "pair",
                               "args": [
+                                {  "prim": "pair",
+                                   "args": [
+                                     {  "prim": "int",
+                                        "annots": [
+                                          "%assetClass"
+                                        ]
+                                     },
+                                     {  "prim": "bytes",
+                                        "annots": [
+                                          "%assetData"
+                                        ]
+                                     }
+                                   ]
+                                   ,
+                                   "annots": [
+                                     "%assetType"
+                                   ]
+                                },
+                                {  "prim": "nat",
+                                   "annots": [
+                                     "%assetValue"
+                                   ]
+                                }
+                              ]
+                              ,
+                              "annots": [
+                                "%makeAsset"
+                              ]
+                           },
+                           {  "prim": "pair",
+                              "args": [
+                                {  "prim": "option",
+                                   "args": [
+                                     {  "prim": "key"  }
+                                   ]
+                                   ,
+                                   "annots": [
+                                     "%taker"
+                                   ]
+                                },
+                                {  "prim": "pair",
+                                   "args": [
+                                     {  "prim": "pair",
+                                        "args": [
+                                          {  "prim": "pair",
+                                             "args": [
+                                               {  "prim": "int",
+                                                  "annots": [
+                                                    "%assetClass"
+                                                  ]
+                                               },
+                                               {  "prim": "bytes",
+                                                  "annots": [
+                                                    "%assetData"
+                                                  ]
+                                               }
+                                             ]
+                                             ,
+                                             "annots": [
+                                               "%assetType"
+                                             ]
+                                          },
+                                          {  "prim": "nat",
+                                             "annots": [
+                                               "%assetValue"
+                                             ]
+                                          }
+                                        ]
+                                        ,
+                                        "annots": [
+                                          "%takeAsset"
+                                        ]
+                                     },
+                                     {  "prim": "pair",
+                                        "args": [
+                                          {  "prim": "nat",
+                                             "annots": [
+                                               "%salt"
+                                             ]
+                                          },
+                                          {  "prim": "pair",
+                                             "args": [
+                                               {  "prim": "option",
+                                                  "args": [
+                                                    {  "prim": "timestamp"  }
+                                                  ]
+                                                  ,
+                                                  "annots": [
+                                                    "%start"
+                                                  ]
+                                               },
+                                               {  "prim": "pair",
+                                                  "args": [
+                                                    {  "prim": "option",
+                                                       "args": [
+                                                         {  "prim": "timestamp"  }
+                                                       ]
+                                                       ,
+                                                       "annots": [
+                                                         "%end"
+                                                       ]
+                                                    },
+                                                    {  "prim": "pair",
+                                                       "args": [
+                                                         {  "prim": "bytes",
+                                                            "annots": [
+                                                              "%dataType"
+                                                            ]
+                                                         },
+                                                         {  "prim": "bytes",
+                                                            "annots": [
+                                                              "%data"
+                                                            ]
+                                                         }
+                                                       ]
+                                                    }
+                                                  ]
+                                               }
+                                             ]
+                                          }
+                                        ]
+                                     }
+                                   ]
+                                }
+                              ]
+                           }
+                         ]
+                      }
+                    ]
+                    ,
+                    "annots": [
+                      "%orderRight"
+                    ]
+                 }
+               ]
+            },
+            {  "prim": "contract",
+               "args": [
+                 {  "prim": "pair",
+                    "args": [
+                      {  "prim": "pair",
+                         "args": [
+                           {  "prim": "option",
+                              "args": [
+                                {  "prim": "key"  }
+                              ]
+                              ,
+                              "annots": [
+                                "%maker"
+                              ]
+                           },
+                           {  "prim": "pair",
+                              "args": [
+                                {  "prim": "pair",
+                                   "args": [
+                                     {  "prim": "pair",
+                                        "args": [
+                                          {  "prim": "int",
+                                             "annots": [
+                                               "%assetClass"
+                                             ]
+                                          },
+                                          {  "prim": "bytes",
+                                             "annots": [
+                                               "%assetData"
+                                             ]
+                                          }
+                                        ]
+                                        ,
+                                        "annots": [
+                                          "%assetType"
+                                        ]
+                                     },
+                                     {  "prim": "nat",
+                                        "annots": [
+                                          "%assetValue"
+                                        ]
+                                     }
+                                   ]
+                                   ,
+                                   "annots": [
+                                     "%makeAsset"
+                                   ]
+                                },
                                 {  "prim": "pair",
                                    "args": [
                                      {  "prim": "option",
@@ -360,7 +368,7 @@ export const matcher_code : any =
                                         ]
                                         ,
                                         "annots": [
-                                          "%maker"
+                                          "%taker"
                                         ]
                                      },
                                      {  "prim": "pair",
@@ -369,7 +377,7 @@ export const matcher_code : any =
                                              "args": [
                                                {  "prim": "pair",
                                                   "args": [
-                                                    {  "prim": "nat",
+                                                    {  "prim": "int",
                                                        "annots": [
                                                          "%assetClass"
                                                        ]
@@ -393,103 +401,48 @@ export const matcher_code : any =
                                              ]
                                              ,
                                              "annots": [
-                                               "%makeAsset"
+                                               "%takeAsset"
                                              ]
                                           },
                                           {  "prim": "pair",
                                              "args": [
-                                               {  "prim": "option",
-                                                  "args": [
-                                                    {  "prim": "key"  }
-                                                  ]
-                                                  ,
+                                               {  "prim": "nat",
                                                   "annots": [
-                                                    "%taker"
+                                                    "%salt"
                                                   ]
                                                },
                                                {  "prim": "pair",
                                                   "args": [
-                                                    {  "prim": "pair",
+                                                    {  "prim": "option",
                                                        "args": [
-                                                         {  "prim": "pair",
-                                                            "args": [
-                                                              {  "prim": "nat",
-                                                                 "annots": [
-                                                                   "%assetClass"
-                                                                 ]
-                                                              },
-                                                              {  "prim": "bytes",
-                                                                 "annots": [
-                                                                   "%assetData"
-                                                                 ]
-                                                              }
-                                                            ]
-                                                            ,
-                                                            "annots": [
-                                                              "%assetType"
-                                                            ]
-                                                         },
-                                                         {  "prim": "nat",
-                                                            "annots": [
-                                                              "%assetValue"
-                                                            ]
-                                                         }
+                                                         {  "prim": "timestamp"  }
                                                        ]
                                                        ,
                                                        "annots": [
-                                                         "%takeAsset"
+                                                         "%start"
                                                        ]
                                                     },
                                                     {  "prim": "pair",
                                                        "args": [
-                                                         {  "prim": "nat",
+                                                         {  "prim": "option",
+                                                            "args": [
+                                                              {  "prim": "timestamp"  }
+                                                            ]
+                                                            ,
                                                             "annots": [
-                                                              "%salt"
+                                                              "%end"
                                                             ]
                                                          },
                                                          {  "prim": "pair",
                                                             "args": [
-                                                              {  "prim": "option",
-                                                                 "args": [
-                                                                   {  "prim": "timestamp"  }
-                                                                 ]
-                                                                 ,
+                                                              {  "prim": "bytes",
                                                                  "annots": [
-                                                                   "%start"
+                                                                   "%dataType"
                                                                  ]
                                                               },
-                                                              {  "prim": "pair",
-                                                                 "args": [
-                                                                   {
-                                                                   "prim": "option",
-                                                                   "args": [
-
-                                                                   {  "prim": "timestamp"  }
-                                                                   ]
-                                                                   ,
-                                                                   "annots": [
-                                                                     "%end"
-                                                                   ]
-                                                                   },
-                                                                   {
-                                                                   "prim": "pair",
-                                                                   "args": [
-
-                                                                   {
-                                                                   "prim": "bytes",
-                                                                   "annots": [
-
-                                                                   "%dataType"
-                                                                   ]
-                                                                   },
-                                                                   {
-                                                                   "prim": "bytes",
-                                                                   "annots": [
-                                                                     "%data"
-                                                                   ]
-                                                                   }
-                                                                   ]
-                                                                   }
+                                                              {  "prim": "bytes",
+                                                                 "annots": [
+                                                                   "%data"
                                                                  ]
                                                               }
                                                             ]
@@ -503,13 +456,61 @@ export const matcher_code : any =
                                         ]
                                      }
                                    ]
+                                }
+                              ]
+                           }
+                         ]
+                         ,
+                         "annots": [
+                           "%orderL"
+                         ]
+                      },
+                      {  "prim": "pair",
+                         "args": [
+                           {  "prim": "pair",
+                              "args": [
+                                {  "prim": "option",
+                                   "args": [
+                                     {  "prim": "key"  }
+                                   ]
                                    ,
                                    "annots": [
-                                     "%orderL"
+                                     "%maker"
                                    ]
                                 },
                                 {  "prim": "pair",
                                    "args": [
+                                     {  "prim": "pair",
+                                        "args": [
+                                          {  "prim": "pair",
+                                             "args": [
+                                               {  "prim": "int",
+                                                  "annots": [
+                                                    "%assetClass"
+                                                  ]
+                                               },
+                                               {  "prim": "bytes",
+                                                  "annots": [
+                                                    "%assetData"
+                                                  ]
+                                               }
+                                             ]
+                                             ,
+                                             "annots": [
+                                               "%assetType"
+                                             ]
+                                          },
+                                          {  "prim": "nat",
+                                             "annots": [
+                                               "%assetValue"
+                                             ]
+                                          }
+                                        ]
+                                        ,
+                                        "annots": [
+                                          "%makeAsset"
+                                        ]
+                                     },
                                      {  "prim": "pair",
                                         "args": [
                                           {  "prim": "option",
@@ -518,7 +519,7 @@ export const matcher_code : any =
                                              ]
                                              ,
                                              "annots": [
-                                               "%maker"
+                                               "%taker"
                                              ]
                                           },
                                           {  "prim": "pair",
@@ -527,7 +528,7 @@ export const matcher_code : any =
                                                   "args": [
                                                     {  "prim": "pair",
                                                        "args": [
-                                                         {  "prim": "nat",
+                                                         {  "prim": "int",
                                                             "annots": [
                                                               "%assetClass"
                                                             ]
@@ -551,96 +552,40 @@ export const matcher_code : any =
                                                   ]
                                                   ,
                                                   "annots": [
-                                                    "%makeAsset"
+                                                    "%takeAsset"
                                                   ]
                                                },
                                                {  "prim": "pair",
                                                   "args": [
-                                                    {  "prim": "option",
-                                                       "args": [
-                                                         {  "prim": "key"  }
-                                                       ]
-                                                       ,
+                                                    {  "prim": "nat",
                                                        "annots": [
-                                                         "%taker"
+                                                         "%salt"
                                                        ]
                                                     },
                                                     {  "prim": "pair",
                                                        "args": [
-                                                         {  "prim": "pair",
+                                                         {  "prim": "option",
                                                             "args": [
-                                                              {  "prim": "pair",
-                                                                 "args": [
-                                                                   {
-                                                                   "prim": "nat",
-                                                                   "annots": [
-
-                                                                   "%assetClass"
-                                                                   ]
-                                                                   },
-                                                                   {
-                                                                   "prim": "bytes",
-                                                                   "annots": [
-
-                                                                   "%assetData"
-                                                                   ]
-                                                                   }
-                                                                 ]
-                                                                 ,
-                                                                 "annots": [
-                                                                   "%assetType"
-                                                                 ]
-                                                              },
-                                                              {  "prim": "nat",
-                                                                 "annots": [
-                                                                   "%assetValue"
-                                                                 ]
-                                                              }
+                                                              {  "prim": "timestamp"  }
                                                             ]
                                                             ,
                                                             "annots": [
-                                                              "%takeAsset"
+                                                              "%start"
                                                             ]
                                                          },
                                                          {  "prim": "pair",
                                                             "args": [
-                                                              {  "prim": "nat",
+                                                              {  "prim": "option",
+                                                                 "args": [
+                                                                   {  "prim": "timestamp"  }
+                                                                 ]
+                                                                 ,
                                                                  "annots": [
-                                                                   "%salt"
+                                                                   "%end"
                                                                  ]
                                                               },
                                                               {  "prim": "pair",
                                                                  "args": [
-                                                                   {
-                                                                   "prim": "option",
-                                                                   "args": [
-
-                                                                   {  "prim": "timestamp"  }
-                                                                   ]
-                                                                   ,
-                                                                   "annots": [
-                                                                     "%start"
-                                                                   ]
-                                                                   },
-                                                                   {
-                                                                   "prim": "pair",
-                                                                   "args": [
-
-                                                                   {
-                                                                   "prim": "option",
-                                                                   "args": [
-
-                                                                   {  "prim": "timestamp"  }
-                                                                   ]
-                                                                   ,
-                                                                   "annots": [
-                                                                     "%end"
-                                                                   ]
-                                                                   },
-                                                                   {
-                                                                   "prim": "pair",
-                                                                   "args": [
-
                                                                    {
                                                                    "prim": "bytes",
                                                                    "annots": [
@@ -654,10 +599,6 @@ export const matcher_code : any =
                                                                      "%data"
                                                                    ]
                                                                    }
-                                                                   ]
-                                                                   }
-                                                                   ]
-                                                                   }
                                                                  ]
                                                               }
                                                             ]
@@ -669,59 +610,59 @@ export const matcher_code : any =
                                              ]
                                           }
                                         ]
-                                        ,
-                                        "annots": [
-                                          "%orderR"
-                                        ]
-                                     },
+                                     }
+                                   ]
+                                }
+                              ]
+                              ,
+                              "annots": [
+                                "%orderR"
+                              ]
+                           },
+                           {  "prim": "pair",
+                              "args": [
+                                {  "prim": "option",
+                                   "args": [
                                      {  "prim": "pair",
                                         "args": [
-                                          {  "prim": "option",
-                                             "args": [
-                                               {  "prim": "pair",
-                                                  "args": [
-                                                    {  "prim": "nat",
-                                                       "annots": [
-                                                         "%assetClass"
-                                                       ]
-                                                    },
-                                                    {  "prim": "bytes",
-                                                       "annots": [
-                                                         "%assetData"
-                                                       ]
-                                                    }
-                                                  ]
-                                               }
-                                             ]
-                                             ,
+                                          {  "prim": "int",
                                              "annots": [
-                                               "%makeMatch"
+                                               "%assetClass"
                                              ]
                                           },
-                                          {  "prim": "option",
-                                             "args": [
-                                               {  "prim": "pair",
-                                                  "args": [
-                                                    {  "prim": "nat",
-                                                       "annots": [
-                                                         "%assetClass"
-                                                       ]
-                                                    },
-                                                    {  "prim": "bytes",
-                                                       "annots": [
-                                                         "%assetData"
-                                                       ]
-                                                    }
-                                                  ]
-                                               }
-                                             ]
-                                             ,
+                                          {  "prim": "bytes",
                                              "annots": [
-                                               "%takeMatch"
+                                               "%assetData"
                                              ]
                                           }
                                         ]
                                      }
+                                   ]
+                                   ,
+                                   "annots": [
+                                     "%makeMatch"
+                                   ]
+                                },
+                                {  "prim": "option",
+                                   "args": [
+                                     {  "prim": "pair",
+                                        "args": [
+                                          {  "prim": "int",
+                                             "annots": [
+                                               "%assetClass"
+                                             ]
+                                          },
+                                          {  "prim": "bytes",
+                                             "annots": [
+                                               "%assetData"
+                                             ]
+                                          }
+                                        ]
+                                     }
+                                   ]
+                                   ,
+                                   "annots": [
+                                     "%takeMatch"
                                    ]
                                 }
                               ]
@@ -729,32 +670,13 @@ export const matcher_code : any =
                          ]
                       }
                     ]
-                    ,
-                    "annots": [
-                      "%matchAssets"
-                    ]
-                 },
-                 {  "prim": "address",
-                    "annots": [
-                      "%transferOwnership"
-                    ]
-                 }
-               ]
-            },
-            {  "prim": "or",
-               "args": [
-                 {  "prim": "unit",
-                    "annots": [
-                      "%claimOwnership"
-                    ]
-                 },
-                 {  "prim": "address",
-                    "annots": [
-                      "%setValidator"
-                    ]
                  }
                ]
             }
+          ]
+          ,
+          "annots": [
+            "%matchAssets"
           ]
        }
      ]
@@ -772,483 +694,133 @@ export const matcher_code : any =
           ]
        },
        {  "prim": "UNPAIR"  },
+       {  "prim": "UNPAIR"  },
+       {  "prim": "UNPAIR"  },
+       {  "prim": "SWAP"  },
+       {  "prim": "DUP",
+          "args": [
+            {  "int": "2"  }
+          ]
+       },
+       {  "prim": "CDR"  },
+       {  "prim": "CAR"  },
+       {  "prim": "CAR"  },
+       {  "prim": "DUP",
+          "args": [
+            {  "int": "3"  }
+          ]
+       },
+       {  "prim": "CDR"  },
+       {  "prim": "CAR"  },
+       {  "prim": "CAR"  },
+       {  "prim": "DUP",
+          "args": [
+            {  "int": "3"  }
+          ]
+       },
+       {  "prim": "CDR"  },
+       {  "prim": "CDR"  },
+       {  "prim": "CDR"  },
+       {  "prim": "CAR"  },
+       {  "prim": "CAR"  },
+       {  "prim": "DUP",
+          "args": [
+            {  "int": "4"  }
+          ]
+       },
+       {  "prim": "CDR"  },
+       {  "prim": "CDR"  },
+       {  "prim": "CDR"  },
+       {  "prim": "CAR"  },
+       {  "prim": "CAR"  },
+       {  "prim": "DUP",
+          "args": [
+            {  "int": "9"  }
+          ]
+       },
+       {  "prim": "DUP",
+          "args": [
+            {  "int": "8"  }
+          ]
+       },
+       {  "prim": "AMOUNT"  },
+       {  "prim": "NONE",
+          "args": [
+            {  "prim": "pair",
+               "args": [
+                 {  "prim": "int"  },
+                 {  "prim": "bytes"  }
+               ]
+            }
+          ]
+       },
+       {  "prim": "NONE",
+          "args": [
+            {  "prim": "pair",
+               "args": [
+                 {  "prim": "int"  },
+                 {  "prim": "bytes"  }
+               ]
+            }
+          ]
+       },
+       {  "prim": "PAIR"  },
+       {  "prim": "DUP",
+          "args": [
+            {  "int": "9"  }
+          ]
+       },
+       {  "prim": "PAIR"  },
+       {  "prim": "DUP",
+          "args": [
+            {  "int": "10"  }
+          ]
+       },
+       {  "prim": "PAIR"  },
+       {  "prim": "TRANSFER_TOKENS"  },
+       {  "prim": "CONS"  },
        {  "prim": "DIP",
           "args": [
             {  "int": "1"  },
-            [  {  "prim": "UNPAIR"  },
-            {  "prim": "SWAP"  },
-            {  "prim": "UNPAIR"  },
-            {  "prim": "SWAP"  }  ]
-          ]
-       },
-       {  "prim": "IF_LEFT",
-          "args": [
-            [  {  "prim": "IF_LEFT",
+            [  {  "prim": "DIG",
                   "args": [
-                    [  {  "prim": "UNPAIR"  },
-                    {  "prim": "UNPAIR"  },
-                    {  "prim": "SWAP"  },
-                    {  "prim": "DIG",
-                       "args": [
-                         {  "int": "4"  }
-                       ]
-                    },
-                    {  "prim": "DUP"  },
-                    {  "prim": "DUG",
-                       "args": [
-                         {  "int": "5"  }
-                       ]
-                    },
-                    {  "prim": "SENDER"  },
-                    {  "prim": "COMPARE"  },
-                    {  "prim": "EQ"  },
-                    {  "prim": "NOT"  },
-                    {  "prim": "IF",
-                       "args": [
-                         [  {  "prim": "PUSH",
-                               "args": [
-                                 {  "prim": "string"  },
-                                 {  "string": "caller must be validator"  }
-                               ]
-                         },
-                         {  "prim": "FAILWITH"  }  ],
-                         [    ]
-                       ]
-                    },
-                    {  "prim": "DIG",
-                       "args": [
-                         {  "int": "1"  }
-                       ]
-                    },
-                    {  "prim": "DUP"  },
-                    {  "prim": "DUG",
-                       "args": [
-                         {  "int": "2"  }
-                       ]
-                    },
-                    {  "prim": "CAR",
-                       "args": [
-                         {  "int": "1"  }
-                       ]
-                    },
-                    {  "prim": "CAR",
-                       "args": [
-                         {  "int": "0"  }
-                       ]
-                    },
-                    {  "prim": "DIG",
-                       "args": [
-                         {  "int": "2"  }
-                       ]
-                    },
-                    {  "prim": "DUP"  },
-                    {  "prim": "DUG",
-                       "args": [
-                         {  "int": "3"  }
-                       ]
-                    },
-                    {  "prim": "CAR",
-                       "args": [
-                         {  "int": "1"  }
-                       ]
-                    },
-                    {  "prim": "CAR",
-                       "args": [
-                         {  "int": "0"  }
-                       ]
-                    },
-                    {  "prim": "DIG",
-                       "args": [
-                         {  "int": "2"  }
-                       ]
-                    },
-                    {  "prim": "DUP"  },
-                    {  "prim": "DUG",
-                       "args": [
-                         {  "int": "3"  }
-                       ]
-                    },
-                    {  "prim": "CAR",
-                       "args": [
-                         {  "int": "3"  }
-                       ]
-                    },
-                    {  "prim": "CAR",
-                       "args": [
-                         {  "int": "0"  }
-                       ]
-                    },
-                    {  "prim": "DIG",
-                       "args": [
-                         {  "int": "3"  }
-                       ]
-                    },
-                    {  "prim": "DUP"  },
-                    {  "prim": "DUG",
-                       "args": [
-                         {  "int": "4"  }
-                       ]
-                    },
-                    {  "prim": "CAR",
-                       "args": [
-                         {  "int": "3"  }
-                       ]
-                    },
-                    {  "prim": "CAR",
-                       "args": [
-                         {  "int": "0"  }
-                       ]
-                    },
-                    {  "prim": "DIG",
-                       "args": [
-                         {  "int": "10"  }
-                       ]
-                    },
-                    {  "prim": "DUP"  },
-                    {  "prim": "DUG",
-                       "args": [
-                         {  "int": "11"  }
-                       ]
-                    },
-                    {  "prim": "DIG",
-                       "args": [
-                         {  "int": "7"  }
-                       ]
-                    },
-                    {  "prim": "DUP"  },
-                    {  "prim": "DUG",
-                       "args": [
-                         {  "int": "8"  }
-                       ]
-                    },
-                    {  "prim": "AMOUNT"  },
-                    {  "prim": "NONE",
-                       "args": [
-                         {  "prim": "pair",
-                            "args": [
-                              {  "prim": "nat"  },
-                              {  "prim": "bytes"  }
-                            ]
-                         }
-                       ]
-                    },
-                    {  "prim": "NONE",
-                       "args": [
-                         {  "prim": "pair",
-                            "args": [
-                              {  "prim": "nat"  },
-                              {  "prim": "bytes"  }
-                            ]
-                         }
-                       ]
-                    },
-                    {  "prim": "PAIR"  },
-                    {  "prim": "DIG",
-                       "args": [
-                         {  "int": "8"  }
-                       ]
-                    },
-                    {  "prim": "DUP"  },
-                    {  "prim": "DUG",
-                       "args": [
-                         {  "int": "9"  }
-                       ]
-                    },
-                    {  "prim": "PAIR"  },
-                    {  "prim": "DIG",
-                       "args": [
-                         {  "int": "9"  }
-                       ]
-                    },
-                    {  "prim": "DUP"  },
-                    {  "prim": "DUG",
-                       "args": [
-                         {  "int": "10"  }
-                       ]
-                    },
-                    {  "prim": "PAIR"  },
-                    {  "prim": "TRANSFER_TOKENS"  },
-                    {  "prim": "CONS"  },
-                    {  "prim": "DIP",
-                       "args": [
-                         {  "int": "1"  },
-                         [  {  "prim": "DIG",
-                               "args": [
-                                 {  "int": "10"  }
-                               ]
-                         },
-                         {  "prim": "DROP",
-                            "args": [
-                              {  "int": "1"  }
-                            ]
-                         }  ]
-                       ]
-                    },
-                    {  "prim": "DUG",
-                       "args": [
-                         {  "int": "10"  }
-                       ]
-                    },
-                    {  "prim": "DROP",
-                       "args": [
-                         {  "int": "7"  }
-                       ]
-                    },
-                    {  "prim": "SWAP"  },
-                    {  "prim": "PAIR"  },
-                    {  "prim": "SWAP"  },
-                    {  "prim": "PAIR"  },
-                    {  "prim": "DIG",
-                       "args": [
-                         {  "int": "1"  }
-                       ]
-                    },
-                    {  "prim": "PAIR"  }  ],
-                    [  {  "prim": "DIG",
-                          "args": [
-                            {  "int": "3"  }
-                          ]
-                    },
-                    {  "prim": "DUP"  },
-                    {  "prim": "DUG",
-                       "args": [
-                         {  "int": "4"  }
-                       ]
-                    },
-                    {  "prim": "SENDER"  },
-                    {  "prim": "COMPARE"  },
-                    {  "prim": "EQ"  },
-                    {  "prim": "NOT"  },
-                    {  "prim": "IF",
-                       "args": [
-                         [  {  "prim": "PUSH",
-                               "args": [
-                                 {  "prim": "string"  },
-                                 {  "string": "InvalidCaller"  }
-                               ]
-                         },
-                         {  "prim": "FAILWITH"  }  ],
-                         [    ]
-                       ]
-                    },
-                    {  "prim": "DUP"  },
-                    {  "prim": "SOME"  },
-                    {  "prim": "DIP",
-                       "args": [
-                         {  "int": "1"  },
-                         [  {  "prim": "DIG",
-                               "args": [
-                                 {  "int": "1"  }
-                               ]
-                         },
-                         {  "prim": "DROP",
-                            "args": [
-                              {  "int": "1"  }
-                            ]
-                         }  ]
-                       ]
-                    },
-                    {  "prim": "DUG",
-                       "args": [
-                         {  "int": "1"  }
-                       ]
-                    },
-                    {  "prim": "DROP",
-                       "args": [
-                         {  "int": "1"  }
-                       ]
-                    },
-                    {  "prim": "SWAP"  },
-                    {  "prim": "PAIR"  },
-                    {  "prim": "SWAP"  },
-                    {  "prim": "PAIR"  },
-                    {  "prim": "DIG",
-                       "args": [
-                         {  "int": "1"  }
-                       ]
-                    },
-                    {  "prim": "PAIR"  }  ]
+                    {  "int": "8"  }
                   ]
-            }  ],
-            [  {  "prim": "IF_LEFT",
-                  "args": [
-                    [  {  "prim": "DROP",
-                          "args": [
-                            {  "int": "1"  }
-                          ]
-                    },
-                    {  "prim": "DUP"  },
-                    {  "prim": "IF_NONE",
-                       "args": [
-                         [  {  "prim": "PUSH",
-                               "args": [
-                                 {  "prim": "string"  },
-                                 {  "string": "NotFound"  }
-                               ]
-                         },
-                         {  "prim": "FAILWITH"  }  ],
-                         [    ]
-                       ]
-                    },
-                    {  "prim": "SENDER"  },
-                    {  "prim": "COMPARE"  },
-                    {  "prim": "EQ"  },
-                    {  "prim": "NOT"  },
-                    {  "prim": "IF",
-                       "args": [
-                         [  {  "prim": "PUSH",
-                               "args": [
-                                 {  "prim": "string"  },
-                                 {  "string": "InvalidCaller"  }
-                               ]
-                         },
-                         {  "prim": "FAILWITH"  }  ],
-                         [    ]
-                       ]
-                    },
-                    {  "prim": "DUP"  },
-                    {  "prim": "IF_NONE",
-                       "args": [
-                         [  {  "prim": "PUSH",
-                               "args": [
-                                 {  "prim": "string"  },
-                                 {  "string": "NotFound"  }
-                               ]
-                         },
-                         {  "prim": "FAILWITH"  }  ],
-                         [    ]
-                       ]
-                    },
-                    {  "prim": "DIP",
-                       "args": [
-                         {  "int": "1"  },
-                         [  {  "prim": "DIG",
-                               "args": [
-                                 {  "int": "2"  }
-                               ]
-                         },
-                         {  "prim": "DROP",
-                            "args": [
-                              {  "int": "1"  }
-                            ]
-                         }  ]
-                       ]
-                    },
-                    {  "prim": "DUG",
-                       "args": [
-                         {  "int": "2"  }
-                       ]
-                    },
-                    {  "prim": "NONE",
-                       "args": [
-                         {  "prim": "address"  }
-                       ]
-                    },
-                    {  "prim": "SWAP"  },
-                    {  "prim": "DROP",
-                       "args": [
-                         {  "int": "1"  }
-                       ]
-                    },
-                    {  "prim": "SWAP"  },
-                    {  "prim": "PAIR"  },
-                    {  "prim": "SWAP"  },
-                    {  "prim": "PAIR"  },
-                    {  "prim": "DIG",
-                       "args": [
-                         {  "int": "1"  }
-                       ]
-                    },
-                    {  "prim": "PAIR"  }  ],
-                    [  {  "prim": "DIG",
-                          "args": [
-                            {  "int": "3"  }
-                          ]
-                    },
-                    {  "prim": "DUP"  },
-                    {  "prim": "DUG",
-                       "args": [
-                         {  "int": "4"  }
-                       ]
-                    },
-                    {  "prim": "SENDER"  },
-                    {  "prim": "COMPARE"  },
-                    {  "prim": "EQ"  },
-                    {  "prim": "NOT"  },
-                    {  "prim": "IF",
-                       "args": [
-                         [  {  "prim": "PUSH",
-                               "args": [
-                                 {  "prim": "string"  },
-                                 {  "string": "InvalidCaller"  }
-                               ]
-                         },
-                         {  "prim": "FAILWITH"  }  ],
-                         [    ]
-                       ]
-                    },
-                    {  "prim": "DUP"  },
-                    {  "prim": "DIP",
-                       "args": [
-                         {  "int": "1"  },
-                         [  {  "prim": "DIG",
-                               "args": [
-                                 {  "int": "2"  }
-                               ]
-                         },
-                         {  "prim": "DROP",
-                            "args": [
-                              {  "int": "1"  }
-                            ]
-                         }  ]
-                       ]
-                    },
-                    {  "prim": "DUG",
-                       "args": [
-                         {  "int": "2"  }
-                       ]
-                    },
-                    {  "prim": "DROP",
-                       "args": [
-                         {  "int": "1"  }
-                       ]
-                    },
-                    {  "prim": "SWAP"  },
-                    {  "prim": "PAIR"  },
-                    {  "prim": "SWAP"  },
-                    {  "prim": "PAIR"  },
-                    {  "prim": "DIG",
-                       "args": [
-                         {  "int": "1"  }
-                       ]
-                    },
-                    {  "prim": "PAIR"  }  ]
-                  ]
+            },
+            {  "prim": "DROP",
+               "args": [
+                 {  "int": "1"  }
+               ]
             }  ]
           ]
-       }  ]
+       },
+       {  "prim": "DUG",
+          "args": [
+            {  "int": "8"  }
+          ]
+       },
+       {  "prim": "DROP",
+          "args": [
+            {  "int": "7"  }
+          ]
+       },
+       {  "prim": "DIG",
+          "args": [
+            {  "int": "1"  }
+          ]
+       },
+       {  "prim": "PAIR"  }  ]
      ]
   }  ]
 
-export function matcher_storage(owner: string, validator: string) : any {
-  return {  "prim": "Pair",
-            "args": [
-              {  "string": owner  },
-              {  "prim": "Pair",
-                 "args": [
-                   {  "string": validator  },
-                   {  "prim": "None"  }
-                 ]
-              }
-            ]
-         }
+
+export function matcher_storage() : any {
+  return {  "prim": "Unit"  }
 }
 
 export async function deploy_matcher(
   provider : Provider,
-  owner: string,
-  validator: string,
 ) : Promise<OperationResult> {
-  const init = matcher_storage(owner, validator)
+  const init = matcher_storage()
   return provider.tezos.originate({init, code: matcher_code})
 }

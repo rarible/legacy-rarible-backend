@@ -10,10 +10,18 @@ let deploy_collection ?endpoint c =
     endpoint in
   Script.command_result ~f:(fun l -> List.hd @@ List.rev l) cmd
 
-let deploy_royalties ?endpoint source =
+let deploy_royalties ?endpoint ~source ~admin () =
   let endpoint = match endpoint with None -> [] | Some e -> ["--endpoint"; e] in
   let cmd = Filename.quote_command !node @@
-    [ !script; "deploy_royalties"; "--owner"; source.tz1;
+    [ !script; "deploy_royalties"; "--owner"; admin.tz1;
+      "--edsk"; source.edsk ] @
+    endpoint in
+  Script.command_result ~f:(fun l -> List.hd @@ List.rev l) cmd
+
+let deploy_fill ?endpoint source =
+  let endpoint = match endpoint with None -> [] | Some e -> ["--endpoint"; e] in
+  let cmd = Filename.quote_command !node @@
+    [ !script; "deploy_fill"; "--owner"; source.tz1;
       "--edsk"; source.edsk ] @
     endpoint in
   Script.command_result ~f:(fun l -> List.hd @@ List.rev l) cmd
@@ -82,11 +90,11 @@ let set_metadata ?endpoint c =
     Lwt.return_unit
   with _ -> Lwt.fail_with "set metadata uri failure"
 
-let deploy_validator ?endpoint ~exchange ~royalties source =
+let deploy_validator ?endpoint ~exchange ~royalties ~admin ~source ~fill () =
   let endpoint = match endpoint with None -> [] | Some e -> ["--endpoint"; e] in
   let cmd = Filename.quote_command !node @@
-    [ !script; "deploy_validator"; "--exchange"; exchange;
-      "--edsk"; source.edsk; "--royalties_contract"; royalties ] @
+    [ !script; "deploy_validator"; "--exchange"; exchange; "--owner"; admin.tz1;
+      "--edsk"; source.edsk; "--royalties_contract"; royalties; "--fill"; fill ] @
     endpoint in
   Script.command_result ~f:(fun l -> List.hd @@ List.rev l) cmd
 
