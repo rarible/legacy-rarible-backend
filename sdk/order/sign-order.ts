@@ -19,9 +19,12 @@ export const XTZ : MichelsonData = { prim: 'Left', args: [ { prim: 'Unit' } ] }
 export const FA_1_2 : MichelsonData = {
   prim: 'Right', args: [ { prim: 'Left', args: [ { prim: 'Unit' } ] } ] }
 
+export const FT_FA_2 : MichelsonData = {
+  prim: 'Right', args: [
+    { prim: 'Right', args: [ { prim: 'Left', args: [ { int: '0' } ] } ] } ] }
 export const FA_2 : MichelsonData = {
   prim: 'Right', args: [
-    { prim: 'Right', args: [ { prim: 'Left', args: [ { prim: 'Unit' } ] } ] } ] }
+    { prim: 'Right', args: [ { prim: 'Left', args: [ { int: '1' } ] } ] } ] }
 
 export function some_struct(v : MichelsonData ) : MichelsonData {
   return {
@@ -37,7 +40,7 @@ export const fa_2_type : MichelsonType =
   {prim:'pair',args:[{prim:'address'},{prim:'nat'}]}
 export const asset_class_type : MichelsonType =
   {prim:'or', args:[{prim:'unit'},{prim:'or',args:[{prim:'unit'}, {prim:'or',args:[
-    {prim:'unit'}, {prim:'or',args:[{prim:'unit'}, {prim:'bytes'}]}]}]}]}
+    {prim:'nat'}, {prim:'or',args:[{prim:'unit'}, {prim:'bytes'}]}]}]}]}
 export const asset_type_type : MichelsonType =
   {prim:'pair',args:[ asset_class_type, {prim: 'bytes'}]}
 export const asset_type : MichelsonType =
@@ -69,8 +72,14 @@ export function asset_type_to_struct(p: Provider, a : AssetType) : MichelsonData
     case "XTZ":
       return { prim: 'Pair', args: [ XTZ,  { bytes: "00" } ] }
     case "FT":
-      return { prim: 'Pair', args: [ FA_1_2,  {
-        bytes: pack({ string: a.contract }, fa_1_2_type) } ] }
+      if (a.token_id==undefined) {
+        return { prim: 'Pair', args: [ FA_1_2,  {
+          bytes: pack({ string: a.contract }, fa_1_2_type) } ] }
+      } else {
+        return { prim: 'Pair', args: [ FT_FA_2,  {
+          bytes: pack({ prim: "Pair", args: [
+            { string: a.contract }, { int: a.token_id.toString() } ] }, fa_2_type) } ] }
+      }
     case "NFT":
       return { prim: 'Pair', args: [ FA_2,  {
         bytes: pack({ prim: "Pair", args: [

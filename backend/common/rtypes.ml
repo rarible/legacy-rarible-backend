@@ -334,7 +334,7 @@ type asset_type_gen = {
 
 type asset_type =
   | ATXTZ [@kind_label "assetClass"] [@kind "XTZ"] [@title "XTZAssetType"] [@def_title]
-  | ATFT of (A.address [@wrap "contract"]) [@kind_label "assetClass"] [@kind "FT"] [@title "FTAssetType"] [@def_title]
+  | ATFT of {contract: A.address; token_id: A.big_integer option} [@kind_label "assetClass"] [@kind "FT"] [@title "FTAssetType"] [@def_title]
   | ATNFT of asset_type_gen [@kind_label "assetClass"] [@kind "NFT"] [@title "NFTAssetType"] [@def_title]
   | ATMT of asset_type_gen [@kind_label "assetClass"] [@kind "MT"] [@title "MTAssetType"] [@def_title]
 [@@deriving encoding {title="AssetType"; def_title}]
@@ -935,8 +935,9 @@ type ft_ledger_kind =
 
 type ft_ledger = {
   ft_kind: ft_ledger_kind;
-  ft_id: z;
+  ft_ledger_id: z;
   ft_crawled: bool; [@dft false]
+  ft_token_id: z option;
 } [@@deriving encoding]
 
 type config = {
@@ -945,7 +946,7 @@ type config = {
   validator: string; [@dft ""]
   royalties: string; [@dft ""]
   mutable ft_contracts: ft_ledger SMap.t; [@map] [@dft SMap.empty]
-  mutable contracts: nft_ledger option SMap.t; [@map] [@dft SMap.empty]
+  mutable contracts: nft_ledger SMap.t; [@map] [@dft SMap.empty]
 } [@@deriving encoding]
 
 type kafka_config = {

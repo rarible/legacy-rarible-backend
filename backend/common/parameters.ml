@@ -209,15 +209,19 @@ let parse_asset_type (mclass : micheline_value) (mdata : micheline_value) = matc
   | `right (`left `unit), `bytes h ->
     begin match
         Tzfunc.Read.unpack (Forge.prim `address) (Tzfunc.Crypto.hex_to_raw h) with
-    | Ok (Mstring a) -> Ok (ATFT a)
+    | Ok (Mstring contract) -> Ok (ATFT {contract; token_id=None})
     | _ -> unexpected_michelson
     end
-  | `right (`right (`left `unit)), `bytes h ->
+  | `right (`right (`left (`int z))), `bytes h ->
     begin match
         Tzfunc.Read.unpack (Forge.prim `pair ~args:[ Forge.prim `address; Forge.prim `nat ])
           (Tzfunc.Crypto.hex_to_raw h) with
     | Ok (Mprim { prim = `Pair; args = [ Mstring asset_contract; Mint asset_token_id ]; _}) ->
-      Ok (ATNFT {asset_contract; asset_token_id}) (* todo separate nft and mt *)
+      if z = Z.zero then
+        Ok (ATFT {contract=asset_contract; token_id = Some asset_token_id})
+      else if z = Z.one then
+        Ok (ATNFT {asset_contract; asset_token_id})
+      else unexpected_michelson
     | _ -> unexpected_michelson
     end
   | _ -> unexpected_michelson
@@ -245,7 +249,8 @@ let parse_do_transfers m =
   match Typed_mich.(parse_value do_transfers_type m) with
   | Ok (`tuple [
       _make_asset_type; _take_asset_type;
-      `nat fill_make_value; `nat fill_take_value;
+      _order_data_left; _order_data_right;
+      `tuple [ `nat fill_make_value; `nat fill_take_value ];
       `tuple [
         left_maker;
         `tuple [ `tuple [ left_m_asset_class; left_m_asset_data ]; `nat left_m_asset_value ];

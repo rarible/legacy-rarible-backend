@@ -75,15 +75,21 @@ let storage_ubi admin =
   Format.sprintf "Pair %S (Some %S) None False {} {} {} {} {}" admin admin
 
 let storage_royalties ~admin =
-  Format.sprintf "{ %S; None; None; {}; {} }" admin
+  Format.sprintf "{ %S; None; {}; {} }" admin
 
 let storage_exchange ~admin ~receiver ~fee =
-  Format.sprintf {|(Pair %S (Pair %S (Pair %s (Pair None (Pair {} (Pair None {Elt "" 0x}))))))|}
+  Format.sprintf {|{ %S; %S; %s; None; {}; None; {Elt "" 0x}}|}
     admin receiver (Z.to_string fee)
 
-let storage_validator ~exchange ~royalties =
-  Format.sprintf {|(Pair %S (Pair %S (Pair {} (Pair {} (Pair {} {Elt "" 0x})))))|}
-    exchange royalties
+let storage_validator ~admin ~exchange ~royalties ~fill =
+  Format.sprintf {|{ %S; %S; %S; %S; {}; {}; {Elt "" 0x}}|}
+    admin exchange royalties fill
+
+let storage_fill ?validator admin =
+  let validator = match validator with None -> "None" | Some v -> Format.sprintf "Some %S" v in
+  Format.sprintf {|{ %S; %s; {}}|} admin validator
+
+let storage_matcher = "Unit"
 
 let compile_contract filename =
   Filename.quote_command "completium-cli" [ "generate"; "michelson"; filename ]
@@ -431,9 +437,15 @@ let main () =
     | [ "deploy_exchange"; admin; receiver; fee ] ->
       deploy ~filename:"contracts/arl/exchangeV2.arl"
         (storage_exchange ~admin ~receiver ~fee:(Z.of_string fee))
-    | [ "deploy_validator"; exchange; royalties ] ->
+    | [ "deploy_validator"; admin; exchange; royalties; fill ] ->
       deploy ~filename:"contracts/arl/validator.arl"
-        (storage_validator ~exchange ~royalties)
+        (storage_validator ~admin ~exchange ~royalties ~fill)
+    | "deploy_fill" :: admin :: l ->
+      let validator = match l with [ v ] -> Some v | _ -> None in
+      deploy ~filename:"contracts/arl/fill.arl"
+        (storage_fill ?validator admin)
+    | [ "deploy_matcher" ] ->
+      deploy ~filename:"contracts/arl/matcher.arl" storage_matcher
     | [ "storage" ] -> get_storage ()
     | [ "value"; bm_id; key; typ ] -> Some (get_bigmap_value bm_id key typ)
     | [ "call"; entrypoint; s ] -> call ~entrypoint s

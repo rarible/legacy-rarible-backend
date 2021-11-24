@@ -1,4 +1,8 @@
-archetype validator(exchangeV2 : address, royaltiesContract : address)
+archetype validator(
+  owner             : address,
+  exchangeV2        : address,
+  royaltiesContract : address,
+  fill              : address)
 with metadata ""
 
 entry setRoyaltiesContract(iroyalties_contract : address) {
@@ -8,11 +12,16 @@ entry setRoyaltiesContract(iroyalties_contract : address) {
   }
 }
 
+enum fa2_class =
+| Fungible
+| NonFungible
+| Unknown
+
 enum asset_class =
 | XTZ
 | FA_1_2
-| FA_2
-| FA_2_LAZY
+| FA_2<fa2_class>
+| FA_2_LAZY<fa2_class>
 | OTHER<bytes>
 
 record asset_type {
@@ -52,17 +61,31 @@ record part {
   partValue   : nat;
 }
 
+constant V1 : bytes = keccak(pack("V1"))
+constant V2 : bytes = keccak(pack("V2"))
+
 record DataV1 {
-  payouts : list<part>;
-  originFees : list<part>;
+  v1_payouts : list<part>;
+  v1_originFees : list<part>;
 }
 
-variable fill : big_map<bytes, nat> = []
+record DataV2 {
+  v2_payouts : list<part>;
+  v2_originFees : list<part>;
+  v2_isMakeFill : bool
+}
 
 entry setMetadataUri(idata : bytes) {
   called by exchangeV2
   effect {
     metadata := put(metadata, "", idata)
+  }
+}
+
+entry setFill(f : address) {
+  called by owner
+  effect {
+    fill := f
   }
 }
 
@@ -73,7 +96,7 @@ entry cancel(iorder : order) {
     r1: iorder.salt <> 0 otherwise "0 salt can't be used";
   }
   effect {
-    fill.remove(hashKeyOrder(iorder));
+    transfer 0tz to fill call remove<bytes>(hashKeyOrder(iorder))
   }
 }
 
@@ -96,7 +119,15 @@ entry setAssetMatcher(k : asset_class, v : address) {
 
 // who fills asset collection `fill` ?
 function hashKeyOrder(iorder : order) : bytes {
-  return keccak(concat([
+  if (iorder.dataType = V2) then
+    return keccak(concat([
+      pack(iorder.maker);
+      keccak(pack(iorder.makeAsset.assetType));
+      keccak(pack(iorder.takeAsset.assetType));
+      pack(iorder.salt);
+      pack(iorder.data)])
+    )
+  else return keccak(concat([
     pack(iorder.maker);
     keccak(pack(iorder.makeAsset.assetType));
     keccak(pack(iorder.takeAsset.assetType));
@@ -117,13 +148,22 @@ function safeGetPartialAmountFloor(
   end
 }
 
-function calculateRemaining(iorder : order, ifill : nat) : (nat * nat) {
-  if (iorder.takeAsset.assetValue < ifill) then (
-    fail(("calculateRemaining", iorder.takeAsset.assetValue, ifill))
-  );
-  var takeValue = sub_nat(iorder.takeAsset.assetValue, ifill);
-  var makeValue = safeGetPartialAmountFloor(iorder.makeAsset.assetValue, iorder.takeAsset.assetValue, takeValue);
-  return ((makeValue, takeValue))
+function calculateRemaining(iorder : order, ifill : nat, isMakeFill : bool) : (nat * nat) {
+  if not isMakeFill then begin
+    if (iorder.takeAsset.assetValue < ifill) then (
+      fail(("calculateRemaining", iorder.takeAsset.assetValue, ifill))
+    );
+    var takeValue = sub_nat(iorder.takeAsset.assetValue, ifill);
+    var makeValue = safeGetPartialAmountFloor(iorder.makeAsset.assetValue, iorder.takeAsset.assetValue, takeValue);
+    return ((makeValue, takeValue))
+  end else begin
+    if (iorder.makeAsset.assetValue < ifill) then (
+      fail(("calculateRemaining", iorder.makeAsset.assetValue, ifill))
+    );
+    var makeValue = sub_nat(iorder.makeAsset.assetValue, ifill);
+    var takeValue = safeGetPartialAmountFloor(iorder.takeAsset.assetValue, iorder.makeAsset.assetValue, makeValue);
+    return ((makeValue, takeValue))
+  end
 }
 
 function fillLeft(leftMakeValue : nat, leftTakeValue : nat, rightMakeValue : nat, rightTakeValue : nat) : fill_result {
@@ -138,9 +178,9 @@ function fillRight(leftMakeValue : nat, leftTakeValue : nat, rightMakeValue : na
   return ({rightTakeValue; makerValue})
 }
 
-function fillOrder(leftOrder : order, rightOrder : order, leftOrderFill : nat, rightOrderFill : nat) : fill_result {
-  var leftPair  = calculateRemaining(leftOrder, leftOrderFill);
-  var rightPair = calculateRemaining(rightOrder, rightOrderFill);
+function fillOrder(leftOrder : order, rightOrder : order, leftOrderFill : nat, rightOrderFill : nat, leftIsMakeFill : bool, rightIsMakeFill : bool) : fill_result {
+  var leftPair  = calculateRemaining(leftOrder, leftOrderFill, leftIsMakeFill);
+  var rightPair = calculateRemaining(rightOrder, rightOrderFill, rightIsMakeFill);
 
   var leftMakeValue  = leftPair[0];
   var leftTakeValue  = leftPair[1];
@@ -155,8 +195,12 @@ function fillOrder(leftOrder : order, rightOrder : order, leftOrderFill : nat, r
 
 function getOrderFill(iorder : order, ihash : bytes) : nat {
   var res : nat = 0;
-  if (iorder.salt <> 0 and fill.contains(ihash))
-  then res := fill[ihash];
+  var fillcontains = match callview<bool>(fill, "contains", ihash) with | some(v) -> v | none -> false end;
+  if (iorder.salt <> 0 and fillcontains)
+  then match callview<nat>(fill, "get", ihash) with
+    | some(v) -> res := v
+    | none -> fail("invalid")
+  end;
   return res
 }
 
@@ -169,9 +213,9 @@ function getFeeSide(imake : asset_class, itake : asset_class) : fee_side {
   then return MAKE
   else if itake = FA_1_2
   then return TAKE
-  else if imake = FA_2
+  else if imake = FA_2(Fungible)
   then return MAKE
-  else if itake = FA_2
+  else if itake = FA_2(Fungible)
   then return TAKE
   else return NONE
 }
@@ -185,27 +229,26 @@ record MintFA2Data {
   mfd_signatures : list<bytes>;
 }
 
-function getRoyaltiesByAssetType(matchNft : asset_type, idata : bytes, s : address) : or<list<part>, operation> {
+function getRoyaltiesByAssetType(matchNft : asset_type, idata : bytes, s : address) : list<part> {
   var empty_royalties : list<part> = [];
-  var res = left<list<part>, operation>(empty_royalties);
+  var res = empty_royalties;
 
   match matchNft.assetClass with
-  | FA_2_LAZY -> begin
+  | FA_2_LAZY(fa2t) -> begin
     match unpack<address * MintFA2Data>(matchNft.assetData) with
-    | some (v) -> res := left<list<part>, operation>(v[1].mfd_royalties)
+    | some (v) -> res := v[1].mfd_royalties
     | none -> fail (("cannot unpack FA_2_LAZY", matchNft.assetData))
     end
   end
-  | FA_2 -> begin
+  | FA_2(fa2t) -> begin
     match unpack<address * nat>(matchNft.assetData) with
-    | some (v) -> begin
+    | some (v) ->
       var token : address = v[0];
       var tokenId : nat   = v[1];
-      var callback = require_entrypoint<list<part> * bytes>("%processRoyalities", s, "processRoyalities not found");
-      var e = require_entrypoint<(address * nat * bytes) * contract<list<part> * bytes>>("%getRoyalties", royaltiesContract, "%getRoyalties not found");
-      var op : operation = mkoperation(transferred, e, ((token, tokenId, idata), callback));
-      res := right<list<part>, operation>(op)
-    end
+      match callview<list<part>>(royaltiesContract, "getRoyalties", (token,tokenId)) with
+      | some(roy) -> res := roy
+      | none -> fail("cannot get royalies from contract")
+      end
     | none -> fail (("cannot unpack FA_2", matchNft.assetData))
     end
   end
@@ -215,62 +258,113 @@ function getRoyaltiesByAssetType(matchNft : asset_type, idata : bytes, s : addre
   return res
 }
 
+function getFillSetNew(
+  orderLeft         : order,
+  orderRight        : order,
+  leftOrderKeyHash  : bytes,
+  rightOrderKeyHash : bytes,
+  leftOrderData     : DataV2,
+  rightOrderData    : DataV2) : (fill_result * option<nat> * option<nat>) {
+  var leftOrderFill = getOrderFill(orderLeft, leftOrderKeyHash);
+  var rightOrderFill = getOrderFill(orderRight, rightOrderKeyHash);
+  var newFill = fillOrder(orderLeft, orderRight, leftOrderFill, rightOrderFill, leftOrderData.v2_isMakeFill, rightOrderData.v2_isMakeFill);
+  dorequire(newFill.fr_takeValue > 0, "nothing to fill");
+  //require(newFill.rightValue > 0 && newFill.leftValue > 0, "nothing to fill");
+  var leftOrderNewFill : option<nat> = none;
+  if (orderLeft.salt <> 0) then
+    if leftOrderData.v2_isMakeFill then
+      leftOrderNewFill := some((leftOrderFill + newFill.fr_makeValue))
+    else
+      leftOrderNewFill := some((leftOrderFill + newFill.fr_takeValue));
+
+  var rightOrderNewFill : option<nat> = none;
+  if (orderRight.salt <> 0) then
+    if rightOrderData.v2_isMakeFill then
+      rightOrderNewFill := some((rightOrderFill + newFill.fr_takeValue))
+    else
+      rightOrderNewFill := some((rightOrderFill + newFill.fr_makeValue));
+
+  return ((newFill, leftOrderNewFill, rightOrderNewFill))
+}
+
+function payoutSet(orderAddress : address, dataOrderOnePayoutIn : DataV2) : DataV2 {
+  return { dataOrderOnePayoutIn with v2_payouts = [{ partAccount = orderAddress; partValue = 10000 }] }
+}
+
+function parse(iorder : order) : DataV2 {
+  var addr_maker : address = key_address(opt_get(iorder.maker));
+  if (iorder.dataType = V1) then (
+    match unpack<DataV1>(iorder.data) with
+    | some(dataOrder) -> begin
+      var res : DataV2 = {
+        dataOrder.v1_payouts;
+        dataOrder.v1_originFees;
+        false
+       };
+       if (length(dataOrder.v1_payouts) = 0) then (
+         res := payoutSet(addr_maker, res);
+       );
+      return res
+    end
+    | none -> fail("unable to unpack DataV1")
+    end
+  ) else if (iorder.dataType = V2) then (
+    match unpack<DataV2>(iorder.data) with
+    | some(dataOrder) -> begin
+      var res = dataOrder;
+      if (length(dataOrder.v2_payouts) = 0) then (
+        res := payoutSet(addr_maker, dataOrder);
+      );
+      return res
+    end
+    | none -> fail("unable to unpack DataV2")
+    end
+  ) else if (iorder.dataType = 0xffffffff) then (
+    var res : DataV2 = { []; []; false };
+    return payoutSet(addr_maker, res)
+  ) else (
+    fail("Unknown Order data type")
+  )
+}
+
 entry matchAndTransfer(orderLeft : order, orderRight : order, imakeMatch : option<asset_type>, itakeMatch : option<asset_type>) {
   called by selfaddress or matcher
   effect {
     var makeMatch = require_some(imakeMatch, "Invalid makeMatch");
     var takeMatch = require_some(itakeMatch, "Invalid takeMatch");
-    var leftOrderKeyHash = hashKeyOrder(orderLeft);
+    var leftOrderKeyHash  = hashKeyOrder(orderLeft);
     var rightOrderKeyHash = hashKeyOrder(orderRight);
-    var leftOrderFill = getOrderFill(orderLeft, leftOrderKeyHash);
-    var rightOrderFill = getOrderFill(orderRight, rightOrderKeyHash);
-    var newFill = fillOrder(orderLeft, orderRight, leftOrderFill, rightOrderFill);
+    var leftOrderData     = parse(orderLeft);
+    var rightOrderData    = parse(orderRight);
 
-    dorequire(newFill.fr_takeValue > 0, "nothing to fill");
+    var getFillSetNewRes  = getFillSetNew(orderLeft, orderRight, leftOrderKeyHash, rightOrderKeyHash, leftOrderData, rightOrderData);
+    var newFill           = getFillSetNewRes[0];
+    var leftOrderNewFill  = getFillSetNewRes[1];
+    var rightOrderNewFill = getFillSetNewRes[2];
 
-    if (orderLeft.salt <> 0)
-    then fill.put(leftOrderKeyHash, (leftOrderFill + newFill.fr_takeValue));
-
-    if (orderRight.salt <> 0)
-    then fill.put(rightOrderKeyHash, (rightOrderFill + newFill.fr_makeValue));
+    match leftOrderNewFill with
+    | some(v) -> transfer 0tz to fill call put<bytes * nat>((leftOrderKeyHash, v))
+    | none -> ()
+    end;
+    match rightOrderNewFill with
+    | some(v) -> transfer 0tz to fill call put<bytes * nat>((rightOrderKeyHash, v))
+    | none -> ()
+    end;
 
     var feeSide = getFeeSide(makeMatch.assetClass, takeMatch.assetClass);
     var packedData = pack((makeMatch, takeMatch, newFill, orderLeft, orderRight, feeSide));
     var empty_royalties : list<part> = [];
-    var royalties : or<list<part>, operation> =
-    match feeSide with
-    | MAKE -> getRoyaltiesByAssetType(takeMatch, packedData, selfaddress)
-    | TAKE -> getRoyaltiesByAssetType(makeMatch, packedData, selfaddress)
-    | NONE -> left<operation>(empty_royalties)
-    end;
+    var royalties : list<part> =
+      match feeSide with
+      | MAKE -> getRoyaltiesByAssetType(takeMatch, packedData, selfaddress)
+      | TAKE -> getRoyaltiesByAssetType(makeMatch, packedData, selfaddress)
+      | NONE -> empty_royalties
+      end;
 
-    match royalties with
-    | left(r) -> transfer transferred to exchangeV2 call doTransfers<asset_type * asset_type * fill_result * order * order * fee_side * list<part>>
-    ((makeMatch, takeMatch, newFill, orderLeft, orderRight, feeSide, r))
-    | right(op) -> transfer op
-    end
+   transfer transferred to exchangeV2 call doTransfers<asset_type * asset_type * DataV2 * DataV2 * fill_result * order * order * fee_side * list<part>>
+    ((makeMatch, takeMatch, leftOrderData, rightOrderData, newFill, orderLeft, orderRight, feeSide, royalties))
   }
 }
-
-entry processRoyalities(r : list<part>, idata : bytes) {
-  called by royaltiesContract
-  effect {
-    match unpack<asset_type * asset_type * fill_result * order * order * fee_side>(idata) with
-    | some (v) -> begin
-        var makeMatch  = v[0];
-        var takeMatch  = v[1];
-        var newFill    = v[2];
-        var orderLeft  = v[3];
-        var orderRight = v[4];
-        var feeSide    = v[5];
-        transfer transferred to exchangeV2 call doTransfers<asset_type * asset_type * fill_result * order * order * fee_side * list<part>>
-        ((makeMatch, takeMatch, newFill, orderLeft, orderRight, feeSide, r))
-    end
-    | none -> fail (("cannot unpack", idata))
-    end
-  }
-}
-
 
 enum time_pos = | PAST | FUTURE
 
@@ -366,7 +460,11 @@ function matchAssetTypes(leftAssetType : asset_type, rightAssetType : asset_type
 
   if (classPair = (XTZ, XTZ))
   then return some(leftAssetType)
-  else if (classPair = (FA_1_2, FA_1_2) or classPair = (FA_2, FA_2) or (eqOther(classLeft, classRight)))
+  else if
+    classPair = (FA_1_2, FA_1_2) or
+    classPair = (FA_2(Fungible), FA_2(Fungible)) or
+    classPair = (FA_2(NonFungible), FA_2(NonFungible)) or
+    eqOther(classLeft, classRight)
   then return simpleMatch(leftAssetType, rightAssetType)
   else return none<asset_type>
 }

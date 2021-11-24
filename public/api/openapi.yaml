@@ -1564,6 +1564,8 @@ components:
           - FT
         contract:
           $ref: '#/components/schemas/Address'
+        token_id:
+          $ref: '#/components/schemas/BigInteger'
       required:
       - contract
       - assetClass

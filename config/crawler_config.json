@@ -1,12 +1,9 @@
 {
-  "nodes": [ "https://granadanet.smartpy.io" ],
-  "start": 719000,
+  "nodes": [ "https://hangzhounet.smartpy.io" ],
+  "start": 90500,
   "db_kind": "pg",
   "step_forward": 30,
-  "ft_contracts": {
-    "KT1HT3EbSPFA1MM2ZiMThB6P6Kky5jebNgAx": { "kind": "lugh", "id": "94594" }
-  },
-  "validator": "KT1JrWXMuHp7nkX7j3trtxckVBiTyggDNnU1",
-  "exchange_v2": "KT1CfvTiEz9EVBLBLLYYFvRTwqyLsCvoZtWm",
-  "royalties": "KT1JPYtEMv8PHXfmLoMuWRLsVykoEou5AqKG"
+  "validator": "KT1U8NoG9oiBYWtszvQ6WiSJyvmeDxo8ZcoT",
+  "exchange_v2": "KT1AguExF32Z9UEKzD5nuixNmqrNs1jBKPT8",
+  "royalties": "KT1Ebv7msgzT9tRGjcWHMnnb6Rm8mAy6b9dq"
 }

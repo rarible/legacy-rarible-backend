@@ -1,5 +1,5 @@
 {
   "api_url": "http://localhost:8080/v0.1/",
-  "node": "https://granada.tz.functori.com",
+  "node": "https://hangzhou.tz.functori.com",
   "nft_contracts": [ ]
 }

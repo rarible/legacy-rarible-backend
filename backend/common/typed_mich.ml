@@ -208,7 +208,7 @@ let rec named_micheline_type ?name (t : micheline_type_short) : micheline_type =
   | `tuple l -> {typ=`tuple (List.map named_micheline_type l); name}
 
 let asset_class_type : micheline_type_short =
-  `or_ (`unit, `or_ (`unit, `or_ (`unit, `or_ (`unit, `bytes))))
+  `or_ (`unit, `or_ (`unit, `or_ (`int, `or_ (`int, `bytes))))
 
 let asset_type_type : micheline_type_short = `tuple [asset_class_type; `bytes]
 let asset_type = `tuple [asset_type_type; `nat]
@@ -226,10 +226,15 @@ let order_type =
     `bytes;
   ]
 
+let part_type = `tuple [`address; `nat]
+let order_data_type = `tuple [`seq part_type; `seq part_type; `bool ]
+
 let do_transfers_type =
   `tuple [
     asset_type_type;
     asset_type_type;
+    order_data_type;
+    order_data_type;
     `tuple [ `nat; `nat ];
     order_type;
     order_type;

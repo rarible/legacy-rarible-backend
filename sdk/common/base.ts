@@ -26,6 +26,7 @@ export interface XTZAssetType  {
 export interface FTAssetType {
   asset_class: "FT";
   contract: string;
+  token_id?: BigNumber;
 }
 
 export interface NFTAssetType {
@@ -86,7 +87,8 @@ export function asset_type_to_json(a: AssetType) : any {
     case "XTZ":
       return { assetClass: a.asset_class }
     case "FT":
-      return { assetClass: a.asset_class, contract: a.contract }
+      return { assetClass: a.asset_class, contract: a.contract,
+               tokenId: (a.token_id==undefined) ? undefined : a.token_id.toString() }
     case "NFT":
     case "MT":
       return {
@@ -102,8 +104,8 @@ export function asset_type_of_json(a: any) : AssetType {
     case "XTZ":
       return { asset_class: a.assetClass }
     case "FT":
-      return { asset_class: a.assetClass, contract: a.contract }
-
+      return { asset_class: a.assetClass, contract: a.contract,
+               token_id: (a.tokenId==undefined) ? undefined : new BigNumber(a.tokenId) }
     case "NFT":
     case "MT":
       return {
@@ -219,4 +221,9 @@ export function to_hex(s: string) : string {
   const encoder = new TextEncoder();
   const a = encoder.encode(s)
   return uint8array_to_hex(a)
+}
+
+export function pack_string(s: string) : string {
+  const h = to_hex(s)
+  return '0501' + Number(h.length/2).toString(16).padStart(8,'0') + h
 }
