@@ -601,9 +601,15 @@ type 'a order_activity_match_side = {
   order_activity_match_side_type : order_activity_side_type ;
 } [@@deriving encoding {title="OrderActivitySideMatch"; def_title}]
 
+type order_activity_match_type =
+  | MTSELL
+  | MTACCEPT_BID
+[@@deriving encoding {enum; title="OrderActivityMatchType"; def_title}]
+
 type 'a order_activity_match = {
   order_activity_match_left: 'a order_activity_match_side ;
   order_activity_match_right: 'a order_activity_match_side ;
+  order_activity_match_type: order_activity_match_type ;
   order_activity_match_price: 'a ;
   order_activity_match_transaction_hash: A.word ;
   order_activity_match_block_hash: A.word ;
@@ -830,7 +836,9 @@ type exchange_param =
   | Cancel of Tzfunc.H.t
   | DoTransfers of
       {left: Tzfunc.H.t; left_maker : string option; left_asset: A.big_integer asset ;
+       left_salt: z ;
        right: Tzfunc.H.t ; right_maker: string option; right_asset: A.big_integer asset ;
+       right_salt: z;
        fill_make_value: A.big_integer; fill_take_value: A.big_integer}
 
 type micheline_value = [
