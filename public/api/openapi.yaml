@@ -772,7 +772,7 @@ paths:
       security: []
   /v0.1/orders/byIds:
     description: Get order by ids
-    get:
+    post:
       tags:
       - order-controller
       description: Get order by ids

@@ -1024,7 +1024,7 @@ let get_order_by_ids _req ids =
     (Ok []) ids.ids >>= function
   | Ok orders -> return_ok orders
   | Error api_err -> return (Error api_err)
-[@@get
+[@@post
   {path="/v0.1/orders/byIds";
    input=ids_enc;
    output=(Json_encoding.list (order_enc A.big_decimal_enc));

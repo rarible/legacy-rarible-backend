@@ -2663,7 +2663,8 @@ let mk_nft_collection obj =
         EzEncoding.destruct micheline_type_short_enc k,
         EzEncoding.destruct micheline_type_short_enc v with
     | `nat, `address -> Ok CTNFT
-    | `tuple [`nat; `address], `nat -> Ok CTMT
+    | `tuple [`nat; `address], `nat
+    | `tuple [`address; `nat], `nat -> Ok CTMT
     | _ -> Error (`hook_error "unknown_token_kind") in
   Ok {
     nft_collection_id = obj#address ;
@@ -2681,7 +2682,10 @@ let get_nft_collection_by_id ?dbh collection =
   use dbh @@ fun dbh ->
   let>? l = [%pgsql.object dbh
       "select address, owner, metadata, name, symbol, kind, ledger_key, ledger_value \
-       from contracts where address = $collection and main"] in
+       from contracts where address = $collection and main and \
+       ((ledger_key = '\"nat\"' and ledger_value = '\"address\"') \
+       or (ledger_key = '[ \"address\", \"nat\"]' and ledger_value = '\"nat\"') \
+       or (ledger_key = '[\"nat\", \"address\"]' and ledger_value = '\"nat\"'))"] in
   match l with
   | [] -> Lwt.return_error (`hook_error "not found")
   | obj :: _ ->
@@ -2701,11 +2705,17 @@ let search_nft_collections_by_owner ?dbh ?continuation ?(size=50) owner =
       "select address, owner, metadata, name, symbol, kind, ledger_key, ledger_value \
        from contracts where \
        main and owner = $owner and \
+       ((ledger_key = '\"nat\"' and ledger_value = '\"address\"') \
+       or (ledger_key = '[ \"address\", \"nat\"]' and ledger_value = '\"nat\"') \
+       or (ledger_key = '[\"nat\", \"address\"]' and ledger_value = '\"nat\"')) and \
        ($no_continuation or \
        (address collate \"C\" > $collection)) \
        order by address collate \"C\" asc limit $size64"] in
   let>? nft_collections_total = [%pgsql dbh
-      "select count(distinct address) from contracts where main and owner = $owner "] in
+      "select count(distinct address) from contracts where main and owner = $owner and \
+       ((ledger_key = '\"nat\"' and ledger_value = '\"address\"') \
+       or (ledger_key = '[ \"address\", \"nat\"]' and ledger_value = '\"nat\"') \
+       or (ledger_key = '[\"nat\", \"address\"]' and ledger_value = '\"nat\"'))"] in
   let>? nft_collections_total = match nft_collections_total with
     | [ None ] -> Lwt.return_ok 0L
     | [ Some i64 ] -> Lwt.return_ok i64
@@ -2729,10 +2739,16 @@ let get_nft_all_collections ?dbh ?continuation ?(size=50) () =
   let>? l = [%pgsql.object dbh
       "select address, owner, metadata, name, symbol, kind, ledger_key, ledger_value \
        from contracts where main and \
+       ((ledger_key = '\"nat\"' and ledger_value = '\"address\"') \
+       or (ledger_key = '[ \"address\", \"nat\"]' and ledger_value = '\"nat\"') \
+       or (ledger_key = '[\"nat\", \"address\"]' and ledger_value = '\"nat\"')) and \
        ($no_continuation or address collate \"C\" > $collection) \
        order by address collate \"C\" asc limit $size64"] in
   let>? nft_collections_total = [%pgsql dbh
-      "select count(distinct address) from contracts where main"] in
+      "select count(distinct address) from contracts where main and \
+       ((ledger_key = '\"nat\"' and ledger_value = '\"address\"') \
+       or (ledger_key = '[ \"address\", \"nat\"]' and ledger_value = '\"nat\"') \
+       or (ledger_key = '[\"nat\", \"address\"]' and ledger_value = '\"nat\"'))"] in
   let>? nft_collections_total = match nft_collections_total with
     | [ None ] -> Lwt.return_ok 0L
     | [ Some i64 ] -> Lwt.return_ok i64
