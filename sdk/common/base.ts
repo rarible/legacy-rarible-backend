@@ -62,7 +62,7 @@ export interface TezosProvider {
   transfer: (arg: TransferParams) => Promise<OperationResult>;
   originate: (arg: OriginateParams) => Promise<OperationResult>;
   batch: (args: TransferParams[]) => Promise<OperationResult>;
-  sign: (bytes: string) => Promise<string>;
+  sign: (bytes: string, type?: "raw" | "micheline") => Promise<string>;
   address: () => Promise<string>;
   public_key: () => Promise<string | undefined>;
   storage: (contract: string) => Promise<any>;
@@ -222,7 +222,7 @@ export function pack_string(s: string) : string {
 export async function sign(p : Provider, message: string) : Promise<SignatureResult> {
   const edpk = await p.tezos.public_key()
   if (edpk==undefined) throw new Error("cannot get public key from provider")
-  return { signature: await p.tezos.sign(pack_string(message)), edpk }
+  return { signature: await p.tezos.sign(message, "raw"), edpk }
 }
 
 const tz1_prefix =  new Uint8Array([6, 161, 159])

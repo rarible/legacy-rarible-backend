@@ -24,6 +24,7 @@
             <b-nav-item :active="path=='tokens'" @click="path='tokens'">Tokens</b-nav-item>
             <b-nav-item :active="path=='orders'" @click="path='orders'">Orders</b-nav-item>
             <b-nav-item :active="path=='api'" @click="path='api'">API</b-nav-item>
+            <b-nav-item :active="path=='test'" @click="path='test'">Test</b-nav-item>
           </b-navbar-nav>
           <b-navbar-nav class="ms-auto">
               <b-input-group prepend="Node" class="mx-2">
@@ -376,6 +377,12 @@
         </div>
         <div v-if="api.result" :class="'text-center text-'+api.status">{{ api.result }}</div>
         <div id="api-request-result"></div>
+      </b-container>
+
+      <b-container v-if="path=='test'" class="mt-4">
+        <h3 class="text-center mt-5 pt-5">
+          <b-button @click="test()">TEST</b-button>
+        </h3>
       </b-container>
 
     </div>

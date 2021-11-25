@@ -88,6 +88,5 @@ export async function verify(
   message: string,
   signature: string) : Promise<boolean> {
   if (address != pk_to_pkh(edpk)) return false
-  const bytes = pack_string(message)
-  return verify_bytes(edpk, bytes, signature)
+  return verify_bytes(edpk, message, signature)
 }

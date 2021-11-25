@@ -31,7 +31,7 @@ export async function temple_provider(endpoint: string, network: TempleDAppNetwo
     const op = await tk.wallet.batch(args2).send()
     return { hash: op.opHash, confirmation: async() => { await op.confirmation() } }
   }
-  const sign = async(bytes: string) => {
+  const sign = async(bytes: string, _?: "raw" | "micheline") => {
     const sig = await wallet.sign(bytes)
     return sig
   }
