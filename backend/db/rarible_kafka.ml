@@ -5,12 +5,14 @@ let topic_item_name = "tezos-item"
 let topic_order_name = "tezos-order"
 let topic_activity_name = "tezos-activity"
 let topic_ownership_name = "tezos-ownership"
+let topic_collection_name = "tezos-collection"
 let topic_test_name = "rarible-tezos-topic"
 
 let topic_item = ref None
 let topic_order = ref None
 let topic_activity = ref None
 let topic_ownership = ref None
+let topic_collection = ref None
 let topic_test = ref None
 
 let kafka_config = ref None
@@ -86,6 +88,20 @@ let produce_ownership_event ownership_event =
     end >>= fun t ->
     EzEncoding.construct Rtypes.nft_ownership_event_enc ownership_event
     |> kafka_produce ~key:ownership_event.Rtypes.nft_ownership_event_event_id t
+  | _ -> Lwt.return ()
+
+let produce_collection_event collection_event =
+  match !kafka_config with
+  | Some _c ->
+    begin match !topic_collection with
+      | None ->
+        create topic_collection_name >>= fun t ->
+        topic_collection := Some t ;
+        Lwt.return t
+      | Some t -> Lwt.return t
+    end >>= fun t ->
+    EzEncoding.construct Rtypes.nft_collection_event_enc collection_event
+    |> kafka_produce ~key:collection_event.Rtypes.nft_collection_event_event_id t
   | _ -> Lwt.return ()
 
 let produce_order_event ~decs:(maked, taked) order_event  =

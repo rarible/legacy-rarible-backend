@@ -452,6 +452,13 @@ let mk_delete_ownership_event os = {
   nft_ownership_event_ownership = os ;
 }
 
+let mk_nft_collection_event collection = {
+  nft_collection_event_event_id = Hex.show @@ Hex.of_bigstring @@ Hacl.Rand.gen 128 ;
+  nft_collection_event_collection_id = collection.nft_collection_id ;
+  nft_collection_event_collection = collection ;
+  nft_collection_event_type = () ;
+}
+
 
 let pk_to_pkh_exn pk = match Tzfunc.Crypto.pk_to_pkh pk with
   | Error _ -> failwith ("cannot hash edpk " ^ pk)

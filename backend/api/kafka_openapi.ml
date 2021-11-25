@@ -28,3 +28,10 @@ let kafka_section =
    name="kafka_activity";
    output=Rtypes.activity_type_enc Rtypes.A.big_decimal_enc;
    section=kafka_section}]
+
+[@@@get
+  {register=true;
+   path="/kafka/collection";
+   name="kafka_collection";
+   output=Rtypes.nft_collection_event_enc;
+   section=kafka_section}]

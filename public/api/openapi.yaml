@@ -1433,6 +1433,22 @@ paths:
               schema:
                 $ref: '#/components/schemas/ActivityType'
       security: []
+  /kafka/collection:
+    summary: kafka_collection
+    get:
+      tags:
+      - kafka-controller
+      summary: kafka_collection
+      operationId: kafka_collection
+      parameters: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NftCollectionEvent'
+      security: []
 components:
   schemas:
     ActivitySort:
@@ -1830,6 +1846,25 @@ components:
       - name
       - type
       - id
+      additionalProperties: false
+    NftCollectionEvent:
+      type: object
+      properties:
+        eventId:
+          type: string
+        collectionId:
+          type: string
+        type:
+          type: string
+          enum:
+          - UPDATE
+        collection:
+          $ref: '#/components/schemas/NftCollection'
+      required:
+      - collection
+      - type
+      - collectionId
+      - eventId
       additionalProperties: false
     NftCollectionFeature:
       type: string
