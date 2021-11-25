@@ -87,12 +87,8 @@ let parse_mint m =
                { fa2m_token_id ; fa2m_owner ; fa2m_amount = () ; fa2m_metadata }))
     | _ ->
       match Typed_mich.parse_value Contract_spec.mint_ubi_entry m with
-      | Ok (`tuple [ `address ubim_owner; `nat ubim_token_id; uri ]) ->
-        let$ ubim_uri = match uri with
-          | `none -> Ok None
-          | `some (`bytes uri) ->
-            Ok (Some (Tzfunc.Crypto.hex_to_raw uri :> string))
-          | _ -> unexpected_michelson in
+      | Ok (`tuple [ `address ubim_owner; `nat ubim_token_id ]) ->
+        let ubim_uri = Some "" in
         Ok (Mint_tokens (UbiMint { ubim_owner ; ubim_token_id ; ubim_uri }))
     | _ ->
       match Typed_mich.parse_value Contract_spec.mint_ubi2_entry m with
@@ -204,7 +200,8 @@ let parse_option_key : micheline_value -> (string option, _) result = function
   | `some (`key maker) -> Ok (Some maker)
   | _ -> unexpected_michelson
 
-let parse_asset_type (mclass : micheline_value) (mdata : micheline_value) = match mclass, mdata with
+let parse_asset_type (mclass : micheline_value) (mdata : micheline_value) =
+ match mclass, mdata with
   | `left `unit, _ -> Ok ATXTZ
   | `right (`left `unit), `bytes h ->
     begin match

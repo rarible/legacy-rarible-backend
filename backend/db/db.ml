@@ -21,6 +21,23 @@ let one ?(err="expected unique row not found") l = match l with
   | [ x ] -> Lwt.return_ok x
   | _ -> Lwt.return_error (`hook_error err)
 
+let is_op_included ?dbh hash =
+  use dbh @@ fun dbh ->
+  let>? t =
+    [%pgsql.object dbh
+        "select hash from transactions where hash = $hash and main"] in
+  let>? o =
+    [%pgsql.object dbh
+        "select hash from originations where hash = $hash and main"] in
+  Lwt.return_ok (o <> [] || t <> [])
+
+let is_collection_crawled ?dbh hash =
+  use dbh @@ fun dbh ->
+  let>? o =
+    [%pgsql.object dbh
+        "select address from contracts where address = $hash and main"] in
+  Lwt.return_ok (o <> [])
+
 let db_contracts =
   List.fold_left (fun acc r ->
       match r#ledger_key, r#ledger_value with
