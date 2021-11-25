@@ -1,4 +1,5 @@
-import { OrderForm, pk_to_pkh } from "./utils"
+import { OrderForm } from "./utils"
+import { pk_to_pkh } from "../common/base"
 import { is_nft } from "./is-nft"
 import BigNumber from "@taquito/rpc/node_modules/bignumber.js"
 

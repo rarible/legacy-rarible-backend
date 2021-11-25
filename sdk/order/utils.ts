@@ -1,27 +1,5 @@
 import { Asset, asset_to_json, asset_of_json } from "../common/base"
 import BigNumber from "@taquito/rpc/node_modules/bignumber.js"
-const bs58check = require('bs58check')
-const blake = require('blakejs');
-
-const tz1_prefix =  new Uint8Array([6, 161, 159])
-const edpk_prefix =  new Uint8Array([13, 15, 37, 217])
-
-function b58enc(payload: Uint8Array, prefix: Uint8Array) {
-  const n = new Uint8Array(prefix.length + payload.length);
-  n.set(prefix);
-  n.set(payload, prefix.length);
-  return bs58check.encode(Buffer.from(n.buffer));
-}
-
-function b58dec(enc : string, prefix : Uint8Array) : Uint8Array {
-  return bs58check.decode(enc).slice(prefix.length)
-}
-
-export function pk_to_pkh(edpk: string) : string {
-  const pk_bytes = b58dec(edpk, edpk_prefix)
-  const hash = blake.blake2b(pk_bytes, null, 20)
-  return b58enc(hash, tz1_prefix)
-}
 
 export interface Part {
   account: string;

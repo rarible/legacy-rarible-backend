@@ -1,6 +1,7 @@
 import { ready, crypto_generichash, crypto_sign_verify_detached } from 'libsodium-wrappers'
 import { ec } from 'elliptic'
 import { b58cdecode, buf2hex, hex2buf, isValidPrefix, prefix } from '@taquito/utils'
+import { pk_to_pkh, pack_string } from './base'
 
 type curves = 'ed' | 'p2' | 'sp'
 
@@ -25,7 +26,7 @@ const pref = {
   },
 }
 
-export async function verify(
+export async function verify_bytes(
   public_key: string,
   bytes: string,
   signature: string)
@@ -79,4 +80,14 @@ export async function verify(
 
     default: throw new Error(`Curve '${curve}' not supported`)
   }
+}
+
+export async function verify(
+  address: string,
+  edpk: string,
+  message: string,
+  signature: string) : Promise<boolean> {
+  if (address != pk_to_pkh(edpk)) return false
+  const bytes = pack_string(message)
+  return verify_bytes(edpk, bytes, signature)
 }

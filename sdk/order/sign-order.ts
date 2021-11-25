@@ -1,5 +1,5 @@
 import { MichelsonData, MichelsonType, packDataBytes } from "@taquito/michel-codec"
-import { Provider, sign, AssetType, Asset } from "../common/base"
+import { Provider, AssetType, Asset } from "../common/base"
 import { OrderForm, OrderRaribleV2DataV1 } from "./utils"
 import BigNumber from "@taquito/rpc/node_modules/bignumber.js"
 const keccak_base = require("keccak")
@@ -143,7 +143,7 @@ export async function sign_order(
   order: OrderForm) : Promise<string> {
   let o = order_to_struct(provider, order)
   let h = pack(o, order_type)
-  const signature = sign(provider, h)
+  const signature = provider.tezos.sign(h)
   return signature
 }
 

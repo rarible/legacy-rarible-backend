@@ -1,5 +1,5 @@
 import { Provider, send, OperationResult, TransactionArg, hex_to_uint8array, uint8array_to_hex } from "../common/base"
-import { pk_to_pkh } from "../order/utils"
+import { pk_to_pkh } from "../common/base"
 import { BigMapAbstraction } from "@taquito/taquito"
 import { MichelsonData, MichelsonType, packDataBytes } from "@taquito/michel-codec"
 import BigNumber from "@taquito/rpc/node_modules/bignumber.js"

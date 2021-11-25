@@ -1330,10 +1330,18 @@ let get_order_activities req input =
    section=order_activities_section}]
 
 let validate _req input =
-  match Tzfunc.Crypto.Ed25519.verify ~edpk:input.svf_signer ~edsig:input.svf_signature
-          ~bytes:(Tzfunc.Raw.mk input.svf_message) with
-  | Ok b -> return_ok b
+  match Tzfunc.Crypto.pk_to_pkh input.svf_edpk with
   | Error e -> return (Error {code=`BAD_REQUEST; message=Let.string_of_error e})
+  | Ok addr ->
+    if addr <> input.svf_address then return_ok false
+    else
+      match Tzfunc.Forge.(pack (prim `string) (Tzfunc.Proto.Mstring input.svf_message)) with
+      | Error e -> return (Error {code=`BAD_REQUEST; message=Let.string_of_error e})
+      | Ok bytes ->
+        match Tzfunc.Crypto.Ed25519.verify ~edpk:input.svf_edpk ~edsig:input.svf_signature
+                ~bytes with
+        | Ok b -> return_ok b
+        | Error e -> return (Error {code=`BAD_REQUEST; message=Let.string_of_error e})
 [@@post
   {path="/v0.1/order/signature/validate";
    name="validate";

@@ -725,7 +725,8 @@ type nft_ownership_event = {
 } [@@deriving encoding {camel; title="NftOwnershipEvent"; def_title}]
 
 type signature_validation_form = {
-  svf_signer: A.edpk;
+  svf_address: A.address;
+  svf_edpk: A.edpk;
   svf_message: string;
   svf_signature: A.edsig;
 } [@@deriving encoding {title="SignatureValidationForm"; def_title}]

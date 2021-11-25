@@ -3,6 +3,7 @@ import { Config } from "../config/type"
 import { MichelsonData } from "@taquito/michel-codec"
 import BigNumber from "@taquito/rpc/node_modules/bignumber.js"
 const bs58check = require("bs58check")
+const blake = require('blakejs');
 
 export interface StorageFA2 {
   owner: string;
@@ -82,6 +83,11 @@ export interface TransactionArg {
   parameter?: MichelsonData
 }
 
+export interface SignatureResult {
+  signature: string;
+  edpk: string
+}
+
 export function asset_type_to_json(a: AssetType) : any {
   switch (a.asset_class) {
     case "XTZ":
@@ -141,21 +147,6 @@ export function get_public_key(p: Provider) : Promise<string | undefined> {
 
 export async function storage<T>(p : Provider, contract: string) : Promise<T> {
   return p.tezos.storage(contract)
-}
-
-export function b58enc(payload: string, prefix: Uint8Array) {
-  const p = payload.match(/.{1,2}/g)
-  if (p) {
-    const a = new Uint8Array(p.map(b => parseInt(b, 16)))
-    const n = new Uint8Array(prefix.length + a.length);
-    n.set(prefix);
-    n.set(a, prefix.length);
-    return bs58check.encode(Buffer.from(n.buffer));
-  }
-}
-
-export async function sign(p : Provider, bytes: string) : Promise<string> {
-  return p.tezos.sign(bytes)
 }
 
 export async function send(
@@ -226,4 +217,30 @@ export function to_hex(s: string) : string {
 export function pack_string(s: string) : string {
   const h = to_hex(s)
   return '0501' + Number(h.length/2).toString(16).padStart(8,'0') + h
+}
+
+export async function sign(p : Provider, message: string) : Promise<SignatureResult> {
+  const edpk = await p.tezos.public_key()
+  if (edpk==undefined) throw new Error("cannot get public key from provider")
+  return { signature: await p.tezos.sign(pack_string(message)), edpk }
+}
+
+const tz1_prefix =  new Uint8Array([6, 161, 159])
+const edpk_prefix =  new Uint8Array([13, 15, 37, 217])
+
+export function b58enc(payload: Uint8Array, prefix: Uint8Array) {
+  const n = new Uint8Array(prefix.length + payload.length);
+  n.set(prefix);
+  n.set(payload, prefix.length);
+  return bs58check.encode(Buffer.from(n.buffer));
+}
+
+export function b58dec(enc : string, prefix : Uint8Array) : Uint8Array {
+  return bs58check.decode(enc).slice(prefix.length)
+}
+
+export function pk_to_pkh(edpk: string) : string {
+  const pk_bytes = b58dec(edpk, edpk_prefix)
+  const hash = blake.blake2b(pk_bytes, null, 20)
+  return b58enc(hash, tz1_prefix)
 }
