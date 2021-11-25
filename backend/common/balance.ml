@@ -102,6 +102,10 @@ let z_order_activity_type ?maked ?taked = function
   | OrderActivityBid o -> OrderActivityBid (z_order_activity_bid ?maked ?taked o)
   | OrderActivityCancelBid o -> OrderActivityCancelBid o
   | OrderActivityCancelList o -> OrderActivityCancelList o
+let dec_order_act_type ?maked ?taked n =
+  { n with order_act_type = dec_order_activity_type ?maked ?taked n.order_act_type }
+let z_order_act_type ?maked ?taked n =
+  { n with order_act_type = z_order_activity_type ?maked ?taked n.order_act_type }
 let dec_nft_activity_elt n =
   { n with nft_activity_value = Z.to_string n.nft_activity_value }
 let z_nft_activity_elt n =
@@ -114,10 +118,14 @@ let z_nft_activity_type = function
   | NftActivityMint n -> NftActivityMint (z_nft_activity_elt n)
   | NftActivityBurn n -> NftActivityBurn (z_nft_activity_elt n)
   | NftActivityTransfer {elt; from} -> NftActivityTransfer {elt=z_nft_activity_elt elt; from}
+let dec_nft_act_type n =
+  { n with nft_act_type = dec_nft_activity_type n.nft_act_type }
+let z_nft_act_type n =
+  { n with nft_act_type = z_nft_activity_type n.nft_act_type }
 let dec_nft_activities n =
-  { n with nft_activities_items = List.map dec_nft_activity_type n.nft_activities_items }
+  { n with nft_activities_items = List.map dec_nft_act_type n.nft_activities_items }
 let z_nft_activities n =
-  { n with nft_activities_items = List.map z_nft_activity_type n.nft_activities_items }
+  { n with nft_activities_items = List.map z_nft_act_type n.nft_activities_items }
 let dec_all_activity_type ?maked ?taked = function
   | OrderActivityType o -> OrderActivityType (dec_order_activity_type ?maked ?taked o)
   | NftActivityType o -> NftActivityType (dec_nft_activity_type o)
@@ -130,10 +138,10 @@ let z_activity_type ?maked ?taked a =
   { a with activity_type = z_all_activity_type ?maked ?taked a.activity_type }
 let dec_order_activities ~d o =
   { o with order_activities_items =
-             List.map2 (fun o (maked, taked) -> dec_order_activity_type ?maked ?taked o) o.order_activities_items d }
+             List.map2 (fun o (maked, taked) -> dec_order_act_type ?maked ?taked o) o.order_activities_items d }
 let z_order_activities ~d o =
   { o with order_activities_items =
-             List.map2 (fun o (maked, taked) -> z_order_activity_type ?maked ?taked o) o.order_activities_items d }
+             List.map2 (fun o (maked, taked) -> z_order_act_type ?maked ?taked o) o.order_activities_items d }
 let dec_order_bid_elt ?maked ?taked o =
   { o with order_bid_elt_make = dec_asset ?d:maked o.order_bid_elt_make;
            order_bid_elt_take = dec_asset ?d:taked o.order_bid_elt_take }

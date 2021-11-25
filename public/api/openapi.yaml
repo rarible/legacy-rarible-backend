@@ -1647,6 +1647,24 @@ components:
       - contract
       - assetClass
       additionalProperties: false
+    NftActType:
+      type: object
+      properties:
+        id:
+          type: string
+        date:
+          type: string
+          format: date-time
+        source:
+          type: string
+        type:
+          $ref: '#/components/schemas/NftActivityType'
+      required:
+      - type
+      - source
+      - date
+      - id
+      additionalProperties: false
     NftActivities:
       type: object
       properties:
@@ -1655,7 +1673,7 @@ components:
         items:
           type: array
           items:
-            $ref: '#/components/schemas/NftActivityType'
+            $ref: '#/components/schemas/NftActType'
       required:
       - items
       additionalProperties: false
@@ -2130,6 +2148,24 @@ components:
       - maker
       - data
       additionalProperties: false
+    OrderActType:
+      type: object
+      properties:
+        id:
+          type: string
+        date:
+          type: string
+          format: date-time
+        source:
+          type: string
+        type:
+          $ref: '#/components/schemas/OrderActivityType'
+      required:
+      - type
+      - source
+      - date
+      - id
+      additionalProperties: false
     OrderActivities:
       type: object
       properties:
@@ -2137,7 +2173,7 @@ components:
           title: OrderActivitiesItems
           type: array
           items:
-            $ref: '#/components/schemas/OrderActivityType'
+            $ref: '#/components/schemas/OrderActType'
         continuation:
           type: string
       required:

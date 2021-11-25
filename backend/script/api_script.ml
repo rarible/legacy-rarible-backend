@@ -1656,13 +1656,13 @@ let check_mint_activity it =
   let kt1 = it.it_collection in
   let tid = it.it_token_id in
   let mint_activity_exists activities =
-    List.exists (fun act -> match act with
+    List.exists (fun act -> match act.nft_act_type with
         | NftActivityMint elt -> check_nft_activity elt it
         | _ -> false) activities in
   (* MINT ONLY ACTIVITIES *)
   call_get_nft_activities_by_item_mint kt1 tid >|= begin function
   | Ok nft_activities ->
-    if mint_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
+    if mint_activity_exists @@ List.map Common.Balance.z_nft_act_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_activities_by_item_mint\n%!"
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_item_mint (no matching mint activity)\n%!"
@@ -1672,7 +1672,7 @@ let check_mint_activity it =
   end >>= fun () ->
   call_get_nft_activities_by_user_mint owner >|= begin function
   | Ok nft_activities ->
-    if mint_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
+    if mint_activity_exists @@ List.map Common.Balance.z_nft_act_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_activities_by_user_mint\n%!"
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_user_mint (no matching mint activity)\n%!"
@@ -1682,7 +1682,7 @@ let check_mint_activity it =
   end >>= fun () ->
   call_get_nft_activities_by_collection_mint kt1 >|= begin function
   | Ok nft_activities ->
-    if mint_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
+    if mint_activity_exists @@ List.map Common.Balance.z_nft_act_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_activities_by_collection_mint\n%!"
     else
       Printf.eprintf
@@ -1693,7 +1693,7 @@ let check_mint_activity it =
   end >>= fun () ->
   call_get_nft_all_activities_mint () >|= begin function
   | Ok nft_activities ->
-    if mint_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
+    if mint_activity_exists @@ List.map Common.Balance.z_nft_act_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_all_activities_mint\n%!"
     else
       Printf.eprintf "[KO] API: get_nft_all_activities_mint (no matching mint activity)\n%!"
@@ -1705,7 +1705,7 @@ let check_mint_activity it =
   (* ALL ACTIVITIES *)
   call_get_nft_activities_by_item_all kt1 tid >|= begin function
   | Ok nft_activities ->
-    if mint_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
+    if mint_activity_exists @@ List.map Common.Balance.z_nft_act_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_activities_by_item_all\n%!"
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_item_all (no matching mint activity)\n%!"
@@ -1715,7 +1715,7 @@ let check_mint_activity it =
   end >>= fun () ->
   call_get_nft_activities_by_user_all owner >|= begin function
   | Ok nft_activities ->
-    if mint_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
+    if mint_activity_exists @@ List.map Common.Balance.z_nft_act_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_activities_by_user_all\n%!"
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_user_all (no matching mint activity)\n%!"
@@ -1725,7 +1725,7 @@ let check_mint_activity it =
   end >>= fun () ->
   call_get_nft_activities_by_collection_all kt1 >|= begin function
   | Ok nft_activities ->
-    if mint_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
+    if mint_activity_exists @@ List.map Common.Balance.z_nft_act_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_activities_by_collection_all\n%!"
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_collection_all (no matching mint activity)\n%!"
@@ -1735,7 +1735,7 @@ let check_mint_activity it =
   end >>= fun () ->
   call_get_nft_all_activities_all () >|= begin function
   | Ok nft_activities ->
-    if mint_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
+    if mint_activity_exists @@ List.map Common.Balance.z_nft_act_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_all_activities_all\n%!"
     else
       Printf.eprintf "[KO] API: get_nft_all_activities_all (no matching mint activity)\n%!"
@@ -1747,7 +1747,7 @@ let check_mint_activity it =
   (* BURN ONLY ACTIVITIES *)
   call_get_nft_activities_by_item_burn kt1 tid >|= begin function
   | Ok nft_activities ->
-    if not @@ mint_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
+    if not @@ mint_activity_exists @@ List.map Common.Balance.z_nft_act_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_activities_by_item_burn\n%!"
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_item_burn (matching mint activity)\n%!"
@@ -1757,7 +1757,7 @@ let check_mint_activity it =
   end >>= fun () ->
   call_get_nft_activities_by_user_burn owner >|= begin function
   | Ok nft_activities ->
-    if not @@ mint_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
+    if not @@ mint_activity_exists @@ List.map Common.Balance.z_nft_act_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_activities_by_user_burn\n%!"
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_user_burn (matching mint activity)\n%!"
@@ -1767,7 +1767,7 @@ let check_mint_activity it =
   end >>= fun () ->
   call_get_nft_activities_by_collection_burn kt1 >|= begin function
   | Ok nft_activities ->
-    if not @@ mint_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
+    if not @@ mint_activity_exists @@ List.map Common.Balance.z_nft_act_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_activities_by_collection_burn\n%!"
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_collection_burn (matching mint activity)\n%!"
@@ -1777,7 +1777,7 @@ let check_mint_activity it =
   end >>= fun () ->
   call_get_nft_all_activities_burn () >|= begin function
   | Ok nft_activities ->
-    if not @@ mint_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
+    if not @@ mint_activity_exists @@ List.map Common.Balance.z_nft_act_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_all_activities_burn\n%!"
     else
       Printf.eprintf "[KO] API: get_nft_all_activities_burn (matching mint activity)\n%!"
@@ -1789,7 +1789,7 @@ let check_mint_activity it =
   (* TRANSFER ONLY ACTIVITIES *)
   call_get_nft_activities_by_item_transfer kt1 tid >|= begin function
   | Ok nft_activities ->
-    if not @@ mint_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
+    if not @@ mint_activity_exists @@ List.map Common.Balance.z_nft_act_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_activities_by_item_transfer\n%!"
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_item_transfer (matching mint activity)\n%!"
@@ -1799,7 +1799,7 @@ let check_mint_activity it =
   end >>= fun () ->
   call_get_nft_activities_by_user_transfer owner >|= begin function
   | Ok nft_activities ->
-    if not @@ mint_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
+    if not @@ mint_activity_exists @@ List.map Common.Balance.z_nft_act_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_activities_by_user_transfer\n%!"
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_user_transfer (matching mint activity)\n%!"
@@ -1809,7 +1809,7 @@ let check_mint_activity it =
   end >>= fun () ->
   call_get_nft_activities_by_collection_transfer kt1 >|= begin function
   | Ok nft_activities ->
-    if not @@ mint_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
+    if not @@ mint_activity_exists @@ List.map Common.Balance.z_nft_act_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_activities_by_collection_transfer\n%!"
     else
       Printf.eprintf
@@ -1820,7 +1820,7 @@ let check_mint_activity it =
   end >>= fun () ->
   call_get_nft_all_activities_transfer () >|= begin function
   | Ok nft_activities ->
-    if not @@ mint_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
+    if not @@ mint_activity_exists @@ List.map Common.Balance.z_nft_act_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_all_activities_transfer\n%!"
     else
       Printf.eprintf "[KO] API: get_nft_all_activities_transfer (matching mint activity)\n%!"
@@ -1834,7 +1834,7 @@ let check_transfer_activity ?(from=false) it =
   let kt1 = it.it_collection in
   let tid = it.it_token_id in
   let transfer_activity_exists activities =
-    List.exists (fun act -> match act with
+    List.exists (fun act -> match act.nft_act_type with
         | NftActivityTransfer {from=addr; elt} ->
           if from then
             check_nft_activity ~from elt {it with it_owner={tz1=addr; edsk=""; edpk=""; alias=""}}
@@ -1843,7 +1843,7 @@ let check_transfer_activity ?(from=false) it =
   (* MINT ONLY ACTIVITIES *)
   call_get_nft_activities_by_item_mint kt1 tid >|= begin function
   | Ok nft_activities ->
-    if not @@ transfer_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
+    if not @@ transfer_activity_exists @@ List.map Common.Balance.z_nft_act_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_activities_by_item_mint\n%!"
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_item_mint (matching transfer activity)\n%!"
@@ -1853,7 +1853,7 @@ let check_transfer_activity ?(from=false) it =
   end >>= fun () ->
   call_get_nft_activities_by_user_mint owner >|= begin function
   | Ok nft_activities ->
-    if not @@ transfer_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
+    if not @@ transfer_activity_exists @@ List.map Common.Balance.z_nft_act_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_activities_by_user_mint\n%!"
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_user_mint (matching transfer activity)\n%!"
@@ -1863,7 +1863,7 @@ let check_transfer_activity ?(from=false) it =
   end >>= fun () ->
   call_get_nft_activities_by_collection_mint kt1 >|= begin function
   | Ok nft_activities ->
-    if not @@ transfer_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
+    if not @@ transfer_activity_exists @@ List.map Common.Balance.z_nft_act_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_activities_by_collection_mint\n%!"
     else
       Printf.eprintf
@@ -1874,7 +1874,7 @@ let check_transfer_activity ?(from=false) it =
   end >>= fun () ->
   call_get_nft_all_activities_mint () >|= begin function
   | Ok nft_activities ->
-    if not @@ transfer_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
+    if not @@ transfer_activity_exists @@ List.map Common.Balance.z_nft_act_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_all_activities_mint\n%!"
     else
       Printf.eprintf "[KO] API: get_nft_all_activities_mint (matching transfer activity)\n%!"
@@ -1886,7 +1886,7 @@ let check_transfer_activity ?(from=false) it =
   (* ALL ACTIVITIES *)
   call_get_nft_activities_by_item_all kt1 tid >|= begin function
   | Ok nft_activities ->
-    if transfer_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
+    if transfer_activity_exists @@ List.map Common.Balance.z_nft_act_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_activities_by_item_all\n%!"
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_item_all (no matching transfer activity)\n%!"
@@ -1896,7 +1896,7 @@ let check_transfer_activity ?(from=false) it =
   end >>= fun () ->
   call_get_nft_activities_by_user_all owner >|= begin function
   | Ok nft_activities ->
-    if transfer_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
+    if transfer_activity_exists @@ List.map Common.Balance.z_nft_act_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_activities_by_user_all\n%!"
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_user_all (no matching transfer activity)\n%!"
@@ -1906,7 +1906,7 @@ let check_transfer_activity ?(from=false) it =
   end >>= fun () ->
   call_get_nft_activities_by_collection_all kt1 >|= begin function
   | Ok nft_activities ->
-    if transfer_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
+    if transfer_activity_exists @@ List.map Common.Balance.z_nft_act_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_activities_by_collection_all\n%!"
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_collection_all (no matching transfer activity)\n%!"
@@ -1916,7 +1916,7 @@ let check_transfer_activity ?(from=false) it =
   end >>= fun () ->
   call_get_nft_all_activities_all () >|= begin function
   | Ok nft_activities ->
-    if transfer_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
+    if transfer_activity_exists @@ List.map Common.Balance.z_nft_act_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_all_activities_all\n%!"
     else
       Printf.eprintf "[KO] API: get_nft_all_activities_all (no matching transfer activity)\n%!"
@@ -1928,7 +1928,7 @@ let check_transfer_activity ?(from=false) it =
   (* BURN ONLY ACTIVITIES *)
   call_get_nft_activities_by_item_burn kt1 tid >|= begin function
   | Ok nft_activities ->
-    if not @@ transfer_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
+    if not @@ transfer_activity_exists @@ List.map Common.Balance.z_nft_act_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_activities_by_item_burn\n%!"
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_item_burn (matching transfer activity)\n%!"
@@ -1938,7 +1938,7 @@ let check_transfer_activity ?(from=false) it =
   end >>= fun () ->
   call_get_nft_activities_by_user_burn owner >|= begin function
   | Ok nft_activities ->
-    if not @@ transfer_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
+    if not @@ transfer_activity_exists @@ List.map Common.Balance.z_nft_act_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_activities_by_user_burn\n%!"
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_user_burn (matching transfer activity)\n%!"
@@ -1948,7 +1948,7 @@ let check_transfer_activity ?(from=false) it =
   end >>= fun () ->
   call_get_nft_activities_by_collection_burn kt1 >|= begin function
   | Ok nft_activities ->
-    if not @@ transfer_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
+    if not @@ transfer_activity_exists @@ List.map Common.Balance.z_nft_act_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_activities_by_collection_burn\n%!"
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_collection_burn (matching transfer activity)\n%!"
@@ -1958,7 +1958,7 @@ let check_transfer_activity ?(from=false) it =
   end >>= fun () ->
   call_get_nft_all_activities_burn () >|= begin function
   | Ok nft_activities ->
-    if not @@ transfer_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
+    if not @@ transfer_activity_exists @@ List.map Common.Balance.z_nft_act_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_all_activities_burn\n%!"
     else
       Printf.eprintf "[KO] API: get_nft_all_activities_burn (matching transfer activity)\n%!"
@@ -1970,7 +1970,7 @@ let check_transfer_activity ?(from=false) it =
   (* TRANSFER ONLY ACTIVITIES *)
   call_get_nft_activities_by_item_transfer kt1 tid >|= begin function
   | Ok nft_activities ->
-    if transfer_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
+    if transfer_activity_exists @@ List.map Common.Balance.z_nft_act_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_activities_by_item_transfer\n%!"
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_item_transfer (no matching transfer activity)\n%!"
@@ -1980,7 +1980,7 @@ let check_transfer_activity ?(from=false) it =
   end >>= fun () ->
   call_get_nft_activities_by_user_transfer owner >|= begin function
   | Ok nft_activities ->
-    if transfer_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
+    if transfer_activity_exists @@ List.map Common.Balance.z_nft_act_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_activities_by_user_transfer\n%!"
     else
       Printf.eprintf "[KO] API: get_nft_activities_by_user_transfer (no matching transfer activity)\n%!"
@@ -1990,7 +1990,7 @@ let check_transfer_activity ?(from=false) it =
   end >>= fun () ->
   call_get_nft_activities_by_collection_transfer kt1 >|= begin function
   | Ok nft_activities ->
-    if transfer_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
+    if transfer_activity_exists @@ List.map Common.Balance.z_nft_act_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_activities_by_collection_transfer\n%!"
     else
       Printf.eprintf
@@ -2001,7 +2001,7 @@ let check_transfer_activity ?(from=false) it =
   end >>= fun () ->
   call_get_nft_all_activities_transfer () >|= begin function
   | Ok nft_activities ->
-    if transfer_activity_exists @@ List.map Common.Balance.z_nft_activity_type nft_activities then
+    if transfer_activity_exists @@ List.map Common.Balance.z_nft_act_type nft_activities then
       Printf.eprintf "[OK] API: get_nft_all_activities_transfer\n%!"
     else
       Printf.eprintf "[KO] API: get_nft_all_activities_transfer (no matching transfer activity)\n%!"

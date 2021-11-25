@@ -286,6 +286,7 @@ let upgrade_1_to_2 dbh version =
       primary key (block, index))|};
 
     {|create table order_activities(
+      id varchar not null,
       match_left varchar,
       match_right varchar,
       hash varchar,
