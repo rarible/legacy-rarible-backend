@@ -766,6 +766,51 @@ let get_nft_item_by_id ?dbh ?include_meta contract token_id =
     Lwt.return_ok nft_item
   | [] -> Lwt.return_error (`hook_error "not found")
 
+let mk_nft_collection_name_symbol r =
+  match r#name with
+  | None -> "Unnamed Collection", r#symbol
+  | Some n -> n, r#symbol
+
+let mk_nft_collection obj =
+  let name, symbol = mk_nft_collection_name_symbol obj in
+  let$ nft_collection_type = match obj#ledger_key, obj#ledger_value with
+    | None, _ | _, None -> Error (`hook_error "unknown_token_kind")
+    | Some k, Some v -> match
+        EzEncoding.destruct micheline_type_short_enc k,
+        EzEncoding.destruct micheline_type_short_enc v with
+    | `nat, `address -> Ok CTNFT
+    | `tuple [`nat; `address], `nat
+    | `tuple [`address; `nat], `nat -> Ok CTMT
+    | _ -> Error (`hook_error "unknown_token_kind") in
+  let nft_collection_minters = match obj#minters with
+    | None -> None
+    | Some a -> Some (List.filter_map (fun x -> x) a) in
+  Ok {
+    nft_collection_id = obj#address ;
+    nft_collection_owner = obj#owner ;
+    nft_collection_type ;
+    nft_collection_name = name ;
+    nft_collection_symbol = symbol ;
+    nft_collection_features = [] ;
+    nft_collection_supports_lazy_mint = false ;
+    nft_collection_minters
+  }
+
+let get_nft_collection_by_id ?dbh collection =
+  Format.eprintf "get_nft_collection_by_id %s@." collection ;
+  use dbh @@ fun dbh ->
+  let>? l = [%pgsql.object dbh
+      "select address, owner, metadata, name, symbol, kind, ledger_key, \
+       ledger_value, minters \
+       from contracts where address = $collection and main and \
+       ((ledger_key = '\"nat\"' and ledger_value = '\"address\"') \
+       or (ledger_key = '[ \"address\", \"nat\"]' and ledger_value = '\"nat\"') \
+       or (ledger_key = '[\"nat\", \"address\"]' and ledger_value = '\"nat\"'))"] in
+  match l with
+  | [] -> Lwt.return_error (`hook_error "not found")
+  | obj :: _ ->
+    Lwt.return @@ mk_nft_collection obj
+
 let produce_order_event_hash dbh hash =
   let>? order = get_order ~dbh hash in
   begin
@@ -791,6 +836,15 @@ let produce_nft_item_event dbh contract token_id =
   | Error err ->
     Printf.eprintf "couldn't produce nft event %S\n%!" @@ Crp.string_of_error err ;
     Lwt.return_ok ()
+
+let produce_nft_collection_event c =
+  Rarible_kafka.produce_collection_event (mk_nft_collection_event c)
+  >>= fun () ->
+  Lwt.return_ok ()
+
+let produce_update_collection_event dbh contract =
+  let>? c = get_nft_collection_by_id ~dbh contract in
+  produce_nft_collection_event c
 
 let produce_nft_ownership_update_event os =
   if os.nft_ownership_value = Z.zero then
@@ -1975,9 +2029,11 @@ let contract_updates dbh main l =
             produce_nft_item_event dbh contract token_id in
           produce_nft_ownership_event dbh contract token_id account
         | _, _, Some uri, _ ->
-          metadata_uri_update dbh ~main ~contract ~block ~level ~tsp uri
+          let>? () = metadata_uri_update dbh ~main ~contract ~block ~level ~tsp uri in
+          produce_update_collection_event dbh contract
         | _, _, _, Some minter ->
-          minter_update dbh ~main ~contract ~block ~level ~tsp minter
+          let>? () = minter_update dbh ~main ~contract ~block ~level ~tsp minter in
+          produce_update_collection_event dbh contract
         | _ -> Lwt.return_ok () in
       Lwt.return_ok (SSet.add contract acc)) SSet.empty l in
   (* update contracts *)
@@ -2200,12 +2256,26 @@ let produce_nft_activity_events main l =
       else Lwt.return_ok ())
     l
 
+let produce_collection_events main l =
+  iter_rp (fun r ->
+      if main then
+        match mk_nft_collection r with
+        | Ok c ->
+          produce_nft_collection_event c
+        | Error err ->
+          Printf.eprintf "couldn't produce collection event %S\n%!" @@ Crp.string_of_error err ;
+          Lwt.return_ok ()
+      else Lwt.return_ok ())
+    l
+
 let set_main _config dbh {Hooks.m_main; m_hash} =
   let sort l = List.sort (fun r1 r2 ->
       if m_main then Int32.compare r1#index r2#index
       else Int32.compare r2#index r1#index) l in
   use (Some dbh) @@ fun dbh ->
-  let>? () = [%pgsql dbh "update contracts set main = $m_main where block = $m_hash"] in
+  let>? collections =
+    [%pgsql.object dbh
+        "update contracts set main = $m_main where block = $m_hash returning *"] in
   let>? () = [%pgsql dbh "update tokens set main = $m_main where block = $m_hash"] in
   let>? nactivities =
     [%pgsql.object dbh
@@ -2242,6 +2312,7 @@ let set_main _config dbh {Hooks.m_main; m_hash} =
   let>? () = contract_updates dbh m_main @@ sort c_updates in
   let>? () = token_updates dbh m_main @@ sort t_updates in
   let>? () = token_balance_updates dbh m_main @@ sort tb_updates in
+  let>? () = produce_collection_events m_main collections in
   let>? () = produce_cancel_events dbh m_main @@ sort cancels in
   let>? () = produce_match_events dbh m_main @@ sort matches in
   let>? () = produce_nft_activity_events m_main @@ sort nactivities in
@@ -2784,52 +2855,6 @@ let generate_nft_token_id ?dbh contract =
       nft_token_id_signature = None ;
     }
   | _ -> Lwt.return_error (`hook_error "no contracts entry for this contract")
-
-let mk_nft_collection_name_symbol r =
-  match r#name with
-  | None -> "Unnamed Collection", r#symbol
-  | Some n -> n, r#symbol
-
-let mk_nft_collection obj =
-  let name, symbol = mk_nft_collection_name_symbol obj in
-  let$ nft_collection_type = match obj#ledger_key, obj#ledger_value with
-    | None, _ | _, None -> Error (`hook_error "unknown_token_kind")
-    | Some k, Some v -> match
-        EzEncoding.destruct micheline_type_short_enc k,
-        EzEncoding.destruct micheline_type_short_enc v with
-    | `nat, `address -> Ok CTNFT
-    | `tuple [`nat; `address], `nat
-    | `tuple [`address; `nat], `nat -> Ok CTMT
-    | _ -> Error (`hook_error "unknown_token_kind") in
-  let nft_collection_minters = match obj#minters with
-    | None -> None
-    | Some a -> Some (List.filter_map (fun x -> x) a) in
-  Ok {
-    nft_collection_id = obj#address ;
-    nft_collection_owner = obj#owner ;
-    nft_collection_type ;
-    nft_collection_name = name ;
-    nft_collection_symbol = symbol ;
-    nft_collection_features = [] ;
-    nft_collection_supports_lazy_mint = false ;
-    nft_collection_minters
-  }
-
-let get_nft_collection_by_id ?dbh collection =
-  Format.eprintf "get_nft_collection_by_id %s@." collection ;
-  use dbh @@ fun dbh ->
-  let>? l = [%pgsql.object dbh
-      "select address, owner, metadata, name, symbol, kind, ledger_key, \
-       ledger_value, minters \
-       from contracts where address = $collection and main and \
-       ((ledger_key = '\"nat\"' and ledger_value = '\"address\"') \
-       or (ledger_key = '[ \"address\", \"nat\"]' and ledger_value = '\"nat\"') \
-       or (ledger_key = '[\"nat\", \"address\"]' and ledger_value = '\"nat\"'))"] in
-  match l with
-  | [] -> Lwt.return_error (`hook_error "not found")
-  | obj :: _ ->
-    Lwt.return @@ mk_nft_collection obj
-
 
 let search_nft_collections_by_owner ?dbh ?continuation ?(size=50) owner =
   Format.eprintf "search_nft_collections_by_owner %s %s %d@."

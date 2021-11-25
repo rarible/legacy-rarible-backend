@@ -328,6 +328,14 @@ type nft_collection = {
   nft_collection_minters: A.address list option; [@opt]
 } [@@deriving encoding {title="NftCollection"; def_title}]
 
+type nft_collection_event = {
+  nft_collection_event_event_id : string ;
+  nft_collection_event_collection_id : string ;
+  nft_collection_event_type : unit ; [@encoding Json_encoding.constant "UPDATE"]
+  nft_collection_event_collection : nft_collection ;
+} [@@deriving encoding {camel; title="NftCollectionEvent"; def_title}]
+
+
 type nft_collections = {
   nft_collections_total : int64 ; [@encoding A.uint53]
   nft_collections_continuation : string option ; [@opt]
