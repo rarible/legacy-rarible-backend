@@ -334,7 +334,7 @@ type asset_type_gen = {
 
 type asset_type =
   | ATXTZ [@kind_label "assetClass"] [@kind "XTZ"] [@title "XTZAssetType"] [@def_title]
-  | ATFT of {contract: A.address; token_id: A.big_integer option} [@kind_label "assetClass"] [@kind "FT"] [@title "FTAssetType"] [@def_title]
+  | ATFT of {contract: A.address; token_id: A.big_integer option [@key "tokenId"]} [@kind_label "assetClass"] [@kind "FT"] [@title "FTAssetType"] [@def_title]
   | ATNFT of asset_type_gen [@kind_label "assetClass"] [@kind "NFT"] [@title "NFTAssetType"] [@def_title]
   | ATMT of asset_type_gen [@kind_label "assetClass"] [@kind "MT"] [@title "MTAssetType"] [@def_title]
 [@@deriving encoding {title="AssetType"; def_title}]
