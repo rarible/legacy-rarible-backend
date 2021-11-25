@@ -2322,7 +2322,14 @@ let get_nft_item_meta_by_id ?dbh contract token_id =
   use dbh @@ fun dbh ->
   let>? meta = mk_nft_item_meta dbh ~contract ~token_id in
   match rarible_meta_of_tzip21_meta meta with
-  | None -> Lwt.return_error (`hook_error ("item without metadata " ^ contract ^ ":" ^ Z.to_string token_id))
+  | None ->
+    Lwt.return_ok {
+      nft_item_meta_name = "Unnamed item" ;
+      nft_item_meta_description = None ;
+      nft_item_meta_attributes = None ;
+      nft_item_meta_image = None ;
+      nft_item_meta_animation = None ;
+    }
   | Some meta -> Lwt.return_ok meta
 
 let get_nft_all_items
