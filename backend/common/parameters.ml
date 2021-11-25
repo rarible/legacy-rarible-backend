@@ -127,37 +127,18 @@ let parse_token_metadata m =
     Ok (Token_metadata (id, l))
   | _ -> unexpected_michelson
 
-let rec parse_fa2 e p =
-  match e, p with
-  | EPdefault, Mprim { prim = `Left; args = [ m ]; _ } ->
-    parse_fa2 (EPnamed "left") m
-  | EPdefault, Mprim { prim = `Right; args = [ m ]; _ } ->
-    parse_fa2 (EPnamed "right") m
-  | EPnamed "left", Mprim { prim = `Left; args = [ m ]; _ } ->
-    parse_fa2 (EPnamed "left_left") m
-  | EPnamed "left", Mprim { prim = `Right; args = [ m ]; _ } ->
-    parse_fa2 (EPnamed "left_right") m
-  | EPnamed "right", Mprim { prim = `Left; args = [ m ]; _ } ->
-    parse_fa2 (EPnamed "right_left") m
-  | EPnamed "right", Mprim { prim = `Right; args = [ m ]; _ } ->
-    parse_fa2 (EPnamed "right_right") m
-  | EPnamed "left_left", Mprim { prim = `Left; args = [ m ]; _ } ->
-    parse_fa2 (EPnamed "balance_of") m
-  | EPnamed "left_left", Mprim { prim = `Right; args = [ m ]; _ } ->
-    parse_fa2 (EPnamed "update_operators") m
-  | EPnamed "left_right", Mprim { prim = `Left; args = [ m ]; _ } ->
-    parse_fa2 (EPnamed "update_operators_for_all") m
-  | EPnamed "left_right", Mprim { prim = `Right; args = [ m ]; _ } ->
-    parse_fa2 (EPnamed "transfer") m
-  | EPnamed "right_left", Mprim { prim = `Left; args = [ m ]; _ } ->
-    parse_fa2 (EPnamed "mint") m
-  | EPnamed "right_left", Mprim { prim = `Right; args = [ m ]; _ } ->
-    parse_fa2 (EPnamed "burn") m
-  | EPnamed "right_right", Mprim { prim = `Left; args = [ m ]; _ } ->
-    parse_fa2 (EPnamed "setMetadaraUri") m
-  | EPnamed "right_right", Mprim { prim = `Right; args = [ m ]; _ } ->
-    parse_fa2 (EPnamed "setTokenMetadata") m
+let parse_add_minter m =
+  match Typed_mich.parse_value `address m with
+  | Ok (`address a) -> Ok (Add_minter a)
+  | _ -> unexpected_michelson
 
+let parse_remove_minter m =
+  match Typed_mich.parse_value `address m with
+  | Ok (`address a) -> Ok (Remove_minter a)
+  | _ -> unexpected_michelson
+
+let parse_fa2 e p =
+  match e, p with
   | EPnamed "update_operators", m -> parse_update_operators m
   | EPnamed "update_operators_for_all", m -> parse_update_operators_all m
   | EPnamed "transfer", m -> parse_transfer m
@@ -165,7 +146,8 @@ let rec parse_fa2 e p =
   | EPnamed "burn", m -> parse_burn m
   | EPnamed "setMetadataUri", m -> parse_metadata_uri m
   | EPnamed "setTokenMetadata", m -> parse_token_metadata m
-
+  | EPnamed "addMinter", m -> parse_add_minter m
+  | EPnamed "removeMinter", m -> parse_remove_minter m
   | _ -> unexpected_michelson
 
 let parse_set_royalties m =
@@ -178,20 +160,8 @@ let parse_set_royalties m =
     Ok {roy_contract; roy_token_id = Z.to_string id; roy_royalties}
   | _ -> unexpected_michelson
 
-let rec parse_royalties e p =
+let parse_royalties e p =
   match e, p with
-  | EPdefault, Mprim { prim = `Left; args = [ m ]; _ } ->
-    parse_royalties (EPnamed "left") m
-  | EPdefault, Mprim { prim = `Right; args = [ m ]; _ } ->
-    parse_royalties (EPnamed "right") m
-  | EPnamed "left", Mprim { prim = `Left; args = [ m ]; _ } ->
-    parse_royalties (EPnamed "getRoyalties") m
-  | EPnamed "left", Mprim { prim = `Right; args = [ m ]; _ } ->
-    parse_royalties (EPnamed "transferOwnership") m
-  | EPnamed "right", Mprim { prim = `Left; args = [ m ]; _ } ->
-    parse_royalties (EPnamed "claimOwnership") m
-  | EPnamed "right", Mprim { prim = `Right; args = [ m ]; _ } ->
-    parse_royalties (EPnamed "setRoyalties") m
   | EPnamed "setRoyalties", m -> parse_set_royalties m
   | _ -> unexpected_michelson
 
@@ -279,57 +249,8 @@ let parse_do_transfers m =
            fill_make_value; fill_take_value})
   | _ -> unexpected_michelson
 
-let rec parse_exchange e p =
+let parse_exchange e p =
   match e, p with
-  | EPdefault, Mprim { prim = `Left; args = [ m ]; _ } ->
-    parse_exchange (EPnamed "left") m
-  | EPnamed "left", Mprim { prim = `Left; args = [ m ]; _ } ->
-    parse_exchange (EPnamed "left_left") m
-  | EPnamed "left_left", Mprim { prim = `Left; args = [ m ]; _ } ->
-    parse_exchange (EPnamed "left_left_left") m
-  | EPnamed "left_left_left", Mprim { prim = `Left; args = [ m ]; _ } ->
-    parse_exchange (EPnamed "setValidator") m
-  | EPnamed "left_left_left", Mprim { prim = `Right; args = [ m ]; _ } ->
-    parse_exchange (EPnamed "declareOwnership") m
-  | EPnamed "left_left", Mprim { prim = `Right; args = [ m ]; _ } ->
-    parse_exchange (EPnamed "left_left_right") m
-  | EPnamed "left_left_right", Mprim { prim = `Left; args = [ m ]; _ } ->
-    parse_exchange (EPnamed "claimOwnership") m
-  | EPnamed "left_left_right", Mprim { prim = `Right; args = [ m ]; _ } ->
-    parse_exchange (EPnamed "setFeeReceiver") m
-  | EPnamed "left", Mprim { prim = `Right; args = [ m ]; _ } ->
-    parse_exchange (EPnamed "left_right") m
-  | EPnamed "left_right", Mprim { prim = `Left; args = [ m ]; _ } ->
-    parse_exchange (EPnamed "left_right_left") m
-  | EPnamed "left_right_left", Mprim { prim = `Left; args = [ m ]; _ } ->
-    parse_exchange (EPnamed "setDefaultReceiver") m
-  | EPnamed "left_right_left", Mprim { prim = `Right; args = [ m ]; _ } ->
-    parse_exchange (EPnamed "cancel") m
-  | EPnamed "left_right", Mprim { prim = `Right; args = [ m ]; _ } ->
-    parse_exchange (EPnamed "left_right_right") m
-  | EPnamed "left_right_right", Mprim { prim = `Left; args = [ m ]; _ } ->
-    parse_exchange (EPnamed "setMetdataUri") m
-  | EPnamed "left_right_right", Mprim { prim = `Right; args = [ m ]; _ } ->
-    parse_exchange (EPnamed "setMetadataUriValidator") m
-  | EPdefault, Mprim { prim = `Right; args = [ m ]; _ } ->
-    parse_exchange (EPnamed "right") m
-  | EPnamed "right", Mprim { prim = `Left; args = [ m ]; _ } ->
-    parse_exchange (EPnamed "right_left") m
-  | EPnamed "right_left", Mprim { prim = `Left; args = [ m ]; _ } ->
-    parse_exchange (EPnamed "right_left_left") m
-  | EPnamed "right_left_left", Mprim { prim = `Left; args = [ m ]; _ } ->
-    parse_exchange (EPnamed "setProtocolFee") m
-  | EPnamed "right_left_left", Mprim { prim = `Right; args = [ m ]; _ } ->
-    parse_exchange (EPnamed "setExchangeContract") m
-  | EPnamed "right_left", Mprim { prim = `Right; args = [ m ]; _ } ->
-    parse_exchange (EPnamed "right_left_right") m
-  | EPnamed "right_left_right", Mprim { prim = `Left; args = [ m ]; _ } ->
-    parse_exchange (EPnamed "setAssetMatcher") m
-  | EPnamed "right_left_right", Mprim { prim = `Right; args = [ m ]; _ } ->
-    parse_exchange (EPnamed "doTransfers") m
-  | EPnamed "right", Mprim { prim = `Right; args = [ m ]; _ } ->
-    parse_exchange (EPnamed "matchOrders") m
-
   | EPnamed "cancel", m -> parse_cancel m
   | EPnamed "doTransfers", m -> parse_do_transfers m
   | _ -> unexpected_michelson

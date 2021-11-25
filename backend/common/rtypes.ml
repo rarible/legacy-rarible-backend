@@ -819,6 +819,8 @@ type nft_param =
   | Burn_tokens of burn
   | Metadata_uri of string
   | Token_metadata of (A.big_integer * (string * string) list)
+  | Add_minter of string
+  | Remove_minter of string
 [@@deriving encoding]
 
 type ft_param =

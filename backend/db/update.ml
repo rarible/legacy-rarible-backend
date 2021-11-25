@@ -48,6 +48,7 @@ let upgrade_1_to_2 dbh version =
       ledger_value jsonb,
       metadata jsonb not null default '{}',
       name varchar,
+      minters varchar[],
       symbol varchar)|};
 
     {|create table tzip21_creators(
@@ -170,6 +171,7 @@ let upgrade_1_to_2 dbh version =
       mint jsonb,
       burn jsonb,
       uri varchar,
+      minter jsonb,
       primary key (block, index))|};
 
     {|create table token_updates(
