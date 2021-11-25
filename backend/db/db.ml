@@ -292,19 +292,28 @@ let mk_order_activity_cancel obj =
   | _ ->
     OrderActivityCancelBid bid, decs
 
-let mk_order_activity obj = match obj#order_activity_type with
-  | "list" ->
-    let|$ listing, decs = mk_order_activity_bid obj in
-    OrderActivityList listing, decs
-  | "bid" ->
-    let|$ listing, decs = mk_order_activity_bid obj in
-    OrderActivityBid listing, decs
-  | "match" ->
-    let|$ matched, decs = mk_order_activity_match obj in
-    OrderActivityMatch matched, decs
-  | "cancel" ->
-    mk_order_activity_cancel obj
-  | _ as t -> Error (`hook_error ("unknown order activity type " ^ t))
+let mk_order_activity obj =
+  let|$ act, decs =
+    match obj#order_activity_type with
+    | "list" ->
+      let|$ listing, decs = mk_order_activity_bid obj in
+      OrderActivityList listing, decs
+    | "bid" ->
+      let|$ listing, decs = mk_order_activity_bid obj in
+      OrderActivityBid listing, decs
+    | "match" ->
+      let|$ matched, decs = mk_order_activity_match obj in
+      OrderActivityMatch matched, decs
+    | "cancel" ->
+      mk_order_activity_cancel obj
+    | _ as t -> Error (`hook_error ("unknown order activity type " ^ t)) in
+  {
+    order_act_id = obj#id ;
+    order_act_date = obj#date ;
+    order_act_source = "RARIBLE";
+    order_act_type = act ;
+  }, decs
+
 
 let get_order_price_history ?dbh hash_key =
   use dbh @@ fun dbh ->
@@ -887,18 +896,27 @@ let mk_nft_activity_elt obj = {
   nft_activity_block_number = Int64.of_int32 obj#level ;
 }
 
-let mk_nft_activity obj = match obj#activity_type with
-  | "mint" ->
-    let nft_activity_elt = mk_nft_activity_elt obj in
-    Lwt.return_ok @@ NftActivityMint nft_activity_elt
-  | "burn" ->
-    let nft_activity_elt = mk_nft_activity_elt obj in
-    Lwt.return_ok @@ NftActivityBurn nft_activity_elt
-  | "transfer" ->
-    let elt = mk_nft_activity_elt obj in
-    let from = Option.get obj#tr_from in
-    Lwt.return_ok @@ NftActivityTransfer {elt; from}
-  | _ as t -> Lwt.return_error (`hook_error ("unknown nft activity type " ^ t))
+let mk_nft_activity obj =
+  let>? act =
+    match obj#activity_type with
+    | "mint" ->
+      let nft_activity_elt = mk_nft_activity_elt obj in
+      Lwt.return_ok @@ NftActivityMint nft_activity_elt
+    | "burn" ->
+      let nft_activity_elt = mk_nft_activity_elt obj in
+      Lwt.return_ok @@ NftActivityBurn nft_activity_elt
+    | "transfer" ->
+      let elt = mk_nft_activity_elt obj in
+      let from = Option.get obj#tr_from in
+      Lwt.return_ok @@ NftActivityTransfer {elt; from}
+    | _ as t -> Lwt.return_error (`hook_error ("unknown nft activity type " ^ t)) in
+  let id = Printf.sprintf "%s_%ld" obj#block obj#index in
+  Lwt.return_ok @@ {
+    nft_act_id = id ;
+    nft_act_date = obj#date ;
+    nft_act_source = "RARIBLE";
+    nft_act_type = act ;
+  }
 
 let get_metadata meta =
   try
@@ -1421,44 +1439,52 @@ let insert_royalties ~dbh ~op roy =
        ${op.bo_tsp}, $source, ${roy.roy_token_id}, ${roy.roy_contract}, $royalties) \
        on conflict do nothing"]
 
-let insert_order_activity
-    dbh match_left match_right hash transaction block level date order_activity_type =
+let insert_order_activity ?(main=false)
+    dbh id match_left match_right hash transaction block level date order_activity_type =
   [%pgsql dbh
-      "insert into order_activities(match_left, match_right, hash, transaction, \
+      "insert into order_activities(id, main, match_left, match_right, hash, transaction, \
        block, level, date, order_activity_type) \
-       values ($?match_left, $?match_right, $?hash, $?transaction, \
+       values ($id, $main, $?match_left, $?match_right, $?hash, $?transaction, \
        $?block, $?level, $date, $order_activity_type) \
        on conflict do nothing"]
 
-let insert_order_activity ~decs dbh id date activity =
-  begin match activity with
+let insert_order_activity ~decs dbh activity =
+  begin match activity.order_act_type with
     | OrderActivityList act ->
       let hash = Some act.order_activity_bid_hash in
-      insert_order_activity dbh None None hash None None None date "list"
+      insert_order_activity ~main:true
+        dbh activity.order_act_id None None hash None None None activity.order_act_date "list"
     | OrderActivityBid act ->
       let hash = Some act.order_activity_bid_hash in
-      insert_order_activity dbh None None hash None None None date "bid"
+      insert_order_activity ~main:true
+        dbh activity.order_act_id None None hash None None None activity.order_act_date "bid"
     | OrderActivityCancelList act ->
       let hash = Some act.order_activity_cancel_bid_hash in
       let transaction = Some act.order_activity_cancel_bid_transaction_hash in
       let block = Some act.order_activity_cancel_bid_block_hash in
       let level = Some (Int64.to_int32 act.order_activity_cancel_bid_block_number) in
-      insert_order_activity dbh None None hash transaction block level date "cancel"
+      insert_order_activity
+        dbh activity.order_act_id None None hash transaction block
+        level activity.order_act_date "cancel"
     | OrderActivityCancelBid act ->
       let hash = Some act.order_activity_cancel_bid_hash in
       let transaction = Some act.order_activity_cancel_bid_transaction_hash in
       let block = Some act.order_activity_cancel_bid_block_hash in
       let level = Some (Int64.to_int32 act.order_activity_cancel_bid_block_number) in
-      insert_order_activity dbh None None hash transaction block level date "cancel"
+      insert_order_activity
+        dbh activity.order_act_id None None hash transaction block
+        level activity.order_act_date "cancel"
     | OrderActivityMatch act ->
       let left = Some act.order_activity_match_left.order_activity_match_side_hash in
       let right = Some act.order_activity_match_right.order_activity_match_side_hash in
       let transaction = Some act.order_activity_match_transaction_hash in
       let block = Some act.order_activity_match_block_hash in
       let level = Some (Int64.to_int32 act.order_activity_match_block_number) in
-      insert_order_activity dbh left right left transaction block level date "match"
+      insert_order_activity
+        dbh activity.order_act_id left right left transaction block
+        level activity.order_act_date "match"
   end >>=? fun () ->
-  Rarible_kafka.produce_order_activity ~decs id date activity >>= fun () ->
+  Rarible_kafka.produce_order_activity ~decs activity >>= fun () ->
   Lwt.return_ok ()
 
 let insert_order_activity_new ~decs dbh date order =
@@ -1478,7 +1504,13 @@ let insert_order_activity_new ~decs dbh date order =
           order.order_elt.order_elt_take.asset_type with
     | ATNFT _, _ | ATMT _, _ -> OrderActivityList activity
     | _, _ -> OrderActivityBid activity in
-  insert_order_activity ~decs dbh id date order_activity_type
+  let order_act = {
+    order_act_id = id ;
+    order_act_date = date ;
+    order_act_source = "RARIBLE" ;
+    order_act_type = order_activity_type ;
+  } in
+  insert_order_activity ~decs dbh order_act
 
 let insert_order_activity_cancel dbh transaction block index level date hash =
   let>? order = get_order ~dbh hash in
@@ -1500,7 +1532,13 @@ let insert_order_activity_cancel dbh transaction block index level date hash =
           order.order_elt.order_elt_take.asset_type with
     | ATNFT _, _ | ATMT _, _ -> OrderActivityCancelList activity
     | _, _ -> OrderActivityCancelBid activity in
-    insert_order_activity ~decs dbh id date order_activity_type
+    let order_act = {
+      order_act_id = id ;
+      order_act_date = date ;
+      order_act_source = "RARIBLE" ;
+      order_act_type = order_activity_type ;
+    } in
+    insert_order_activity ~decs dbh order_act
   | None ->
     Lwt.return_ok ()
 
@@ -1557,9 +1595,15 @@ let insert_order_activity_match
       order_activity_match_block_number = Int64.of_int32 level ;
       order_activity_match_log_index = 0 ;
     } in
+  let order_act = {
+    order_act_id = id ;
+    order_act_date = date ;
+    order_act_source = "RARIBLE" ;
+    order_act_type = order_activity_type ;
+  } in
   let>? maked = get_decimals left_asset.asset_type in
   let>? taked = get_decimals right_asset.asset_type in
-  insert_order_activity ~decs:(maked, taked) dbh id date order_activity_type
+  insert_order_activity ~decs:(maked, taked) dbh order_act
 
 let insert_cancel ~dbh ~op (hash : Tzfunc.H.t) =
   let hash = ( hash :> string ) in
@@ -2147,12 +2191,11 @@ let produce_match_events dbh main l =
       else Lwt.return_ok ())
     l
 
-let produce_nft_activitiy_events main l =
+let produce_nft_activity_events main l =
   iter_rp (fun r ->
       if main then
         let>? ev = mk_nft_activity r in
-        let id = Printf.sprintf "%s_%ld" r#block r#index in
-        Rarible_kafka.produce_nft_activity id r#date ev >>= fun () ->
+        Rarible_kafka.produce_nft_activity ev >>= fun () ->
         Lwt.return_ok ()
       else Lwt.return_ok ())
     l
@@ -2201,7 +2244,7 @@ let set_main _config dbh {Hooks.m_main; m_hash} =
   let>? () = token_balance_updates dbh m_main @@ sort tb_updates in
   let>? () = produce_cancel_events dbh m_main @@ sort cancels in
   let>? () = produce_match_events dbh m_main @@ sort matches in
-  let>? () = produce_nft_activitiy_events m_main @@ sort nactivities in
+  let>? () = produce_nft_activity_events m_main @@ sort nactivities in
   Lwt.return_ok ()
 
 let get_level ?dbh () =
@@ -2450,7 +2493,7 @@ let get_nft_activities_by_collection ?dbh ?(sort=LATEST_FIRST) ?continuation ?(s
     match sort with
     | LATEST_FIRST ->
       [%pgsql.object dbh
-          "select activity_type, transaction, block, level, date, contract, \
+          "select activity_type, transaction, index, block, level, date, contract, \
            token_id, owner, amount, tr_from from nft_activities where \
            main and contract = $contract and \
            position(activity_type in $types) > 0 and \
@@ -2462,7 +2505,7 @@ let get_nft_activities_by_collection ?dbh ?(sort=LATEST_FIRST) ?continuation ?(s
            limit $size64"]
     | EARLIEST_FIRST ->
       [%pgsql.object dbh
-          "select activity_type, transaction, block, level, date, contract, \
+          "select activity_type, transaction, index, block, level, date, contract, \
            token_id, owner, amount, tr_from from nft_activities where \
            main and contract = $contract and \
            position(activity_type in $types) > 0 and \
@@ -2505,7 +2548,7 @@ let get_nft_activities_by_item ?dbh ?(sort=LATEST_FIRST) ?continuation ?(size=50
     match sort with
     | LATEST_FIRST ->
       [%pgsql.object dbh
-          "select activity_type, transaction, block, level, date, contract, \
+          "select activity_type, transaction, index, block, level, date, contract, \
            token_id, owner, amount, tr_from from nft_activities where \
            main and contract = $contract and token_id = $token_id and \
            position(activity_type in $types) > 0 and \
@@ -2516,7 +2559,7 @@ let get_nft_activities_by_item ?dbh ?(sort=LATEST_FIRST) ?continuation ?(size=50
            transaction collate \"C\" desc limit $size64"]
     | EARLIEST_FIRST ->
       [%pgsql.object dbh
-          "select activity_type, transaction, block, level, date, contract, \
+          "select activity_type, transaction, index, block, level, date, contract, \
            token_id, owner, amount, tr_from from nft_activities where \
            main and contract = $contract and token_id = $token_id and \
            position(activity_type in $types) > 0 and \
@@ -2556,7 +2599,7 @@ let get_nft_activities_by_user ?dbh ?(sort=LATEST_FIRST) ?continuation ?(size=50
     match sort with
     | LATEST_FIRST ->
       [%pgsql.object dbh
-          "select activity_type, transaction, block, level, date, contract, \
+          "select activity_type, transaction, index, block, level, date, contract, \
            token_id, owner, amount, tr_from from nft_activities where \
            main and \
            (position(owner in $users) > 0 or position(tr_from in $users) > 0) and \
@@ -2569,7 +2612,7 @@ let get_nft_activities_by_user ?dbh ?(sort=LATEST_FIRST) ?continuation ?(size=50
            limit $size64"]
     | EARLIEST_FIRST ->
       [%pgsql.object dbh
-          "select activity_type, transaction, block, level, date, contract, \
+          "select activity_type, transaction, index, block, level, date, contract, \
            token_id, owner, amount, tr_from from nft_activities where \
            main and \
            (position(owner in $users) > 0 or position(tr_from in $users) > 0) and \
@@ -2607,7 +2650,7 @@ let get_nft_activities_all ?dbh ?(sort=LATEST_FIRST) ?continuation ?(size=50) ty
     match sort with
     | LATEST_FIRST ->
       [%pgsql.object dbh "show"
-          "select activity_type, transaction, block, level, date, contract, \
+          "select activity_type, transaction, index, block, level, date, contract, \
            token_id, owner, amount, tr_from from nft_activities where \
            main and position(activity_type in $types) > 0 and \
            ($no_continuation or \
@@ -2617,7 +2660,7 @@ let get_nft_activities_all ?dbh ?(sort=LATEST_FIRST) ?continuation ?(size=50) ty
            transaction collate \"C\" desc limit $size64"]
     | EARLIEST_FIRST ->
       [%pgsql.object dbh "show"
-          "select activity_type, transaction, block, level, date, contract, \
+          "select activity_type, transaction, index, block, level, date, contract, \
            token_id, owner, amount, tr_from from nft_activities where \
            main and position(activity_type in $types) > 0 and \
            ($no_continuation or \
@@ -3641,10 +3684,11 @@ let upsert_order ?dbh order =
   insert_payouts dbh payouts hash_key >>=? fun () ->
   produce_order_event_hash dbh order.order_elt.order_elt_hash
 
-let mk_order_activity_continuation _obj =
-  Printf.sprintf "TODO"
-    (* (Int64.of_float @@ CalendarLib.Calendar.to_unixfloat obj#date)
-     * obj#transaction *)
+let mk_order_activity_continuation obj =
+  Printf.sprintf "%Ld_%s"
+    (Int64.of_float @@
+     CalendarLib.Calendar.to_unixfloat obj#date *. 1000.)
+    obj#id
 
 let get_order_activities_by_collection ?dbh ?(sort=LATEST_FIRST) ?continuation ?(size=50) filter =
   Format.eprintf "get_order_activities_by_collection %s [%s] %s %d@."
@@ -3667,7 +3711,7 @@ let get_order_activities_by_collection ?dbh ?(sort=LATEST_FIRST) ?continuation ?
     match sort with
     | LATEST_FIRST ->
       [%pgsql.object dbh
-          "select order_activity_type, \
+          "select a.id as id, order_activity_type, \
            o.make_asset_type_class, o.make_asset_type_contract, \
            o.make_asset_type_token_id, o.make_asset_value, o.make_asset_decimals, \
            o.take_asset_type_class, o.take_asset_type_contract, \
@@ -3717,14 +3761,14 @@ let get_order_activities_by_collection ?dbh ?(sort=LATEST_FIRST) ?continuation ?
            oright.make_asset_type_contract = $contract or \
            oright.take_asset_type_contract = $contract) and \
            ($no_continuation or \
-           (date = $ts and transaction collate \"C\" < $h) or \
+           (date = $ts and id collate \"C\" < $h) or \
            (date < $ts)) \
            order by date desc, \
-           transaction collate \"C\" desc \
+           id collate \"C\" desc \
            limit $size64"]
     | EARLIEST_FIRST ->
       [%pgsql.object dbh
-          "select order_activity_type, \
+          "select a.id as id, order_activity_type, \
            o.make_asset_type_class, o.make_asset_type_contract, \
            o.make_asset_type_token_id, o.make_asset_value, o.make_asset_decimals, \
            o.take_asset_type_class, o.take_asset_type_contract, \
@@ -3773,10 +3817,10 @@ let get_order_activities_by_collection ?dbh ?(sort=LATEST_FIRST) ?continuation ?
            oright.make_asset_type_contract = $contract or \
            oright.take_asset_type_contract = $contract) and \
            ($no_continuation or \
-           (date = $ts and transaction collate \"C\" > $h) or \
+           (date = $ts and id collate \"C\" > $h) or \
            (date > $ts)) \
            order by date asc, \
-           transaction collate \"C\" asc \
+           id collate \"C\" asc \
            limit $size64"] in
   let>? activities = map_rp (fun r ->
       let|>? (a, decs) = Lwt.return @@ mk_order_activity r in
@@ -3813,7 +3857,7 @@ let get_order_activities_by_item ?dbh ?(sort=LATEST_FIRST) ?continuation ?(size=
     match sort with
     | LATEST_FIRST ->
       [%pgsql.object dbh
-          "select order_activity_type, \
+          "select a.id as id, order_activity_type, \
            o.make_asset_type_class, o.make_asset_type_contract, \
            o.make_asset_type_token_id, o.make_asset_value, o.make_asset_decimals, \
            o.take_asset_type_class, o.take_asset_type_contract, \
@@ -3866,14 +3910,14 @@ let get_order_activities_by_item ?dbh ?(sort=LATEST_FIRST) ?continuation ?(size=
            (oright.take_asset_type_contract = $contract and \
            oright.take_asset_type_token_id = $token_id)) and \
            ($no_continuation or \
-           (date = $ts and transaction collate \"C\" < $h) or \
+           (date = $ts and id collate \"C\" < $h) or \
            (date < $ts)) \
            order by date desc, \
-           transaction collate \"C\" desc \
+           id collate \"C\" desc \
            limit $size64"]
     | EARLIEST_FIRST ->
       [%pgsql.object dbh
-          "select order_activity_type, \
+          "select a.id as id, order_activity_type, \
            o.make_asset_type_class, o.make_asset_type_contract, \
            o.make_asset_type_token_id, o.make_asset_value, o.make_asset_decimals, \
            o.take_asset_type_class, o.take_asset_type_contract, \
@@ -3926,10 +3970,10 @@ let get_order_activities_by_item ?dbh ?(sort=LATEST_FIRST) ?continuation ?(size=
            (oright.take_asset_type_contract = $contract and \
            oright.take_asset_type_token_id = $token_id)) and \
            ($no_continuation or \
-           (date = $ts and transaction collate \"C\" > $h) or \
+           (date = $ts and id collate \"C\" > $h) or \
            (date > $ts)) \
            order by date asc, \
-           transaction collate \"C\" asc \
+           id collate \"C\" asc \
            limit $size64"] in
   let>? activities = map_rp (fun r ->
       let|>? a, decs = Lwt.return @@ mk_order_activity r in
@@ -3961,7 +4005,7 @@ let get_order_activities_all ?dbh ?(sort=LATEST_FIRST) ?continuation ?(size=50) 
     match sort with
     | LATEST_FIRST ->
       [%pgsql.object dbh
-          "select order_activity_type, \
+          "select a.id as id, order_activity_type, \
            o.make_asset_type_class, o.make_asset_type_contract, \
            o.make_asset_type_token_id, o.make_asset_value, o.make_asset_decimals, \
            o.take_asset_type_class, o.take_asset_type_contract, \
@@ -4004,14 +4048,14 @@ let get_order_activities_all ?dbh ?(sort=LATEST_FIRST) ?continuation ?(size=50) 
            left join orders as oright on oright.hash = a.match_right where \
            main and position(order_activity_type in $types) > 0 and \
            ($no_continuation or \
-           (date = $ts and transaction collate \"C\" < $h) or \
+           (date = $ts and id collate \"C\" < $h) or \
            (date < $ts)) \
            order by date desc, \
-           transaction collate \"C\" desc \
+           id collate \"C\" desc \
            limit $size64"]
     | EARLIEST_FIRST ->
       [%pgsql.object dbh
-          "select order_activity_type, \
+          "select a.id as id, order_activity_type, \
            o.make_asset_type_class, o.make_asset_type_contract, \
            o.make_asset_type_token_id, o.make_asset_value, o.make_asset_decimals, \
            o.take_asset_type_class, o.take_asset_type_contract, \
@@ -4054,10 +4098,10 @@ let get_order_activities_all ?dbh ?(sort=LATEST_FIRST) ?continuation ?(size=50) 
            left join orders as oright on oright.hash = a.match_right where \
            main and position(order_activity_type in $types) > 0 and \
            ($no_continuation or \
-           (date = $ts and transaction collate \"C\" > $h) or \
+           (date = $ts and id collate \"C\" > $h) or \
            (date > $ts)) \
            order by date asc, \
-           transaction collate \"C\" asc limit $size64"] in
+           id collate \"C\" asc limit $size64"] in
   let>? activities = map_rp (fun r ->
       let|>? a, decs = Lwt.return @@ mk_order_activity r in
       (a, r), decs) l in
@@ -4091,7 +4135,7 @@ let get_order_activities_by_user ?dbh ?(sort=LATEST_FIRST) ?continuation ?(size=
     match sort with
     | LATEST_FIRST ->
       [%pgsql.object dbh
-          "select order_activity_type, \
+          "select a.id as id, order_activity_type, \
            o.make_asset_type_class, o.make_asset_type_contract, \
            o.make_asset_type_token_id, o.make_asset_value, o.make_asset_decimals, \
            o.take_asset_type_class, o.take_asset_type_contract, \
@@ -4137,14 +4181,14 @@ let get_order_activities_by_user ?dbh ?(sort=LATEST_FIRST) ?continuation ?(size=
            (position(oleft.maker in $users) > 0 or position(oleft.taker in $users) > 0) or \
            (position(oright.maker in $users) > 0 or position(oright.taker in $users) > 0)) and \
            ($no_continuation or \
-           (date = $ts and transaction collate \"C\" < $h) or \
+           (date = $ts and id collate \"C\" < $h) or \
            (date < $ts)) \
            order by date desc, \
-           transaction collate \"C\" desc \
+           id collate \"C\" desc \
            limit $size64"]
     | EARLIEST_FIRST ->
       [%pgsql.object dbh
-          "select order_activity_type, \
+          "select a.id as id, order_activity_type, \
            o.make_asset_type_class, o.make_asset_type_contract, \
            o.make_asset_type_token_id, o.make_asset_value, o.make_asset_decimals, \
            o.take_asset_type_class, o.take_asset_type_contract, \
@@ -4190,10 +4234,10 @@ let get_order_activities_by_user ?dbh ?(sort=LATEST_FIRST) ?continuation ?(size=
            (position(oleft.maker in $users) > 0 or position(oleft.taker in $users) > 0) or \
            (position(oright.maker in $users) > 0 or position(oright.taker in $users) > 0)) and \
            ($no_continuation or \
-           (date = $ts and transaction collate \"C\" > $h) or \
+           (date = $ts and id collate \"C\" > $h) or \
            (date > $ts)) \
            order by date asc, \
-           transaction collate \"C\" asc \
+           id collate \"C\" asc \
            limit $size64"] in
   let>? activities = map_rp (fun r ->
       let|>? a, decs = Lwt.return @@ mk_order_activity r in

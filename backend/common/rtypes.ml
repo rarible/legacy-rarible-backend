@@ -243,9 +243,16 @@ type 'a nft_activity_type =
   | NftActivityTransfer of {elt: 'a nft_activity_elt; from: A.address} [@kind "transfer"] [@kind_label "@type"] [@title "Transfer"] [@def_title]
 [@@deriving encoding {title="NftActivityType"; def_title}]
 
+type 'a nft_act_type = {
+  nft_act_id : string ;
+  nft_act_date : A.date ;
+  nft_act_source : string ;
+  nft_act_type : 'a nft_activity_type ;
+} [@@deriving encoding {title="NftActType"; def_title}]
+
 type 'a nft_activities = {
   nft_activities_continuation : string option ; [@opt]
-  nft_activities_items : 'a nft_activity_type list
+  nft_activities_items : 'a nft_act_type list
 } [@@deriving encoding {title="NftActivities"; def_title}]
 
 type item_history_elt = {
@@ -656,8 +663,15 @@ type 'a activity_type = {
   activity_type : 'a all_activity_type ;
 } [@@deriving encoding {title="ActivityType"; def_title}]
 
+type 'a order_act_type = {
+  order_act_id : string ;
+  order_act_date : A.date ;
+  order_act_source : string ;
+  order_act_type : 'a order_activity_type ;
+} [@@deriving encoding {title="OrderActType"; def_title}]
+
 type 'a order_activities = {
-  order_activities_items : 'a order_activity_type list [@title "OrderActivitiesItems"];
+  order_activities_items : 'a order_act_type list [@title "OrderActivitiesItems"];
   order_activities_continuation : string option ; [@opt]
 } [@@deriving encoding {title="OrderActivities"; def_title}]
 
