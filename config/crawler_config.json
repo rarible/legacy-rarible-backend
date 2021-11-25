@@ -1,9 +1,1 @@
-{
-  "nodes": [ "https://hangzhounet.smartpy.io" ],
-  "start": 90500,
-  "db_kind": "pg",
-  "step_forward": 30,
-  "validator": "KT1U8NoG9oiBYWtszvQ6WiSJyvmeDxo8ZcoT",
-  "exchange_v2": "KT1AguExF32Z9UEKzD5nuixNmqrNs1jBKPT8",
-  "royalties": "KT1Ebv7msgzT9tRGjcWHMnnb6Rm8mAy6b9dq"
-}
+{"nodes":["https://hangzhounet.smartpy.io"],"start":16074,"confirmations_needed":5,"step_forward":30,"exchange_v2":"KT1AguExF32Z9UEKzD5nuixNmqrNs1jBKPT8","validator":"KT1U8NoG9oiBYWtszvQ6WiSJyvmeDxo8ZcoT","royalties":"KT1Ebv7msgzT9tRGjcWHMnnb6Rm8mAy6b9dq"}

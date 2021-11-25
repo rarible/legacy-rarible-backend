@@ -14,7 +14,8 @@ let royalties = "KT1Ebv7msgzT9tRGjcWHMnnb6Rm8mAy6b9dq"
 let validator = "KT1U8NoG9oiBYWtszvQ6WiSJyvmeDxo8ZcoT"
 let exchange_v2 = "KT1AguExF32Z9UEKzD5nuixNmqrNs1jBKPT8"
 let fill = "KT1GwQQ2HL8JW931AMod49fmNmS2kfjqAtS7"
-let lugh_contract = "KT1HT3EbSPFA1MM2ZiMThB6P6Kky5jebNgAx"
+
+let lugh_contract = "KT1StBf222xBLfLTChsute8F9HSt9kVHpqdY"
 
 let config = {
   admin_wallet = "" ;
@@ -109,7 +110,11 @@ let js = ref false
 
 let spec = [
   "--api", Arg.Set_string api, "api address (default: http://localhost:8080)";
-  "--endpoint", Arg.Set_string endpoint, "node endpoint (default: http://granada.tz.functori.com)";
+  "--endpoint",
+  Arg.String (fun str ->
+      endpoint := str;
+      Script.endpoint := Some str),
+  "node endpoint (default: http://granada.tz.functori.com)";
   "--client", Arg.Set_string Script.client, "tezos client" ;
   "--sdk", Arg.Set sdk, "use sdk to make tezos operations (default: false, uses tezos-client)";
   "--verbose", Arg.Set_int Script.verbose, "verbosity";
@@ -121,7 +126,7 @@ let wait_next_block () =
     Db.get_level () >>= function
     | Ok level ->
       Printf.eprintf "wait_next_block level0 %d level %d\n%!" level0 level ;
-      if level <> level0 then Lwt.return_unit
+      if level > level0 then Lwt.return_unit
       else
         Lwt_unix.sleep 20. >>= fun () ->
         aux level0
@@ -133,6 +138,42 @@ let wait_next_block () =
     Lwt.return @@ Format.eprintf "wait_next_block error %s\n%!" @@ Crp.string_of_error err
   | Ok level ->
     aux level
+
+let wait_op_included ?(timeout=180.) hash =
+  Format.eprintf "wait_op_included %s@." hash ;
+  let rec aux () =
+    let>? b = Db.is_op_included hash in
+    if b then
+      begin
+        Printf.eprintf "op %s crawled\n%!" hash ;
+        Lwt.return_ok ()
+      end
+    else
+      Lwt_unix.sleep 20. >>= fun () ->
+      aux ()
+  in
+  let timeout =
+    Lwt_unix.sleep timeout >>= fun () ->
+    Lwt.return_error (`hook_error "timeout") in
+  Lwt.pick [ timeout ; aux () ]
+
+let wait_deploy_crawled ?(timeout=180.) address =
+  Format.eprintf "wait_deploy_crawled %s@." address ;
+  let rec aux () =
+    let>? b = Db.is_collection_crawled address in
+    if b then
+      begin
+        Printf.eprintf "contract %s crawled\n%!" address ;
+        Lwt.return_ok ()
+      end
+    else
+      Lwt_unix.sleep 20. >>= fun () ->
+      aux ()
+  in
+  let timeout =
+    Lwt_unix.sleep timeout >>= fun () ->
+    Lwt.return_error (`hook_error "timeout") in
+  Lwt.pick [ timeout ; aux () ]
 
 let by_pk i =
   match List.find_opt (fun a -> a.edpk = i) accounts with
@@ -175,6 +216,22 @@ let rec sys_command ?(verbose=0) ?(retry=0) c =
   end
   else
     code, out_temp_fn, err_temp_fn
+
+let get_op_hash out_file =
+  let strs = Array.to_list @@ Arg.read_arg out_file in
+  let op =
+    List.fold_left (fun acc l ->
+        match acc with
+        | Some _ -> acc
+        | None ->
+          begin match String.split_on_char '\'' l with
+            | _before :: op_hash :: _ -> Some op_hash
+            | _ -> acc
+          end)
+      None strs in
+  match op with
+  | None -> Lwt.fail_with @@ Printf.sprintf "can't find op_hash in %s" out_file
+  | Some op -> Lwt.return_ok op
 
 let pk_to_pkh_exn pk =
   Result.get_ok @@ Tzfunc.Crypto.pk_to_pkh pk
@@ -851,7 +908,9 @@ let deploy ?verbose ?(burn_cap=42.1) ~filename ~storage ~source alias =
   if code <> 0 then
     failwith (Printf.sprintf "deploy failure : out %S err %S" out err)
   else
-    wait_next_block ()
+    wait_next_block () >>= fun () ->
+    wait_next_block () >>= fun () ->
+    Lwt.return_ok ()
 
 let create_collection ?(royalties=pick_royalties ()) ?alias ?(kind=`nft) ?(privacy=`priv) () =
   let col_alias = generate_alias "collection" in
@@ -903,7 +962,7 @@ let deploy_collection c =
   Printf.eprintf "Deploying new collection\n%!" ;
   if !js then
     let col_kt1 = Script_js.deploy_collection ~endpoint:!endpoint c in
-    Lwt.return { c with col_kt1 }
+    Lwt.return_ok { c with col_kt1 }
   else
     let filename, storage = match c.col_kind, c.col_privacy with
       | `nft, `priv -> "contracts/arl/nft-private.arl", Script.storage_private_nft c.col_admin.tz1
@@ -911,13 +970,13 @@ let deploy_collection c =
       | `nft, `pub -> "contracts/arl/nft-public.arl", Script.storage_public_nft c.col_admin.tz1
       | `mt, `pub -> "contracts/arl/mt-public.arl", Script.storage_public_multi c.col_admin.tz1 in
     (* let storage = Script.storage_public_nft c.col_admin.tz1 in *)
-    let> () = deploy ~filename ~storage ~source:c.col_source c.col_alias in
+    let>? () = deploy ~filename ~storage ~source:c.col_source c.col_alias in
     Printf.eprintf "  deployed collection %s\n%!" c.col_alias ;
     let col_kt1 = find_kt1 c.col_alias in
     let c = { c with col_kt1 } in
     let> () = set_metadata c in
     Printf.eprintf "  --> %s:%s\n%!" c.col_alias c.col_kt1 ;
-    Lwt.return c
+    Lwt.return_ok c
 
 let deploy_ubi_collection c =
   Printf.eprintf "Deploying new collection\n%!" ;
@@ -925,13 +984,13 @@ let deploy_ubi_collection c =
   else
     let filename = "contracts/mich/ubi.tz" in
     let storage = Script.storage_ubi c.col_admin.tz1 in
-    let> () = deploy ~filename ~storage ~source:c.col_source c.col_alias in
+    let>? () = deploy ~filename ~storage ~source:c.col_source c.col_alias in
     Printf.eprintf "  deployed collection %s\n%!" c.col_alias ;
     let col_kt1 = find_kt1 c.col_alias in
     let c = { c with col_kt1 } in
     let> () = set_metadata c in
     Printf.eprintf "  --> %s:%s\n%!" c.col_alias c.col_kt1 ;
-    Lwt.return c
+    Lwt.return_ok c
 
 let create_royalties () =
   Printf.eprintf "Creating new royalties\n%!" ;
@@ -939,15 +998,15 @@ let create_royalties () =
   let source = generate_address () in
   if !js then
     let kt1 = Script_js.deploy_royalties ~endpoint:!endpoint ~source ~admin () in
-    Lwt.return (kt1, admin)
+    Lwt.return_ok (kt1, admin)
   else
     let alias = generate_alias "royalties" in
     may_import_key admin ;
     may_import_key source ;
     let filename = "contracts/arl/royalties.arl" in
     let storage = Script.storage_royalties ~admin:admin.tz1 in
-    let> () = deploy ~filename ~storage ~source alias in
-    Lwt.return (alias, admin)
+    let>? () = deploy ~filename ~storage ~source alias in
+    Lwt.return_ok (alias, admin)
 
 let create_validator ~exchange ~royalties ~fill =
   Printf.eprintf "Creating new validator\n%!" ;
@@ -956,14 +1015,14 @@ let create_validator ~exchange ~royalties ~fill =
   if !js then
     let kt1_validator =
       Script_js.deploy_validator ~endpoint:!endpoint ~exchange ~royalties ~fill ~admin ~source () in
-    Lwt.return (kt1_validator, source)
+    Lwt.return_ok (kt1_validator, source)
   else
     let alias = generate_alias "validator" in
     may_import_key source ;
     let filename = "contracts/arl/validator.arl" in
     let storage = Script.storage_validator ~admin:admin.tz1 ~exchange ~royalties ~fill in
-    let> () = deploy ~burn_cap:4.67575 ~filename ~storage ~source alias in
-    Lwt.return (alias, source)
+    let>? () = deploy ~burn_cap:4.67575 ~filename ~storage ~source alias in
+    Lwt.return_ok (alias, source)
 
 let create_exchange () =
   Printf.eprintf "Creating new exchange\n%!" ;
@@ -976,20 +1035,20 @@ let create_exchange () =
   if !js then
     let kt1_exchange = Script_js.deploy_exchange ~endpoint:!endpoint ~admin
         ~receiver ~fee:(Z.of_int 300) source in
-    Lwt.return (kt1_exchange, admin, receiver)
+    Lwt.return_ok (kt1_exchange, admin, receiver)
   else
     let filename = "contracts/arl/exchangeV2.arl" in
     let storage = Script.storage_exchange ~admin:admin.tz1 ~receiver:receiver.tz1 ~fee:(Z.of_int 300) in
     let alias = generate_alias "exchange" in
-    let> () = deploy ~burn_cap:42.1 ~filename ~storage ~source alias in
-    Lwt.return (alias, admin, receiver)
+    let>? () = deploy ~burn_cap:42.1 ~filename ~storage ~source alias in
+    Lwt.return_ok (alias, admin, receiver)
 
 let create_fill () =
   Printf.eprintf "Creating new fill\n%!" ;
   let admin = generate_address () in
   if !js then
     let kt1 = Script_js.deploy_fill ~endpoint:!endpoint admin in
-    Lwt.return (kt1, admin)
+    Lwt.return_ok (kt1, admin)
   else
     let alias = generate_alias "fill" in
     may_import_key admin ;
@@ -997,7 +1056,7 @@ let create_fill () =
     may_import_key source ;
     let filename = "contracts/arl/fill.arl" in
     let storage = Script.storage_fill admin.tz1 in
-    let|> () = deploy ~filename ~storage ~source alias in
+    let|>? () = deploy ~filename ~storage ~source alias in
     alias, admin
 
 let set_validator ~validator ~source ~contract =
@@ -1043,15 +1102,24 @@ let ubi_set_royalties id royalties source contract =
 let update_operators_for_all operator source contract =
   Printf.eprintf "update_operators_for_all %s for %s on %s\n%!" operator source.tz1 contract ;
   if !js then
-    Script_js.update_operators_for_all ~endpoint:!endpoint ~contract ~operator source
+    let> () =
+      Script_js.update_operators_for_all ~endpoint:!endpoint ~contract ~operator source in
+    Lwt.return_ok ()
   else
     let cmd =
-      Script.update_operators_for_all_aux ~endpoint:!endpoint [ operator, true ] source.tz1 contract in
+      Script.update_operators_for_all_aux
+        ~endpoint:!endpoint [ operator, true ] source.tz1 contract in
     let code, out, err = sys_command cmd in
     if code <> 0 then
-      Lwt.return @@
+      Lwt.return_ok @@
       Printf.eprintf "update_operator_for_all failure (log %s err %s)\n%!" out err
-    else Lwt.return_unit
+    else
+      get_op_hash out >>= function
+      | Ok hash ->
+        wait_op_included hash
+      | Error err ->
+        Printf.eprintf "update_operator_for_all error %s" @@ Tzfunc.Rp.string_of_error err ;
+        Lwt.return_ok ()
 
 let update_operators token_id owner operator source contract =
   Printf.eprintf "update_operators %s for %s on %s\n%!" operator (fst source) contract ;
@@ -1064,12 +1132,20 @@ let update_operators token_id owner operator source contract =
         (fst source) contract in
     let code, out, err = sys_command cmd in
     if code <> 0 then
-      Lwt.return @@
+      Lwt.return_ok @@
       Printf.eprintf "update_operator failure (log %s err %s)\n%!" out err
-    else Lwt.return_unit
+    else
+      get_op_hash out >>= function
+      | Ok hash ->
+        wait_op_included hash
+      | Error err ->
+        Printf.eprintf "update_operators error %s" @@ Tzfunc.Rp.string_of_error err ;
+        Lwt.return_ok ()
 
 let mint_tokens c it =
-  if !js then Script_js.mint_tokens ~endpoint:!endpoint c it
+  if !js then
+    let> () = Script_js.mint_tokens ~endpoint:!endpoint c it in
+    Lwt.return_ok ()
   else
     let cmd = Script.mint_tokens_aux
         ~endpoint:!endpoint ~id:it.it_token_id
@@ -1078,9 +1154,11 @@ let mint_tokens c it =
         c.col_admin.tz1 c.col_kt1 in
     let code, out, err = sys_command cmd in
     if code <> 0 then
-      Lwt.return @@
-      Printf.eprintf "mint failure (log %s err %s)\n%!" out err
-    else wait_next_block ()
+      Lwt.fail_with @@
+      Printf.sprintf "mint failure (log %s err %s)\n%!" out err
+    else
+      let>? hash = get_op_hash out in
+      wait_op_included hash
 
 let mint_ubi_tokens c it =
   if !js then
@@ -1097,19 +1175,23 @@ let mint_ubi_tokens c it =
 
 let burn_tokens it kind =
   if !js then
-    Script_js.burn_tokens ~endpoint:!endpoint it kind
+    let> () = Script_js.burn_tokens ~endpoint:!endpoint it kind in
+    Lwt.return_ok ()
   else
     let cmd = Script.burn_tokens_aux ~endpoint:!endpoint ~id:it.it_token_id
         ~kind it.it_owner.tz1 it.it_collection in
     let code, out, err = sys_command cmd in
     if code <> 0 then
-      Lwt.return @@
+      Lwt.return_ok @@
       Printf.eprintf "burn failure (log %s err %s)\n%!" out err
-    else Lwt.return_unit
+    else
+      let>? hash = get_op_hash out in
+      wait_op_included hash
 
 let transfer_tokens it amount new_owner =
   if !js then
-    Script_js.transfer_tokens ~endpoint:!endpoint it ~amount new_owner
+    let> () = Script_js.transfer_tokens ~endpoint:!endpoint it ~amount new_owner in
+    Lwt.return_ok ()
   else
     let cmd =
       Script.transfer_aux ~endpoint:!endpoint
@@ -1118,9 +1200,11 @@ let transfer_tokens it amount new_owner =
         it.it_owner.tz1 it.it_collection in
     let code, out, err = sys_command cmd in
     if code <> 0 then
-      Lwt.return @@
+      Lwt.return_ok @@
       Printf.eprintf "transfer failure (log %s err %s)\n%!" out err
-    else Lwt.return_unit
+    else
+      let>? hash = get_op_hash out in
+      wait_op_included hash
 
 let mint_with_random_token_id c =
   Printf.eprintf "mint_with_random_token_id for %s on %s\n%!" c.col_admin.tz1 c.col_kt1 ;
@@ -1132,8 +1216,13 @@ let mint_with_random_token_id c =
   let it_royalties = generate_royalties () in
   let it_metadata = generate_ipfs_metadata () in
   let item = {it_owner; it_token_id; it_kind; it_royalties; it_metadata; it_collection=c.col_kt1} in
-  mint_tokens c item >>= fun () ->
-  Lwt.return_ok item
+  mint_tokens c item >>= function
+  | Ok () ->
+    Lwt.return_ok item
+  | Error err ->
+    Lwt.fail_with @@
+    Format.sprintf "mint_one_with_token_id_from_api %s\n%!" @@
+    Crp.string_of_error err
 
 let mint_one_with_token_id_from_api ?metadata_link ?diff ?alias c =
   let it_owner =
@@ -1144,9 +1233,15 @@ let mint_one_with_token_id_from_api ?metadata_link ?diff ?alias c =
   let it_metadata = generate_ipfs_metadata ?metadata_link () in
   let>? it_token_id = call_generate_token_id c.col_kt1 in
   let it_kind = match c.col_kind with `nft -> `nft | `mt -> `mt Z.one in
-  let item = {it_owner; it_token_id; it_kind; it_royalties; it_metadata; it_collection=c.col_kt1} in
-  let> () = mint_tokens c item in
-  Lwt.return_ok item
+  let item =
+    {it_owner; it_token_id; it_kind; it_royalties; it_metadata; it_collection=c.col_kt1} in
+  mint_tokens c item >>= function
+  | Ok () ->
+    Lwt.return_ok item
+  | Error err ->
+    Lwt.fail_with @@
+    Format.sprintf "mint_one_with_token_id_from_api %s\n%!" @@
+    Crp.string_of_error err
 
 let mint_ubi_with_token_id_from_api ?diff ?alias c =
   Printf.eprintf "mint_one_with_token_id_from_api for %s on %s\n%!" c.col_admin.tz1 c.col_kt1 ;
@@ -1174,12 +1269,23 @@ let mint_with_token_id_from_api c =
   let it_metadata = generate_ipfs_metadata () in
   let>? it_token_id = call_generate_token_id c.col_kt1 in
   let item = {it_owner; it_token_id; it_kind; it_royalties; it_metadata; it_collection=c.col_kt1} in
-  let> () = mint_tokens c item in
-  Lwt.return_ok item
+  mint_tokens c item >>= function
+  | Ok () ->
+    Lwt.return_ok item
+  | Error err ->
+    Lwt.fail_with @@
+    Format.sprintf "mint_with_token_id_from_api %s\n%!" @@
+    Crp.string_of_error err
 
 let burn_with_token_id it kind =
   Printf.eprintf "burn_with_token_id for %s on %s\n%!" it.it_owner.tz1 it.it_collection ;
-  burn_tokens it kind
+  burn_tokens it kind >>= function
+  | Ok () ->
+    Lwt.return_ok ()
+  | Error err ->
+    Lwt.fail_with @@
+    Format.sprintf "burn_with_token_id_from_api %s\n%!" @@
+    Crp.string_of_error err
 
 let transfer_with_token_id it amount new_owner =
   Printf.eprintf "transfer_with_token_id %s from %s to %s on %s\n%!"
@@ -1201,7 +1307,7 @@ let burn it =
       else
         let a = Z.of_int64 @@ Random.int64 (Z.to_int64 max_amount) in
         `mt a, Some (`mt (Z.sub max_amount a)) in
-  let|> () = burn_with_token_id it kind in
+  let|>? () = burn_with_token_id it kind in
   match new_kind with None -> None | Some it_kind -> Some { it with it_kind }
 
 let transfer it =
@@ -1216,7 +1322,7 @@ let transfer it =
           Random.int64 Int64.(sub (Z.to_int64 max_amount) 1L) in
         Some { it with it_kind = `mt (Z.sub max_amount a) },
         { it with it_kind = `mt a; it_owner = new_owner }, a in
-  let|> () = transfer_with_token_id it amount new_owner in
+  let|>? () = transfer_with_token_id it amount new_owner in
   old_item, new_item
 
 let make_tr ?entrypoint ?(fee= -1L) ?(gas_limit=Z.minus_one)
@@ -1305,7 +1411,7 @@ let random_mint ?with_token_id collections =
 let random_burn items =
   let selected = Random.int @@ List.length items in
   let it = List.nth items selected in
-  let|> new_item = burn it in
+  let|>? new_item = burn it in
   match new_item with
   | None ->
     let l = List.mapi (fun i it -> if i = selected then None else Some it) items in
@@ -1316,7 +1422,7 @@ let random_burn items =
 let random_transfer items =
   let selected = Random.int @@ List.length items in
   let it = List.nth items selected in
-  let|> old_item, new_item = transfer it  in
+  let|>? old_item, new_item = transfer it  in
   match old_item with
     | None ->
       let l = List.mapi (fun i it -> if i = selected then None else Some it) items in
@@ -1912,7 +2018,7 @@ let mint_check_random ?verbose ?with_token_id collections =
   Lwt.return_ok item
 
 let burn_check_random items =
-  let> (items, updated_item) = random_burn items in
+  let>? (items, updated_item) = random_burn items in
   wait_next_block () >>= fun () ->
   let> () = match updated_item with
     | None -> Lwt.return_unit (* todo: check if amount is 0 *)
@@ -1923,13 +2029,14 @@ let transfer_check_random items =
   Printf.eprintf "before [%s]\n%!" @@ String.concat " ; " @@
   List.map (fun it ->
       let am = match it.it_kind with `nft -> Z.one | `mt am -> am in
-      Printf.sprintf "%s:%s-%s" (Z.to_string it.it_token_id) it.it_owner.tz1 (Z.to_string am)) items ;
-  let> (items, updated_item, new_item) = random_transfer items in
+      Printf.sprintf "%s:%s-%s"
+        (Z.to_string it.it_token_id) it.it_owner.tz1 (Z.to_string am)) items ;
+  let>? (items, updated_item, new_item) = random_transfer items in
   Printf.eprintf "after [%s]\n%!" @@ String.concat " ; " @@
   List.map (fun it ->
       let am = match it.it_kind with `nft -> Z.one | `mt am -> am in
-      Printf.sprintf "%s:%s-%s" (Z.to_string it.it_token_id) it.it_owner.tz1 (Z.to_string am)) items ;
-  wait_next_block () >>= fun () ->
+      Printf.sprintf "%s:%s-%s"
+        (Z.to_string it.it_token_id) it.it_owner.tz1 (Z.to_string am)) items ;
   let> () = match updated_item with
     | None -> Lwt.return_unit (* todo: check if amount is 0 *)
     | Some it ->
@@ -2006,7 +2113,7 @@ let deploy_check_random_collections ?royalties ?(max=10) () =
   let nb = Random.int max + 1 in
   Printf.eprintf "Deploying and checking %d collection(s)\n%!" nb ;
   let collections = create_collections ?royalties nb in
-  let> new_collections = Lwt_list.map_s deploy_collection collections in
+  let>? new_collections = map_rp deploy_collection collections in
   Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
   let> () = Lwt_unix.sleep 6. in
   let> res = Lwt_list.map_s check_collection new_collections in
@@ -2017,7 +2124,7 @@ let deploy_check_random_collections ?royalties ?(max=10) () =
         Printf.eprintf "[KO] API: check_collection (error : %s)\n%!" @@
         Api.Errors.string_of_error err)
     res >>= fun () ->
-  Lwt.return new_collections
+  Lwt.return_ok new_collections
 
 let reset_db () =
   Printf.eprintf "Resetting db\n%!" ;
@@ -2105,16 +2212,16 @@ let start_crawler admin_wallet validator exchange_v2 royalties
 let setup_test_env ?(spawn_exchange_infra=false) () =
   reset_db () ;
   if spawn_exchange_infra then
-    let> r_alias, _r_source = create_royalties () in
+    let>? r_alias, _r_source = create_royalties () in
     let r_kt1 = find_kt1 r_alias in
     Printf.eprintf "New royalties %s\n%!" r_kt1 ;
-    let> ex_alias, ex_admin, _ex_receiver = create_exchange () in
+    let>? ex_alias, ex_admin, _ex_receiver = create_exchange () in
     let ex_kt1 = find_kt1 ex_alias in
     Printf.eprintf "New exchange %s\n%!" ex_kt1 ;
-    let> fill_alias, fill_admin = create_fill () in
+    let>? fill_alias, fill_admin = create_fill () in
     let fill_kt1 = find_kt1 fill_alias in
     Printf.eprintf "New fill %s\n%!" fill_kt1 ;
-    let> v_alias, _v_source =
+    let>? v_alias, _v_source =
       create_validator ~exchange:ex_kt1 ~royalties:r_kt1 ~fill:fill_kt1 in
     let v_kt1 = find_kt1 v_alias in
     Printf.eprintf "New validator %s\n%!" v_kt1 ;
@@ -2126,7 +2233,7 @@ let setup_test_env ?(spawn_exchange_infra=false) () =
     set_validator ~validator:v_kt1 ~source:fill_admin ~contract:fill_kt1 >>= fun () ->
     Printf.eprintf "Waiting 6sec to let crawler catch up...\n%!" ;
     Lwt_unix.sleep 6. >>= fun () ->
-    Lwt.return (r_kt1, ex_kt1)
+    Lwt.return_ok (r_kt1, ex_kt1)
   else
     start_crawler ""
       validator exchange_v2 royalties
@@ -2136,7 +2243,7 @@ let setup_test_env ?(spawn_exchange_infra=false) () =
     crawler_pid := Some cpid ;
     Printf.eprintf "Waiting 6sec to let crawler catch up...\n%!" ;
     Lwt_unix.sleep 6. >>= fun () ->
-    Lwt.return (royalties, exchange_v2)
+    Lwt.return_ok (royalties, exchange_v2)
 
 let clean_test_env () =
   begin match !api_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
@@ -2144,87 +2251,104 @@ let clean_test_env () =
 
 let transfer_test ?royalties ~kind ~privacy () =
   let c = create_collection ?royalties ~kind ~privacy () in
-  let> c = deploy_collection c in
-  let> () = wait_next_block () in
-  let>? () = check_collection c in
-  let>? item1 = match kind with
-    | `nft -> mint_one_with_token_id_from_api c
-    | `mt ->  mint_with_token_id_from_api c in
-  wait_next_block () >>= fun () ->
-  let> () = check_item item1 in
-  let>? item2 = match kind with
-    | `nft -> mint_one_with_token_id_from_api c
-    | `mt ->  mint_with_token_id_from_api c in
-  wait_next_block () >>= fun () ->
-  let> () = check_item item2 in
-  transfers_check_random ~max:5 [item1 ; item2] >>= begin function
-    | Error err ->
-      Lwt.return_ok @@
-      Printf.eprintf "transfer error %s" @@
-      Api.Errors.string_of_error err
-    | Ok _items -> Lwt.return_ok ()
-  end
+  deploy_collection c >>= function
+  | Ok c ->
+    let>? () = check_collection c in
+    wait_next_block () >>= fun () ->
+    let>? item1 = match kind with
+      | `nft -> mint_one_with_token_id_from_api c
+      | `mt ->  mint_with_token_id_from_api c in
+    let> () = check_item item1 in
+    let>? item2 = match kind with
+      | `nft -> mint_one_with_token_id_from_api c
+      | `mt ->  mint_with_token_id_from_api c in
+    let> () = check_item item2 in
+    transfers_check_random ~max:5 [item1 ; item2] >>= begin function
+      | Error err ->
+        Lwt.return_ok @@
+        Printf.eprintf "transfer error %s" @@
+        Crp.string_of_error err
+      | Ok _items -> Lwt.return_ok ()
+    end
+  | Error err ->
+    Lwt.return_ok @@
+    Printf.eprintf "transfer_test error %s" @@
+    Crp.string_of_error err
 
 let burn_test ?royalties ~kind ~privacy () =
   let c = create_collection ?royalties ~kind ~privacy () in
-  let> c = deploy_collection c in
-  let> () = wait_next_block () in
-  let>? () = check_collection c in
-  let>? item1 = mint_one_with_token_id_from_api c in
-  wait_next_block () >>= fun () ->
-  let> () = check_item item1 in
-  let> new_item1 = burn item1 in
-  wait_next_block () >>= fun () ->
-  let> () = match new_item1 with
-    | None -> check_not_item item1
-    | Some it -> check_item it in
-  Lwt.return_ok ()
-
-let reset_meta_test ?royalties ~kind ~privacy () =
-  let c = create_collection ?royalties ~kind ~privacy () in
-  let> c = deploy_collection c in
-  let>? () = check_collection c in
-  Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
-  let> () = Lwt_unix.sleep 6. in
-  let>? item1 = match kind with
-    | `nft -> mint_one_with_token_id_from_api ~metadata_link:"http://localhost:8888/meta.json" c
-    | `mt ->  mint_with_token_id_from_api c in
-  wait_next_block () >>= fun () ->
-  Lwt_unix.sleep 60.0 >>= fun () ->
-  let>? nft_item_1 =
-    call_get_nft_item_by_id ~include_meta:true
-      item1.it_collection
-      (Z.to_string item1.it_token_id) in
-  begin match nft_item_1.nft_item_meta with
-    | None ->
-      Format.eprintf "meta None@." ;
-    | Some m ->
-      Format.eprintf "meta %S@." @@ EzEncoding.construct nft_item_meta_enc m
-  end ;
-  call_reset_nft_item_meta_by_id
-    item1.it_collection
-    (Z.to_string item1.it_token_id) >>= function
-  | Ok () ->
+  deploy_collection c >>= function
+  | Ok c ->
+    let>? () = check_collection c in
     wait_next_block () >>= fun () ->
-    let>? nft_item_2 =
-      call_get_nft_item_by_id ~include_meta:true
-        item1.it_collection
-        (Z.to_string item1.it_token_id) in
-    if nft_item_1.nft_item_meta <> nft_item_2.nft_item_meta then
-      Printf.eprintf "[OK] different meta\n%!"
-    else
-      Printf.eprintf "[KO] same meta\n%!" ;
-    begin match nft_item_2.nft_item_meta with
+    let>? item1 = mint_one_with_token_id_from_api c in
+    let> () = check_item item1 in
+    let>? new_item1 = burn item1 in
+    let>? () = match new_item1 with
       | None ->
-        Format.eprintf "meta None@." ;
-      | Some m ->
-        Format.eprintf "meta %S@." @@ EzEncoding.construct nft_item_meta_enc m
-    end ;
+        let> () = check_not_item item1 in
+        Lwt.return_ok ()
+      | Some it ->
+        let> () = check_item it in
+        Lwt.return_ok () in
     Lwt.return_ok ()
   | Error err ->
     Lwt.return_ok @@
+    Printf.eprintf "burn_test error %s" @@
+    Crp.string_of_error err
+
+let reset_meta_test ?royalties ~kind ~privacy () =
+  let c = create_collection ?royalties ~kind ~privacy () in
+  deploy_collection c >>= function
+  | Ok c ->
+    begin
+      let>? () = check_collection c in
+      Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
+      let> () = Lwt_unix.sleep 6. in
+      let>? item1 = match kind with
+        | `nft -> mint_one_with_token_id_from_api ~metadata_link:"http://localhost:8888/meta.json" c
+        | `mt ->  mint_with_token_id_from_api c in
+      wait_next_block () >>= fun () ->
+      Lwt_unix.sleep 60.0 >>= fun () ->
+      let>? nft_item_1 =
+        call_get_nft_item_by_id ~include_meta:true
+          item1.it_collection
+          (Z.to_string item1.it_token_id) in
+      begin match nft_item_1.nft_item_meta with
+        | None ->
+          Format.eprintf "meta None@." ;
+        | Some m ->
+          Format.eprintf "meta %S@." @@ EzEncoding.construct nft_item_meta_enc m
+      end ;
+      call_reset_nft_item_meta_by_id
+        item1.it_collection
+        (Z.to_string item1.it_token_id) >>= function
+      | Ok () ->
+        wait_next_block () >>= fun () ->
+        let>? nft_item_2 =
+          call_get_nft_item_by_id ~include_meta:true
+            item1.it_collection
+            (Z.to_string item1.it_token_id) in
+        if nft_item_1.nft_item_meta <> nft_item_2.nft_item_meta then
+          Printf.eprintf "[OK] different meta\n%!"
+        else
+          Printf.eprintf "[KO] same meta\n%!" ;
+        begin match nft_item_2.nft_item_meta with
+          | None ->
+            Format.eprintf "meta None@." ;
+          | Some m ->
+            Format.eprintf "meta %S@." @@ EzEncoding.construct nft_item_meta_enc m
+        end ;
+        Lwt.return_ok ()
+      | Error err ->
+        Lwt.return_ok @@
+        Printf.eprintf "reset error %s" @@
+        Api.Errors.string_of_error err
+    end
+  | Error err ->
+    Lwt.return_ok @@
     Printf.eprintf "reset error %s" @@
-    Api.Errors.string_of_error err
+    Crp.string_of_error err
 
 let sell_nft_for_nft ?salt collection item1 item2 =
   match order_form_from_items ?salt collection item1 item2 with
@@ -2265,164 +2389,136 @@ let get_token_id_from_item (_owner, _amount, token_id, _royalties, _metadata) =
 
 let match_orders_nft ?royalties ?(exchange=exchange_v2) ~kind ~privacy () =
   let c = create_collection ?royalties ~kind ~privacy () in
-  let> c = deploy_collection c in
+  let>? c = deploy_collection c in
   let>? () = check_collection c in
-  Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
-  let> () = Lwt_unix.sleep 6. in
+  let> () = wait_next_block () in
   let>? item1 = mint_one_with_token_id_from_api c in
-  Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
-  let> () = Lwt_unix.sleep 6. in
   let> () = check_item item1 in
-  let> () =
-    update_operators
-      item1.it_token_id
-      item1.it_owner.tz1
-      exchange
-      (item1.it_owner.tz1, item1.it_owner.edsk)
-      item1.it_collection in
-  let>? item2 = mint_one_with_token_id_from_api ~diff:item1.it_owner.tz1 c in
-  wait_next_block () >>= fun () ->
-  let> () = check_item item2 in
-  let> () = update_operators_for_all exchange item2.it_owner item2.it_collection in
-  wait_next_block () >>= fun () ->
-  (* let tid = get_token_id_from_item item1 in *)
-  let>? order1 = sell_nft_for_nft c.col_kt1 item1 item2 in
-  let order1 = Common.Balance.z_order order1 in
-  (* TODO : check order *)
-  let>? order2 = sell_nft_for_nft ~salt:1 c.col_kt1 item2 item1 in
-  let order2 = Common.Balance.z_order order2 in
-  (* TODO : check order *)
-  let> r = match_orders ~source:item1.it_owner ~contract:exchange order1 order2 in
-  let> () = match r with
+  update_operators
+    item1.it_token_id item1.it_owner.tz1 exchange
+    (item1.it_owner.tz1, item1.it_owner.edsk) item1.it_collection >>= function
+  | Error err ->
+    Lwt.return_ok @@
+    Printf.eprintf "match_orders_nft error %s" @@
+    Crp.string_of_error err
+  | Ok () ->
+    let>? item2 = mint_one_with_token_id_from_api ~diff:item1.it_owner.tz1 c in
+    let> () = check_item item2 in
+    update_operators_for_all exchange item2.it_owner item2.it_collection >>= function
     | Error err ->
-      Printf.eprintf "match_orders error %s" @@ Tzfunc.Rp.string_of_error err ;
-      Lwt.return_unit
-    | Ok op_hash ->
-    Printf.eprintf "HASH = %s\n%!" op_hash ;
-    Printf.eprintf "Waiting next block...\n%!" ;
-    let> () = wait_next_block () in
-    Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
-    let> () = Lwt_unix.sleep 6. in
-    let> () = check_item {item2 with it_owner = item2.it_owner} in
-    check_item {item1 with it_owner = item2.it_owner} in
-  begin match !api_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
-  begin match !crawler_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
-  Lwt.return_ok ()
+      Lwt.return_ok @@
+      Printf.eprintf "match_orders_nft error %s" @@
+      Crp.string_of_error err
+    | Ok () ->
+      (* let tid = get_token_id_from_item item1 in *)
+      let>? order1 = sell_nft_for_nft c.col_kt1 item1 item2 in
+      let order1 = Common.Balance.z_order order1 in
+      (* TODO : check order *)
+      let>? order2 = sell_nft_for_nft ~salt:1 c.col_kt1 item2 item1 in
+      let order2 = Common.Balance.z_order order2 in
+      (* TODO : check order *)
+      let> r = match_orders ~source:item1.it_owner ~contract:exchange order1 order2 in
+      let> () = match r with
+        | Error err ->
+          Printf.eprintf "match_orders error %s" @@ Tzfunc.Rp.string_of_error err ;
+          Lwt.return_unit
+        | Ok op_hash ->
+          Printf.eprintf "HASH = %s\n%!" op_hash ;
+          Printf.eprintf "Waiting next block...\n%!" ;
+          let> () = wait_next_block () in
+          Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
+          let> () = Lwt_unix.sleep 6. in
+          let> () = check_item {item2 with it_owner = item2.it_owner} in
+          check_item {item1 with it_owner = item2.it_owner} in
+      Lwt.return_ok ()
 
 let match_orders_tezos ?royalties ?(exchange=exchange_v2) ~kind ~privacy () =
   let c = create_collection ?royalties ~kind ~privacy () in
-  let> c = deploy_collection c in
-  Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
-  Lwt_unix.sleep 6. >>= fun () ->
+  let>? c = deploy_collection c in
   let>? () = check_collection c in
+  let> () = wait_next_block () in
   let>? item1 = mint_one_with_token_id_from_api c in
   wait_next_block () >>= fun () ->
   let> () = check_item item1 in
-  let> () =
-    update_operators
-      item1.it_token_id
-      item1.it_owner.tz1
-      exchange
-      (item1.it_owner.tz1, item1.it_owner.edsk)
-      item1.it_collection in
-  (* let> () = update_operators_for_all exchange item1.it_owner c.col_kt1 in *)
-  wait_next_block () >>= fun () ->
-  let> () = set_royalties
-      ~contract:c.col_kt1 ~id:item1.it_token_id ~royalties:[]
-      item1.it_owner c.col_royalties_contract in
-  wait_next_block () >>= fun () ->
-  let>? order1 = sell_nft_for_tezos ~salt:1 c.col_kt1 item1 1 in
-  let order1 = Common.Balance.z_order ~taked:6l order1 in
-  (* TODO : check order *)
-  let source2 = generate_address ~diff:item1.it_owner.tz1 () in
-  let>? order2 = buy_nft_for_tezos c.col_kt1 source2 item1 1 in
-  let order2 = Common.Balance.z_order ~maked:6l order2 in
-  (* TODO : check order *)
-  begin
-    match_orders ~amount:1L ~source:source2 ~contract:exchange order2 order1
-    >>= function
-    | Error err ->
-      Printf.eprintf "match_orders error %s" @@ Tzfunc.Rp.string_of_error err ;
-      Lwt.return_unit
-  | Ok op_hash ->
-      Printf.eprintf "HASH = %s\n%!" op_hash ;
-      Printf.eprintf "Waiting next block...\n%!" ;
-      wait_next_block () >>= fun () ->
-      Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
-      Lwt_unix.sleep 6. >>= fun () ->
-      (* TODO : check_item not *)
-      check_item {item1 with it_owner = source2}
-      (* check_orders *)
-  end >>= fun () ->
-  begin match !api_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
-  begin match !crawler_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
-  Lwt.return_ok ()
+  update_operators
+    item1.it_token_id item1.it_owner.tz1 exchange
+    (item1.it_owner.tz1, item1.it_owner.edsk) item1.it_collection >>= function
+  | Error err ->
+    Lwt.return_ok @@
+    Printf.eprintf "match_orders_tezos error %s" @@
+    Crp.string_of_error err
+  | Ok () ->
+    wait_next_block () >>= fun () ->
+    let>? order1 = sell_nft_for_tezos ~salt:1 c.col_kt1 item1 1 in
+    let order1 = Common.Balance.z_order ~taked:6l order1 in
+    (* TODO : check order *)
+    let source2 = generate_address ~diff:item1.it_owner.tz1 () in
+    let>? order2 = buy_nft_for_tezos c.col_kt1 source2 item1 1 in
+    let order2 = Common.Balance.z_order ~maked:6l order2 in
+    (* TODO : check order *)
+    begin
+      match_orders ~amount:1L ~source:source2 ~contract:exchange order2 order1
+      >>= function
+      | Error err ->
+        Printf.eprintf "match_orders error %s" @@ Tzfunc.Rp.string_of_error err ;
+        Lwt.return_unit
+      | Ok op_hash ->
+        wait_op_included op_hash >>= function
+        | Error err ->
+          Printf.eprintf "match_orders error %s" @@ Crp.string_of_error err ;
+          Lwt.return_unit
+        | Ok () ->
+          check_item {item1 with it_owner = source2}
+          (* check_orders *)
+    end >>= fun () ->
+    Lwt.return_ok ()
 
-let match_orders_lugh () =
-  reset_db () ;
-  let r_kt1 = royalties in
-  Printf.eprintf "Royalties %s\n%!" r_kt1 ;
-  let ex_kt1 = exchange_v2 in
-  Printf.eprintf "Exchange %s\n%!" ex_kt1 ;
-  let v_kt1 = validator in
-  Printf.eprintf "Validator %s\n%!" v_kt1 ;
-  let>  (cpid, kafka_config) = start_crawler "" v_kt1 ex_kt1 r_kt1 SMap.empty
-      (SMap.singleton "KT1HT3EbSPFA1MM2ZiMThB6P6Kky5jebNgAx"
-         {ft_kind=Lugh; ft_crawled=true; ft_ledger_id=Z.of_int 94594; ft_token_id=None}) "" "" "" in
-  api_pid := Some (start_api kafka_config) ;
-  crawler_pid := Some cpid ;
-  Printf.eprintf "Waiting 30sec to let crawler catch up...\n%!" ;
-  Lwt_unix.sleep 30. >>= fun () ->
-  let contract =  "KT1KvxhtWWhEDQJjH6pENJA8HN5UjBLGHYSg" in
-  let source = by_alias "rarible1" in
-  let c = {
-    col_kt1 = contract; col_alias = contract; col_kind=`nft; col_privacy=`priv;
-    col_admin=source; col_source=source; col_royalties_contract=""; col_metadata="" } in
-  (* let (admin, source, contract, royalties, uri) =
-   *   create_collection ~royalties:r_kt1 () in
-   * let> (admin, contract, source, _royalties) =
-   *   deploy_ubi_collection admin source contract royalties uri in *)
-  Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
-  Lwt_unix.sleep 6. >>= fun () ->
-  (* let>? () = check_collection admin contract source in *)
-  let>? item1 = mint_ubi_with_token_id_from_api c in
-  Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
-  let> () = Lwt_unix.sleep 6. in
-  let> () = check_item item1 in
-  let royalties = generate_royalties () in
-  let> () = ubi_set_royalties item1.it_token_id royalties item1.it_owner r_kt1 in
-  let> () = update_operators_for_all ex_kt1 item1.it_owner contract in
-  let>? order1 = sell_nft_for_lugh ~salt:1 contract item1 1 in
-  let order1 = Common.Balance.z_order order1 in
-  (* TODO : check order *)
-  let source2 = generate_address ~alias:"rarible1" () in
-  let>? order2 = buy_nft_for_lugh contract source2 item1 1 in
-  let order2 = Common.Balance.z_order order2 in
-  (* TODO : check order *)
-  begin match_orders ~amount:1L ~source:source2 ~contract:ex_kt1 order2 order1 >>= function
-    | Error err ->
-      Printf.eprintf "match_orders error %s" @@ Tzfunc.Rp.string_of_error err ;
-      Lwt.return_unit
-  | Ok op_hash ->
-      Printf.eprintf "HASH = %s\n%!" op_hash ;
-      Printf.eprintf "Waiting next block...\n%!" ;
-      wait_next_block () >>= fun () ->
-      Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
-      Lwt_unix.sleep 6. >>= fun () ->
-      (* TODO : check_item not *)
-      check_item {item1 with it_owner = source2}
-      (* check_orders *)
-  end >>= fun () ->
-  begin match !api_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
-  begin match !crawler_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
-  Lwt.return_ok ()
-
-let fill_orders_db r_kt1 ex_kt1 =
-  let c = create_collection ~royalties:r_kt1 () in
-  let> c = deploy_collection c in
+let match_orders_lugh ?royalties ?(exchange=exchange_v2) ~kind ~privacy () =
+  let c = create_collection ?royalties ~kind ~privacy () in
+  let>? c = deploy_collection c in
   let>? () = check_collection c in
-  Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
-  Lwt_unix.sleep 6. >>= fun () ->
+  let> () = wait_next_block () in
+  let>? item1 = mint_one_with_token_id_from_api c in
+  wait_next_block () >>= fun () ->
+  let> () = check_item item1 in
+  update_operators
+    item1.it_token_id item1.it_owner.tz1 exchange
+    (item1.it_owner.tz1, item1.it_owner.edsk) item1.it_collection >>= function
+  | Error err ->
+    Lwt.return_ok @@
+    Printf.eprintf "match_orders_tezos error %s" @@
+    Crp.string_of_error err
+  | Ok () ->
+    wait_next_block () >>= fun () ->
+    let>? order1 = sell_nft_for_lugh ~salt:1 c.col_kt1 item1 1 in
+    let order1 = Common.Balance.z_order ~taked:6l order1 in
+    (* TODO : check order *)
+    let source2 = generate_address ~alias:"rarible1" () in
+    let>? order2 = buy_nft_for_lugh c.col_kt1 source2 item1 1 in
+    let order2 = Common.Balance.z_order ~maked:6l order2 in
+    (* TODO : check order *)
+    begin
+      match_orders ~amount:1L ~source:source2 ~contract:exchange order2 order1
+      >>= function
+      | Error err ->
+        Printf.eprintf "match_orders error %s" @@ Tzfunc.Rp.string_of_error err ;
+        Lwt.return_unit
+      | Ok op_hash ->
+        wait_op_included op_hash >>= function
+        | Error err ->
+          Printf.eprintf "match_orders error %s" @@ Crp.string_of_error err ;
+          Lwt.return_unit
+        | Ok () ->
+          check_item {item1 with it_owner = source2}
+          (* check_orders *)
+    end >>= fun () ->
+    Lwt.return_ok ()
+
+let fill_orders_db ?royalties ~exchange ~kind ~privacy () =
+  let c = create_collection ?royalties ~kind ~privacy () in
+  let>? c = deploy_collection c in
+  let>? () = check_collection c in
+  let> () = wait_next_block () in
   let>? item1 = mint_one_with_token_id_from_api c in
   let>? item2 = mint_one_with_token_id_from_api c in
   let>? item3 = mint_one_with_token_id_from_api c in
@@ -2435,92 +2531,51 @@ let fill_orders_db r_kt1 ex_kt1 =
   let> () = check_item item3 in
   let> () = check_item item4 in
   let> () = check_item item5 in
-  let> () = update_operators_for_all ex_kt1 item1.it_owner c.col_kt1 in
-  (* SELL ORDERS *)
-  let>? _sell1_1 = sell_nft_for_tezos ~salt:1 c.col_kt1 item1 5 in
-  let> () = Lwt_unix.sleep 1. in
-  let>? _sell2 = sell_nft_for_tezos ~salt:1 c.col_kt1 item2 1 in
-  let> () = Lwt_unix.sleep 1. in
-  let>? _sell3 = sell_nft_for_tezos ~salt:1 c.col_kt1 item3 1 in
-  let> () = Lwt_unix.sleep 1. in
-  let>? _sell4 = sell_nft_for_tezos ~salt:1 c.col_kt1 item4 1 in
-  let> () = Lwt_unix.sleep 1. in
-  let>? _sell5 = sell_nft_for_tezos ~salt:1 c.col_kt1 item5 1 in
-  (* BIDS ORDERS *)
-  let source2 = generate_address ~diff:item1.it_owner.tz1 () in
-  let>? _buy1_1 = buy_nft_for_tezos c.col_kt1 source2 item1 1 in
-  let> () = Lwt_unix.sleep 1. in
-  let source3 = generate_address ~diff:item2.it_owner.tz1 () in
-  let>? _buy1_2 = buy_nft_for_tezos c.col_kt1 source3 item1 1 in
-  let> () = Lwt_unix.sleep 1. in
-  let>? _buy4 = buy_nft_for_tezos c.col_kt1 source2 item4 1 in
-  let> () = Lwt_unix.sleep 1. in
-  Lwt.return_ok ()
+  update_operators_for_all exchange item1.it_owner c.col_kt1 >>= function
+  | Error err ->
+    Lwt.return_ok @@
+    Printf.eprintf "fill_orders_db error %s" @@
+    Crp.string_of_error err
+  | Ok () ->
+    (* SELL ORDERS *)
+    let>? _sell1_1 = sell_nft_for_tezos ~salt:1 c.col_kt1 item1 5 in
+    let> () = Lwt_unix.sleep 1. in
+    let>? _sell2 = sell_nft_for_tezos ~salt:1 c.col_kt1 item2 1 in
+    let> () = Lwt_unix.sleep 1. in
+    let>? _sell3 = sell_nft_for_tezos ~salt:1 c.col_kt1 item3 1 in
+    let> () = Lwt_unix.sleep 1. in
+    let>? _sell4 = sell_nft_for_tezos ~salt:1 c.col_kt1 item4 1 in
+    let> () = Lwt_unix.sleep 1. in
+    let>? _sell5 = sell_nft_for_tezos ~salt:1 c.col_kt1 item5 1 in
+    (* BIDS ORDERS *)
+    let source2 = generate_address ~diff:item1.it_owner.tz1 () in
+    let>? _buy1_1 = buy_nft_for_tezos c.col_kt1 source2 item1 1 in
+    let> () = Lwt_unix.sleep 1. in
+    let source3 = generate_address ~diff:item2.it_owner.tz1 () in
+    let>? _buy1_2 = buy_nft_for_tezos c.col_kt1 source3 item1 1 in
+    let> () = Lwt_unix.sleep 1. in
+    let>? _buy4 = buy_nft_for_tezos c.col_kt1 source2 item4 1 in
+    let> () = Lwt_unix.sleep 1. in
+    Lwt.return_ok ()
 
-let fill_orders () =
-  reset_db () ;
-  let> r_alias, _r_source = create_royalties () in
-  let r_kt1 = find_kt1 r_alias in
-  Printf.eprintf "New royalties %s\n%!" r_kt1 ;
-  let> ex_alias, ex_admin, _ex_receiver = create_exchange () in
-  let ex_kt1 = find_kt1 ex_alias in
-  Printf.eprintf "New exchange %s\n%!" ex_kt1 ;
-  let> fill_alias, fill_admin = create_fill () in
-  let fill_kt1 = find_kt1 fill_alias in
-  Printf.eprintf "New fill %s\n%!" fill_kt1 ;
-  let> v_alias, _v_source = create_validator ~exchange:ex_kt1 ~royalties:r_kt1 ~fill:fill_kt1 in
-  let v_kt1 = find_kt1 v_alias in
-  Printf.eprintf "New validator %s\n%!" v_kt1 ;
-  start_crawler "" v_kt1 ex_kt1 r_kt1 SMap.empty SMap.empty "" "" "" >>= fun (cpid, kafka_config) ->
-  api_pid := Some (start_api kafka_config) ;
-  crawler_pid := Some cpid ;
-  set_validator ~validator:v_kt1 ~source:ex_admin ~contract:ex_kt1 >>= fun () ->
-  set_validator ~validator:v_kt1 ~source:fill_admin ~contract:fill_kt1 >>= fun () ->
-  Printf.eprintf "Waiting 6sec to let crawler catch up...\n%!" ;
-  Lwt_unix.sleep 6. >>= fun () ->
-  fill_orders_db r_kt1 ex_kt1 >>=? fun () ->
-  fill_orders_db r_kt1 ex_kt1 >>=? fun () ->
-  fill_orders_db r_kt1 ex_kt1 >>=? fun () ->
+let fill_orders ?royalties ?(exchange=exchange_v2) ~kind ~privacy () =
+  fill_orders_db ?royalties ~exchange ~kind ~privacy () >>=? fun () ->
+  fill_orders_db ?royalties ~exchange ~kind ~privacy () >>=? fun () ->
+  fill_orders_db ?royalties ~exchange ~kind ~privacy ()
   (* TODO : check order *)
 
-  begin match !api_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
-  begin match !crawler_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
-  Lwt.return_ok ()
-
-let cancel_order () =
-  reset_db () ;
-  let> r_alias, _r_source = create_royalties () in
-  let r_kt1 = find_kt1 r_alias in
-  Printf.eprintf "New royalties %s\n%!" r_kt1 ;
-  let> ex_alias, ex_admin, _ex_receiver = create_exchange () in
-  let ex_kt1 = find_kt1 ex_alias in
-  Printf.eprintf "New exchange %s\n%!" ex_kt1 ;
-  let> fill_alias, fill_admin = create_fill () in
-  let fill_kt1 = find_kt1 fill_alias in
-  Printf.eprintf "New fill %s\n%!" fill_kt1 ;
-  let> v_alias, _v_source = create_validator ~exchange:ex_kt1 ~royalties:r_kt1 ~fill:fill_kt1 in
-  let v_kt1 = find_kt1 v_alias in
-  Printf.eprintf "New validator %s\n%!" v_kt1 ;
-  start_crawler "" v_kt1 ex_kt1 r_kt1 SMap.empty SMap.empty "" "" "" >>= fun (cpid, kafka_config) ->
-  api_pid := Some (start_api kafka_config) ;
-  crawler_pid := Some cpid ;
-  set_validator ~validator:v_kt1 ~source:ex_admin ~contract:ex_kt1 >>= fun () ->
-  set_validator ~validator:v_kt1 ~source:fill_admin ~contract:fill_kt1 >>= fun () ->
-  Printf.eprintf "Waiting 6sec to let crawler catch up...\n%!" ;
-  Lwt_unix.sleep 6. >>= fun () ->
-  let c = create_collection ~royalties:r_kt1 () in
-  let> c = deploy_collection c in
+let cancel_order ?royalties ?(exchange=exchange_v2) ~kind ~privacy () =
+  let c = create_collection ?royalties ~kind ~privacy () in
+  let>? c = deploy_collection c in
   let>? () = check_collection c in
-  Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
-  let> () = Lwt_unix.sleep 6. in
+  let> () = wait_next_block () in
   let>? item1 = mint_one_with_token_id_from_api c in
-  Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
-  let> () = Lwt_unix.sleep 6. in
+  wait_next_block () >>= fun () ->
   let> () = check_item item1 in
   let>? order = sell_nft_for_tezos ~salt:1 c.col_kt1 item1 1 in
   let order = Common.Balance.z_order ~taked:6l order in
   (* TODO : check order *)
-  begin cancel_order ~source:item1.it_owner ~contract:ex_kt1 order >>= function
+  begin cancel_order ~source:item1.it_owner ~contract:exchange order >>= function
     | Error err ->
       Printf.eprintf "cancel_order error %s" @@ Tzfunc.Rp.string_of_error err ;
       Lwt.return_unit
@@ -2592,9 +2647,11 @@ let main () =
       Lwt.catch (fun () ->
           let kind = `nft in
           let privacy = `priv in
-          setup_test_env () >>= fun( royalties, _exchange) ->
-          transfer_test ~royalties ~kind ~privacy () >>= fun _ ->
-          Lwt.return @@ clean_test_env ())
+          setup_test_env () >>= function
+          | Ok ( royalties, _exchange) ->
+            transfer_test ~royalties ~kind ~privacy () >>= fun _ ->
+            Lwt.return @@ clean_test_env ()
+          | Error _err -> Lwt.return @@ clean_test_env ())
         (fun exn ->
            Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
            Lwt.return @@ clean_test_env ()))
@@ -2603,9 +2660,11 @@ let main () =
       Lwt.catch (fun () ->
           let kind = `nft in
           let privacy = `priv in
-          setup_test_env () >>= fun (royalties, _exchange) ->
-          burn_test ~royalties ~kind ~privacy () >>= fun _ ->
-          Lwt.return @@ clean_test_env ())
+          setup_test_env () >>= function
+          | Ok (royalties, _exchange) ->
+            burn_test ~royalties ~kind ~privacy () >>= fun _ ->
+            Lwt.return @@ clean_test_env ()
+          | Error _err -> Lwt.return @@ clean_test_env ())
         (fun exn ->
            Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
            Lwt.return @@ clean_test_env ()))
@@ -2614,10 +2673,12 @@ let main () =
       Lwt.catch (fun () ->
           let kind = `nft in
           let privacy = `priv in
-          setup_test_env () >>= fun (royalties, _exchange) ->
-          transfer_test ~royalties ~kind ~privacy () >>= fun _ ->
-          burn_test ~kind ~privacy () >>= fun _ ->
-          Lwt.return @@ clean_test_env ())
+          setup_test_env () >>= function
+          | Ok (royalties, _exchange) ->
+            transfer_test ~royalties ~kind ~privacy () >>= fun _ ->
+            burn_test ~kind ~privacy () >>= fun _ ->
+            Lwt.return @@ clean_test_env ()
+          | Error _err -> Lwt.return @@ clean_test_env ())
         (fun exn ->
            Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
            Lwt.return @@ clean_test_env ()))
@@ -2627,9 +2688,11 @@ let main () =
       Lwt.catch (fun () ->
           let kind = `mt in
           let privacy = `priv in
-          setup_test_env () >>= fun (royalties, _exchange) ->
-          transfer_test ~royalties ~kind ~privacy () >>= fun _ ->
-          Lwt.return @@ clean_test_env ())
+          setup_test_env () >>= function
+          | Ok (royalties, _exchange) ->
+            transfer_test ~royalties ~kind ~privacy () >>= fun _ ->
+            Lwt.return @@ clean_test_env ()
+          | Error _err -> Lwt.return @@ clean_test_env ())
         (fun exn ->
            Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
            Lwt.return @@ clean_test_env ()))
@@ -2638,9 +2701,11 @@ let main () =
       Lwt.catch (fun () ->
           let kind = `mt in
           let privacy = `priv in
-          setup_test_env () >>= fun (royalties, _exchange) ->
-          burn_test ~royalties ~kind ~privacy () >>= fun _ ->
-          Lwt.return @@ clean_test_env ())
+          setup_test_env () >>= function
+          | Ok (royalties, _exchange) ->
+            burn_test ~royalties ~kind ~privacy () >>= fun _ ->
+            Lwt.return @@ clean_test_env ()
+          | Error _err -> Lwt.return @@ clean_test_env ())
         (fun exn ->
            Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
            Lwt.return @@ clean_test_env ()))
@@ -2649,10 +2714,12 @@ let main () =
       Lwt.catch (fun () ->
           let kind = `mt in
           let privacy = `priv in
-          setup_test_env () >>= fun (royalties, _exchange) ->
-          transfer_test ~royalties ~kind ~privacy () >>= fun _ ->
-          burn_test ~kind ~privacy () >>= fun _ ->
-          Lwt.return @@ clean_test_env ())
+          setup_test_env () >>= function
+          | Ok (royalties, _exchange) ->
+            transfer_test ~royalties ~kind ~privacy () >>= fun _ ->
+            burn_test ~kind ~privacy () >>= fun _ ->
+            Lwt.return @@ clean_test_env ()
+          | Error _err -> Lwt.return @@ clean_test_env ())
         (fun exn ->
            Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
            Lwt.return @@ clean_test_env ()))
@@ -2662,9 +2729,11 @@ let main () =
       Lwt.catch (fun () ->
           let kind = `nft in
           let privacy = `pub in
-          setup_test_env () >>= fun (royalties, _exchange) ->
-          transfer_test ~royalties ~kind ~privacy () >>= fun _ ->
-          Lwt.return @@ clean_test_env ())
+          setup_test_env () >>= function
+          | Ok (royalties, _exchange) ->
+            transfer_test ~royalties ~kind ~privacy () >>= fun _ ->
+            Lwt.return @@ clean_test_env ()
+          | Error _err -> Lwt.return @@ clean_test_env ())
         (fun exn ->
            Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
            Lwt.return @@ clean_test_env ()))
@@ -2673,9 +2742,11 @@ let main () =
       Lwt.catch (fun () ->
           let kind = `nft in
           let privacy = `pub in
-          setup_test_env () >>= fun (royalties, _exchange) ->
-          burn_test ~royalties ~kind ~privacy () >>= fun _ ->
-          Lwt.return @@ clean_test_env ())
+          setup_test_env () >>= function
+          | Ok (royalties, _exchange) ->
+            burn_test ~royalties ~kind ~privacy () >>= fun _ ->
+            Lwt.return @@ clean_test_env ()
+          | Error _err -> Lwt.return @@ clean_test_env ())
         (fun exn ->
            Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
            Lwt.return @@ clean_test_env ()))
@@ -2684,10 +2755,12 @@ let main () =
       Lwt.catch (fun () ->
           let kind = `nft in
           let privacy = `pub in
-          setup_test_env () >>= fun (royalties, _exchange) ->
-          transfer_test ~royalties ~kind ~privacy () >>= fun _ ->
-          burn_test ~royalties ~kind ~privacy () >>= fun _ ->
-          Lwt.return @@ clean_test_env ())
+          setup_test_env () >>= function
+          | Ok (royalties, _exchange) ->
+            transfer_test ~royalties ~kind ~privacy () >>= fun _ ->
+            burn_test ~royalties ~kind ~privacy () >>= fun _ ->
+            Lwt.return @@ clean_test_env ()
+          | Error _err -> Lwt.return @@ clean_test_env ())
         (fun exn ->
            Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
            Lwt.return @@ clean_test_env ()))
@@ -2697,9 +2770,11 @@ let main () =
       Lwt.catch (fun () ->
           let kind = `mt in
           let privacy = `pub in
-          setup_test_env () >>= fun (royalties, _exchange) ->
-          transfer_test ~royalties ~kind ~privacy () >>= fun _ ->
-          Lwt.return @@ clean_test_env ())
+          setup_test_env () >>= function
+          | Ok (royalties, _exchange) ->
+            transfer_test ~royalties ~kind ~privacy () >>= fun _ ->
+            Lwt.return @@ clean_test_env ()
+          | Error _err -> Lwt.return @@ clean_test_env ())
         (fun exn ->
            Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
            Lwt.return @@ clean_test_env ()))
@@ -2708,9 +2783,11 @@ let main () =
       Lwt.catch (fun () ->
           let kind = `mt in
           let privacy = `pub in
-          setup_test_env () >>= fun (royalties, _exchange) ->
-          burn_test ~royalties ~kind ~privacy () >>= fun _ ->
-          Lwt.return @@ clean_test_env ())
+          setup_test_env () >>= function
+          | Ok (royalties, _exchange) ->
+            burn_test ~royalties ~kind ~privacy () >>= fun _ ->
+            Lwt.return @@ clean_test_env ()
+          | Error _err -> Lwt.return @@ clean_test_env ())
         (fun exn ->
            Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
            Lwt.return @@ clean_test_env ()))
@@ -2719,10 +2796,12 @@ let main () =
       Lwt.catch (fun () ->
           let kind = `mt in
           let privacy = `pub in
-          setup_test_env () >>= fun (royalties, _exchange) ->
-          transfer_test ~royalties ~kind ~privacy () >>= fun _ ->
-          burn_test ~royalties ~kind ~privacy () >>= fun _ ->
-          Lwt.return @@ clean_test_env ())
+          setup_test_env () >>= function
+          | Ok (royalties, _exchange) ->
+            transfer_test ~royalties ~kind ~privacy () >>= fun _ ->
+            burn_test ~royalties ~kind ~privacy () >>= fun _ ->
+            Lwt.return @@ clean_test_env ()
+          | Error _err -> Lwt.return @@ clean_test_env ())
         (fun exn ->
            Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
            Lwt.return @@ clean_test_env ()))
@@ -2732,9 +2811,11 @@ let main () =
       Lwt.catch (fun () ->
           let kind = `nft in
           let privacy = `priv in
-          setup_test_env () >>= fun (royalties, exchange) ->
-          match_orders_nft ~royalties ~exchange ~kind ~privacy () >>= fun _ ->
-          Lwt.return @@ clean_test_env ())
+          setup_test_env () >>= function
+          | Ok (royalties, exchange) ->
+            match_orders_nft ~royalties ~exchange ~kind ~privacy () >>= fun _ ->
+            Lwt.return @@ clean_test_env ()
+          | Error _err -> Lwt.return @@ clean_test_env ())
         (fun exn ->
            Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
            begin match !api_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
@@ -2745,45 +2826,59 @@ let main () =
       Lwt.catch (fun () ->
           let kind = `nft in
           let privacy = `priv in
-          setup_test_env () >>= fun (royalties, exchange) ->
-          match_orders_tezos ~royalties ~exchange ~kind ~privacy () >>= fun _ ->
-          Lwt.return @@ clean_test_env ())
+          setup_test_env () >>= function
+          | Ok (royalties, exchange) ->
+            match_orders_tezos ~royalties ~exchange ~kind ~privacy () >>= fun _ ->
+            Lwt.return @@ clean_test_env ()
+          | Error _err -> Lwt.return @@ clean_test_env ())
         (fun exn ->
            Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
            begin match !api_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
            begin match !crawler_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
            Lwt.return_unit))
+
   | [ "match_order_lugh_bid" ] ->
     Lwt_main.run (
       Lwt.catch (fun () ->
-          match_orders_lugh () >>= function
-          | Ok _ -> Lwt.return_unit
-          | Error err ->
-            Lwt.fail_with @@ Api.Errors.string_of_error err)
+          let kind = `nft in
+          let privacy = `priv in
+          setup_test_env () >>= function
+          | Ok (royalties, exchange) ->
+            match_orders_lugh ~royalties ~exchange ~kind ~privacy () >>= fun _ ->
+            Lwt.return @@ clean_test_env ()
+          | Error _err -> Lwt.return @@ clean_test_env ())
         (fun exn ->
            Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
            begin match !api_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
            begin match !crawler_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
            Lwt.return_unit))
+
   | [ "fill_orders" ] ->
     Lwt_main.run (
       Lwt.catch (fun () ->
-          fill_orders () >>= function
-          | Ok _ -> Lwt.return_unit
-          | Error err ->
-            Lwt.fail_with @@ Api.Errors.string_of_error err)
+          let kind = `nft in
+          let privacy = `priv in
+          setup_test_env () >>= function
+          | Ok (royalties, exchange) ->
+            fill_orders ~royalties ~exchange ~kind ~privacy () >>= fun _ ->
+            Lwt.return @@ clean_test_env ()
+          | Error _err ->Lwt.return @@ clean_test_env ())
         (fun exn ->
            Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
            begin match !api_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
            begin match !crawler_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
            Lwt.return_unit))
+
   | [ "cancel_order" ] ->
     Lwt_main.run (
       Lwt.catch (fun () ->
-          cancel_order () >>= function
-          | Ok _ -> Lwt.return_unit
-          | Error err ->
-            Lwt.fail_with @@ Api.Errors.string_of_error err)
+          let kind = `nft in
+          let privacy = `priv in
+          setup_test_env () >>= function
+          | Ok (royalties, exchange) ->
+            cancel_order ~royalties ~exchange ~kind ~privacy () >>= fun _ ->
+            Lwt.return @@ clean_test_env ()
+          | Error _err ->Lwt.return @@ clean_test_env ())
         (fun exn ->
            Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
            begin match !api_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
@@ -2795,9 +2890,11 @@ let main () =
       Lwt.catch (fun () ->
           let kind = `nft in
           let privacy = `priv in
-          setup_test_env () >>= fun (royalties, _exchange) ->
-          reset_meta_test ~royalties ~kind ~privacy () >>= fun _ ->
-          Lwt.return @@ clean_test_env ())
+          setup_test_env () >>= function
+          | Ok (royalties, _exchange) ->
+            reset_meta_test ~royalties ~kind ~privacy () >>= fun _ ->
+            Lwt.return @@ clean_test_env ()
+          | Error _err -> Lwt.return @@ clean_test_env ())
         (fun exn ->
            Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
            begin match !api_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
