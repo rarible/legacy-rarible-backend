@@ -576,6 +576,9 @@ export default new Vue({
         this.fill.status = 'success'
         this.fill.result = `operation ${op.hash} confirmed`
       }
+    },
+
+    async test() {
     }
   }
 })

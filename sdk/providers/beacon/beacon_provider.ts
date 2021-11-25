@@ -38,9 +38,9 @@ export async function beacon_provider(network: Network, name = "rarible") : Prom
     const op = await tk.wallet.batch(args2).send()
     return { hash: op.opHash, confirmation: async() => { await op.confirmation() } }
   }
-  const sign = async(bytes: string) => {
+  const sign = async(bytes: string, type?: "raw" | "micheline") => {
     const { signature } = await wallet.client.requestSignPayload({
-      signingType: SigningType.MICHELINE,
+      signingType: (type=="raw") ? SigningType.RAW : SigningType.MICHELINE,
       payload: bytes
     })
     return signature

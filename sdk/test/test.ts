@@ -1,4 +1,4 @@
-import { deploy_nft_public, mint, make_permit, add_permit, send } from "../main"
+import { deploy_nft_public, mint, make_permit, add_permit, send, sign } from "../main"
 import { in_memory_provider } from '../providers/in_memory/in_memory_provider'
 import BigNumber from "@taquito/rpc/node_modules/bignumber.js"
 
@@ -47,13 +47,17 @@ async function main() {
 
     // const op = await add_permit(provider_amw, permit)
 
-    const op = await send(provider_u6h, {
-      destination: "KT1JPYtEMv8PHXfmLoMuWRLsVykoEou5AqKG",
-      entrypoint: 'setRoyalties',
-      parameter: [ {string: 'KT1Ex1FBFh8JeGwNU3uZNrV4afU7LoUgLWEK' }, {prim: "Some", args: [{int: '0'}]}, [] ]
-    })
-    console.log(op)
-    await op.confirmation()
+    // const op = await send(provider_u6h, {
+    //   destination: "KT1JPYtEMv8PHXfmLoMuWRLsVykoEou5AqKG",
+    //   entrypoint: 'setRoyalties',
+    //   parameter: [ {string: 'KT1Ex1FBFh8JeGwNU3uZNrV4afU7LoUgLWEK' }, {prim: "Some", args: [{int: '0'}]}, [] ]
+    // })
+
+    const s = await sign(provider_u6h, "I would like to save like for itemId: 0xf5de760f2e916647fd766b4ad9e85ff943ce3a2b:16440")
+    console.log(s)
+
+    // console.log(op)
+    // await op.confirmation()
 
   } catch (e) {
     console.error(e)
