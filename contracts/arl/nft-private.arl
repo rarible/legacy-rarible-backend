@@ -112,7 +112,7 @@ function checkOwnerAndOperator(txs : list<address * list<transfer_destination>>)
     var %from = tx[0];
     var tds = tx[1];
     for td in tds do begin
-      res &= if caller <> %from then (operator.contains((caller,td.token_id_dest,%from)) or operator_for_all.contains((%from, caller))) else true
+      res &= if caller <> %from then (operator.contains((caller,td.token_id_dest,%from)) or operator_for_all.contains((%from, caller))) else ledger[td.token_id_dest].lowner = caller;
     end
     done
   done;
@@ -147,7 +147,8 @@ getter balance_of (requests : list<balance_of_request>) : list<balance_of_respon
 entry burn(itokenid : nat) {
     dorequire(not pause, "CONTRACT_PAUSED");
     if ledger.contains(itokenid) and ledger[itokenid].lowner = caller then begin
-      ledger.remove(itokenid)
+      ledger.remove(itokenid);
+      token_metadata.remove(itokenid);
     end
     else
       fail("CALLER NOT OWNER");
