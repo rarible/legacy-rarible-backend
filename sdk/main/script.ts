@@ -4,7 +4,7 @@ import yargs from 'yargs'
 import BigNumber from "@taquito/rpc/node_modules/bignumber.js"
 
 async function main() {
-  const argv = yargs(process.argv.slice(2)).options({
+  const argv = await yargs(process.argv.slice(2)).options({
     edsk: {type: 'string', default: 'edsk4CmgW9r4fwqtsT6x2bB7BdVcERxLPt6poFXGpk1gTKbqR43G5H'},
     endpoint: {type: 'string', default: 'https://hangzhou.tz.functori.com'},
     exchange: {type: 'string', default: 'KT1AguExF32Z9UEKzD5nuixNmqrNs1jBKPT8'},

@@ -9,5 +9,5 @@
     "downlevelIteration": true,
     "declaration": true
   },
-  "include": [ "main/*.ts", "test/*.ts", "providers/*/*.ts" ]
+  "include": [ "main/*.ts", "test/*.ts", "providers/in_memory/*.ts", "providers/beacon/*.ts" ]
 }
