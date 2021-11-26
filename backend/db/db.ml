@@ -2066,7 +2066,7 @@ let contract_updates dbh main l =
   iter_rp (fun c ->
       let>? l =
         [%pgsql dbh
-            "select count(distinct token_id), max(token_id) from tokens where contract = $c"] in
+            "select count(distinct token_id), max(lpad(token_id, 100, '0')) from tokens where contract = $c"] in
       let tokens_number, next_token_id = match l with
         | [] | _ :: _ :: _ -> 0L, "0"
         | [ tokens_number, last_token_id ] ->
