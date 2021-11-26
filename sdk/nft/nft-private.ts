@@ -781,13 +781,8 @@ export const nft_private_code : any =
                   "args": [
                     {  "prim": "big_map",
                        "args": [
-                         {  "prim": "pair",
-                            "args": [
-                              {  "prim": "address"  },
-                              {  "prim": "address"  }
-                            ]
-                         },
-                         {  "prim": "unit"  }
+                         {  "prim": "nat"  },
+                         {  "prim": "address"  }
                        ]
                     },
                     {  "prim": "pair",
@@ -797,41 +792,56 @@ export const nft_private_code : any =
                               {  "prim": "pair",
                                  "args": [
                                    {  "prim": "address"  },
-                                   {  "prim": "pair",
-                                      "args": [
-                                        {  "prim": "nat"  },
-                                        {  "prim": "address"  }
-                                      ]
-                                   }
+                                   {  "prim": "address"  }
                                  ]
                               },
                               {  "prim": "unit"  }
                             ]
                          },
-                         {  "prim": "list",
+                         {  "prim": "pair",
                             "args": [
-                              {  "prim": "pair",
+                              {  "prim": "big_map",
                                  "args": [
-                                   {  "prim": "address"  },
-                                   {  "prim": "list",
+                                   {  "prim": "pair",
                                       "args": [
+                                        {  "prim": "address"  },
                                         {  "prim": "pair",
                                            "args": [
-                                             {  "prim": "address",
-                                                "annots": [
-                                                  "%to"
-                                                ]
-                                             },
+                                             {  "prim": "nat"  },
+                                             {  "prim": "address"  }
+                                           ]
+                                        }
+                                      ]
+                                   },
+                                   {  "prim": "unit"  }
+                                 ]
+                              },
+                              {  "prim": "list",
+                                 "args": [
+                                   {  "prim": "pair",
+                                      "args": [
+                                        {  "prim": "address"  },
+                                        {  "prim": "list",
+                                           "args": [
                                              {  "prim": "pair",
                                                 "args": [
-                                                  {  "prim": "nat",
+                                                  {  "prim": "address",
                                                      "annots": [
-                                                       "%token_id"
+                                                       "%to"
                                                      ]
                                                   },
-                                                  {  "prim": "nat",
-                                                     "annots": [
-                                                       "%amount"
+                                                  {  "prim": "pair",
+                                                     "args": [
+                                                       {  "prim": "nat",
+                                                          "annots": [
+                                                            "%token_id"
+                                                          ]
+                                                       },
+                                                       {  "prim": "nat",
+                                                          "annots": [
+                                                            "%amount"
+                                                          ]
+                                                       }
                                                      ]
                                                   }
                                                 ]
@@ -849,10 +859,11 @@ export const nft_private_code : any =
                   ]
                },
                {  "prim": "bool"  },
-               [  {  "prim": "UNPAIR"  },
-               {  "prim": "SWAP"  },
-               {  "prim": "UNPAIR"  },
-               {  "prim": "SWAP"  },
+               [  {  "prim": "UNPAIR",
+                     "args": [
+                       {  "int": "4"  }
+                     ]
+               },
                {  "prim": "PUSH",
                   "args": [
                     {  "prim": "unit"  },
@@ -865,148 +876,107 @@ export const nft_private_code : any =
                     {  "prim": "True"  }
                   ]
                },
-               {  "prim": "DIG",
+               {  "prim": "DUP",
                   "args": [
-                    {  "int": "2"  }
-                  ]
-               },
-               {  "prim": "DUP"  },
-               {  "prim": "DUG",
-                  "args": [
-                    {  "int": "3"  }
+                    {  "int": "6"  }
                   ]
                },
                {  "prim": "ITER",
                   "args": [
                     [  {  "prim": "DUP"  },
-                    {  "prim": "CAR",
-                       "args": [
-                         {  "int": "0"  }
-                       ]
-                    },
-                    {  "prim": "DIG",
-                       "args": [
-                         {  "int": "1"  }
-                       ]
-                    },
-                    {  "prim": "DUP"  },
-                    {  "prim": "DUG",
+                    {  "prim": "CAR"  },
+                    {  "prim": "DUP",
                        "args": [
                          {  "int": "2"  }
                        ]
                     },
-                    {  "prim": "CDR",
-                       "args": [
-                         {  "int": "1"  }
-                       ]
-                    },
+                    {  "prim": "CDR"  },
                     {  "prim": "DUP"  },
                     {  "prim": "ITER",
                        "args": [
-                         [  {  "prim": "DIG",
+                         [  {  "prim": "DUP",
                                "args": [
-                                 {  "int": "2"  }
+                                 {  "int": "3"  }
                                ]
-                         },
-                         {  "prim": "DUP"  },
-                         {  "prim": "DUG",
-                            "args": [
-                              {  "int": "3"  }
-                            ]
                          },
                          {  "prim": "SENDER"  },
                          {  "prim": "COMPARE"  },
                          {  "prim": "NEQ"  },
                          {  "prim": "IF",
                             "args": [
-                              [  {  "prim": "DIG",
+                              [  {  "prim": "DUP",
                                     "args": [
                                       {  "int": "8"  }
                                     ]
                               },
-                              {  "prim": "DUP"  },
-                              {  "prim": "DUG",
-                                 "args": [
-                                   {  "int": "9"  }
-                                 ]
-                              },
                               {  "prim": "SENDER"  },
-                              {  "prim": "DIG",
-                                 "args": [
-                                   {  "int": "4"  }
-                                 ]
-                              },
-                              {  "prim": "DUP"  },
-                              {  "prim": "DUG",
+                              {  "prim": "DUP",
                                  "args": [
                                    {  "int": "5"  }
                                  ]
                               },
                               {  "prim": "PAIR"  },
                               {  "prim": "MEM"  },
-                              {  "prim": "DIG",
+                              {  "prim": "DUP",
                                  "args": [
-                                   {  "int": "8"  }
+                                   {  "int": "10"  }
                                  ]
                               },
-                              {  "prim": "DUP"  },
-                              {  "prim": "DUG",
-                                 "args": [
-                                   {  "int": "9"  }
-                                 ]
-                              },
-                              {  "prim": "DIG",
-                                 "args": [
-                                   {  "int": "4"  }
-                                 ]
-                              },
-                              {  "prim": "DUP"  },
-                              {  "prim": "DUG",
+                              {  "prim": "DUP",
                                  "args": [
                                    {  "int": "5"  }
                                  ]
                               },
-                              {  "prim": "DIG",
-                                 "args": [
-                                   {  "int": "3"  }
-                                 ]
-                              },
-                              {  "prim": "DUP"  },
-                              {  "prim": "DUG",
+                              {  "prim": "DUP",
                                  "args": [
                                    {  "int": "4"  }
                                  ]
                               },
-                              {  "prim": "CDR",
-                                 "args": [
-                                   {  "int": "1"  }
-                                 ]
-                              },
-                              {  "prim": "CAR",
-                                 "args": [
-                                   {  "int": "0"  }
-                                 ]
-                              },
+                              {  "prim": "CDR"  },
+                              {  "prim": "CAR"  },
                               {  "prim": "PAIR"  },
                               {  "prim": "SENDER"  },
                               {  "prim": "PAIR"  },
                               {  "prim": "MEM"  },
                               {  "prim": "OR"  }  ],
-                              [  {  "prim": "PUSH",
-                                    "args": [
-                                      {  "prim": "bool"  },
-                                      {  "prim": "True"  }
-                                    ]
-                              }  ]
+                              [  {  "prim": "SENDER"  },
+                              {  "prim": "DUP",
+                                 "args": [
+                                   {  "int": "8"  }
+                                 ]
+                              },
+                              {  "prim": "DUP",
+                                 "args": [
+                                   {  "int": "3"  }
+                                 ]
+                              },
+                              {  "prim": "CDR"  },
+                              {  "prim": "CAR"  },
+                              {  "prim": "GET"  },
+                              {  "prim": "IF_NONE",
+                                 "args": [
+                                   [  {  "prim": "PUSH",
+                                         "args": [
+                                           {  "prim": "string"  },
+                                           {  "string": "ledger"  }
+                                         ]
+                                   },
+                                   {  "prim": "PUSH",
+                                      "args": [
+                                        {  "prim": "string"  },
+                                        {  "string": "AssetNotFound"  }
+                                      ]
+                                   },
+                                   {  "prim": "PAIR"  },
+                                   {  "prim": "FAILWITH"  }  ],
+                                   [    ]
+                                 ]
+                              },
+                              {  "prim": "COMPARE"  },
+                              {  "prim": "EQ"  }  ]
                             ]
                          },
-                         {  "prim": "DIG",
-                            "args": [
-                              {  "int": "5"  }
-                            ]
-                         },
-                         {  "prim": "DUP"  },
-                         {  "prim": "DUG",
+                         {  "prim": "DUP",
                             "args": [
                               {  "int": "6"  }
                             ]
@@ -1074,12 +1044,12 @@ export const nft_private_code : any =
                },
                {  "prim": "DUG",
                   "args": [
-                    {  "int": "3"  }
+                    {  "int": "4"  }
                   ]
                },
                {  "prim": "DROP",
                   "args": [
-                    {  "int": "3"  }
+                    {  "int": "4"  }
                   ]
                }  ]
              ]
@@ -1132,40 +1102,27 @@ export const nft_private_code : any =
                  {  "prim": "address"  }
                ]
             },
-            [  {  "prim": "UNPAIR"  },
-            {  "prim": "SWAP"  },
+            [  {  "prim": "UNPAIR",
+                  "args": [
+                    {  "int": "2"  }
+                  ]
+            },
             {  "prim": "PUSH",
                "args": [
                  {  "prim": "unit"  },
                  {  "prim": "Unit"  }
                ]
             },
-            {  "prim": "DIG",
+            {  "prim": "DUP",
                "args": [
-                 {  "int": "1"  }
-               ]
-            },
-            {  "prim": "DUP"  },
-            {  "prim": "DUG",
-               "args": [
-                 {  "int": "2"  }
+                 {  "int": "3"  }
                ]
             },
             {  "prim": "IF_CONS",
                "args": [
                  [  {  "prim": "DUP"  },
-                 {  "prim": "CAR",
-                    "args": [
-                      {  "int": "0"  }
-                    ]
-                 },
-                 {  "prim": "DIG",
-                    "args": [
-                      {  "int": "2"  }
-                    ]
-                 },
-                 {  "prim": "DUP"  },
-                 {  "prim": "DUG",
+                 {  "prim": "CAR"  },
+                 {  "prim": "DUP",
                     "args": [
                       {  "int": "3"  }
                     ]
@@ -1173,18 +1130,8 @@ export const nft_private_code : any =
                  {  "prim": "ITER",
                     "args": [
                       [  {  "prim": "DUP"  },
-                      {  "prim": "CAR",
-                         "args": [
-                           {  "int": "0"  }
-                         ]
-                      },
-                      {  "prim": "DIG",
-                         "args": [
-                           {  "int": "2"  }
-                         ]
-                      },
-                      {  "prim": "DUP"  },
-                      {  "prim": "DUG",
+                      {  "prim": "CAR"  },
+                      {  "prim": "DUP",
                          "args": [
                            {  "int": "3"  }
                          ]
@@ -1299,61 +1246,38 @@ export const nft_private_code : any =
                ]
             },
             {  "prim": "bool"  },
-            [  {  "prim": "UNPAIR"  },
-            {  "prim": "SWAP"  },
-            {  "prim": "UNPAIR"  },
-            {  "prim": "SWAP"  },
+            [  {  "prim": "UNPAIR",
+                  "args": [
+                    {  "int": "3"  }
+                  ]
+            },
             {  "prim": "PUSH",
                "args": [
                  {  "prim": "unit"  },
                  {  "prim": "Unit"  }
                ]
             },
-            {  "prim": "DIG",
-               "args": [
-                 {  "int": "2"  }
-               ]
-            },
-            {  "prim": "DUP"  },
-            {  "prim": "DUG",
+            {  "prim": "DUP",
                "args": [
                  {  "int": "3"  }
                ]
             },
-            {  "prim": "DIG",
+            {  "prim": "DUP",
                "args": [
-                 {  "int": "2"  }
-               ]
-            },
-            {  "prim": "DUP"  },
-            {  "prim": "DUG",
-               "args": [
-                 {  "int": "3"  }
+                 {  "int": "5"  }
                ]
             },
             {  "prim": "MEM"  },
             {  "prim": "IF",
                "args": [
-                 [  {  "prim": "DIG",
+                 [  {  "prim": "DUP",
                        "args": [
-                         {  "int": "2"  }
+                         {  "int": "3"  }
                        ]
                  },
-                 {  "prim": "DUP"  },
-                 {  "prim": "DUG",
+                 {  "prim": "DUP",
                     "args": [
-                      {  "int": "3"  }
-                    ]
-                 },
-                 {  "prim": "DIG",
-                    "args": [
-                      {  "int": "2"  }
-                    ]
-                 },
-                 {  "prim": "DUP"  },
-                 {  "prim": "DUG",
-                    "args": [
-                      {  "int": "3"  }
+                      {  "int": "5"  }
                     ]
                  },
                  {  "prim": "GET"  },
@@ -1362,55 +1286,40 @@ export const nft_private_code : any =
                       [  {  "prim": "PUSH",
                             "args": [
                               {  "prim": "string"  },
-                              {  "string": "NotFound"  }
+                              {  "string": "permit_info"  }
                             ]
                       },
+                      {  "prim": "PUSH",
+                         "args": [
+                           {  "prim": "string"  },
+                           {  "string": "AssetNotFound"  }
+                         ]
+                      },
+                      {  "prim": "PAIR"  },
                       {  "prim": "FAILWITH"  }  ],
                       [    ]
                     ]
                  },
-                 {  "prim": "CDR",
-                    "args": [
-                      {  "int": "1"  }
-                    ]
-                 },
+                 {  "prim": "CDR"  },
                  {  "prim": "IF_NONE",
                     "args": [
-                      [  {  "prim": "DIG",
+                      [  {  "prim": "DUP",
                             "args": [
-                              {  "int": "3"  }
+                              {  "int": "2"  }
                             ]
-                      },
-                      {  "prim": "DUP"  },
-                      {  "prim": "DUG",
-                         "args": [
-                           {  "int": "4"  }
-                         ]
                       }  ],
                       [    ]
                     ]
                  },
                  {  "prim": "NOW"  },
-                 {  "prim": "DIG",
-                    "args": [
-                      {  "int": "4"  }
-                    ]
-                 },
-                 {  "prim": "DUP"  },
-                 {  "prim": "DUG",
+                 {  "prim": "DUP",
                     "args": [
                       {  "int": "5"  }
                     ]
                  },
-                 {  "prim": "DIG",
+                 {  "prim": "DUP",
                     "args": [
-                      {  "int": "4"  }
-                    ]
-                 },
-                 {  "prim": "DUP"  },
-                 {  "prim": "DUG",
-                    "args": [
-                      {  "int": "5"  }
+                      {  "int": "7"  }
                     ]
                  },
                  {  "prim": "GET"  },
@@ -1419,25 +1328,22 @@ export const nft_private_code : any =
                       [  {  "prim": "PUSH",
                             "args": [
                               {  "prim": "string"  },
-                              {  "string": "NotFound"  }
+                              {  "string": "permit_info"  }
                             ]
                       },
+                      {  "prim": "PUSH",
+                         "args": [
+                           {  "prim": "string"  },
+                           {  "string": "AssetNotFound"  }
+                         ]
+                      },
+                      {  "prim": "PAIR"  },
                       {  "prim": "FAILWITH"  }  ],
                       [    ]
                     ]
                  },
-                 {  "prim": "CAR",
-                    "args": [
-                      {  "int": "0"  }
-                    ]
-                 },
-                 {  "prim": "DIG",
-                    "args": [
-                      {  "int": "2"  }
-                    ]
-                 },
-                 {  "prim": "DUP"  },
-                 {  "prim": "DUG",
+                 {  "prim": "CAR"  },
+                 {  "prim": "DUP",
                     "args": [
                       {  "int": "3"  }
                     ]
@@ -1629,31 +1535,18 @@ export const nft_private_code : any =
                ]
             },
             {  "prim": "bool"  },
-            [  {  "prim": "UNPAIR"  },
-            {  "prim": "SWAP"  },
-            {  "prim": "UNPAIR"  },
-            {  "prim": "SWAP"  },
-            {  "prim": "UNPAIR"  },
-            {  "prim": "SWAP"  },
-            {  "prim": "UNPAIR"  },
-            {  "prim": "SWAP"  },
-            {  "prim": "UNPAIR"  },
-            {  "prim": "SWAP"  },
-            {  "prim": "UNPAIR"  },
-            {  "prim": "SWAP"  },
+            [  {  "prim": "UNPAIR",
+                  "args": [
+                    {  "int": "7"  }
+                  ]
+            },
             {  "prim": "PUSH",
                "args": [
                  {  "prim": "unit"  },
                  {  "prim": "Unit"  }
                ]
             },
-            {  "prim": "DIG",
-               "args": [
-                 {  "int": "4"  }
-               ]
-            },
-            {  "prim": "DUP"  },
-            {  "prim": "DUG",
+            {  "prim": "DUP",
                "args": [
                  {  "int": "5"  }
                ]
@@ -1663,24 +1556,12 @@ export const nft_private_code : any =
             {  "prim": "NEQ"  },
             {  "prim": "IF",
                "args": [
-                 [  {  "prim": "DIG",
+                 [  {  "prim": "DUP",
                        "args": [
-                         {  "int": "5"  }
+                         {  "int": "4"  }
                        ]
                  },
-                 {  "prim": "DUP"  },
-                 {  "prim": "DUG",
-                    "args": [
-                      {  "int": "6"  }
-                    ]
-                 },
-                 {  "prim": "DIG",
-                    "args": [
-                      {  "int": "5"  }
-                    ]
-                 },
-                 {  "prim": "DUP"  },
-                 {  "prim": "DUG",
+                 {  "prim": "DUP",
                     "args": [
                       {  "int": "6"  }
                     ]
@@ -1689,105 +1570,57 @@ export const nft_private_code : any =
                  {  "prim": "NOT"  },
                  {  "prim": "IF",
                     "args": [
-                      [  {  "prim": "DIG",
+                      [  {  "prim": "DUP",
                             "args": [
-                              {  "int": "2"  }
+                              {  "int": "7"  }
                             ]
-                      },
-                      {  "prim": "DUP"  },
-                      {  "prim": "DUG",
-                         "args": [
-                           {  "int": "3"  }
-                         ]
                       },
                       {  "prim": "FAILWITH"  }  ],
                       [    ]
                     ]
                  },
-                 {  "prim": "DIG",
+                 {  "prim": "DUP",
                     "args": [
-                      {  "int": "6"  }
+                      {  "int": "3"  }
                     ]
                  },
-                 {  "prim": "DUP"  },
-                 {  "prim": "DUG",
+                 {  "prim": "DUP",
                     "args": [
                       {  "int": "7"  }
                     ]
                  },
-                 {  "prim": "DIG",
-                    "args": [
-                      {  "int": "4"  }
-                    ]
-                 },
-                 {  "prim": "DUP"  },
-                 {  "prim": "DUG",
-                    "args": [
-                      {  "int": "5"  }
-                    ]
-                 },
                  {  "prim": "MEM"  },
                  {  "prim": "NOT"  },
                  {  "prim": "IF",
                     "args": [
-                      [  {  "prim": "DIG",
+                      [  {  "prim": "DUP",
                             "args": [
-                              {  "int": "2"  }
+                              {  "int": "7"  }
                             ]
-                      },
-                      {  "prim": "DUP"  },
-                      {  "prim": "DUG",
-                         "args": [
-                           {  "int": "3"  }
-                         ]
                       },
                       {  "prim": "FAILWITH"  }  ],
                       [    ]
                     ]
                  },
-                 {  "prim": "DIG",
-                    "args": [
-                      {  "int": "1"  }
-                    ]
-                 },
-                 {  "prim": "DUP"  },
-                 {  "prim": "DUG",
-                    "args": [
-                      {  "int": "2"  }
-                    ]
-                 },
-                 {  "prim": "DIG",
-                    "args": [
-                      {  "int": "4"  }
-                    ]
-                 },
-                 {  "prim": "DUP"  },
-                 {  "prim": "DUG",
-                    "args": [
-                      {  "int": "5"  }
-                    ]
-                 },
-                 {  "prim": "DIG",
+                 {  "prim": "DUP",
                     "args": [
                       {  "int": "8"  }
                     ]
                  },
-                 {  "prim": "DUP"  },
-                 {  "prim": "DUG",
+                 {  "prim": "DUP",
                     "args": [
-                      {  "int": "9"  }
+                      {  "int": "7"  }
+                    ]
+                 },
+                 {  "prim": "DUP",
+                    "args": [
+                      {  "int": "5"  }
                     ]
                  },
                  {  "prim": "PAIR"  },
-                 {  "prim": "DIG",
+                 {  "prim": "DUP",
                     "args": [
-                      {  "int": "9"  }
-                    ]
-                 },
-                 {  "prim": "DUP"  },
-                 {  "prim": "DUG",
-                    "args": [
-                      {  "int": "10"  }
+                      {  "int": "4"  }
                     ]
                  },
                  {  "prim": "PAIR"  },
@@ -1856,28 +1689,11 @@ export const nft_private_code : any =
        {  "prim": "DIP",
           "args": [
             {  "int": "1"  },
-            [  {  "prim": "UNPAIR"  },
-            {  "prim": "SWAP"  },
-            {  "prim": "UNPAIR"  },
-            {  "prim": "SWAP"  },
-            {  "prim": "UNPAIR"  },
-            {  "prim": "SWAP"  },
-            {  "prim": "UNPAIR"  },
-            {  "prim": "SWAP"  },
-            {  "prim": "UNPAIR"  },
-            {  "prim": "SWAP"  },
-            {  "prim": "UNPAIR"  },
-            {  "prim": "SWAP"  },
-            {  "prim": "UNPAIR"  },
-            {  "prim": "SWAP"  },
-            {  "prim": "UNPAIR"  },
-            {  "prim": "SWAP"  },
-            {  "prim": "UNPAIR"  },
-            {  "prim": "SWAP"  },
-            {  "prim": "UNPAIR"  },
-            {  "prim": "SWAP"  },
-            {  "prim": "UNPAIR"  },
-            {  "prim": "SWAP"  }  ]
+            [  {  "prim": "UNPAIR",
+                  "args": [
+                    {  "int": "12"  }
+                  ]
+            }  ]
           ]
        },
        {  "prim": "IF_LEFT",
@@ -1891,36 +1707,18 @@ export const nft_private_code : any =
                                     [  {  "prim": "IF_LEFT",
                                           "args": [
                                             [  {  "prim": "UNPAIR"  },
-                                            {  "prim": "DIG",
-                                               "args": [
-                                                 {  "int": "14"  }
-                                               ]
-                                            },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
+                                            {  "prim": "DUP",
                                                "args": [
                                                  {  "int": "15"  }
                                                ]
                                             },
-                                            {  "prim": "DIG",
-                                               "args": [
-                                                 {  "int": "2"  }
-                                               ]
-                                            },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
+                                            {  "prim": "DUP",
                                                "args": [
                                                  {  "int": "3"  }
                                                ]
                                             },
                                             {  "prim": "AMOUNT"  },
-                                            {  "prim": "DIG",
-                                               "args": [
-                                                 {  "int": "3"  }
-                                               ]
-                                            },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
+                                            {  "prim": "DUP",
                                                "args": [
                                                  {  "int": "4"  }
                                                ]
@@ -1928,80 +1726,51 @@ export const nft_private_code : any =
                                             {  "prim": "MAP",
                                                "args": [
                                                  [  {  "prim": "DUP"  },
-                                                 {  "prim": "CAR",
+                                                 {  "prim": "CAR"  },
+                                                 {  "prim": "DUP",
                                                     "args": [
-                                                      {  "int": "0"  }
+                                                      {  "int": "10"  }
                                                     ]
                                                  },
-                                                 {  "prim": "DIG",
-                                                    "args": [
-                                                      {  "int": "16"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
-                                                    "args": [
-                                                      {  "int": "17"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DIG",
-                                                    "args": [
-                                                      {  "int": "2"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
+                                                 {  "prim": "DUP",
                                                     "args": [
                                                       {  "int": "3"  }
                                                     ]
                                                  },
-                                                 {  "prim": "CDR",
-                                                    "args": [
-                                                      {  "int": "1"  }
-                                                    ]
-                                                 },
+                                                 {  "prim": "CDR"  },
                                                  {  "prim": "GET"  },
                                                  {  "prim": "IF_NONE",
                                                     "args": [
                                                       [  {  "prim": "PUSH",
                                                             "args": [
                                                               {  "prim": "string"  },
-                                                              {  "string": "NotFound"  }
+                                                              {  "string": "ledger"  }
                                                             ]
                                                       },
+                                                      {  "prim": "PUSH",
+                                                         "args": [
+                                                           {  "prim": "string"  },
+                                                           {  "string": "AssetNotFound"  }
+                                                         ]
+                                                      },
+                                                      {  "prim": "PAIR"  },
                                                       {  "prim": "FAILWITH"  }  ],
                                                       [    ]
                                                     ]
                                                  },
                                                  {  "prim": "COMPARE"  },
                                                  {  "prim": "EQ"  },
-                                                 {  "prim": "DIG",
+                                                 {  "prim": "DUP",
                                                     "args": [
-                                                      {  "int": "16"  }
+                                                      {  "int": "10"  }
                                                     ]
                                                  },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
-                                                    "args": [
-                                                      {  "int": "17"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DIG",
-                                                    "args": [
-                                                      {  "int": "2"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
+                                                 {  "prim": "DUP",
                                                     "args": [
                                                       {  "int": "3"  }
                                                     ]
                                                  },
-                                                 {  "prim": "CDR",
-                                                    "args": [
-                                                      {  "int": "1"  }
-                                                    ]
-                                                 },
+                                                 {  "prim": "CDR"  },
                                                  {  "prim": "MEM"  },
                                                  {  "prim": "AND"  },
                                                  {  "prim": "IF",
@@ -2020,13 +1789,7 @@ export const nft_private_code : any =
                                                       }  ]
                                                     ]
                                                  },
-                                                 {  "prim": "DIG",
-                                                    "args": [
-                                                      {  "int": "1"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
+                                                 {  "prim": "DUP",
                                                     "args": [
                                                       {  "int": "2"  }
                                                     ]
@@ -2067,28 +1830,11 @@ export const nft_private_code : any =
                                                  {  "int": "2"  }
                                                ]
                                             },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
+                                            {  "prim": "PAIR",
+                                               "args": [
+                                                 {  "int": "12"  }
+                                               ]
+                                            },
                                             {  "prim": "DIG",
                                                "args": [
                                                  {  "int": "1"  }
@@ -2096,47 +1842,23 @@ export const nft_private_code : any =
                                             },
                                             {  "prim": "PAIR"  }  ],
                                             [  {  "prim": "UNPAIR"  },
-                                            {  "prim": "DIG",
-                                               "args": [
-                                                 {  "int": "14"  }
-                                               ]
-                                            },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
+                                            {  "prim": "DUP",
                                                "args": [
                                                  {  "int": "15"  }
                                                ]
                                             },
-                                            {  "prim": "DIG",
-                                               "args": [
-                                                 {  "int": "2"  }
-                                               ]
-                                            },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
+                                            {  "prim": "DUP",
                                                "args": [
                                                  {  "int": "3"  }
                                                ]
                                             },
                                             {  "prim": "AMOUNT"  },
-                                            {  "prim": "DIG",
+                                            {  "prim": "DUP",
                                                "args": [
-                                                 {  "int": "15"  }
+                                                 {  "int": "7"  }
                                                ]
                                             },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
-                                               "args": [
-                                                 {  "int": "16"  }
-                                               ]
-                                            },
-                                            {  "prim": "DIG",
-                                               "args": [
-                                                 {  "int": "4"  }
-                                               ]
-                                            },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
+                                            {  "prim": "DUP",
                                                "args": [
                                                  {  "int": "5"  }
                                                ]
@@ -2147,9 +1869,16 @@ export const nft_private_code : any =
                                                  [  {  "prim": "PUSH",
                                                        "args": [
                                                          {  "prim": "string"  },
-                                                         {  "string": "NotFound"  }
+                                                         {  "string": "royalties"  }
                                                        ]
                                                  },
+                                                 {  "prim": "PUSH",
+                                                    "args": [
+                                                      {  "prim": "string"  },
+                                                      {  "string": "AssetNotFound"  }
+                                                    ]
+                                                 },
+                                                 {  "prim": "PAIR"  },
                                                  {  "prim": "FAILWITH"  }  ],
                                                  [    ]
                                                ]
@@ -2181,28 +1910,11 @@ export const nft_private_code : any =
                                                  {  "int": "2"  }
                                                ]
                                             },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
+                                            {  "prim": "PAIR",
+                                               "args": [
+                                                 {  "int": "12"  }
+                                               ]
+                                            },
                                             {  "prim": "DIG",
                                                "args": [
                                                  {  "int": "1"  }
@@ -2213,16 +1925,10 @@ export const nft_private_code : any =
                                     }  ],
                                     [  {  "prim": "IF_LEFT",
                                           "args": [
-                                            [  {  "prim": "DIG",
+                                            [  {  "prim": "DUP",
                                                   "args": [
-                                                    {  "int": "2"  }
+                                                    {  "int": "12"  }
                                                   ]
-                                            },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
-                                               "args": [
-                                                 {  "int": "3"  }
-                                               ]
                                             },
                                             {  "prim": "IF",
                                                "args": [
@@ -2243,22 +1949,12 @@ export const nft_private_code : any =
                                                  {  "prim": "IF_LEFT",
                                                     "args": [
                                                       [  {  "prim": "SENDER"  },
-                                                      {  "prim": "DIG",
-                                                         "args": [
-                                                           {  "int": "1"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
+                                                      {  "prim": "DUP",
                                                          "args": [
                                                            {  "int": "2"  }
                                                          ]
                                                       },
-                                                      {  "prim": "CAR",
-                                                         "args": [
-                                                           {  "int": "0"  }
-                                                         ]
-                                                      },
+                                                      {  "prim": "CAR"  },
                                                       {  "prim": "COMPARE"  },
                                                       {  "prim": "EQ"  },
                                                       {  "prim": "NOT"  },
@@ -2274,71 +1970,32 @@ export const nft_private_code : any =
                                                            [    ]
                                                          ]
                                                       },
-                                                      {  "prim": "DIG",
+                                                      {  "prim": "DUP",
                                                          "args": [
-                                                           {  "int": "11"  }
+                                                           {  "int": "7"  }
                                                          ]
                                                       },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
-                                                         "args": [
-                                                           {  "int": "12"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DIG",
-                                                         "args": [
-                                                           {  "int": "1"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
+                                                      {  "prim": "DUP",
                                                          "args": [
                                                            {  "int": "2"  }
                                                          ]
                                                       },
-                                                      {  "prim": "CAR",
-                                                         "args": [
-                                                           {  "int": "0"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DIG",
-                                                         "args": [
-                                                           {  "int": "2"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
+                                                      {  "prim": "CAR"  },
+                                                      {  "prim": "DUP",
                                                          "args": [
                                                            {  "int": "3"  }
                                                          ]
                                                       },
-                                                      {  "prim": "CDR",
-                                                         "args": [
-                                                           {  "int": "2"  }
-                                                         ]
-                                                      },
+                                                      {  "prim": "CDR"  },
+                                                      {  "prim": "CDR"  },
                                                       {  "prim": "PAIR"  },
-                                                      {  "prim": "DIG",
-                                                         "args": [
-                                                           {  "int": "2"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
+                                                      {  "prim": "DUP",
                                                          "args": [
                                                            {  "int": "3"  }
                                                          ]
                                                       },
-                                                      {  "prim": "CDR",
-                                                         "args": [
-                                                           {  "int": "1"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "CAR",
-                                                         "args": [
-                                                           {  "int": "0"  }
-                                                         ]
-                                                      },
+                                                      {  "prim": "CDR"  },
+                                                      {  "prim": "CAR"  },
                                                       {  "prim": "PAIR"  },
                                                       {  "prim": "MEM"  },
                                                       {  "prim": "IF",
@@ -2346,20 +2003,21 @@ export const nft_private_code : any =
                                                            [  {  "prim": "PUSH",
                                                                  "args": [
                                                                    {  "prim": "string"  },
-                                                                   {  "string": "KeyExists"  }
+                                                                   {  "string": "operator"  }
                                                                  ]
                                                            },
-                                                           {  "prim": "FAILWITH"  }  ],
-                                                           [  {  "prim": "DIG",
-                                                                 "args": [
-                                                                   {  "int": "11"  }
-                                                                 ]
-                                                           },
-                                                           {  "prim": "DUP"  },
-                                                           {  "prim": "DUG",
+                                                           {  "prim": "PUSH",
                                                               "args": [
-                                                                {  "int": "12"  }
+                                                                {  "prim": "string"  },
+                                                                {  "string": "KeyExists"  }
                                                               ]
+                                                           },
+                                                           {  "prim": "PAIR"  },
+                                                           {  "prim": "FAILWITH"  }  ],
+                                                           [  {  "prim": "DUP",
+                                                                 "args": [
+                                                                   {  "int": "7"  }
+                                                                 ]
                                                            },
                                                            {  "prim": "PUSH",
                                                               "args": [
@@ -2368,60 +2026,27 @@ export const nft_private_code : any =
                                                               ]
                                                            },
                                                            {  "prim": "SOME"  },
-                                                           {  "prim": "DIG",
-                                                              "args": [
-                                                                {  "int": "2"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "DUP"  },
-                                                           {  "prim": "DUG",
+                                                           {  "prim": "DUP",
                                                               "args": [
                                                                 {  "int": "3"  }
                                                               ]
                                                            },
-                                                           {  "prim": "CAR",
-                                                              "args": [
-                                                                {  "int": "0"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "DIG",
-                                                              "args": [
-                                                                {  "int": "3"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "DUP"  },
-                                                           {  "prim": "DUG",
+                                                           {  "prim": "CAR"  },
+                                                           {  "prim": "DUP",
                                                               "args": [
                                                                 {  "int": "4"  }
                                                               ]
                                                            },
-                                                           {  "prim": "CDR",
-                                                              "args": [
-                                                                {  "int": "2"  }
-                                                              ]
-                                                           },
+                                                           {  "prim": "CDR"  },
+                                                           {  "prim": "CDR"  },
                                                            {  "prim": "PAIR"  },
-                                                           {  "prim": "DIG",
-                                                              "args": [
-                                                                {  "int": "3"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "DUP"  },
-                                                           {  "prim": "DUG",
+                                                           {  "prim": "DUP",
                                                               "args": [
                                                                 {  "int": "4"  }
                                                               ]
                                                            },
-                                                           {  "prim": "CDR",
-                                                              "args": [
-                                                                {  "int": "1"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "CAR",
-                                                              "args": [
-                                                                {  "int": "0"  }
-                                                              ]
-                                                           },
+                                                           {  "prim": "CDR"  },
+                                                           {  "prim": "CAR"  },
                                                            {  "prim": "PAIR"  },
                                                            {  "prim": "UPDATE"  },
                                                            {  "prim": "DIP",
@@ -2430,7 +2055,7 @@ export const nft_private_code : any =
                                                                 [  {
                                                                 "prim": "DIG",
                                                                 "args": [
-                                                                  {  "int": "11"  }
+                                                                  {  "int": "6"  }
                                                                 ]
                                                                 },
                                                                 {  "prim": "DROP",
@@ -2443,7 +2068,7 @@ export const nft_private_code : any =
                                                            },
                                                            {  "prim": "DUG",
                                                               "args": [
-                                                                {  "int": "11"  }
+                                                                {  "int": "6"  }
                                                               ]
                                                            }  ]
                                                          ]
@@ -2454,22 +2079,12 @@ export const nft_private_code : any =
                                                          ]
                                                       }  ],
                                                       [  {  "prim": "SENDER"  },
-                                                      {  "prim": "DIG",
-                                                         "args": [
-                                                           {  "int": "1"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
+                                                      {  "prim": "DUP",
                                                          "args": [
                                                            {  "int": "2"  }
                                                          ]
                                                       },
-                                                      {  "prim": "CAR",
-                                                         "args": [
-                                                           {  "int": "0"  }
-                                                         ]
-                                                      },
+                                                      {  "prim": "CAR"  },
                                                       {  "prim": "COMPARE"  },
                                                       {  "prim": "EQ"  },
                                                       {  "prim": "NOT"  },
@@ -2485,15 +2100,9 @@ export const nft_private_code : any =
                                                            [    ]
                                                          ]
                                                       },
-                                                      {  "prim": "DIG",
+                                                      {  "prim": "DUP",
                                                          "args": [
-                                                           {  "int": "11"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
-                                                         "args": [
-                                                           {  "int": "12"  }
+                                                           {  "int": "7"  }
                                                          ]
                                                       },
                                                       {  "prim": "NONE",
@@ -2501,60 +2110,27 @@ export const nft_private_code : any =
                                                            {  "prim": "unit"  }
                                                          ]
                                                       },
-                                                      {  "prim": "DIG",
-                                                         "args": [
-                                                           {  "int": "2"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
+                                                      {  "prim": "DUP",
                                                          "args": [
                                                            {  "int": "3"  }
                                                          ]
                                                       },
-                                                      {  "prim": "CAR",
-                                                         "args": [
-                                                           {  "int": "0"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DIG",
-                                                         "args": [
-                                                           {  "int": "3"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
+                                                      {  "prim": "CAR"  },
+                                                      {  "prim": "DUP",
                                                          "args": [
                                                            {  "int": "4"  }
                                                          ]
                                                       },
-                                                      {  "prim": "CDR",
-                                                         "args": [
-                                                           {  "int": "2"  }
-                                                         ]
-                                                      },
+                                                      {  "prim": "CDR"  },
+                                                      {  "prim": "CDR"  },
                                                       {  "prim": "PAIR"  },
-                                                      {  "prim": "DIG",
-                                                         "args": [
-                                                           {  "int": "3"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
+                                                      {  "prim": "DUP",
                                                          "args": [
                                                            {  "int": "4"  }
                                                          ]
                                                       },
-                                                      {  "prim": "CDR",
-                                                         "args": [
-                                                           {  "int": "1"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "CAR",
-                                                         "args": [
-                                                           {  "int": "0"  }
-                                                         ]
-                                                      },
+                                                      {  "prim": "CDR"  },
+                                                      {  "prim": "CAR"  },
                                                       {  "prim": "PAIR"  },
                                                       {  "prim": "UPDATE"  },
                                                       {  "prim": "DIP",
@@ -2562,7 +2138,7 @@ export const nft_private_code : any =
                                                            {  "int": "1"  },
                                                            [  {  "prim": "DIG",
                                                                  "args": [
-                                                                   {  "int": "11"  }
+                                                                   {  "int": "6"  }
                                                                  ]
                                                            },
                                                            {  "prim": "DROP",
@@ -2574,7 +2150,7 @@ export const nft_private_code : any =
                                                       },
                                                       {  "prim": "DUG",
                                                          "args": [
-                                                           {  "int": "11"  }
+                                                           {  "int": "6"  }
                                                          ]
                                                       },
                                                       {  "prim": "DROP",
@@ -2596,28 +2172,11 @@ export const nft_private_code : any =
                                                  {  "int": "1"  }
                                                ]
                                             },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
+                                            {  "prim": "PAIR",
+                                               "args": [
+                                                 {  "int": "12"  }
+                                               ]
+                                            },
                                             {  "prim": "DIG",
                                                "args": [
                                                  {  "int": "1"  }
@@ -2630,25 +2189,13 @@ export const nft_private_code : any =
                                                  [  {  "prim": "DUP"  },
                                                  {  "prim": "IF_LEFT",
                                                     "args": [
-                                                      [  {  "prim": "DIG",
+                                                      [  {  "prim": "DUP",
                                                             "args": [
-                                                              {  "int": "7"  }
+                                                              {  "int": "11"  }
                                                             ]
                                                       },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
-                                                         "args": [
-                                                           {  "int": "8"  }
-                                                         ]
-                                                      },
                                                       {  "prim": "SENDER"  },
-                                                      {  "prim": "DIG",
-                                                         "args": [
-                                                           {  "int": "2"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
+                                                      {  "prim": "DUP",
                                                          "args": [
                                                            {  "int": "3"  }
                                                          ]
@@ -2660,20 +2207,21 @@ export const nft_private_code : any =
                                                            [  {  "prim": "PUSH",
                                                                  "args": [
                                                                    {  "prim": "string"  },
-                                                                   {  "string": "KeyExists"  }
+                                                                   {  "string": "operator_for_all"  }
                                                                  ]
                                                            },
-                                                           {  "prim": "FAILWITH"  }  ],
-                                                           [  {  "prim": "DIG",
-                                                                 "args": [
-                                                                   {  "int": "7"  }
-                                                                 ]
-                                                           },
-                                                           {  "prim": "DUP"  },
-                                                           {  "prim": "DUG",
+                                                           {  "prim": "PUSH",
                                                               "args": [
-                                                                {  "int": "8"  }
+                                                                {  "prim": "string"  },
+                                                                {  "string": "KeyExists"  }
                                                               ]
+                                                           },
+                                                           {  "prim": "PAIR"  },
+                                                           {  "prim": "FAILWITH"  }  ],
+                                                           [  {  "prim": "DUP",
+                                                                 "args": [
+                                                                   {  "int": "11"  }
+                                                                 ]
                                                            },
                                                            {  "prim": "PUSH",
                                                               "args": [
@@ -2683,13 +2231,7 @@ export const nft_private_code : any =
                                                            },
                                                            {  "prim": "SOME"  },
                                                            {  "prim": "SENDER"  },
-                                                           {  "prim": "DIG",
-                                                              "args": [
-                                                                {  "int": "3"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "DUP"  },
-                                                           {  "prim": "DUG",
+                                                           {  "prim": "DUP",
                                                               "args": [
                                                                 {  "int": "4"  }
                                                               ]
@@ -2702,7 +2244,7 @@ export const nft_private_code : any =
                                                                 [  {
                                                                 "prim": "DIG",
                                                                 "args": [
-                                                                  {  "int": "7"  }
+                                                                  {  "int": "10"  }
                                                                 ]
                                                                 },
                                                                 {  "prim": "DROP",
@@ -2715,7 +2257,7 @@ export const nft_private_code : any =
                                                            },
                                                            {  "prim": "DUG",
                                                               "args": [
-                                                                {  "int": "7"  }
+                                                                {  "int": "10"  }
                                                               ]
                                                            }  ]
                                                          ]
@@ -2725,16 +2267,10 @@ export const nft_private_code : any =
                                                            {  "int": "1"  }
                                                          ]
                                                       }  ],
-                                                      [  {  "prim": "DIG",
+                                                      [  {  "prim": "DUP",
                                                             "args": [
-                                                              {  "int": "7"  }
+                                                              {  "int": "11"  }
                                                             ]
-                                                      },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
-                                                         "args": [
-                                                           {  "int": "8"  }
-                                                         ]
                                                       },
                                                       {  "prim": "NONE",
                                                          "args": [
@@ -2742,13 +2278,7 @@ export const nft_private_code : any =
                                                          ]
                                                       },
                                                       {  "prim": "SENDER"  },
-                                                      {  "prim": "DIG",
-                                                         "args": [
-                                                           {  "int": "3"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
+                                                      {  "prim": "DUP",
                                                          "args": [
                                                            {  "int": "4"  }
                                                          ]
@@ -2760,7 +2290,7 @@ export const nft_private_code : any =
                                                            {  "int": "1"  },
                                                            [  {  "prim": "DIG",
                                                                  "args": [
-                                                                   {  "int": "7"  }
+                                                                   {  "int": "10"  }
                                                                  ]
                                                            },
                                                            {  "prim": "DROP",
@@ -2772,7 +2302,7 @@ export const nft_private_code : any =
                                                       },
                                                       {  "prim": "DUG",
                                                          "args": [
-                                                           {  "int": "7"  }
+                                                           {  "int": "10"  }
                                                          ]
                                                       },
                                                       {  "prim": "DROP",
@@ -2794,28 +2324,11 @@ export const nft_private_code : any =
                                                  {  "int": "1"  }
                                                ]
                                             },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
+                                            {  "prim": "PAIR",
+                                               "args": [
+                                                 {  "int": "12"  }
+                                               ]
+                                            },
                                             {  "prim": "DIG",
                                                "args": [
                                                  {  "int": "1"  }
@@ -2830,16 +2343,10 @@ export const nft_private_code : any =
                                   "args": [
                                     [  {  "prim": "IF_LEFT",
                                           "args": [
-                                            [  {  "prim": "DIG",
+                                            [  {  "prim": "DUP",
                                                   "args": [
-                                                    {  "int": "2"  }
+                                                    {  "int": "12"  }
                                                   ]
-                                            },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
-                                               "args": [
-                                                 {  "int": "3"  }
-                                               ]
                                             },
                                             {  "prim": "IF",
                                                "args": [
@@ -2854,24 +2361,12 @@ export const nft_private_code : any =
                                                ]
                                             },
                                             {  "prim": "SENDER"  },
-                                            {  "prim": "DIG",
+                                            {  "prim": "DUP",
                                                "args": [
-                                                 {  "int": "11"  }
+                                                 {  "int": "5"  }
                                                ]
                                             },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
-                                               "args": [
-                                                 {  "int": "12"  }
-                                               ]
-                                            },
-                                            {  "prim": "DIG",
-                                               "args": [
-                                                 {  "int": "2"  }
-                                               ]
-                                            },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
+                                            {  "prim": "DUP",
                                                "args": [
                                                  {  "int": "3"  }
                                                ]
@@ -2882,33 +2377,28 @@ export const nft_private_code : any =
                                                  [  {  "prim": "PUSH",
                                                        "args": [
                                                          {  "prim": "string"  },
-                                                         {  "string": "NotFound"  }
+                                                         {  "string": "ledger"  }
                                                        ]
                                                  },
+                                                 {  "prim": "PUSH",
+                                                    "args": [
+                                                      {  "prim": "string"  },
+                                                      {  "string": "AssetNotFound"  }
+                                                    ]
+                                                 },
+                                                 {  "prim": "PAIR"  },
                                                  {  "prim": "FAILWITH"  }  ],
                                                  [    ]
                                                ]
                                             },
                                             {  "prim": "COMPARE"  },
                                             {  "prim": "EQ"  },
-                                            {  "prim": "DIG",
+                                            {  "prim": "DUP",
                                                "args": [
-                                                 {  "int": "11"  }
+                                                 {  "int": "5"  }
                                                ]
                                             },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
-                                               "args": [
-                                                 {  "int": "12"  }
-                                               ]
-                                            },
-                                            {  "prim": "DIG",
-                                               "args": [
-                                                 {  "int": "2"  }
-                                               ]
-                                            },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
+                                            {  "prim": "DUP",
                                                "args": [
                                                  {  "int": "3"  }
                                                ]
@@ -2917,29 +2407,17 @@ export const nft_private_code : any =
                                             {  "prim": "AND"  },
                                             {  "prim": "IF",
                                                "args": [
-                                                 [  {  "prim": "DIG",
+                                                 [  {  "prim": "DUP",
                                                        "args": [
-                                                         {  "int": "10"  }
+                                                         {  "int": "4"  }
                                                        ]
-                                                 },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
-                                                    "args": [
-                                                      {  "int": "11"  }
-                                                    ]
                                                  },
                                                  {  "prim": "NONE",
                                                     "args": [
                                                       {  "prim": "address"  }
                                                     ]
                                                  },
-                                                 {  "prim": "DIG",
-                                                    "args": [
-                                                      {  "int": "2"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
+                                                 {  "prim": "DUP",
                                                     "args": [
                                                       {  "int": "3"  }
                                                     ]
@@ -2950,7 +2428,7 @@ export const nft_private_code : any =
                                                       {  "int": "1"  },
                                                       [  {  "prim": "DIG",
                                                             "args": [
-                                                              {  "int": "10"  }
+                                                              {  "int": "3"  }
                                                             ]
                                                       },
                                                       {  "prim": "DROP",
@@ -2962,7 +2440,53 @@ export const nft_private_code : any =
                                                  },
                                                  {  "prim": "DUG",
                                                     "args": [
-                                                      {  "int": "10"  }
+                                                      {  "int": "3"  }
+                                                    ]
+                                                 },
+                                                 {  "prim": "DUP",
+                                                    "args": [
+                                                      {  "int": "6"  }
+                                                    ]
+                                                 },
+                                                 {  "prim": "NONE",
+                                                    "args": [
+                                                      {  "prim": "pair",
+                                                         "args": [
+                                                           {  "prim": "nat"  },
+                                                           {  "prim": "map",
+                                                              "args": [
+                                                                {  "prim": "string"  },
+                                                                {  "prim": "bytes"  }
+                                                              ]
+                                                           }
+                                                         ]
+                                                      }
+                                                    ]
+                                                 },
+                                                 {  "prim": "DUP",
+                                                    "args": [
+                                                      {  "int": "3"  }
+                                                    ]
+                                                 },
+                                                 {  "prim": "UPDATE"  },
+                                                 {  "prim": "DIP",
+                                                    "args": [
+                                                      {  "int": "1"  },
+                                                      [  {  "prim": "DIG",
+                                                            "args": [
+                                                              {  "int": "5"  }
+                                                            ]
+                                                      },
+                                                      {  "prim": "DROP",
+                                                         "args": [
+                                                           {  "int": "1"  }
+                                                         ]
+                                                      }  ]
+                                                    ]
+                                                 },
+                                                 {  "prim": "DUG",
+                                                    "args": [
+                                                      {  "int": "5"  }
                                                     ]
                                                  }  ],
                                                  [  {  "prim": "PUSH",
@@ -2979,28 +2503,11 @@ export const nft_private_code : any =
                                                  {  "int": "1"  }
                                                ]
                                             },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
+                                            {  "prim": "PAIR",
+                                               "args": [
+                                                 {  "int": "12"  }
+                                               ]
+                                            },
                                             {  "prim": "DIG",
                                                "args": [
                                                  {  "int": "1"  }
@@ -3009,15 +2516,9 @@ export const nft_private_code : any =
                                             {  "prim": "PAIR"  }  ],
                                             [  {  "prim": "UNPAIR"  },
                                             {  "prim": "SWAP"  },
-                                            {  "prim": "DIG",
+                                            {  "prim": "DUP",
                                                "args": [
-                                                 {  "int": "13"  }
-                                               ]
-                                            },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
-                                               "args": [
-                                                 {  "int": "14"  }
+                                                 {  "int": "3"  }
                                                ]
                                             },
                                             {  "prim": "SENDER"  },
@@ -3036,15 +2537,9 @@ export const nft_private_code : any =
                                                  [    ]
                                                ]
                                             },
-                                            {  "prim": "DIG",
+                                            {  "prim": "DUP",
                                                "args": [
-                                                 {  "int": "3"  }
-                                               ]
-                                            },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
-                                               "args": [
-                                                 {  "int": "4"  }
+                                                 {  "int": "13"  }
                                                ]
                                             },
                                             {  "prim": "IF",
@@ -3061,28 +2556,16 @@ export const nft_private_code : any =
                                             },
                                             {  "prim": "DIG",
                                                "args": [
-                                                 {  "int": "2"  }
+                                                 {  "int": "13"  }
                                                ]
                                             },
-                                            {  "prim": "DIG",
-                                               "args": [
-                                                 {  "int": "1"  }
-                                               ]
-                                            },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
+                                            {  "prim": "DUP",
                                                "args": [
                                                  {  "int": "2"  }
                                                ]
                                             },
                                             {  "prim": "SOME"  },
-                                            {  "prim": "DIG",
-                                               "args": [
-                                                 {  "int": "3"  }
-                                               ]
-                                            },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
+                                            {  "prim": "DUP",
                                                "args": [
                                                  {  "int": "4"  }
                                                ]
@@ -3090,7 +2573,7 @@ export const nft_private_code : any =
                                             {  "prim": "UPDATE"  },
                                             {  "prim": "DUG",
                                                "args": [
-                                                 {  "int": "2"  }
+                                                 {  "int": "13"  }
                                                ]
                                             },
                                             {  "prim": "DROP",
@@ -3098,28 +2581,11 @@ export const nft_private_code : any =
                                                  {  "int": "2"  }
                                                ]
                                             },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
+                                            {  "prim": "PAIR",
+                                               "args": [
+                                                 {  "int": "12"  }
+                                               ]
+                                            },
                                             {  "prim": "DIG",
                                                "args": [
                                                  {  "int": "1"  }
@@ -3132,8 +2598,7 @@ export const nft_private_code : any =
                                           "args": [
                                             [  {  "prim": "UNPAIR"  },
                                             {  "prim": "SWAP"  },
-                                            {  "prim": "SELF"  },
-                                            {  "prim": "ADDRESS"  },
+                                            {  "prim": "SELF_ADDRESS"  },
                                             {  "prim": "SENDER"  },
                                             {  "prim": "COMPARE"  },
                                             {  "prim": "EQ"  },
@@ -3150,15 +2615,9 @@ export const nft_private_code : any =
                                                  [    ]
                                                ]
                                             },
-                                            {  "prim": "DIG",
+                                            {  "prim": "DUP",
                                                "args": [
-                                                 {  "int": "3"  }
-                                               ]
-                                            },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
-                                               "args": [
-                                                 {  "int": "4"  }
+                                                 {  "int": "13"  }
                                                ]
                                             },
                                             {  "prim": "IF",
@@ -3173,71 +2632,177 @@ export const nft_private_code : any =
                                                  [    ]
                                                ]
                                             },
-                                            {  "prim": "DIG",
+                                            {  "prim": "DUP",
                                                "args": [
-                                                 {  "int": "9"  }
+                                                 {  "int": "7"  }
                                                ]
                                             },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
-                                               "args": [
-                                                 {  "int": "10"  }
-                                               ]
-                                            },
-                                            {  "prim": "DIG",
-                                               "args": [
-                                                 {  "int": "1"  }
-                                               ]
-                                            },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
-                                               "args": [
-                                                 {  "int": "2"  }
-                                               ]
-                                            },
-                                            {  "prim": "DIG",
+                                            {  "prim": "DUP",
                                                "args": [
                                                  {  "int": "3"  }
                                                ]
                                             },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
+                                            {  "prim": "MEM"  },
+                                            {  "prim": "IF",
                                                "args": [
-                                                 {  "int": "4"  }
-                                               ]
-                                            },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SOME"  },
-                                            {  "prim": "DIG",
-                                               "args": [
-                                                 {  "int": "3"  }
-                                               ]
-                                            },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
-                                               "args": [
-                                                 {  "int": "4"  }
-                                               ]
-                                            },
-                                            {  "prim": "UPDATE"  },
-                                            {  "prim": "DIP",
-                                               "args": [
-                                                 {  "int": "1"  },
-                                                 [  {  "prim": "DIG",
+                                                 [  {  "prim": "DUP",
                                                        "args": [
-                                                         {  "int": "9"  }
+                                                         {  "int": "7"  }
                                                        ]
                                                  },
+                                                 {  "prim": "DUP",
+                                                    "args": [
+                                                      {  "int": "8"  }
+                                                    ]
+                                                 },
+                                                 {  "prim": "DUP",
+                                                    "args": [
+                                                      {  "int": "4"  }
+                                                    ]
+                                                 },
+                                                 {  "prim": "GET"  },
+                                                 {  "prim": "IF_NONE",
+                                                    "args": [
+                                                      [  {  "prim": "PUSH",
+                                                            "args": [
+                                                              {  "prim": "string"  },
+                                                              {  "string": "token_metadata"  }
+                                                            ]
+                                                      },
+                                                      {  "prim": "PUSH",
+                                                         "args": [
+                                                           {  "prim": "string"  },
+                                                           {  "string": "AssetNotFound"  }
+                                                         ]
+                                                      },
+                                                      {  "prim": "PAIR"  },
+                                                      {  "prim": "FAILWITH"  }  ],
+                                                      [    ]
+                                                    ]
+                                                 },
+                                                 {  "prim": "UNPAIR"  },
                                                  {  "prim": "DROP",
                                                     "args": [
                                                       {  "int": "1"  }
                                                     ]
+                                                 },
+                                                 {  "prim": "DUP",
+                                                    "args": [
+                                                      {  "int": "4"  }
+                                                    ]
+                                                 },
+                                                 {  "prim": "SWAP"  },
+                                                 {  "prim": "DROP",
+                                                    "args": [
+                                                      {  "int": "1"  }
+                                                    ]
+                                                 },
+                                                 {  "prim": "DUP",
+                                                    "args": [
+                                                      {  "int": "3"  }
+                                                    ]
+                                                 },
+                                                 {  "prim": "SWAP"  },
+                                                 {  "prim": "PAIR"  },
+                                                 {  "prim": "SOME"  },
+                                                 {  "prim": "DUP",
+                                                    "args": [
+                                                      {  "int": "4"  }
+                                                    ]
+                                                 },
+                                                 {  "prim": "UPDATE"  },
+                                                 {  "prim": "DIP",
+                                                    "args": [
+                                                      {  "int": "1"  },
+                                                      [  {  "prim": "DIG",
+                                                            "args": [
+                                                              {  "int": "6"  }
+                                                            ]
+                                                      },
+                                                      {  "prim": "DROP",
+                                                         "args": [
+                                                           {  "int": "1"  }
+                                                         ]
+                                                      }  ]
+                                                    ]
+                                                 },
+                                                 {  "prim": "DUG",
+                                                    "args": [
+                                                      {  "int": "6"  }
+                                                    ]
+                                                 }  ],
+                                                 [  {  "prim": "DUP",
+                                                       "args": [
+                                                         {  "int": "7"  }
+                                                       ]
+                                                 },
+                                                 {  "prim": "DUP",
+                                                    "args": [
+                                                      {  "int": "3"  }
+                                                    ]
+                                                 },
+                                                 {  "prim": "MEM"  },
+                                                 {  "prim": "IF",
+                                                    "args": [
+                                                      [  {  "prim": "PUSH",
+                                                            "args": [
+                                                              {  "prim": "string"  },
+                                                              {  "string": "token_metadata"  }
+                                                            ]
+                                                      },
+                                                      {  "prim": "PUSH",
+                                                         "args": [
+                                                           {  "prim": "string"  },
+                                                           {  "string": "KeyExists"  }
+                                                         ]
+                                                      },
+                                                      {  "prim": "PAIR"  },
+                                                      {  "prim": "FAILWITH"  }  ],
+                                                      [  {  "prim": "DUP",
+                                                            "args": [
+                                                              {  "int": "7"  }
+                                                            ]
+                                                      },
+                                                      {  "prim": "DUP",
+                                                         "args": [
+                                                           {  "int": "2"  }
+                                                         ]
+                                                      },
+                                                      {  "prim": "DUP",
+                                                         "args": [
+                                                           {  "int": "4"  }
+                                                         ]
+                                                      },
+                                                      {  "prim": "PAIR"  },
+                                                      {  "prim": "SOME"  },
+                                                      {  "prim": "DUP",
+                                                         "args": [
+                                                           {  "int": "4"  }
+                                                         ]
+                                                      },
+                                                      {  "prim": "UPDATE"  },
+                                                      {  "prim": "DIP",
+                                                         "args": [
+                                                           {  "int": "1"  },
+                                                           [  {  "prim": "DIG",
+                                                                 "args": [
+                                                                   {  "int": "6"  }
+                                                                 ]
+                                                           },
+                                                           {  "prim": "DROP",
+                                                              "args": [
+                                                                {  "int": "1"  }
+                                                              ]
+                                                           }  ]
+                                                         ]
+                                                      },
+                                                      {  "prim": "DUG",
+                                                         "args": [
+                                                           {  "int": "6"  }
+                                                         ]
+                                                      }  ]
+                                                    ]
                                                  }  ]
-                                               ]
-                                            },
-                                            {  "prim": "DUG",
-                                               "args": [
-                                                 {  "int": "9"  }
                                                ]
                                             },
                                             {  "prim": "DROP",
@@ -3245,44 +2810,21 @@ export const nft_private_code : any =
                                                  {  "int": "2"  }
                                                ]
                                             },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
+                                            {  "prim": "PAIR",
+                                               "args": [
+                                                 {  "int": "12"  }
+                                               ]
+                                            },
                                             {  "prim": "DIG",
                                                "args": [
                                                  {  "int": "1"  }
                                                ]
                                             },
                                             {  "prim": "PAIR"  }  ],
-                                            [  {  "prim": "DIG",
+                                            [  {  "prim": "DUP",
                                                   "args": [
-                                                    {  "int": "12"  }
+                                                    {  "int": "2"  }
                                                   ]
-                                            },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
-                                               "args": [
-                                                 {  "int": "13"  }
-                                               ]
                                             },
                                             {  "prim": "SENDER"  },
                                             {  "prim": "COMPARE"  },
@@ -3306,7 +2848,7 @@ export const nft_private_code : any =
                                                  {  "int": "1"  },
                                                  [  {  "prim": "DIG",
                                                        "args": [
-                                                         {  "int": "2"  }
+                                                         {  "int": "11"  }
                                                        ]
                                                  },
                                                  {  "prim": "DROP",
@@ -3318,7 +2860,7 @@ export const nft_private_code : any =
                                             },
                                             {  "prim": "DUG",
                                                "args": [
-                                                 {  "int": "2"  }
+                                                 {  "int": "11"  }
                                                ]
                                             },
                                             {  "prim": "DROP",
@@ -3326,28 +2868,11 @@ export const nft_private_code : any =
                                                  {  "int": "1"  }
                                                ]
                                             },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
+                                            {  "prim": "PAIR",
+                                               "args": [
+                                                 {  "int": "12"  }
+                                               ]
+                                            },
                                             {  "prim": "DIG",
                                                "args": [
                                                  {  "int": "1"  }
@@ -3370,15 +2895,9 @@ export const nft_private_code : any =
                                             {  "prim": "SWAP"  },
                                             {  "prim": "UNPAIR"  },
                                             {  "prim": "SWAP"  },
-                                            {  "prim": "DIG",
+                                            {  "prim": "DUP",
                                                "args": [
-                                                 {  "int": "4"  }
-                                               ]
-                                            },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
-                                               "args": [
-                                                 {  "int": "5"  }
+                                                 {  "int": "14"  }
                                                ]
                                             },
                                             {  "prim": "IF",
@@ -3393,13 +2912,7 @@ export const nft_private_code : any =
                                                  [    ]
                                                ]
                                             },
-                                            {  "prim": "DIG",
-                                               "args": [
-                                                 {  "int": "2"  }
-                                               ]
-                                            },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
+                                            {  "prim": "DUP",
                                                "args": [
                                                  {  "int": "3"  }
                                                ]
@@ -3407,24 +2920,12 @@ export const nft_private_code : any =
                                             {  "prim": "HASH_KEY"  },
                                             {  "prim": "IMPLICIT_ACCOUNT"  },
                                             {  "prim": "ADDRESS"  },
-                                            {  "prim": "DIG",
+                                            {  "prim": "DUP",
                                                "args": [
-                                                 {  "int": "9"  }
+                                                 {  "int": "11"  }
                                                ]
                                             },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
-                                               "args": [
-                                                 {  "int": "10"  }
-                                               ]
-                                            },
-                                            {  "prim": "DIG",
-                                               "args": [
-                                                 {  "int": "1"  }
-                                               ]
-                                            },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
+                                            {  "prim": "DUP",
                                                "args": [
                                                  {  "int": "2"  }
                                                ]
@@ -3432,24 +2933,12 @@ export const nft_private_code : any =
                                             {  "prim": "MEM"  },
                                             {  "prim": "IF",
                                                "args": [
-                                                 [  {  "prim": "DIG",
+                                                 [  {  "prim": "DUP",
                                                        "args": [
-                                                         {  "int": "9"  }
+                                                         {  "int": "11"  }
                                                        ]
                                                  },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
-                                                    "args": [
-                                                      {  "int": "10"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DIG",
-                                                    "args": [
-                                                      {  "int": "1"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
+                                                 {  "prim": "DUP",
                                                     "args": [
                                                       {  "int": "2"  }
                                                     ]
@@ -3460,38 +2949,29 @@ export const nft_private_code : any =
                                                       [  {  "prim": "PUSH",
                                                             "args": [
                                                               {  "prim": "string"  },
-                                                              {  "string": "NotFound"  }
+                                                              {  "string": "permit"  }
                                                             ]
                                                       },
+                                                      {  "prim": "PUSH",
+                                                         "args": [
+                                                           {  "prim": "string"  },
+                                                           {  "string": "AssetNotFound"  }
+                                                         ]
+                                                      },
+                                                      {  "prim": "PAIR"  },
                                                       {  "prim": "FAILWITH"  }  ],
                                                       [    ]
                                                     ]
                                                  },
-                                                 {  "prim": "CAR",
-                                                    "args": [
-                                                      {  "int": "0"  }
-                                                    ]
-                                                 },
+                                                 {  "prim": "CAR"  },
                                                  {  "prim": "ITER",
                                                     "args": [
-                                                      [  {  "prim": "DIG",
+                                                      [  {  "prim": "DUP",
                                                             "args": [
                                                               {  "int": "11"  }
                                                             ]
                                                       },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
-                                                         "args": [
-                                                           {  "int": "12"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DIG",
-                                                         "args": [
-                                                           {  "int": "1"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
+                                                      {  "prim": "DUP",
                                                          "args": [
                                                            {  "int": "2"  }
                                                          ]
@@ -3502,72 +2982,49 @@ export const nft_private_code : any =
                                                            [  {  "prim": "PUSH",
                                                                  "args": [
                                                                    {  "prim": "string"  },
-                                                                   {  "string": "NotFound"  }
+                                                                   {  "string": "permit"  }
                                                                  ]
                                                            },
+                                                           {  "prim": "PUSH",
+                                                              "args": [
+                                                                {  "prim": "string"  },
+                                                                {  "string": "AssetNotFound"  }
+                                                              ]
+                                                           },
+                                                           {  "prim": "PAIR"  },
                                                            {  "prim": "FAILWITH"  }  ],
                                                            [    ]
                                                          ]
                                                       },
-                                                      {  "prim": "DIG",
-                                                         "args": [
-                                                           {  "int": "20"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
+                                                      {  "prim": "DUP",
                                                          "args": [
                                                            {  "int": "21"  }
                                                          ]
                                                       },
-                                                      {  "prim": "DIG",
-                                                         "args": [
-                                                           {  "int": "2"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
+                                                      {  "prim": "DUP",
                                                          "args": [
                                                            {  "int": "3"  }
                                                          ]
                                                       },
-                                                      {  "prim": "DIG",
+                                                      {  "prim": "DUP",
                                                          "args": [
                                                            {  "int": "14"  }
                                                          ]
                                                       },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
-                                                         "args": [
-                                                           {  "int": "15"  }
-                                                         ]
-                                                      },
                                                       {  "prim": "PAIR"  },
-                                                      {  "prim": "DIG",
+                                                      {  "prim": "DUP",
                                                          "args": [
-                                                           {  "int": "10"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
-                                                         "args": [
-                                                           {  "int": "11"  }
+                                                           {  "int": "18"  }
                                                          ]
                                                       },
                                                       {  "prim": "PAIR"  },
                                                       {  "prim": "EXEC"  },
                                                       {  "prim": "IF",
                                                          "args": [
-                                                           [  {  "prim": "DIG",
+                                                           [  {  "prim": "DUP",
                                                                  "args": [
                                                                    {  "int": "12"  }
                                                                  ]
-                                                           },
-                                                           {  "prim": "DUP"  },
-                                                           {  "prim": "DUG",
-                                                              "args": [
-                                                                {  "int": "13"  }
-                                                              ]
                                                            },
                                                            {  "prim": "NONE",
                                                               "args": [
@@ -3586,15 +3043,127 @@ export const nft_private_code : any =
                                                                 }
                                                               ]
                                                            },
-                                                           {  "prim": "DIG",
-                                                              "args": [
-                                                                {  "int": "3"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "DUP"  },
-                                                           {  "prim": "DUG",
+                                                           {  "prim": "DUP",
                                                               "args": [
                                                                 {  "int": "4"  }
+                                                              ]
+                                                           },
+                                                           {  "prim": "UPDATE"  },
+                                                           {  "prim": "DIP",
+                                                              "args": [
+                                                                {  "int": "1"  },
+                                                                [  {
+                                                                "prim": "DIG",
+                                                                "args": [
+                                                                  {  "int": "11"  }
+                                                                ]
+                                                                },
+                                                                {  "prim": "DROP",
+                                                                   "args": [
+
+                                                                   {  "int": "1"  }
+                                                                   ]
+                                                                }  ]
+                                                              ]
+                                                           },
+                                                           {  "prim": "DUG",
+                                                              "args": [
+                                                                {  "int": "11"  }
+                                                              ]
+                                                           },
+                                                           {  "prim": "DUP",
+                                                              "args": [
+                                                                {  "int": "13"  }
+                                                              ]
+                                                           },
+                                                           {  "prim": "DUP",
+                                                              "args": [
+                                                                {  "int": "14"  }
+                                                              ]
+                                                           },
+                                                           {  "prim": "DUP",
+                                                              "args": [
+                                                                {  "int": "5"  }
+                                                              ]
+                                                           },
+                                                           {  "prim": "GET"  },
+                                                           {  "prim": "IF_NONE",
+                                                              "args": [
+                                                                [  {
+                                                                "prim": "PUSH",
+                                                                "args": [
+                                                                  {  "prim": "string"  },
+                                                                  {  "string": "permit"  }
+                                                                ]
+                                                                },
+                                                                {  "prim": "PUSH",
+                                                                   "args": [
+
+                                                                   {  "prim": "string"  },
+                                                                   {  "string": "AssetNotFound"  }
+                                                                   ]
+                                                                },
+                                                                {  "prim": "PAIR"  },
+                                                                {  "prim": "FAILWITH"  }  ],
+                                                                [    ]
+                                                              ]
+                                                           },
+                                                           {  "prim": "UNPAIR"  },
+                                                           {  "prim": "DROP",
+                                                              "args": [
+                                                                {  "int": "1"  }
+                                                              ]
+                                                           },
+                                                           {  "prim": "DUP",
+                                                              "args": [
+                                                                {  "int": "15"  }
+                                                              ]
+                                                           },
+                                                           {  "prim": "DUP",
+                                                              "args": [
+                                                                {  "int": "6"  }
+                                                              ]
+                                                           },
+                                                           {  "prim": "GET"  },
+                                                           {  "prim": "IF_NONE",
+                                                              "args": [
+                                                                [  {
+                                                                "prim": "PUSH",
+                                                                "args": [
+                                                                  {  "prim": "string"  },
+                                                                  {  "string": "permit"  }
+                                                                ]
+                                                                },
+                                                                {  "prim": "PUSH",
+                                                                   "args": [
+
+                                                                   {  "prim": "string"  },
+                                                                   {  "string": "AssetNotFound"  }
+                                                                   ]
+                                                                },
+                                                                {  "prim": "PAIR"  },
+                                                                {  "prim": "FAILWITH"  }  ],
+                                                                [    ]
+                                                              ]
+                                                           },
+                                                           {  "prim": "CAR"  },
+                                                           {  "prim": "PUSH",
+                                                              "args": [
+                                                                {  "prim": "bool"  },
+                                                                {  "prim": "False"  }
+                                                              ]
+                                                           },
+                                                           {  "prim": "DUP",
+                                                              "args": [
+                                                                {  "int": "6"  }
+                                                              ]
+                                                           },
+                                                           {  "prim": "UPDATE"  },
+                                                           {  "prim": "PAIR"  },
+                                                           {  "prim": "SOME"  },
+                                                           {  "prim": "DUP",
+                                                              "args": [
+                                                                {  "int": "5"  }
                                                               ]
                                                            },
                                                            {  "prim": "UPDATE"  },
@@ -3619,154 +3188,6 @@ export const nft_private_code : any =
                                                               "args": [
                                                                 {  "int": "12"  }
                                                               ]
-                                                           },
-                                                           {  "prim": "DIG",
-                                                              "args": [
-                                                                {  "int": "11"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "DUP"  },
-                                                           {  "prim": "DUG",
-                                                              "args": [
-                                                                {  "int": "12"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "DIG",
-                                                              "args": [
-                                                                {  "int": "12"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "DUP"  },
-                                                           {  "prim": "DUG",
-                                                              "args": [
-                                                                {  "int": "13"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "DIG",
-                                                              "args": [
-                                                                {  "int": "4"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "DUP"  },
-                                                           {  "prim": "DUG",
-                                                              "args": [
-                                                                {  "int": "5"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "GET"  },
-                                                           {  "prim": "IF_NONE",
-                                                              "args": [
-                                                                [  {
-                                                                "prim": "PUSH",
-                                                                "args": [
-                                                                  {  "prim": "string"  },
-                                                                  {  "string": "NotFound"  }
-                                                                ]
-                                                                },
-                                                                {  "prim": "FAILWITH"  }  ],
-                                                                [    ]
-                                                              ]
-                                                           },
-                                                           {  "prim": "UNPAIR"  },
-                                                           {  "prim": "DROP",
-                                                              "args": [
-                                                                {  "int": "1"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "DIG",
-                                                              "args": [
-                                                                {  "int": "13"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "DUP"  },
-                                                           {  "prim": "DUG",
-                                                              "args": [
-                                                                {  "int": "14"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "DIG",
-                                                              "args": [
-                                                                {  "int": "5"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "DUP"  },
-                                                           {  "prim": "DUG",
-                                                              "args": [
-                                                                {  "int": "6"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "GET"  },
-                                                           {  "prim": "IF_NONE",
-                                                              "args": [
-                                                                [  {
-                                                                "prim": "PUSH",
-                                                                "args": [
-                                                                  {  "prim": "string"  },
-                                                                  {  "string": "NotFound"  }
-                                                                ]
-                                                                },
-                                                                {  "prim": "FAILWITH"  }  ],
-                                                                [    ]
-                                                              ]
-                                                           },
-                                                           {  "prim": "CAR",
-                                                              "args": [
-                                                                {  "int": "0"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "PUSH",
-                                                              "args": [
-                                                                {  "prim": "bool"  },
-                                                                {  "prim": "False"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "DIG",
-                                                              "args": [
-                                                                {  "int": "5"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "DUP"  },
-                                                           {  "prim": "DUG",
-                                                              "args": [
-                                                                {  "int": "6"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "UPDATE"  },
-                                                           {  "prim": "PAIR"  },
-                                                           {  "prim": "SOME"  },
-                                                           {  "prim": "DIG",
-                                                              "args": [
-                                                                {  "int": "4"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "DUP"  },
-                                                           {  "prim": "DUG",
-                                                              "args": [
-                                                                {  "int": "5"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "UPDATE"  },
-                                                           {  "prim": "DIP",
-                                                              "args": [
-                                                                {  "int": "1"  },
-                                                                [  {
-                                                                "prim": "DIG",
-                                                                "args": [
-                                                                  {  "int": "11"  }
-                                                                ]
-                                                                },
-                                                                {  "prim": "DROP",
-                                                                   "args": [
-
-                                                                   {  "int": "1"  }
-                                                                   ]
-                                                                }  ]
-                                                              ]
-                                                           },
-                                                           {  "prim": "DUG",
-                                                              "args": [
-                                                                {  "int": "11"  }
-                                                              ]
                                                            }  ],
                                                            [    ]
                                                          ]
@@ -3781,24 +3202,12 @@ export const nft_private_code : any =
                                                  [    ]
                                                ]
                                             },
-                                            {  "prim": "DIG",
+                                            {  "prim": "DUP",
                                                "args": [
-                                                 {  "int": "9"  }
+                                                 {  "int": "11"  }
                                                ]
                                             },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
-                                               "args": [
-                                                 {  "int": "10"  }
-                                               ]
-                                            },
-                                            {  "prim": "DIG",
-                                               "args": [
-                                                 {  "int": "1"  }
-                                               ]
-                                            },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
+                                            {  "prim": "DUP",
                                                "args": [
                                                  {  "int": "2"  }
                                                ]
@@ -3806,24 +3215,12 @@ export const nft_private_code : any =
                                             {  "prim": "MEM"  },
                                             {  "prim": "IF",
                                                "args": [
-                                                 [  {  "prim": "DIG",
+                                                 [  {  "prim": "DUP",
                                                        "args": [
-                                                         {  "int": "9"  }
+                                                         {  "int": "11"  }
                                                        ]
                                                  },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
-                                                    "args": [
-                                                      {  "int": "10"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DIG",
-                                                    "args": [
-                                                      {  "int": "1"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
+                                                 {  "prim": "DUP",
                                                     "args": [
                                                       {  "int": "2"  }
                                                     ]
@@ -3834,18 +3231,22 @@ export const nft_private_code : any =
                                                       [  {  "prim": "PUSH",
                                                             "args": [
                                                               {  "prim": "string"  },
-                                                              {  "string": "NotFound"  }
+                                                              {  "string": "permit"  }
                                                             ]
                                                       },
+                                                      {  "prim": "PUSH",
+                                                         "args": [
+                                                           {  "prim": "string"  },
+                                                           {  "string": "AssetNotFound"  }
+                                                         ]
+                                                      },
+                                                      {  "prim": "PAIR"  },
                                                       {  "prim": "FAILWITH"  }  ],
                                                       [    ]
                                                     ]
                                                  },
-                                                 {  "prim": "CDR",
-                                                    "args": [
-                                                      {  "int": "2"  }
-                                                    ]
-                                                 }  ],
+                                                 {  "prim": "CDR"  },
+                                                 {  "prim": "CDR"  }  ],
                                                  [  {  "prim": "PUSH",
                                                        "args": [
                                                          {  "prim": "nat"  },
@@ -3854,54 +3255,29 @@ export const nft_private_code : any =
                                                  }  ]
                                                ]
                                             },
-                                            {  "prim": "DIG",
-                                               "args": [
-                                                 {  "int": "2"  }
-                                               ]
-                                            },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
+                                            {  "prim": "DUP",
                                                "args": [
                                                  {  "int": "3"  }
                                                ]
                                             },
-                                            {  "prim": "DIG",
-                                               "args": [
-                                                 {  "int": "1"  }
-                                               ]
-                                            },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
+                                            {  "prim": "DUP",
                                                "args": [
                                                  {  "int": "2"  }
                                                ]
                                             },
                                             {  "prim": "PAIR"  },
                                             {  "prim": "CHAIN_ID"  },
-                                            {  "prim": "SELF"  },
-                                            {  "prim": "ADDRESS"  },
+                                            {  "prim": "SELF_ADDRESS"  },
                                             {  "prim": "PAIR"  },
                                             {  "prim": "PAIR"  },
                                             {  "prim": "PACK"  },
                                             {  "prim": "DUP"  },
-                                            {  "prim": "DIG",
-                                               "args": [
-                                                 {  "int": "5"  }
-                                               ]
-                                            },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
+                                            {  "prim": "DUP",
                                                "args": [
                                                  {  "int": "6"  }
                                                ]
                                             },
-                                            {  "prim": "DIG",
-                                               "args": [
-                                                 {  "int": "7"  }
-                                               ]
-                                            },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
+                                            {  "prim": "DUP",
                                                "args": [
                                                  {  "int": "8"  }
                                                ]
@@ -3922,49 +3298,25 @@ export const nft_private_code : any =
                                                  [    ]
                                                ]
                                             },
-                                            {  "prim": "DIG",
-                                               "args": [
-                                                 {  "int": "20"  }
-                                               ]
-                                            },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
+                                            {  "prim": "DUP",
                                                "args": [
                                                  {  "int": "21"  }
                                                ]
                                             },
-                                            {  "prim": "DIG",
-                                               "args": [
-                                                 {  "int": "4"  }
-                                               ]
-                                            },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
+                                            {  "prim": "DUP",
                                                "args": [
                                                  {  "int": "5"  }
                                                ]
                                             },
-                                            {  "prim": "DIG",
+                                            {  "prim": "DUP",
                                                "args": [
                                                  {  "int": "14"  }
                                                ]
                                             },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
-                                               "args": [
-                                                 {  "int": "15"  }
-                                               ]
-                                            },
                                             {  "prim": "PAIR"  },
-                                            {  "prim": "DIG",
+                                            {  "prim": "DUP",
                                                "args": [
-                                                 {  "int": "10"  }
-                                               ]
-                                            },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
-                                               "args": [
-                                                 {  "int": "11"  }
+                                                 {  "int": "18"  }
                                                ]
                                             },
                                             {  "prim": "PAIR"  },
@@ -3981,24 +3333,12 @@ export const nft_private_code : any =
                                                  [    ]
                                                ]
                                             },
-                                            {  "prim": "DIG",
+                                            {  "prim": "DUP",
                                                "args": [
-                                                 {  "int": "11"  }
+                                                 {  "int": "13"  }
                                                ]
                                             },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
-                                               "args": [
-                                                 {  "int": "12"  }
-                                               ]
-                                            },
-                                            {  "prim": "DIG",
-                                               "args": [
-                                                 {  "int": "3"  }
-                                               ]
-                                            },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
+                                            {  "prim": "DUP",
                                                "args": [
                                                  {  "int": "4"  }
                                                ]
@@ -4006,24 +3346,12 @@ export const nft_private_code : any =
                                             {  "prim": "MEM"  },
                                             {  "prim": "IF",
                                                "args": [
-                                                 [  {  "prim": "DIG",
+                                                 [  {  "prim": "DUP",
                                                        "args": [
-                                                         {  "int": "11"  }
+                                                         {  "int": "13"  }
                                                        ]
                                                  },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
-                                                    "args": [
-                                                      {  "int": "12"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DIG",
-                                                    "args": [
-                                                      {  "int": "3"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
+                                                 {  "prim": "DUP",
                                                     "args": [
                                                       {  "int": "4"  }
                                                     ]
@@ -4034,42 +3362,31 @@ export const nft_private_code : any =
                                                       [  {  "prim": "PUSH",
                                                             "args": [
                                                               {  "prim": "string"  },
-                                                              {  "string": "NotFound"  }
+                                                              {  "string": "permit"  }
                                                             ]
                                                       },
+                                                      {  "prim": "PUSH",
+                                                         "args": [
+                                                           {  "prim": "string"  },
+                                                           {  "string": "AssetNotFound"  }
+                                                         ]
+                                                      },
+                                                      {  "prim": "PAIR"  },
                                                       {  "prim": "FAILWITH"  }  ],
                                                       [    ]
                                                     ]
                                                  },
-                                                 {  "prim": "DIG",
-                                                    "args": [
-                                                      {  "int": "12"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
-                                                    "args": [
-                                                      {  "int": "13"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DIG",
-                                                    "args": [
-                                                      {  "int": "13"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
+                                                 {  "prim": "DUP",
                                                     "args": [
                                                       {  "int": "14"  }
                                                     ]
                                                  },
-                                                 {  "prim": "DIG",
+                                                 {  "prim": "DUP",
                                                     "args": [
-                                                      {  "int": "5"  }
+                                                      {  "int": "15"  }
                                                     ]
                                                  },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
+                                                 {  "prim": "DUP",
                                                     "args": [
                                                       {  "int": "6"  }
                                                     ]
@@ -4080,9 +3397,16 @@ export const nft_private_code : any =
                                                       [  {  "prim": "PUSH",
                                                             "args": [
                                                               {  "prim": "string"  },
-                                                              {  "string": "NotFound"  }
+                                                              {  "string": "permit"  }
                                                             ]
                                                       },
+                                                      {  "prim": "PUSH",
+                                                         "args": [
+                                                           {  "prim": "string"  },
+                                                           {  "string": "AssetNotFound"  }
+                                                         ]
+                                                      },
+                                                      {  "prim": "PAIR"  },
                                                       {  "prim": "FAILWITH"  }  ],
                                                       [    ]
                                                     ]
@@ -4102,35 +3426,20 @@ export const nft_private_code : any =
                                                       {  "int": "1"  }
                                                     ]
                                                  },
-                                                 {  "prim": "DIG",
-                                                    "args": [
-                                                      {  "int": "4"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
+                                                 {  "prim": "DUP",
                                                     "args": [
                                                       {  "int": "5"  }
                                                     ]
                                                  },
-                                                 {  "prim": "CDR",
-                                                    "args": [
-                                                      {  "int": "2"  }
-                                                    ]
-                                                 },
+                                                 {  "prim": "CDR"  },
+                                                 {  "prim": "CDR"  },
                                                  {  "prim": "ADD"  },
                                                  {  "prim": "SWAP"  },
                                                  {  "prim": "PAIR"  },
                                                  {  "prim": "SWAP"  },
                                                  {  "prim": "PAIR"  },
                                                  {  "prim": "SOME"  },
-                                                 {  "prim": "DIG",
-                                                    "args": [
-                                                      {  "int": "5"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
+                                                 {  "prim": "DUP",
                                                     "args": [
                                                       {  "int": "6"  }
                                                     ]
@@ -4141,7 +3450,7 @@ export const nft_private_code : any =
                                                       {  "int": "1"  },
                                                       [  {  "prim": "DIG",
                                                             "args": [
-                                                              {  "int": "12"  }
+                                                              {  "int": "13"  }
                                                             ]
                                                       },
                                                       {  "prim": "DROP",
@@ -4153,7 +3462,7 @@ export const nft_private_code : any =
                                                  },
                                                  {  "prim": "DUG",
                                                     "args": [
-                                                      {  "int": "12"  }
+                                                      {  "int": "13"  }
                                                     ]
                                                  },
                                                  {  "prim": "DROP",
@@ -4161,24 +3470,12 @@ export const nft_private_code : any =
                                                       {  "int": "1"  }
                                                     ]
                                                  }  ],
-                                                 [  {  "prim": "DIG",
+                                                 [  {  "prim": "DUP",
                                                        "args": [
-                                                         {  "int": "11"  }
+                                                         {  "int": "13"  }
                                                        ]
                                                  },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
-                                                    "args": [
-                                                      {  "int": "12"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DIG",
-                                                    "args": [
-                                                      {  "int": "3"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
+                                                 {  "prim": "DUP",
                                                     "args": [
                                                       {  "int": "4"  }
                                                     ]
@@ -4189,20 +3486,21 @@ export const nft_private_code : any =
                                                       [  {  "prim": "PUSH",
                                                             "args": [
                                                               {  "prim": "string"  },
-                                                              {  "string": "KeyExists"  }
+                                                              {  "string": "permit"  }
                                                             ]
                                                       },
-                                                      {  "prim": "FAILWITH"  }  ],
-                                                      [  {  "prim": "DIG",
-                                                            "args": [
-                                                              {  "int": "11"  }
-                                                            ]
-                                                      },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
+                                                      {  "prim": "PUSH",
                                                          "args": [
-                                                           {  "int": "12"  }
+                                                           {  "prim": "string"  },
+                                                           {  "string": "KeyExists"  }
                                                          ]
+                                                      },
+                                                      {  "prim": "PAIR"  },
+                                                      {  "prim": "FAILWITH"  }  ],
+                                                      [  {  "prim": "DUP",
+                                                            "args": [
+                                                              {  "int": "13"  }
+                                                            ]
                                                       },
                                                       {  "prim": "PUSH",
                                                          "args": [
@@ -4230,203 +3528,9 @@ export const nft_private_code : any =
                                                       },
                                                       {  "prim": "PAIR"  },
                                                       {  "prim": "SOME"  },
-                                                      {  "prim": "DIG",
-                                                         "args": [
-                                                           {  "int": "4"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
+                                                      {  "prim": "DUP",
                                                          "args": [
                                                            {  "int": "5"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "UPDATE"  },
-                                                      {  "prim": "DIP",
-                                                         "args": [
-                                                           {  "int": "1"  },
-                                                           [  {  "prim": "DIG",
-                                                                 "args": [
-                                                                   {  "int": "11"  }
-                                                                 ]
-                                                           },
-                                                           {  "prim": "DROP",
-                                                              "args": [
-                                                                {  "int": "1"  }
-                                                              ]
-                                                           }  ]
-                                                         ]
-                                                      },
-                                                      {  "prim": "DUG",
-                                                         "args": [
-                                                           {  "int": "11"  }
-                                                         ]
-                                                      }  ]
-                                                    ]
-                                                 }  ]
-                                               ]
-                                            },
-                                            {  "prim": "DIG",
-                                               "args": [
-                                                 {  "int": "12"  }
-                                               ]
-                                            },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
-                                               "args": [
-                                                 {  "int": "13"  }
-                                               ]
-                                            },
-                                            {  "prim": "DIG",
-                                               "args": [
-                                                 {  "int": "4"  }
-                                               ]
-                                            },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
-                                               "args": [
-                                                 {  "int": "5"  }
-                                               ]
-                                            },
-                                            {  "prim": "MEM"  },
-                                            {  "prim": "IF",
-                                               "args": [
-                                                 [  {  "prim": "DIG",
-                                                       "args": [
-                                                         {  "int": "11"  }
-                                                       ]
-                                                 },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
-                                                    "args": [
-                                                      {  "int": "12"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DIG",
-                                                    "args": [
-                                                      {  "int": "3"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
-                                                    "args": [
-                                                      {  "int": "4"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "GET"  },
-                                                 {  "prim": "IF_NONE",
-                                                    "args": [
-                                                      [  {  "prim": "PUSH",
-                                                            "args": [
-                                                              {  "prim": "string"  },
-                                                              {  "string": "NotFound"  }
-                                                            ]
-                                                      },
-                                                      {  "prim": "FAILWITH"  }  ],
-                                                      [    ]
-                                                    ]
-                                                 },
-                                                 {  "prim": "CAR",
-                                                    "args": [
-                                                      {  "int": "0"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DIG",
-                                                    "args": [
-                                                      {  "int": "4"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
-                                                    "args": [
-                                                      {  "int": "5"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "MEM"  },
-                                                 {  "prim": "IF",
-                                                    "args": [
-                                                      [    ],
-                                                      [  {  "prim": "DIG",
-                                                            "args": [
-                                                              {  "int": "3"  }
-                                                            ]
-                                                      },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
-                                                         "args": [
-                                                           {  "int": "4"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "PUSH",
-                                                         "args": [
-                                                           {  "prim": "string"  },
-                                                           {  "string": "KeyNotFound"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "PAIR"  },
-                                                      {  "prim": "FAILWITH"  }  ]
-                                                    ]
-                                                 }  ],
-                                                 [  {  "prim": "DIG",
-                                                       "args": [
-                                                         {  "int": "12"  }
-                                                       ]
-                                                 },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
-                                                    "args": [
-                                                      {  "int": "13"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DIG",
-                                                    "args": [
-                                                      {  "int": "4"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
-                                                    "args": [
-                                                      {  "int": "5"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "MEM"  },
-                                                 {  "prim": "IF",
-                                                    "args": [
-                                                      [  {  "prim": "PUSH",
-                                                            "args": [
-                                                              {  "prim": "string"  },
-                                                              {  "string": "KeyExists"  }
-                                                            ]
-                                                      },
-                                                      {  "prim": "FAILWITH"  }  ],
-                                                      [  {  "prim": "DIG",
-                                                            "args": [
-                                                              {  "int": "12"  }
-                                                            ]
-                                                      },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
-                                                         "args": [
-                                                           {  "int": "13"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "NONE",
-                                                         "args": [
-                                                           {  "prim": "int"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "NOW"  },
-                                                      {  "prim": "PAIR"  },
-                                                      {  "prim": "SOME"  },
-                                                      {  "prim": "DIG",
-                                                         "args": [
-                                                           {  "int": "5"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
-                                                         "args": [
-                                                           {  "int": "6"  }
                                                          ]
                                                       },
                                                       {  "prim": "UPDATE"  },
@@ -4451,36 +3555,156 @@ export const nft_private_code : any =
                                                          ]
                                                       }  ]
                                                     ]
+                                                 }  ]
+                                               ]
+                                            },
+                                            {  "prim": "DUP",
+                                               "args": [
+                                                 {  "int": "12"  }
+                                               ]
+                                            },
+                                            {  "prim": "DUP",
+                                               "args": [
+                                                 {  "int": "5"  }
+                                               ]
+                                            },
+                                            {  "prim": "MEM"  },
+                                            {  "prim": "IF",
+                                               "args": [
+                                                 [  {  "prim": "DUP",
+                                                       "args": [
+                                                         {  "int": "13"  }
+                                                       ]
                                                  },
-                                                 {  "prim": "DIG",
-                                                    "args": [
-                                                      {  "int": "11"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
-                                                    "args": [
-                                                      {  "int": "12"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DIG",
-                                                    "args": [
-                                                      {  "int": "12"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
-                                                    "args": [
-                                                      {  "int": "13"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DIG",
+                                                 {  "prim": "DUP",
                                                     "args": [
                                                       {  "int": "4"  }
                                                     ]
                                                  },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
+                                                 {  "prim": "GET"  },
+                                                 {  "prim": "IF_NONE",
+                                                    "args": [
+                                                      [  {  "prim": "PUSH",
+                                                            "args": [
+                                                              {  "prim": "string"  },
+                                                              {  "string": "permit"  }
+                                                            ]
+                                                      },
+                                                      {  "prim": "PUSH",
+                                                         "args": [
+                                                           {  "prim": "string"  },
+                                                           {  "string": "AssetNotFound"  }
+                                                         ]
+                                                      },
+                                                      {  "prim": "PAIR"  },
+                                                      {  "prim": "FAILWITH"  }  ],
+                                                      [    ]
+                                                    ]
+                                                 },
+                                                 {  "prim": "CAR"  },
+                                                 {  "prim": "DUP",
+                                                    "args": [
+                                                      {  "int": "5"  }
+                                                    ]
+                                                 },
+                                                 {  "prim": "MEM"  },
+                                                 {  "prim": "IF",
+                                                    "args": [
+                                                      [    ],
+                                                      [  {  "prim": "DUP",
+                                                            "args": [
+                                                              {  "int": "4"  }
+                                                            ]
+                                                      },
+                                                      {  "prim": "PUSH",
+                                                         "args": [
+                                                           {  "prim": "string"  },
+                                                           {  "string": "KeyNotFound"  }
+                                                         ]
+                                                      },
+                                                      {  "prim": "PAIR"  },
+                                                      {  "prim": "FAILWITH"  }  ]
+                                                    ]
+                                                 }  ],
+                                                 [  {  "prim": "DUP",
+                                                       "args": [
+                                                         {  "int": "12"  }
+                                                       ]
+                                                 },
+                                                 {  "prim": "DUP",
+                                                    "args": [
+                                                      {  "int": "5"  }
+                                                    ]
+                                                 },
+                                                 {  "prim": "MEM"  },
+                                                 {  "prim": "IF",
+                                                    "args": [
+                                                      [  {  "prim": "PUSH",
+                                                            "args": [
+                                                              {  "prim": "string"  },
+                                                              {  "string": "permit_info"  }
+                                                            ]
+                                                      },
+                                                      {  "prim": "PUSH",
+                                                         "args": [
+                                                           {  "prim": "string"  },
+                                                           {  "string": "KeyExists"  }
+                                                         ]
+                                                      },
+                                                      {  "prim": "PAIR"  },
+                                                      {  "prim": "FAILWITH"  }  ],
+                                                      [  {  "prim": "DUP",
+                                                            "args": [
+                                                              {  "int": "12"  }
+                                                            ]
+                                                      },
+                                                      {  "prim": "NONE",
+                                                         "args": [
+                                                           {  "prim": "int"  }
+                                                         ]
+                                                      },
+                                                      {  "prim": "NOW"  },
+                                                      {  "prim": "PAIR"  },
+                                                      {  "prim": "SOME"  },
+                                                      {  "prim": "DUP",
+                                                         "args": [
+                                                           {  "int": "6"  }
+                                                         ]
+                                                      },
+                                                      {  "prim": "UPDATE"  },
+                                                      {  "prim": "DIP",
+                                                         "args": [
+                                                           {  "int": "1"  },
+                                                           [  {  "prim": "DIG",
+                                                                 "args": [
+                                                                   {  "int": "11"  }
+                                                                 ]
+                                                           },
+                                                           {  "prim": "DROP",
+                                                              "args": [
+                                                                {  "int": "1"  }
+                                                              ]
+                                                           }  ]
+                                                         ]
+                                                      },
+                                                      {  "prim": "DUG",
+                                                         "args": [
+                                                           {  "int": "11"  }
+                                                         ]
+                                                      }  ]
+                                                    ]
+                                                 },
+                                                 {  "prim": "DUP",
+                                                    "args": [
+                                                      {  "int": "13"  }
+                                                    ]
+                                                 },
+                                                 {  "prim": "DUP",
+                                                    "args": [
+                                                      {  "int": "14"  }
+                                                    ]
+                                                 },
+                                                 {  "prim": "DUP",
                                                     "args": [
                                                       {  "int": "5"  }
                                                     ]
@@ -4491,9 +3715,16 @@ export const nft_private_code : any =
                                                       [  {  "prim": "PUSH",
                                                             "args": [
                                                               {  "prim": "string"  },
-                                                              {  "string": "NotFound"  }
+                                                              {  "string": "permit"  }
                                                             ]
                                                       },
+                                                      {  "prim": "PUSH",
+                                                         "args": [
+                                                           {  "prim": "string"  },
+                                                           {  "string": "AssetNotFound"  }
+                                                         ]
+                                                      },
+                                                      {  "prim": "PAIR"  },
                                                       {  "prim": "FAILWITH"  }  ],
                                                       [    ]
                                                     ]
@@ -4504,24 +3735,12 @@ export const nft_private_code : any =
                                                       {  "int": "1"  }
                                                     ]
                                                  },
-                                                 {  "prim": "DIG",
+                                                 {  "prim": "DUP",
                                                     "args": [
-                                                      {  "int": "13"  }
+                                                      {  "int": "15"  }
                                                     ]
                                                  },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
-                                                    "args": [
-                                                      {  "int": "14"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DIG",
-                                                    "args": [
-                                                      {  "int": "5"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
+                                                 {  "prim": "DUP",
                                                     "args": [
                                                       {  "int": "6"  }
                                                     ]
@@ -4532,31 +3751,28 @@ export const nft_private_code : any =
                                                       [  {  "prim": "PUSH",
                                                             "args": [
                                                               {  "prim": "string"  },
-                                                              {  "string": "NotFound"  }
+                                                              {  "string": "permit"  }
                                                             ]
                                                       },
+                                                      {  "prim": "PUSH",
+                                                         "args": [
+                                                           {  "prim": "string"  },
+                                                           {  "string": "AssetNotFound"  }
+                                                         ]
+                                                      },
+                                                      {  "prim": "PAIR"  },
                                                       {  "prim": "FAILWITH"  }  ],
                                                       [    ]
                                                     ]
                                                  },
-                                                 {  "prim": "CAR",
-                                                    "args": [
-                                                      {  "int": "0"  }
-                                                    ]
-                                                 },
+                                                 {  "prim": "CAR"  },
                                                  {  "prim": "PUSH",
                                                     "args": [
                                                       {  "prim": "bool"  },
                                                       {  "prim": "True"  }
                                                     ]
                                                  },
-                                                 {  "prim": "DIG",
-                                                    "args": [
-                                                      {  "int": "7"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
+                                                 {  "prim": "DUP",
                                                     "args": [
                                                       {  "int": "8"  }
                                                     ]
@@ -4564,13 +3780,7 @@ export const nft_private_code : any =
                                                  {  "prim": "UPDATE"  },
                                                  {  "prim": "PAIR"  },
                                                  {  "prim": "SOME"  },
-                                                 {  "prim": "DIG",
-                                                    "args": [
-                                                      {  "int": "4"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
+                                                 {  "prim": "DUP",
                                                     "args": [
                                                       {  "int": "5"  }
                                                     ]
@@ -4581,7 +3791,7 @@ export const nft_private_code : any =
                                                       {  "int": "1"  },
                                                       [  {  "prim": "DIG",
                                                             "args": [
-                                                              {  "int": "11"  }
+                                                              {  "int": "12"  }
                                                             ]
                                                       },
                                                       {  "prim": "DROP",
@@ -4593,29 +3803,17 @@ export const nft_private_code : any =
                                                  },
                                                  {  "prim": "DUG",
                                                     "args": [
-                                                      {  "int": "11"  }
+                                                      {  "int": "12"  }
                                                     ]
                                                  }  ]
                                                ]
                                             },
-                                            {  "prim": "DIG",
+                                            {  "prim": "DUP",
                                                "args": [
-                                                 {  "int": "11"  }
+                                                 {  "int": "13"  }
                                                ]
                                             },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
-                                               "args": [
-                                                 {  "int": "12"  }
-                                               ]
-                                            },
-                                            {  "prim": "DIG",
-                                               "args": [
-                                                 {  "int": "3"  }
-                                               ]
-                                            },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
+                                            {  "prim": "DUP",
                                                "args": [
                                                  {  "int": "4"  }
                                                ]
@@ -4626,38 +3824,29 @@ export const nft_private_code : any =
                                                  [  {  "prim": "PUSH",
                                                        "args": [
                                                          {  "prim": "string"  },
-                                                         {  "string": "NotFound"  }
+                                                         {  "string": "permit"  }
                                                        ]
                                                  },
+                                                 {  "prim": "PUSH",
+                                                    "args": [
+                                                      {  "prim": "string"  },
+                                                      {  "string": "AssetNotFound"  }
+                                                    ]
+                                                 },
+                                                 {  "prim": "PAIR"  },
                                                  {  "prim": "FAILWITH"  }  ],
                                                  [    ]
                                                ]
                                             },
-                                            {  "prim": "CAR",
-                                               "args": [
-                                                 {  "int": "0"  }
-                                               ]
-                                            },
+                                            {  "prim": "CAR"  },
                                             {  "prim": "ITER",
                                                "args": [
-                                                 [  {  "prim": "DIG",
+                                                 [  {  "prim": "DUP",
                                                        "args": [
                                                          {  "int": "13"  }
                                                        ]
                                                  },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
-                                                    "args": [
-                                                      {  "int": "14"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DIG",
-                                                    "args": [
-                                                      {  "int": "1"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
+                                                 {  "prim": "DUP",
                                                     "args": [
                                                       {  "int": "2"  }
                                                     ]
@@ -4668,72 +3857,49 @@ export const nft_private_code : any =
                                                       [  {  "prim": "PUSH",
                                                             "args": [
                                                               {  "prim": "string"  },
-                                                              {  "string": "NotFound"  }
+                                                              {  "string": "permit"  }
                                                             ]
                                                       },
+                                                      {  "prim": "PUSH",
+                                                         "args": [
+                                                           {  "prim": "string"  },
+                                                           {  "string": "AssetNotFound"  }
+                                                         ]
+                                                      },
+                                                      {  "prim": "PAIR"  },
                                                       {  "prim": "FAILWITH"  }  ],
                                                       [    ]
                                                     ]
                                                  },
-                                                 {  "prim": "DIG",
-                                                    "args": [
-                                                      {  "int": "22"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
+                                                 {  "prim": "DUP",
                                                     "args": [
                                                       {  "int": "23"  }
                                                     ]
                                                  },
-                                                 {  "prim": "DIG",
-                                                    "args": [
-                                                      {  "int": "2"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
+                                                 {  "prim": "DUP",
                                                     "args": [
                                                       {  "int": "3"  }
                                                     ]
                                                  },
-                                                 {  "prim": "DIG",
+                                                 {  "prim": "DUP",
                                                     "args": [
                                                       {  "int": "16"  }
                                                     ]
                                                  },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
-                                                    "args": [
-                                                      {  "int": "17"  }
-                                                    ]
-                                                 },
                                                  {  "prim": "PAIR"  },
-                                                 {  "prim": "DIG",
+                                                 {  "prim": "DUP",
                                                     "args": [
-                                                      {  "int": "12"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
-                                                    "args": [
-                                                      {  "int": "13"  }
+                                                      {  "int": "20"  }
                                                     ]
                                                  },
                                                  {  "prim": "PAIR"  },
                                                  {  "prim": "EXEC"  },
                                                  {  "prim": "IF",
                                                     "args": [
-                                                      [  {  "prim": "DIG",
+                                                      [  {  "prim": "DUP",
                                                             "args": [
                                                               {  "int": "14"  }
                                                             ]
-                                                      },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
-                                                         "args": [
-                                                           {  "int": "15"  }
-                                                         ]
                                                       },
                                                       {  "prim": "NONE",
                                                          "args": [
@@ -4750,159 +3916,9 @@ export const nft_private_code : any =
                                                            }
                                                          ]
                                                       },
-                                                      {  "prim": "DIG",
-                                                         "args": [
-                                                           {  "int": "3"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
+                                                      {  "prim": "DUP",
                                                          "args": [
                                                            {  "int": "4"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "UPDATE"  },
-                                                      {  "prim": "DIP",
-                                                         "args": [
-                                                           {  "int": "1"  },
-                                                           [  {  "prim": "DIG",
-                                                                 "args": [
-                                                                   {  "int": "14"  }
-                                                                 ]
-                                                           },
-                                                           {  "prim": "DROP",
-                                                              "args": [
-                                                                {  "int": "1"  }
-                                                              ]
-                                                           }  ]
-                                                         ]
-                                                      },
-                                                      {  "prim": "DUG",
-                                                         "args": [
-                                                           {  "int": "14"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DIG",
-                                                         "args": [
-                                                           {  "int": "13"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
-                                                         "args": [
-                                                           {  "int": "14"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DIG",
-                                                         "args": [
-                                                           {  "int": "14"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
-                                                         "args": [
-                                                           {  "int": "15"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DIG",
-                                                         "args": [
-                                                           {  "int": "6"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
-                                                         "args": [
-                                                           {  "int": "7"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "GET"  },
-                                                      {  "prim": "IF_NONE",
-                                                         "args": [
-                                                           [  {  "prim": "PUSH",
-                                                                 "args": [
-                                                                   {  "prim": "string"  },
-                                                                   {  "string": "NotFound"  }
-                                                                 ]
-                                                           },
-                                                           {  "prim": "FAILWITH"  }  ],
-                                                           [    ]
-                                                         ]
-                                                      },
-                                                      {  "prim": "UNPAIR"  },
-                                                      {  "prim": "DROP",
-                                                         "args": [
-                                                           {  "int": "1"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DIG",
-                                                         "args": [
-                                                           {  "int": "15"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
-                                                         "args": [
-                                                           {  "int": "16"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DIG",
-                                                         "args": [
-                                                           {  "int": "7"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
-                                                         "args": [
-                                                           {  "int": "8"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "GET"  },
-                                                      {  "prim": "IF_NONE",
-                                                         "args": [
-                                                           [  {  "prim": "PUSH",
-                                                                 "args": [
-                                                                   {  "prim": "string"  },
-                                                                   {  "string": "NotFound"  }
-                                                                 ]
-                                                           },
-                                                           {  "prim": "FAILWITH"  }  ],
-                                                           [    ]
-                                                         ]
-                                                      },
-                                                      {  "prim": "CAR",
-                                                         "args": [
-                                                           {  "int": "0"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "PUSH",
-                                                         "args": [
-                                                           {  "prim": "bool"  },
-                                                           {  "prim": "False"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DIG",
-                                                         "args": [
-                                                           {  "int": "5"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
-                                                         "args": [
-                                                           {  "int": "6"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "UPDATE"  },
-                                                      {  "prim": "PAIR"  },
-                                                      {  "prim": "SOME"  },
-                                                      {  "prim": "DIG",
-                                                         "args": [
-                                                           {  "int": "6"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
-                                                         "args": [
-                                                           {  "int": "7"  }
                                                          ]
                                                       },
                                                       {  "prim": "UPDATE"  },
@@ -4925,6 +3941,118 @@ export const nft_private_code : any =
                                                          "args": [
                                                            {  "int": "13"  }
                                                          ]
+                                                      },
+                                                      {  "prim": "DUP",
+                                                         "args": [
+                                                           {  "int": "15"  }
+                                                         ]
+                                                      },
+                                                      {  "prim": "DUP",
+                                                         "args": [
+                                                           {  "int": "16"  }
+                                                         ]
+                                                      },
+                                                      {  "prim": "DUP",
+                                                         "args": [
+                                                           {  "int": "7"  }
+                                                         ]
+                                                      },
+                                                      {  "prim": "GET"  },
+                                                      {  "prim": "IF_NONE",
+                                                         "args": [
+                                                           [  {  "prim": "PUSH",
+                                                                 "args": [
+                                                                   {  "prim": "string"  },
+                                                                   {  "string": "permit"  }
+                                                                 ]
+                                                           },
+                                                           {  "prim": "PUSH",
+                                                              "args": [
+                                                                {  "prim": "string"  },
+                                                                {  "string": "AssetNotFound"  }
+                                                              ]
+                                                           },
+                                                           {  "prim": "PAIR"  },
+                                                           {  "prim": "FAILWITH"  }  ],
+                                                           [    ]
+                                                         ]
+                                                      },
+                                                      {  "prim": "UNPAIR"  },
+                                                      {  "prim": "DROP",
+                                                         "args": [
+                                                           {  "int": "1"  }
+                                                         ]
+                                                      },
+                                                      {  "prim": "DUP",
+                                                         "args": [
+                                                           {  "int": "17"  }
+                                                         ]
+                                                      },
+                                                      {  "prim": "DUP",
+                                                         "args": [
+                                                           {  "int": "8"  }
+                                                         ]
+                                                      },
+                                                      {  "prim": "GET"  },
+                                                      {  "prim": "IF_NONE",
+                                                         "args": [
+                                                           [  {  "prim": "PUSH",
+                                                                 "args": [
+                                                                   {  "prim": "string"  },
+                                                                   {  "string": "permit"  }
+                                                                 ]
+                                                           },
+                                                           {  "prim": "PUSH",
+                                                              "args": [
+                                                                {  "prim": "string"  },
+                                                                {  "string": "AssetNotFound"  }
+                                                              ]
+                                                           },
+                                                           {  "prim": "PAIR"  },
+                                                           {  "prim": "FAILWITH"  }  ],
+                                                           [    ]
+                                                         ]
+                                                      },
+                                                      {  "prim": "CAR"  },
+                                                      {  "prim": "PUSH",
+                                                         "args": [
+                                                           {  "prim": "bool"  },
+                                                           {  "prim": "False"  }
+                                                         ]
+                                                      },
+                                                      {  "prim": "DUP",
+                                                         "args": [
+                                                           {  "int": "6"  }
+                                                         ]
+                                                      },
+                                                      {  "prim": "UPDATE"  },
+                                                      {  "prim": "PAIR"  },
+                                                      {  "prim": "SOME"  },
+                                                      {  "prim": "DUP",
+                                                         "args": [
+                                                           {  "int": "7"  }
+                                                         ]
+                                                      },
+                                                      {  "prim": "UPDATE"  },
+                                                      {  "prim": "DIP",
+                                                         "args": [
+                                                           {  "int": "1"  },
+                                                           [  {  "prim": "DIG",
+                                                                 "args": [
+                                                                   {  "int": "14"  }
+                                                                 ]
+                                                           },
+                                                           {  "prim": "DROP",
+                                                              "args": [
+                                                                {  "int": "1"  }
+                                                              ]
+                                                           }  ]
+                                                         ]
+                                                      },
+                                                      {  "prim": "DUG",
+                                                         "args": [
+                                                           {  "int": "14"  }
+                                                         ]
                                                       }  ],
                                                       [    ]
                                                     ]
@@ -4941,28 +4069,11 @@ export const nft_private_code : any =
                                                  {  "int": "6"  }
                                                ]
                                             },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
+                                            {  "prim": "PAIR",
+                                               "args": [
+                                                 {  "int": "12"  }
+                                               ]
+                                            },
                                             {  "prim": "DIG",
                                                "args": [
                                                  {  "int": "1"  }
@@ -4973,8 +4084,7 @@ export const nft_private_code : any =
                                             {  "prim": "SWAP"  },
                                             {  "prim": "UNPAIR"  },
                                             {  "prim": "SWAP"  },
-                                            {  "prim": "SELF"  },
-                                            {  "prim": "ADDRESS"  },
+                                            {  "prim": "SELF_ADDRESS"  },
                                             {  "prim": "SENDER"  },
                                             {  "prim": "COMPARE"  },
                                             {  "prim": "EQ"  },
@@ -4991,113 +4101,59 @@ export const nft_private_code : any =
                                                  [    ]
                                                ]
                                             },
-                                            {  "prim": "DIG",
-                                               "args": [
-                                                 {  "int": "16"  }
-                                               ]
-                                            },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
+                                            {  "prim": "DUP",
                                                "args": [
                                                  {  "int": "17"  }
                                                ]
                                             },
-                                            {  "prim": "DIG",
-                                               "args": [
-                                                 {  "int": "18"  }
-                                               ]
-                                            },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
+                                            {  "prim": "DUP",
                                                "args": [
                                                  {  "int": "19"  }
                                                ]
                                             },
-                                            {  "prim": "DIG",
-                                               "args": [
-                                                 {  "int": "2"  }
-                                               ]
-                                            },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
+                                            {  "prim": "DUP",
                                                "args": [
                                                  {  "int": "3"  }
                                                ]
                                             },
                                             {  "prim": "PAIR"  },
-                                            {  "prim": "DIG",
-                                               "args": [
-                                                 {  "int": "3"  }
-                                               ]
-                                            },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
+                                            {  "prim": "DUP",
                                                "args": [
                                                  {  "int": "4"  }
                                                ]
                                             },
                                             {  "prim": "PAIR"  },
-                                            {  "prim": "DIG",
-                                               "args": [
-                                                 {  "int": "4"  }
-                                               ]
-                                            },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
+                                            {  "prim": "DUP",
                                                "args": [
                                                  {  "int": "5"  }
                                                ]
                                             },
                                             {  "prim": "PAIR"  },
-                                            {  "prim": "DIG",
-                                               "args": [
-                                                 {  "int": "10"  }
-                                               ]
-                                            },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
-                                               "args": [
-                                                 {  "int": "11"  }
-                                               ]
-                                            },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "DIG",
-                                               "args": [
-                                                 {  "int": "11"  }
-                                               ]
-                                            },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
+                                            {  "prim": "DUP",
                                                "args": [
                                                  {  "int": "12"  }
                                                ]
                                             },
                                             {  "prim": "PAIR"  },
-                                            {  "prim": "DIG",
+                                            {  "prim": "DUP",
                                                "args": [
-                                                 {  "int": "7"  }
+                                                 {  "int": "11"  }
                                                ]
                                             },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
+                                            {  "prim": "PAIR"  },
+                                            {  "prim": "DUP",
                                                "args": [
-                                                 {  "int": "8"  }
+                                                 {  "int": "15"  }
                                                ]
                                             },
                                             {  "prim": "PAIR"  },
                                             {  "prim": "EXEC"  },
                                             {  "prim": "IF",
                                                "args": [
-                                                 [  {  "prim": "DIG",
+                                                 [  {  "prim": "DUP",
                                                        "args": [
                                                          {  "int": "9"  }
                                                        ]
-                                                 },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
-                                                    "args": [
-                                                      {  "int": "10"  }
-                                                    ]
                                                  },
                                                  {  "prim": "NONE",
                                                     "args": [
@@ -5113,159 +4169,9 @@ export const nft_private_code : any =
                                                       }
                                                     ]
                                                  },
-                                                 {  "prim": "DIG",
-                                                    "args": [
-                                                      {  "int": "3"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
+                                                 {  "prim": "DUP",
                                                     "args": [
                                                       {  "int": "4"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "UPDATE"  },
-                                                 {  "prim": "DIP",
-                                                    "args": [
-                                                      {  "int": "1"  },
-                                                      [  {  "prim": "DIG",
-                                                            "args": [
-                                                              {  "int": "9"  }
-                                                            ]
-                                                      },
-                                                      {  "prim": "DROP",
-                                                         "args": [
-                                                           {  "int": "1"  }
-                                                         ]
-                                                      }  ]
-                                                    ]
-                                                 },
-                                                 {  "prim": "DUG",
-                                                    "args": [
-                                                      {  "int": "9"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DIG",
-                                                    "args": [
-                                                      {  "int": "8"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
-                                                    "args": [
-                                                      {  "int": "9"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DIG",
-                                                    "args": [
-                                                      {  "int": "9"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
-                                                    "args": [
-                                                      {  "int": "10"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DIG",
-                                                    "args": [
-                                                      {  "int": "4"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
-                                                    "args": [
-                                                      {  "int": "5"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "GET"  },
-                                                 {  "prim": "IF_NONE",
-                                                    "args": [
-                                                      [  {  "prim": "PUSH",
-                                                            "args": [
-                                                              {  "prim": "string"  },
-                                                              {  "string": "NotFound"  }
-                                                            ]
-                                                      },
-                                                      {  "prim": "FAILWITH"  }  ],
-                                                      [    ]
-                                                    ]
-                                                 },
-                                                 {  "prim": "UNPAIR"  },
-                                                 {  "prim": "DROP",
-                                                    "args": [
-                                                      {  "int": "1"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DIG",
-                                                    "args": [
-                                                      {  "int": "10"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
-                                                    "args": [
-                                                      {  "int": "11"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DIG",
-                                                    "args": [
-                                                      {  "int": "5"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
-                                                    "args": [
-                                                      {  "int": "6"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "GET"  },
-                                                 {  "prim": "IF_NONE",
-                                                    "args": [
-                                                      [  {  "prim": "PUSH",
-                                                            "args": [
-                                                              {  "prim": "string"  },
-                                                              {  "string": "NotFound"  }
-                                                            ]
-                                                      },
-                                                      {  "prim": "FAILWITH"  }  ],
-                                                      [    ]
-                                                    ]
-                                                 },
-                                                 {  "prim": "CAR",
-                                                    "args": [
-                                                      {  "int": "0"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "PUSH",
-                                                    "args": [
-                                                      {  "prim": "bool"  },
-                                                      {  "prim": "False"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DIG",
-                                                    "args": [
-                                                      {  "int": "5"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
-                                                    "args": [
-                                                      {  "int": "6"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "UPDATE"  },
-                                                 {  "prim": "PAIR"  },
-                                                 {  "prim": "SOME"  },
-                                                 {  "prim": "DIG",
-                                                    "args": [
-                                                      {  "int": "4"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
-                                                    "args": [
-                                                      {  "int": "5"  }
                                                     ]
                                                  },
                                                  {  "prim": "UPDATE"  },
@@ -5288,6 +4194,118 @@ export const nft_private_code : any =
                                                     "args": [
                                                       {  "int": "8"  }
                                                     ]
+                                                 },
+                                                 {  "prim": "DUP",
+                                                    "args": [
+                                                      {  "int": "10"  }
+                                                    ]
+                                                 },
+                                                 {  "prim": "DUP",
+                                                    "args": [
+                                                      {  "int": "11"  }
+                                                    ]
+                                                 },
+                                                 {  "prim": "DUP",
+                                                    "args": [
+                                                      {  "int": "5"  }
+                                                    ]
+                                                 },
+                                                 {  "prim": "GET"  },
+                                                 {  "prim": "IF_NONE",
+                                                    "args": [
+                                                      [  {  "prim": "PUSH",
+                                                            "args": [
+                                                              {  "prim": "string"  },
+                                                              {  "string": "permit"  }
+                                                            ]
+                                                      },
+                                                      {  "prim": "PUSH",
+                                                         "args": [
+                                                           {  "prim": "string"  },
+                                                           {  "string": "AssetNotFound"  }
+                                                         ]
+                                                      },
+                                                      {  "prim": "PAIR"  },
+                                                      {  "prim": "FAILWITH"  }  ],
+                                                      [    ]
+                                                    ]
+                                                 },
+                                                 {  "prim": "UNPAIR"  },
+                                                 {  "prim": "DROP",
+                                                    "args": [
+                                                      {  "int": "1"  }
+                                                    ]
+                                                 },
+                                                 {  "prim": "DUP",
+                                                    "args": [
+                                                      {  "int": "12"  }
+                                                    ]
+                                                 },
+                                                 {  "prim": "DUP",
+                                                    "args": [
+                                                      {  "int": "6"  }
+                                                    ]
+                                                 },
+                                                 {  "prim": "GET"  },
+                                                 {  "prim": "IF_NONE",
+                                                    "args": [
+                                                      [  {  "prim": "PUSH",
+                                                            "args": [
+                                                              {  "prim": "string"  },
+                                                              {  "string": "permit"  }
+                                                            ]
+                                                      },
+                                                      {  "prim": "PUSH",
+                                                         "args": [
+                                                           {  "prim": "string"  },
+                                                           {  "string": "AssetNotFound"  }
+                                                         ]
+                                                      },
+                                                      {  "prim": "PAIR"  },
+                                                      {  "prim": "FAILWITH"  }  ],
+                                                      [    ]
+                                                    ]
+                                                 },
+                                                 {  "prim": "CAR"  },
+                                                 {  "prim": "PUSH",
+                                                    "args": [
+                                                      {  "prim": "bool"  },
+                                                      {  "prim": "False"  }
+                                                    ]
+                                                 },
+                                                 {  "prim": "DUP",
+                                                    "args": [
+                                                      {  "int": "6"  }
+                                                    ]
+                                                 },
+                                                 {  "prim": "UPDATE"  },
+                                                 {  "prim": "PAIR"  },
+                                                 {  "prim": "SOME"  },
+                                                 {  "prim": "DUP",
+                                                    "args": [
+                                                      {  "int": "5"  }
+                                                    ]
+                                                 },
+                                                 {  "prim": "UPDATE"  },
+                                                 {  "prim": "DIP",
+                                                    "args": [
+                                                      {  "int": "1"  },
+                                                      [  {  "prim": "DIG",
+                                                            "args": [
+                                                              {  "int": "9"  }
+                                                            ]
+                                                      },
+                                                      {  "prim": "DROP",
+                                                         "args": [
+                                                           {  "int": "1"  }
+                                                         ]
+                                                      }  ]
+                                                    ]
+                                                 },
+                                                 {  "prim": "DUG",
+                                                    "args": [
+                                                      {  "int": "9"  }
+                                                    ]
                                                  }  ],
                                                  [    ]
                                                ]
@@ -5297,28 +4315,11 @@ export const nft_private_code : any =
                                                  {  "int": "3"  }
                                                ]
                                             },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
+                                            {  "prim": "PAIR",
+                                               "args": [
+                                                 {  "int": "12"  }
+                                               ]
+                                            },
                                             {  "prim": "DIG",
                                                "args": [
                                                  {  "int": "1"  }
@@ -5333,15 +4334,9 @@ export const nft_private_code : any =
                                             {  "prim": "SWAP"  },
                                             {  "prim": "UNPAIR"  },
                                             {  "prim": "SWAP"  },
-                                            {  "prim": "DIG",
+                                            {  "prim": "DUP",
                                                "args": [
-                                                 {  "int": "4"  }
-                                               ]
-                                            },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
-                                               "args": [
-                                                 {  "int": "5"  }
+                                                 {  "int": "14"  }
                                                ]
                                             },
                                             {  "prim": "IF",
@@ -5356,24 +4351,12 @@ export const nft_private_code : any =
                                                  [    ]
                                                ]
                                             },
-                                            {  "prim": "DIG",
+                                            {  "prim": "DUP",
                                                "args": [
-                                                 {  "int": "8"  }
+                                                 {  "int": "10"  }
                                                ]
                                             },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
-                                               "args": [
-                                                 {  "int": "9"  }
-                                               ]
-                                            },
-                                            {  "prim": "DIG",
-                                               "args": [
-                                                 {  "int": "3"  }
-                                               ]
-                                            },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
+                                            {  "prim": "DUP",
                                                "args": [
                                                  {  "int": "4"  }
                                                ]
@@ -5381,24 +4364,12 @@ export const nft_private_code : any =
                                             {  "prim": "MEM"  },
                                             {  "prim": "IF",
                                                "args": [
-                                                 [  {  "prim": "DIG",
+                                                 [  {  "prim": "DUP",
                                                        "args": [
-                                                         {  "int": "8"  }
+                                                         {  "int": "10"  }
                                                        ]
                                                  },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
-                                                    "args": [
-                                                      {  "int": "9"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DIG",
-                                                    "args": [
-                                                      {  "int": "3"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
+                                                 {  "prim": "DUP",
                                                     "args": [
                                                       {  "int": "4"  }
                                                     ]
@@ -5409,38 +4380,29 @@ export const nft_private_code : any =
                                                       [  {  "prim": "PUSH",
                                                             "args": [
                                                               {  "prim": "string"  },
-                                                              {  "string": "NotFound"  }
+                                                              {  "string": "permit"  }
                                                             ]
                                                       },
+                                                      {  "prim": "PUSH",
+                                                         "args": [
+                                                           {  "prim": "string"  },
+                                                           {  "string": "AssetNotFound"  }
+                                                         ]
+                                                      },
+                                                      {  "prim": "PAIR"  },
                                                       {  "prim": "FAILWITH"  }  ],
                                                       [    ]
                                                     ]
                                                  },
-                                                 {  "prim": "CAR",
-                                                    "args": [
-                                                      {  "int": "0"  }
-                                                    ]
-                                                 },
+                                                 {  "prim": "CAR"  },
                                                  {  "prim": "ITER",
                                                     "args": [
-                                                      [  {  "prim": "DIG",
+                                                      [  {  "prim": "DUP",
                                                             "args": [
                                                               {  "int": "10"  }
                                                             ]
                                                       },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
-                                                         "args": [
-                                                           {  "int": "11"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DIG",
-                                                         "args": [
-                                                           {  "int": "1"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
+                                                      {  "prim": "DUP",
                                                          "args": [
                                                            {  "int": "2"  }
                                                          ]
@@ -5451,72 +4413,49 @@ export const nft_private_code : any =
                                                            [  {  "prim": "PUSH",
                                                                  "args": [
                                                                    {  "prim": "string"  },
-                                                                   {  "string": "NotFound"  }
+                                                                   {  "string": "permit"  }
                                                                  ]
                                                            },
+                                                           {  "prim": "PUSH",
+                                                              "args": [
+                                                                {  "prim": "string"  },
+                                                                {  "string": "AssetNotFound"  }
+                                                              ]
+                                                           },
+                                                           {  "prim": "PAIR"  },
                                                            {  "prim": "FAILWITH"  }  ],
                                                            [    ]
                                                          ]
                                                       },
-                                                      {  "prim": "DIG",
-                                                         "args": [
-                                                           {  "int": "19"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
+                                                      {  "prim": "DUP",
                                                          "args": [
                                                            {  "int": "20"  }
                                                          ]
                                                       },
-                                                      {  "prim": "DIG",
-                                                         "args": [
-                                                           {  "int": "2"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
+                                                      {  "prim": "DUP",
                                                          "args": [
                                                            {  "int": "3"  }
                                                          ]
                                                       },
-                                                      {  "prim": "DIG",
+                                                      {  "prim": "DUP",
                                                          "args": [
                                                            {  "int": "13"  }
                                                          ]
                                                       },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
-                                                         "args": [
-                                                           {  "int": "14"  }
-                                                         ]
-                                                      },
                                                       {  "prim": "PAIR"  },
-                                                      {  "prim": "DIG",
+                                                      {  "prim": "DUP",
                                                          "args": [
-                                                           {  "int": "9"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
-                                                         "args": [
-                                                           {  "int": "10"  }
+                                                           {  "int": "17"  }
                                                          ]
                                                       },
                                                       {  "prim": "PAIR"  },
                                                       {  "prim": "EXEC"  },
                                                       {  "prim": "IF",
                                                          "args": [
-                                                           [  {  "prim": "DIG",
+                                                           [  {  "prim": "DUP",
                                                                  "args": [
                                                                    {  "int": "11"  }
                                                                  ]
-                                                           },
-                                                           {  "prim": "DUP"  },
-                                                           {  "prim": "DUG",
-                                                              "args": [
-                                                                {  "int": "12"  }
-                                                              ]
                                                            },
                                                            {  "prim": "NONE",
                                                               "args": [
@@ -5535,15 +4474,127 @@ export const nft_private_code : any =
                                                                 }
                                                               ]
                                                            },
-                                                           {  "prim": "DIG",
-                                                              "args": [
-                                                                {  "int": "3"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "DUP"  },
-                                                           {  "prim": "DUG",
+                                                           {  "prim": "DUP",
                                                               "args": [
                                                                 {  "int": "4"  }
+                                                              ]
+                                                           },
+                                                           {  "prim": "UPDATE"  },
+                                                           {  "prim": "DIP",
+                                                              "args": [
+                                                                {  "int": "1"  },
+                                                                [  {
+                                                                "prim": "DIG",
+                                                                "args": [
+                                                                  {  "int": "10"  }
+                                                                ]
+                                                                },
+                                                                {  "prim": "DROP",
+                                                                   "args": [
+
+                                                                   {  "int": "1"  }
+                                                                   ]
+                                                                }  ]
+                                                              ]
+                                                           },
+                                                           {  "prim": "DUG",
+                                                              "args": [
+                                                                {  "int": "10"  }
+                                                              ]
+                                                           },
+                                                           {  "prim": "DUP",
+                                                              "args": [
+                                                                {  "int": "12"  }
+                                                              ]
+                                                           },
+                                                           {  "prim": "DUP",
+                                                              "args": [
+                                                                {  "int": "13"  }
+                                                              ]
+                                                           },
+                                                           {  "prim": "DUP",
+                                                              "args": [
+                                                                {  "int": "7"  }
+                                                              ]
+                                                           },
+                                                           {  "prim": "GET"  },
+                                                           {  "prim": "IF_NONE",
+                                                              "args": [
+                                                                [  {
+                                                                "prim": "PUSH",
+                                                                "args": [
+                                                                  {  "prim": "string"  },
+                                                                  {  "string": "permit"  }
+                                                                ]
+                                                                },
+                                                                {  "prim": "PUSH",
+                                                                   "args": [
+
+                                                                   {  "prim": "string"  },
+                                                                   {  "string": "AssetNotFound"  }
+                                                                   ]
+                                                                },
+                                                                {  "prim": "PAIR"  },
+                                                                {  "prim": "FAILWITH"  }  ],
+                                                                [    ]
+                                                              ]
+                                                           },
+                                                           {  "prim": "UNPAIR"  },
+                                                           {  "prim": "DROP",
+                                                              "args": [
+                                                                {  "int": "1"  }
+                                                              ]
+                                                           },
+                                                           {  "prim": "DUP",
+                                                              "args": [
+                                                                {  "int": "14"  }
+                                                              ]
+                                                           },
+                                                           {  "prim": "DUP",
+                                                              "args": [
+                                                                {  "int": "8"  }
+                                                              ]
+                                                           },
+                                                           {  "prim": "GET"  },
+                                                           {  "prim": "IF_NONE",
+                                                              "args": [
+                                                                [  {
+                                                                "prim": "PUSH",
+                                                                "args": [
+                                                                  {  "prim": "string"  },
+                                                                  {  "string": "permit"  }
+                                                                ]
+                                                                },
+                                                                {  "prim": "PUSH",
+                                                                   "args": [
+
+                                                                   {  "prim": "string"  },
+                                                                   {  "string": "AssetNotFound"  }
+                                                                   ]
+                                                                },
+                                                                {  "prim": "PAIR"  },
+                                                                {  "prim": "FAILWITH"  }  ],
+                                                                [    ]
+                                                              ]
+                                                           },
+                                                           {  "prim": "CAR"  },
+                                                           {  "prim": "PUSH",
+                                                              "args": [
+                                                                {  "prim": "bool"  },
+                                                                {  "prim": "False"  }
+                                                              ]
+                                                           },
+                                                           {  "prim": "DUP",
+                                                              "args": [
+                                                                {  "int": "6"  }
+                                                              ]
+                                                           },
+                                                           {  "prim": "UPDATE"  },
+                                                           {  "prim": "PAIR"  },
+                                                           {  "prim": "SOME"  },
+                                                           {  "prim": "DUP",
+                                                              "args": [
+                                                                {  "int": "7"  }
                                                               ]
                                                            },
                                                            {  "prim": "UPDATE"  },
@@ -5568,154 +4619,6 @@ export const nft_private_code : any =
                                                               "args": [
                                                                 {  "int": "11"  }
                                                               ]
-                                                           },
-                                                           {  "prim": "DIG",
-                                                              "args": [
-                                                                {  "int": "10"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "DUP"  },
-                                                           {  "prim": "DUG",
-                                                              "args": [
-                                                                {  "int": "11"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "DIG",
-                                                              "args": [
-                                                                {  "int": "11"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "DUP"  },
-                                                           {  "prim": "DUG",
-                                                              "args": [
-                                                                {  "int": "12"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "DIG",
-                                                              "args": [
-                                                                {  "int": "6"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "DUP"  },
-                                                           {  "prim": "DUG",
-                                                              "args": [
-                                                                {  "int": "7"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "GET"  },
-                                                           {  "prim": "IF_NONE",
-                                                              "args": [
-                                                                [  {
-                                                                "prim": "PUSH",
-                                                                "args": [
-                                                                  {  "prim": "string"  },
-                                                                  {  "string": "NotFound"  }
-                                                                ]
-                                                                },
-                                                                {  "prim": "FAILWITH"  }  ],
-                                                                [    ]
-                                                              ]
-                                                           },
-                                                           {  "prim": "UNPAIR"  },
-                                                           {  "prim": "DROP",
-                                                              "args": [
-                                                                {  "int": "1"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "DIG",
-                                                              "args": [
-                                                                {  "int": "12"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "DUP"  },
-                                                           {  "prim": "DUG",
-                                                              "args": [
-                                                                {  "int": "13"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "DIG",
-                                                              "args": [
-                                                                {  "int": "7"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "DUP"  },
-                                                           {  "prim": "DUG",
-                                                              "args": [
-                                                                {  "int": "8"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "GET"  },
-                                                           {  "prim": "IF_NONE",
-                                                              "args": [
-                                                                [  {
-                                                                "prim": "PUSH",
-                                                                "args": [
-                                                                  {  "prim": "string"  },
-                                                                  {  "string": "NotFound"  }
-                                                                ]
-                                                                },
-                                                                {  "prim": "FAILWITH"  }  ],
-                                                                [    ]
-                                                              ]
-                                                           },
-                                                           {  "prim": "CAR",
-                                                              "args": [
-                                                                {  "int": "0"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "PUSH",
-                                                              "args": [
-                                                                {  "prim": "bool"  },
-                                                                {  "prim": "False"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "DIG",
-                                                              "args": [
-                                                                {  "int": "5"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "DUP"  },
-                                                           {  "prim": "DUG",
-                                                              "args": [
-                                                                {  "int": "6"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "UPDATE"  },
-                                                           {  "prim": "PAIR"  },
-                                                           {  "prim": "SOME"  },
-                                                           {  "prim": "DIG",
-                                                              "args": [
-                                                                {  "int": "6"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "DUP"  },
-                                                           {  "prim": "DUG",
-                                                              "args": [
-                                                                {  "int": "7"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "UPDATE"  },
-                                                           {  "prim": "DIP",
-                                                              "args": [
-                                                                {  "int": "1"  },
-                                                                [  {
-                                                                "prim": "DIG",
-                                                                "args": [
-                                                                  {  "int": "10"  }
-                                                                ]
-                                                                },
-                                                                {  "prim": "DROP",
-                                                                   "args": [
-
-                                                                   {  "int": "1"  }
-                                                                   ]
-                                                                }  ]
-                                                              ]
-                                                           },
-                                                           {  "prim": "DUG",
-                                                              "args": [
-                                                                {  "int": "10"  }
-                                                              ]
                                                            }  ],
                                                            [    ]
                                                          ]
@@ -5730,24 +4633,12 @@ export const nft_private_code : any =
                                                  [    ]
                                                ]
                                             },
-                                            {  "prim": "DIG",
+                                            {  "prim": "DUP",
                                                "args": [
-                                                 {  "int": "5"  }
+                                                 {  "int": "13"  }
                                                ]
                                             },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
-                                               "args": [
-                                                 {  "int": "6"  }
-                                               ]
-                                            },
-                                            {  "prim": "DIG",
-                                               "args": [
-                                                 {  "int": "2"  }
-                                               ]
-                                            },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
+                                            {  "prim": "DUP",
                                                "args": [
                                                  {  "int": "3"  }
                                                ]
@@ -5772,13 +4663,7 @@ export const nft_private_code : any =
                                                  {  "int": "0"  }
                                                ]
                                             },
-                                            {  "prim": "DIG",
-                                               "args": [
-                                                 {  "int": "2"  }
-                                               ]
-                                            },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
+                                            {  "prim": "DUP",
                                                "args": [
                                                  {  "int": "3"  }
                                                ]
@@ -5800,282 +4685,32 @@ export const nft_private_code : any =
                                             {  "prim": "DUP"  },
                                             {  "prim": "IF_NONE",
                                                "args": [
-                                                 [  {  "prim": "DIG",
+                                                 [  {  "prim": "DUP",
                                                        "args": [
-                                                         {  "int": "8"  }
+                                                         {  "int": "10"  }
                                                        ]
                                                  },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
-                                                    "args": [
-                                                      {  "int": "9"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "PUSH",
-                                                    "args": [
-                                                      {  "prim": "nat"  },
-                                                      {  "int": "0"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DIG",
-                                                    "args": [
-                                                      {  "int": "3"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
+                                                 {  "prim": "DUP",
                                                     "args": [
                                                       {  "int": "4"  }
                                                     ]
                                                  },
-                                                 {  "prim": "SOME"  },
-                                                 {  "prim": "PAIR"  },
-                                                 {  "prim": "EMPTY_SET",
-                                                    "args": [
-                                                      {  "prim": "bytes"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "PAIR"  },
-                                                 {  "prim": "SOME"  },
-                                                 {  "prim": "DIG",
-                                                    "args": [
-                                                      {  "int": "4"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
-                                                    "args": [
-                                                      {  "int": "5"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "UPDATE"  },
-                                                 {  "prim": "DIP",
-                                                    "args": [
-                                                      {  "int": "1"  },
-                                                      [  {  "prim": "DIG",
-                                                            "args": [
-                                                              {  "int": "8"  }
-                                                            ]
-                                                      },
-                                                      {  "prim": "DROP",
-                                                         "args": [
-                                                           {  "int": "1"  }
-                                                         ]
-                                                      }  ]
-                                                    ]
-                                                 },
-                                                 {  "prim": "DUG",
-                                                    "args": [
-                                                      {  "int": "8"  }
-                                                    ]
-                                                 }  ],
-                                                 [  {  "prim": "SENDER"  },
-                                                 {  "prim": "DIG",
-                                                    "args": [
-                                                      {  "int": "4"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
-                                                    "args": [
-                                                      {  "int": "5"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "COMPARE"  },
-                                                 {  "prim": "NEQ"  },
+                                                 {  "prim": "MEM"  },
                                                  {  "prim": "IF",
                                                     "args": [
-                                                      [  {  "prim": "PUSH",
-                                                            "args": [
-                                                              {  "prim": "string"  },
-                                                              {  "string": "NOT_PERMIT_ISSUER"  }
-                                                            ]
-                                                      },
-                                                      {  "prim": "FAILWITH"  }  ],
-                                                      [    ]
-                                                    ]
-                                                 },
-                                                 {  "prim": "DIG",
-                                                    "args": [
-                                                      {  "int": "17"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
-                                                    "args": [
-                                                      {  "int": "18"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DIG",
-                                                    "args": [
-                                                      {  "int": "19"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
-                                                    "args": [
-                                                      {  "int": "20"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "PUSH",
-                                                    "args": [
-                                                      {  "prim": "string"  },
-                                                      {  "string": "PERMIT_MISSING"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "PAIR"  },
-                                                 {  "prim": "DIG",
-                                                    "args": [
-                                                      {  "int": "2"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
-                                                    "args": [
-                                                      {  "int": "3"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "PAIR"  },
-                                                 {  "prim": "DIG",
-                                                    "args": [
-                                                      {  "int": "5"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
-                                                    "args": [
-                                                      {  "int": "6"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "PAIR"  },
-                                                 {  "prim": "DIG",
-                                                    "args": [
-                                                      {  "int": "11"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
-                                                    "args": [
-                                                      {  "int": "12"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "PAIR"  },
-                                                 {  "prim": "DIG",
-                                                    "args": [
-                                                      {  "int": "12"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
-                                                    "args": [
-                                                      {  "int": "13"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "PAIR"  },
-                                                 {  "prim": "DIG",
-                                                    "args": [
-                                                      {  "int": "8"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
-                                                    "args": [
-                                                      {  "int": "9"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "PAIR"  },
-                                                 {  "prim": "EXEC"  },
-                                                 {  "prim": "IF",
-                                                    "args": [
-                                                      [  {  "prim": "DIG",
+                                                      [  {  "prim": "DUP",
                                                             "args": [
                                                               {  "int": "10"  }
                                                             ]
                                                       },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
+                                                      {  "prim": "DUP",
                                                          "args": [
                                                            {  "int": "11"  }
                                                          ]
                                                       },
-                                                      {  "prim": "NONE",
-                                                         "args": [
-                                                           {  "prim": "pair",
-                                                              "args": [
-                                                                {  "prim": "timestamp"  },
-                                                                {  "prim": "option",
-                                                                   "args": [
-
-                                                                   {  "prim": "int"  }
-                                                                   ]
-                                                                }
-                                                              ]
-                                                           }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DIG",
-                                                         "args": [
-                                                           {  "int": "2"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
-                                                         "args": [
-                                                           {  "int": "3"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "UPDATE"  },
-                                                      {  "prim": "DIP",
-                                                         "args": [
-                                                           {  "int": "1"  },
-                                                           [  {  "prim": "DIG",
-                                                                 "args": [
-                                                                   {  "int": "10"  }
-                                                                 ]
-                                                           },
-                                                           {  "prim": "DROP",
-                                                              "args": [
-                                                                {  "int": "1"  }
-                                                              ]
-                                                           }  ]
-                                                         ]
-                                                      },
-                                                      {  "prim": "DUG",
-                                                         "args": [
-                                                           {  "int": "10"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DIG",
-                                                         "args": [
-                                                           {  "int": "9"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
-                                                         "args": [
-                                                           {  "int": "10"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DIG",
-                                                         "args": [
-                                                           {  "int": "10"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
-                                                         "args": [
-                                                           {  "int": "11"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DIG",
+                                                      {  "prim": "DUP",
                                                          "args": [
                                                            {  "int": "5"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
-                                                         "args": [
-                                                           {  "int": "6"  }
                                                          ]
                                                       },
                                                       {  "prim": "GET"  },
@@ -6084,88 +4719,41 @@ export const nft_private_code : any =
                                                            [  {  "prim": "PUSH",
                                                                  "args": [
                                                                    {  "prim": "string"  },
-                                                                   {  "string": "NotFound"  }
+                                                                   {  "string": "permit"  }
                                                                  ]
                                                            },
+                                                           {  "prim": "PUSH",
+                                                              "args": [
+                                                                {  "prim": "string"  },
+                                                                {  "string": "AssetNotFound"  }
+                                                              ]
+                                                           },
+                                                           {  "prim": "PAIR"  },
                                                            {  "prim": "FAILWITH"  }  ],
                                                            [    ]
                                                          ]
                                                       },
+                                                      {  "prim": "UNPAIR"  },
+                                                      {  "prim": "SWAP"  },
                                                       {  "prim": "UNPAIR"  },
                                                       {  "prim": "DROP",
                                                          "args": [
                                                            {  "int": "1"  }
                                                          ]
                                                       },
-                                                      {  "prim": "DIG",
-                                                         "args": [
-                                                           {  "int": "11"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
-                                                         "args": [
-                                                           {  "int": "12"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DIG",
-                                                         "args": [
-                                                           {  "int": "6"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
-                                                         "args": [
-                                                           {  "int": "7"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "GET"  },
-                                                      {  "prim": "IF_NONE",
-                                                         "args": [
-                                                           [  {  "prim": "PUSH",
-                                                                 "args": [
-                                                                   {  "prim": "string"  },
-                                                                   {  "string": "NotFound"  }
-                                                                 ]
-                                                           },
-                                                           {  "prim": "FAILWITH"  }  ],
-                                                           [    ]
-                                                         ]
-                                                      },
-                                                      {  "prim": "CAR",
-                                                         "args": [
-                                                           {  "int": "0"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "PUSH",
-                                                         "args": [
-                                                           {  "prim": "bool"  },
-                                                           {  "prim": "False"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DIG",
-                                                         "args": [
-                                                           {  "int": "4"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
+                                                      {  "prim": "DUP",
                                                          "args": [
                                                            {  "int": "5"  }
                                                          ]
                                                       },
-                                                      {  "prim": "UPDATE"  },
+                                                      {  "prim": "SOME"  },
+                                                      {  "prim": "PAIR"  },
+                                                      {  "prim": "SWAP"  },
                                                       {  "prim": "PAIR"  },
                                                       {  "prim": "SOME"  },
-                                                      {  "prim": "DIG",
+                                                      {  "prim": "DUP",
                                                          "args": [
                                                            {  "int": "5"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
-                                                         "args": [
-                                                           {  "int": "6"  }
                                                          ]
                                                       },
                                                       {  "prim": "UPDATE"  },
@@ -6189,1108 +4777,61 @@ export const nft_private_code : any =
                                                            {  "int": "9"  }
                                                          ]
                                                       }  ],
-                                                      [    ]
-                                                    ]
-                                                 },
-                                                 {  "prim": "DIG",
-                                                    "args": [
-                                                      {  "int": "9"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
-                                                    "args": [
-                                                      {  "int": "10"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DIG",
-                                                    "args": [
-                                                      {  "int": "4"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
-                                                    "args": [
-                                                      {  "int": "5"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "MEM"  },
-                                                 {  "prim": "IF",
-                                                    "args": [
-                                                      [  {  "prim": "DIG",
+                                                      [  {  "prim": "DUP",
                                                             "args": [
-                                                              {  "int": "18"  }
+                                                              {  "int": "10"  }
                                                             ]
                                                       },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
+                                                      {  "prim": "DUP",
                                                          "args": [
-                                                           {  "int": "19"  }
+                                                           {  "int": "4"  }
                                                          ]
                                                       },
-                                                      {  "prim": "DIG",
-                                                         "args": [
-                                                           {  "int": "1"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
-                                                         "args": [
-                                                           {  "int": "2"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DIG",
-                                                         "args": [
-                                                           {  "int": "12"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
-                                                         "args": [
-                                                           {  "int": "13"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "PAIR"  },
-                                                      {  "prim": "DIG",
-                                                         "args": [
-                                                           {  "int": "8"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
-                                                         "args": [
-                                                           {  "int": "9"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "PAIR"  },
-                                                      {  "prim": "EXEC"  },
-                                                      {  "prim": "NOT"  },
+                                                      {  "prim": "MEM"  },
                                                       {  "prim": "IF",
                                                          "args": [
                                                            [  {  "prim": "PUSH",
                                                                  "args": [
-                                                                   {  "prim": "int"  },
-                                                                   {  "int": "0"  }
+                                                                   {  "prim": "string"  },
+                                                                   {  "string": "permit"  }
                                                                  ]
                                                            },
-                                                           {  "prim": "DIG",
+                                                           {  "prim": "PUSH",
                                                               "args": [
-                                                                {  "int": "3"  }
+                                                                {  "prim": "string"  },
+                                                                {  "string": "KeyExists"  }
                                                               ]
                                                            },
-                                                           {  "prim": "DUP"  },
-                                                           {  "prim": "DUG",
-                                                              "args": [
-                                                                {  "int": "4"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "COMPARE"  },
-                                                           {  "prim": "EQ"  },
-                                                           {  "prim": "IF",
-                                                              "args": [
-                                                                [  {
-                                                                "prim": "DIG",
-                                                                "args": [
-                                                                  {  "int": "10"  }
-                                                                ]
-                                                                },
-                                                                {  "prim": "DUP"  },
-                                                                {  "prim": "DUG",
-                                                                   "args": [
-
-                                                                   {  "int": "11"  }
-                                                                   ]
-                                                                },
-                                                                {  "prim": "NONE",
-                                                                   "args": [
-
-                                                                   {
-                                                                   "prim": "pair",
-                                                                   "args": [
-
-                                                                   {  "prim": "timestamp"  },
-                                                                   {
-                                                                   "prim": "option",
-                                                                   "args": [
-
-                                                                   {  "prim": "int"  }
-                                                                   ]
-                                                                   }
-                                                                   ]
-                                                                   }
-                                                                   ]
-                                                                },
-                                                                {  "prim": "DIG",
-                                                                   "args": [
-
-                                                                   {  "int": "2"  }
-                                                                   ]
-                                                                },
-                                                                {  "prim": "DUP"  },
-                                                                {  "prim": "DUG",
-                                                                   "args": [
-
-                                                                   {  "int": "3"  }
-                                                                   ]
-                                                                },
-                                                                {  "prim": "UPDATE"  },
-                                                                {  "prim": "DIP",
-                                                                   "args": [
-
-                                                                   {  "int": "1"  },
-                                                                   [  {
-                                                                   "prim": "DIG",
-                                                                   "args": [
-
-                                                                   {  "int": "10"  }
-                                                                   ]
-                                                                   },
-                                                                   {
-                                                                   "prim": "DROP",
-                                                                   "args": [
-
-                                                                   {  "int": "1"  }
-                                                                   ]
-                                                                   }  ]
-                                                                   ]
-                                                                },
-                                                                {  "prim": "DUG",
-                                                                   "args": [
-
-                                                                   {  "int": "10"  }
-                                                                   ]
-                                                                },
-                                                                {  "prim": "DIG",
-                                                                   "args": [
-
-                                                                   {  "int": "9"  }
-                                                                   ]
-                                                                },
-                                                                {  "prim": "DUP"  },
-                                                                {  "prim": "DUG",
-                                                                   "args": [
-
-                                                                   {  "int": "10"  }
-                                                                   ]
-                                                                },
-                                                                {  "prim": "DIG",
-                                                                   "args": [
-
-                                                                   {  "int": "10"  }
-                                                                   ]
-                                                                },
-                                                                {  "prim": "DUP"  },
-                                                                {  "prim": "DUG",
-                                                                   "args": [
-
-                                                                   {  "int": "11"  }
-                                                                   ]
-                                                                },
-                                                                {  "prim": "DIG",
-                                                                   "args": [
-
-                                                                   {  "int": "5"  }
-                                                                   ]
-                                                                },
-                                                                {  "prim": "DUP"  },
-                                                                {  "prim": "DUG",
-                                                                   "args": [
-
-                                                                   {  "int": "6"  }
-                                                                   ]
-                                                                },
-                                                                {  "prim": "GET"  },
-                                                                {  "prim": "IF_NONE",
-                                                                   "args": [
-
-                                                                   [  {
-                                                                   "prim": "PUSH",
-                                                                   "args": [
-
-                                                                   {  "prim": "string"  },
-                                                                   {  "string": "NotFound"  }
-                                                                   ]
-                                                                   },
-                                                                   {  "prim": "FAILWITH"  }  ],
-                                                                   [    ]
-                                                                   ]
-                                                                },
-                                                                {  "prim": "UNPAIR"  },
-                                                                {  "prim": "DROP",
-                                                                   "args": [
-
-                                                                   {  "int": "1"  }
-                                                                   ]
-                                                                },
-                                                                {  "prim": "DIG",
-                                                                   "args": [
-
-                                                                   {  "int": "11"  }
-                                                                   ]
-                                                                },
-                                                                {  "prim": "DUP"  },
-                                                                {  "prim": "DUG",
-                                                                   "args": [
-
-                                                                   {  "int": "12"  }
-                                                                   ]
-                                                                },
-                                                                {  "prim": "DIG",
-                                                                   "args": [
-
-                                                                   {  "int": "6"  }
-                                                                   ]
-                                                                },
-                                                                {  "prim": "DUP"  },
-                                                                {  "prim": "DUG",
-                                                                   "args": [
-
-                                                                   {  "int": "7"  }
-                                                                   ]
-                                                                },
-                                                                {  "prim": "GET"  },
-                                                                {  "prim": "IF_NONE",
-                                                                   "args": [
-
-                                                                   [  {
-                                                                   "prim": "PUSH",
-                                                                   "args": [
-
-                                                                   {  "prim": "string"  },
-                                                                   {  "string": "NotFound"  }
-                                                                   ]
-                                                                   },
-                                                                   {  "prim": "FAILWITH"  }  ],
-                                                                   [    ]
-                                                                   ]
-                                                                },
-                                                                {  "prim": "CAR",
-                                                                   "args": [
-
-                                                                   {  "int": "0"  }
-                                                                   ]
-                                                                },
-                                                                {  "prim": "PUSH",
-                                                                   "args": [
-
-                                                                   {  "prim": "bool"  },
-                                                                   {  "prim": "False"  }
-                                                                   ]
-                                                                },
-                                                                {  "prim": "DIG",
-                                                                   "args": [
-
-                                                                   {  "int": "4"  }
-                                                                   ]
-                                                                },
-                                                                {  "prim": "DUP"  },
-                                                                {  "prim": "DUG",
-                                                                   "args": [
-
-                                                                   {  "int": "5"  }
-                                                                   ]
-                                                                },
-                                                                {  "prim": "UPDATE"  },
-                                                                {  "prim": "PAIR"  },
-                                                                {  "prim": "SOME"  },
-                                                                {  "prim": "DIG",
-                                                                   "args": [
-
-                                                                   {  "int": "5"  }
-                                                                   ]
-                                                                },
-                                                                {  "prim": "DUP"  },
-                                                                {  "prim": "DUG",
-                                                                   "args": [
-
-                                                                   {  "int": "6"  }
-                                                                   ]
-                                                                },
-                                                                {  "prim": "UPDATE"  },
-                                                                {  "prim": "DIP",
-                                                                   "args": [
-
-                                                                   {  "int": "1"  },
-                                                                   [  {
-                                                                   "prim": "DIG",
-                                                                   "args": [
-
-                                                                   {  "int": "9"  }
-                                                                   ]
-                                                                   },
-                                                                   {
-                                                                   "prim": "DROP",
-                                                                   "args": [
-
-                                                                   {  "int": "1"  }
-                                                                   ]
-                                                                   }  ]
-                                                                   ]
-                                                                },
-                                                                {  "prim": "DUG",
-                                                                   "args": [
-
-                                                                   {  "int": "9"  }
-                                                                   ]
-                                                                }  ],
-                                                                [  {
-                                                                "prim": "DIG",
-                                                                "args": [
-                                                                  {  "int": "10"  }
-                                                                ]
-                                                                },
-                                                                {  "prim": "DUP"  },
-                                                                {  "prim": "DUG",
-                                                                   "args": [
-
-                                                                   {  "int": "11"  }
-                                                                   ]
-                                                                },
-                                                                {  "prim": "DIG",
-                                                                   "args": [
-
-                                                                   {  "int": "1"  }
-                                                                   ]
-                                                                },
-                                                                {  "prim": "DUP"  },
-                                                                {  "prim": "DUG",
-                                                                   "args": [
-
-                                                                   {  "int": "2"  }
-                                                                   ]
-                                                                },
-                                                                {  "prim": "MEM"  },
-                                                                {  "prim": "IF",
-                                                                   "args": [
-
-                                                                   [  {
-                                                                   "prim": "DIG",
-                                                                   "args": [
-
-                                                                   {  "int": "9"  }
-                                                                   ]
-                                                                   },
-                                                                   {  "prim": "DUP"  },
-                                                                   {
-                                                                   "prim": "DUG",
-                                                                   "args": [
-
-                                                                   {  "int": "10"  }
-                                                                   ]
-                                                                   },
-                                                                   {
-                                                                   "prim": "DIG",
-                                                                   "args": [
-
-                                                                   {  "int": "4"  }
-                                                                   ]
-                                                                   },
-                                                                   {  "prim": "DUP"  },
-                                                                   {
-                                                                   "prim": "DUG",
-                                                                   "args": [
-
-                                                                   {  "int": "5"  }
-                                                                   ]
-                                                                   },
-                                                                   {  "prim": "GET"  },
-                                                                   {
-                                                                   "prim": "IF_NONE",
-                                                                   "args": [
-
-                                                                   [  {
-                                                                   "prim": "PUSH",
-                                                                   "args": [
-
-                                                                   {  "prim": "string"  },
-                                                                   {  "string": "NotFound"  }
-                                                                   ]
-                                                                   },
-                                                                   {  "prim": "FAILWITH"  }  ],
-                                                                   [    ]
-                                                                   ]
-                                                                   },
-                                                                   {
-                                                                   "prim": "CAR",
-                                                                   "args": [
-
-                                                                   {  "int": "0"  }
-                                                                   ]
-                                                                   },
-                                                                   {
-                                                                   "prim": "DIG",
-                                                                   "args": [
-
-                                                                   {  "int": "1"  }
-                                                                   ]
-                                                                   },
-                                                                   {  "prim": "DUP"  },
-                                                                   {
-                                                                   "prim": "DUG",
-                                                                   "args": [
-
-                                                                   {  "int": "2"  }
-                                                                   ]
-                                                                   },
-                                                                   {  "prim": "MEM"  },
-                                                                   {
-                                                                   "prim": "IF",
-                                                                   "args": [
-
-                                                                   [  {
-                                                                   "prim": "DIG",
-                                                                   "args": [
-
-                                                                   {  "int": "10"  }
-                                                                   ]
-                                                                   },
-                                                                   {  "prim": "DUP"  },
-                                                                   {
-                                                                   "prim": "DUG",
-                                                                   "args": [
-
-                                                                   {  "int": "11"  }
-                                                                   ]
-                                                                   },
-                                                                   {
-                                                                   "prim": "DIG",
-                                                                   "args": [
-
-                                                                   {  "int": "11"  }
-                                                                   ]
-                                                                   },
-                                                                   {  "prim": "DUP"  },
-                                                                   {
-                                                                   "prim": "DUG",
-                                                                   "args": [
-
-                                                                   {  "int": "12"  }
-                                                                   ]
-                                                                   },
-                                                                   {
-                                                                   "prim": "DIG",
-                                                                   "args": [
-
-                                                                   {  "int": "2"  }
-                                                                   ]
-                                                                   },
-                                                                   {  "prim": "DUP"  },
-                                                                   {
-                                                                   "prim": "DUG",
-                                                                   "args": [
-
-                                                                   {  "int": "3"  }
-                                                                   ]
-                                                                   },
-                                                                   {  "prim": "GET"  },
-                                                                   {
-                                                                   "prim": "IF_NONE",
-                                                                   "args": [
-
-                                                                   [  {
-                                                                   "prim": "PUSH",
-                                                                   "args": [
-
-                                                                   {  "prim": "string"  },
-                                                                   {  "string": "NotFound"  }
-                                                                   ]
-                                                                   },
-                                                                   {  "prim": "FAILWITH"  }  ],
-                                                                   [    ]
-                                                                   ]
-                                                                   },
-                                                                   {  "prim": "UNPAIR"  },
-                                                                   {  "prim": "SWAP"  },
-                                                                   {
-                                                                   "prim": "DROP",
-                                                                   "args": [
-
-                                                                   {  "int": "1"  }
-                                                                   ]
-                                                                   },
-                                                                   {
-                                                                   "prim": "DIG",
-                                                                   "args": [
-
-                                                                   {  "int": "4"  }
-                                                                   ]
-                                                                   },
-                                                                   {  "prim": "DUP"  },
-                                                                   {
-                                                                   "prim": "DUG",
-                                                                   "args": [
-
-                                                                   {  "int": "5"  }
-                                                                   ]
-                                                                   },
-                                                                   {  "prim": "SOME"  },
-                                                                   {  "prim": "SWAP"  },
-                                                                   {  "prim": "PAIR"  },
-                                                                   {  "prim": "SOME"  },
-                                                                   {
-                                                                   "prim": "DIG",
-                                                                   "args": [
-
-                                                                   {  "int": "2"  }
-                                                                   ]
-                                                                   },
-                                                                   {  "prim": "DUP"  },
-                                                                   {
-                                                                   "prim": "DUG",
-                                                                   "args": [
-
-                                                                   {  "int": "3"  }
-                                                                   ]
-                                                                   },
-                                                                   {  "prim": "UPDATE"  },
-                                                                   {
-                                                                   "prim": "DIP",
-                                                                   "args": [
-
-                                                                   {  "int": "1"  },
-                                                                   [  {
-                                                                   "prim": "DIG",
-                                                                   "args": [
-
-                                                                   {  "int": "10"  }
-                                                                   ]
-                                                                   },
-                                                                   {
-                                                                   "prim": "DROP",
-                                                                   "args": [
-
-                                                                   {  "int": "1"  }
-                                                                   ]
-                                                                   }  ]
-                                                                   ]
-                                                                   },
-                                                                   {
-                                                                   "prim": "DUG",
-                                                                   "args": [
-
-                                                                   {  "int": "10"  }
-                                                                   ]
-                                                                   }  ],
-                                                                   [  {  "prim": "DUP"  },
-                                                                   {
-                                                                   "prim": "PUSH",
-                                                                   "args": [
-
-                                                                   {  "prim": "string"  },
-                                                                   {  "string": "KeyNotFound"  }
-                                                                   ]
-                                                                   },
-                                                                   {  "prim": "PAIR"  },
-                                                                   {  "prim": "FAILWITH"  }  ]
-                                                                   ]
-                                                                   }  ],
-                                                                   [  {
-                                                                   "prim": "DIG",
-                                                                   "args": [
-
-                                                                   {  "int": "10"  }
-                                                                   ]
-                                                                   },
-                                                                   {  "prim": "DUP"  },
-                                                                   {
-                                                                   "prim": "DUG",
-                                                                   "args": [
-
-                                                                   {  "int": "11"  }
-                                                                   ]
-                                                                   },
-                                                                   {
-                                                                   "prim": "DIG",
-                                                                   "args": [
-
-                                                                   {  "int": "1"  }
-                                                                   ]
-                                                                   },
-                                                                   {  "prim": "DUP"  },
-                                                                   {
-                                                                   "prim": "DUG",
-                                                                   "args": [
-
-                                                                   {  "int": "2"  }
-                                                                   ]
-                                                                   },
-                                                                   {  "prim": "MEM"  },
-                                                                   {
-                                                                   "prim": "IF",
-                                                                   "args": [
-
-                                                                   [  {
-                                                                   "prim": "PUSH",
-                                                                   "args": [
-
-                                                                   {  "prim": "string"  },
-                                                                   {  "string": "KeyExists"  }
-                                                                   ]
-                                                                   },
-                                                                   {  "prim": "FAILWITH"  }  ],
-                                                                   [  {
-                                                                   "prim": "DIG",
-                                                                   "args": [
-
-                                                                   {  "int": "10"  }
-                                                                   ]
-                                                                   },
-                                                                   {  "prim": "DUP"  },
-                                                                   {
-                                                                   "prim": "DUG",
-                                                                   "args": [
-
-                                                                   {  "int": "11"  }
-                                                                   ]
-                                                                   },
-                                                                   {
-                                                                   "prim": "DIG",
-                                                                   "args": [
-
-                                                                   {  "int": "3"  }
-                                                                   ]
-                                                                   },
-                                                                   {  "prim": "DUP"  },
-                                                                   {
-                                                                   "prim": "DUG",
-                                                                   "args": [
-
-                                                                   {  "int": "4"  }
-                                                                   ]
-                                                                   },
-                                                                   {  "prim": "SOME"  },
-                                                                   {  "prim": "NOW"  },
-                                                                   {  "prim": "PAIR"  },
-                                                                   {  "prim": "SOME"  },
-                                                                   {
-                                                                   "prim": "DIG",
-                                                                   "args": [
-
-                                                                   {  "int": "2"  }
-                                                                   ]
-                                                                   },
-                                                                   {  "prim": "DUP"  },
-                                                                   {
-                                                                   "prim": "DUG",
-                                                                   "args": [
-
-                                                                   {  "int": "3"  }
-                                                                   ]
-                                                                   },
-                                                                   {  "prim": "UPDATE"  },
-                                                                   {
-                                                                   "prim": "DIP",
-                                                                   "args": [
-
-                                                                   {  "int": "1"  },
-                                                                   [  {
-                                                                   "prim": "DIG",
-                                                                   "args": [
-
-                                                                   {  "int": "10"  }
-                                                                   ]
-                                                                   },
-                                                                   {
-                                                                   "prim": "DROP",
-                                                                   "args": [
-
-                                                                   {  "int": "1"  }
-                                                                   ]
-                                                                   }  ]
-                                                                   ]
-                                                                   },
-                                                                   {
-                                                                   "prim": "DUG",
-                                                                   "args": [
-
-                                                                   {  "int": "10"  }
-                                                                   ]
-                                                                   }  ]
-                                                                   ]
-                                                                   },
-                                                                   {
-                                                                   "prim": "DIG",
-                                                                   "args": [
-
-                                                                   {  "int": "9"  }
-                                                                   ]
-                                                                   },
-                                                                   {  "prim": "DUP"  },
-                                                                   {
-                                                                   "prim": "DUG",
-                                                                   "args": [
-
-                                                                   {  "int": "10"  }
-                                                                   ]
-                                                                   },
-                                                                   {
-                                                                   "prim": "DIG",
-                                                                   "args": [
-
-                                                                   {  "int": "10"  }
-                                                                   ]
-                                                                   },
-                                                                   {  "prim": "DUP"  },
-                                                                   {
-                                                                   "prim": "DUG",
-                                                                   "args": [
-
-                                                                   {  "int": "11"  }
-                                                                   ]
-                                                                   },
-                                                                   {
-                                                                   "prim": "DIG",
-                                                                   "args": [
-
-                                                                   {  "int": "5"  }
-                                                                   ]
-                                                                   },
-                                                                   {  "prim": "DUP"  },
-                                                                   {
-                                                                   "prim": "DUG",
-                                                                   "args": [
-
-                                                                   {  "int": "6"  }
-                                                                   ]
-                                                                   },
-                                                                   {  "prim": "GET"  },
-                                                                   {
-                                                                   "prim": "IF_NONE",
-                                                                   "args": [
-
-                                                                   [  {
-                                                                   "prim": "PUSH",
-                                                                   "args": [
-
-                                                                   {  "prim": "string"  },
-                                                                   {  "string": "NotFound"  }
-                                                                   ]
-                                                                   },
-                                                                   {  "prim": "FAILWITH"  }  ],
-                                                                   [    ]
-                                                                   ]
-                                                                   },
-                                                                   {  "prim": "UNPAIR"  },
-                                                                   {
-                                                                   "prim": "DROP",
-                                                                   "args": [
-
-                                                                   {  "int": "1"  }
-                                                                   ]
-                                                                   },
-                                                                   {
-                                                                   "prim": "DIG",
-                                                                   "args": [
-
-                                                                   {  "int": "11"  }
-                                                                   ]
-                                                                   },
-                                                                   {  "prim": "DUP"  },
-                                                                   {
-                                                                   "prim": "DUG",
-                                                                   "args": [
-
-                                                                   {  "int": "12"  }
-                                                                   ]
-                                                                   },
-                                                                   {
-                                                                   "prim": "DIG",
-                                                                   "args": [
-
-                                                                   {  "int": "6"  }
-                                                                   ]
-                                                                   },
-                                                                   {  "prim": "DUP"  },
-                                                                   {
-                                                                   "prim": "DUG",
-                                                                   "args": [
-
-                                                                   {  "int": "7"  }
-                                                                   ]
-                                                                   },
-                                                                   {  "prim": "GET"  },
-                                                                   {
-                                                                   "prim": "IF_NONE",
-                                                                   "args": [
-
-                                                                   [  {
-                                                                   "prim": "PUSH",
-                                                                   "args": [
-
-                                                                   {  "prim": "string"  },
-                                                                   {  "string": "NotFound"  }
-                                                                   ]
-                                                                   },
-                                                                   {  "prim": "FAILWITH"  }  ],
-                                                                   [    ]
-                                                                   ]
-                                                                   },
-                                                                   {
-                                                                   "prim": "CAR",
-                                                                   "args": [
-
-                                                                   {  "int": "0"  }
-                                                                   ]
-                                                                   },
-                                                                   {
-                                                                   "prim": "PUSH",
-                                                                   "args": [
-
-                                                                   {  "prim": "bool"  },
-                                                                   {  "prim": "True"  }
-                                                                   ]
-                                                                   },
-                                                                   {
-                                                                   "prim": "DIG",
-                                                                   "args": [
-
-                                                                   {  "int": "4"  }
-                                                                   ]
-                                                                   },
-                                                                   {  "prim": "DUP"  },
-                                                                   {
-                                                                   "prim": "DUG",
-                                                                   "args": [
-
-                                                                   {  "int": "5"  }
-                                                                   ]
-                                                                   },
-                                                                   {  "prim": "UPDATE"  },
-                                                                   {  "prim": "PAIR"  },
-                                                                   {  "prim": "SOME"  },
-                                                                   {
-                                                                   "prim": "DIG",
-                                                                   "args": [
-
-                                                                   {  "int": "5"  }
-                                                                   ]
-                                                                   },
-                                                                   {  "prim": "DUP"  },
-                                                                   {
-                                                                   "prim": "DUG",
-                                                                   "args": [
-
-                                                                   {  "int": "6"  }
-                                                                   ]
-                                                                   },
-                                                                   {  "prim": "UPDATE"  },
-                                                                   {
-                                                                   "prim": "DIP",
-                                                                   "args": [
-
-                                                                   {  "int": "1"  },
-                                                                   [  {
-                                                                   "prim": "DIG",
-                                                                   "args": [
-
-                                                                   {  "int": "9"  }
-                                                                   ]
-                                                                   },
-                                                                   {
-                                                                   "prim": "DROP",
-                                                                   "args": [
-
-                                                                   {  "int": "1"  }
-                                                                   ]
-                                                                   }  ]
-                                                                   ]
-                                                                   },
-                                                                   {
-                                                                   "prim": "DUG",
-                                                                   "args": [
-
-                                                                   {  "int": "9"  }
-                                                                   ]
-                                                                   }  ]
-                                                                   ]
-                                                                }  ]
-                                                              ]
-                                                           }  ],
-                                                           [  {  "prim": "DIG",
+                                                           {  "prim": "PAIR"  },
+                                                           {  "prim": "FAILWITH"  }  ],
+                                                           [  {  "prim": "DUP",
                                                                  "args": [
                                                                    {  "int": "10"  }
                                                                  ]
                                                            },
-                                                           {  "prim": "DUP"  },
-                                                           {  "prim": "DUG",
+                                                           {  "prim": "PUSH",
                                                               "args": [
-                                                                {  "int": "11"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "NONE",
-                                                              "args": [
-                                                                {  "prim": "pair",
-                                                                   "args": [
-
-                                                                   {  "prim": "timestamp"  },
-                                                                   {
-                                                                   "prim": "option",
-                                                                   "args": [
-
-                                                                   {  "prim": "int"  }
-                                                                   ]
-                                                                   }
-                                                                   ]
-                                                                }
-                                                              ]
-                                                           },
-                                                           {  "prim": "DIG",
-                                                              "args": [
-                                                                {  "int": "2"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "DUP"  },
-                                                           {  "prim": "DUG",
-                                                              "args": [
-                                                                {  "int": "3"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "UPDATE"  },
-                                                           {  "prim": "DIP",
-                                                              "args": [
-                                                                {  "int": "1"  },
-                                                                [  {
-                                                                "prim": "DIG",
-                                                                "args": [
-                                                                  {  "int": "10"  }
-                                                                ]
-                                                                },
-                                                                {  "prim": "DROP",
-                                                                   "args": [
-
-                                                                   {  "int": "1"  }
-                                                                   ]
-                                                                }  ]
-                                                              ]
-                                                           },
-                                                           {  "prim": "DUG",
-                                                              "args": [
-                                                                {  "int": "10"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "DIG",
-                                                              "args": [
-                                                                {  "int": "9"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "DUP"  },
-                                                           {  "prim": "DUG",
-                                                              "args": [
-                                                                {  "int": "10"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "DIG",
-                                                              "args": [
-                                                                {  "int": "10"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "DUP"  },
-                                                           {  "prim": "DUG",
-                                                              "args": [
-                                                                {  "int": "11"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "DIG",
-                                                              "args": [
-                                                                {  "int": "5"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "DUP"  },
-                                                           {  "prim": "DUG",
-                                                              "args": [
-                                                                {  "int": "6"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "GET"  },
-                                                           {  "prim": "IF_NONE",
-                                                              "args": [
-                                                                [  {
-                                                                "prim": "PUSH",
-                                                                "args": [
-                                                                  {  "prim": "string"  },
-                                                                  {  "string": "NotFound"  }
-                                                                ]
-                                                                },
-                                                                {  "prim": "FAILWITH"  }  ],
-                                                                [    ]
-                                                              ]
-                                                           },
-                                                           {  "prim": "UNPAIR"  },
-                                                           {  "prim": "DROP",
-                                                              "args": [
-                                                                {  "int": "1"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "DIG",
-                                                              "args": [
-                                                                {  "int": "11"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "DUP"  },
-                                                           {  "prim": "DUG",
-                                                              "args": [
-                                                                {  "int": "12"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "DIG",
-                                                              "args": [
-                                                                {  "int": "6"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "DUP"  },
-                                                           {  "prim": "DUG",
-                                                              "args": [
-                                                                {  "int": "7"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "GET"  },
-                                                           {  "prim": "IF_NONE",
-                                                              "args": [
-                                                                [  {
-                                                                "prim": "PUSH",
-                                                                "args": [
-                                                                  {  "prim": "string"  },
-                                                                  {  "string": "NotFound"  }
-                                                                ]
-                                                                },
-                                                                {  "prim": "FAILWITH"  }  ],
-                                                                [    ]
-                                                              ]
-                                                           },
-                                                           {  "prim": "CAR",
-                                                              "args": [
+                                                                {  "prim": "nat"  },
                                                                 {  "int": "0"  }
                                                               ]
                                                            },
-                                                           {  "prim": "PUSH",
-                                                              "args": [
-                                                                {  "prim": "bool"  },
-                                                                {  "prim": "False"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "DIG",
+                                                           {  "prim": "DUP",
                                                               "args": [
                                                                 {  "int": "4"  }
                                                               ]
                                                            },
-                                                           {  "prim": "DUP"  },
-                                                           {  "prim": "DUG",
+                                                           {  "prim": "SOME"  },
+                                                           {  "prim": "PAIR"  },
+                                                           {  "prim": "EMPTY_SET",
                                                               "args": [
-                                                                {  "int": "5"  }
+                                                                {  "prim": "bytes"  }
                                                               ]
                                                            },
-                                                           {  "prim": "UPDATE"  },
                                                            {  "prim": "PAIR"  },
                                                            {  "prim": "SOME"  },
-                                                           {  "prim": "DIG",
+                                                           {  "prim": "DUP",
                                                               "args": [
                                                                 {  "int": "5"  }
-                                                              ]
-                                                           },
-                                                           {  "prim": "DUP"  },
-                                                           {  "prim": "DUG",
-                                                              "args": [
-                                                                {  "int": "6"  }
                                                               ]
                                                            },
                                                            {  "prim": "UPDATE"  },
@@ -7317,6 +4858,1090 @@ export const nft_private_code : any =
                                                               ]
                                                            }  ]
                                                          ]
+                                                      }  ]
+                                                    ]
+                                                 }  ],
+                                                 [  {  "prim": "SENDER"  },
+                                                 {  "prim": "DUP",
+                                                    "args": [
+                                                      {  "int": "5"  }
+                                                    ]
+                                                 },
+                                                 {  "prim": "COMPARE"  },
+                                                 {  "prim": "NEQ"  },
+                                                 {  "prim": "IF",
+                                                    "args": [
+                                                      [  {  "prim": "PUSH",
+                                                            "args": [
+                                                              {  "prim": "string"  },
+                                                              {  "string": "NOT_PERMIT_ISSUER"  }
+                                                            ]
+                                                      },
+                                                      {  "prim": "FAILWITH"  }  ],
+                                                      [    ]
+                                                    ]
+                                                 },
+                                                 {  "prim": "DUP",
+                                                    "args": [
+                                                      {  "int": "18"  }
+                                                    ]
+                                                 },
+                                                 {  "prim": "DUP",
+                                                    "args": [
+                                                      {  "int": "20"  }
+                                                    ]
+                                                 },
+                                                 {  "prim": "PUSH",
+                                                    "args": [
+                                                      {  "prim": "string"  },
+                                                      {  "string": "PERMIT_MISSING"  }
+                                                    ]
+                                                 },
+                                                 {  "prim": "PAIR"  },
+                                                 {  "prim": "DUP",
+                                                    "args": [
+                                                      {  "int": "3"  }
+                                                    ]
+                                                 },
+                                                 {  "prim": "PAIR"  },
+                                                 {  "prim": "DUP",
+                                                    "args": [
+                                                      {  "int": "6"  }
+                                                    ]
+                                                 },
+                                                 {  "prim": "PAIR"  },
+                                                 {  "prim": "DUP",
+                                                    "args": [
+                                                      {  "int": "13"  }
+                                                    ]
+                                                 },
+                                                 {  "prim": "PAIR"  },
+                                                 {  "prim": "DUP",
+                                                    "args": [
+                                                      {  "int": "12"  }
+                                                    ]
+                                                 },
+                                                 {  "prim": "PAIR"  },
+                                                 {  "prim": "DUP",
+                                                    "args": [
+                                                      {  "int": "16"  }
+                                                    ]
+                                                 },
+                                                 {  "prim": "PAIR"  },
+                                                 {  "prim": "EXEC"  },
+                                                 {  "prim": "IF",
+                                                    "args": [
+                                                      [  {  "prim": "DUP",
+                                                            "args": [
+                                                              {  "int": "10"  }
+                                                            ]
+                                                      },
+                                                      {  "prim": "NONE",
+                                                         "args": [
+                                                           {  "prim": "pair",
+                                                              "args": [
+                                                                {  "prim": "timestamp"  },
+                                                                {  "prim": "option",
+                                                                   "args": [
+
+                                                                   {  "prim": "int"  }
+                                                                   ]
+                                                                }
+                                                              ]
+                                                           }
+                                                         ]
+                                                      },
+                                                      {  "prim": "DUP",
+                                                         "args": [
+                                                           {  "int": "3"  }
+                                                         ]
+                                                      },
+                                                      {  "prim": "UPDATE"  },
+                                                      {  "prim": "DIP",
+                                                         "args": [
+                                                           {  "int": "1"  },
+                                                           [  {  "prim": "DIG",
+                                                                 "args": [
+                                                                   {  "int": "9"  }
+                                                                 ]
+                                                           },
+                                                           {  "prim": "DROP",
+                                                              "args": [
+                                                                {  "int": "1"  }
+                                                              ]
+                                                           }  ]
+                                                         ]
+                                                      },
+                                                      {  "prim": "DUG",
+                                                         "args": [
+                                                           {  "int": "9"  }
+                                                         ]
+                                                      },
+                                                      {  "prim": "DUP",
+                                                         "args": [
+                                                           {  "int": "11"  }
+                                                         ]
+                                                      },
+                                                      {  "prim": "DUP",
+                                                         "args": [
+                                                           {  "int": "12"  }
+                                                         ]
+                                                      },
+                                                      {  "prim": "DUP",
+                                                         "args": [
+                                                           {  "int": "6"  }
+                                                         ]
+                                                      },
+                                                      {  "prim": "GET"  },
+                                                      {  "prim": "IF_NONE",
+                                                         "args": [
+                                                           [  {  "prim": "PUSH",
+                                                                 "args": [
+                                                                   {  "prim": "string"  },
+                                                                   {  "string": "permit"  }
+                                                                 ]
+                                                           },
+                                                           {  "prim": "PUSH",
+                                                              "args": [
+                                                                {  "prim": "string"  },
+                                                                {  "string": "AssetNotFound"  }
+                                                              ]
+                                                           },
+                                                           {  "prim": "PAIR"  },
+                                                           {  "prim": "FAILWITH"  }  ],
+                                                           [    ]
+                                                         ]
+                                                      },
+                                                      {  "prim": "UNPAIR"  },
+                                                      {  "prim": "DROP",
+                                                         "args": [
+                                                           {  "int": "1"  }
+                                                         ]
+                                                      },
+                                                      {  "prim": "DUP",
+                                                         "args": [
+                                                           {  "int": "13"  }
+                                                         ]
+                                                      },
+                                                      {  "prim": "DUP",
+                                                         "args": [
+                                                           {  "int": "7"  }
+                                                         ]
+                                                      },
+                                                      {  "prim": "GET"  },
+                                                      {  "prim": "IF_NONE",
+                                                         "args": [
+                                                           [  {  "prim": "PUSH",
+                                                                 "args": [
+                                                                   {  "prim": "string"  },
+                                                                   {  "string": "permit"  }
+                                                                 ]
+                                                           },
+                                                           {  "prim": "PUSH",
+                                                              "args": [
+                                                                {  "prim": "string"  },
+                                                                {  "string": "AssetNotFound"  }
+                                                              ]
+                                                           },
+                                                           {  "prim": "PAIR"  },
+                                                           {  "prim": "FAILWITH"  }  ],
+                                                           [    ]
+                                                         ]
+                                                      },
+                                                      {  "prim": "CAR"  },
+                                                      {  "prim": "PUSH",
+                                                         "args": [
+                                                           {  "prim": "bool"  },
+                                                           {  "prim": "False"  }
+                                                         ]
+                                                      },
+                                                      {  "prim": "DUP",
+                                                         "args": [
+                                                           {  "int": "5"  }
+                                                         ]
+                                                      },
+                                                      {  "prim": "UPDATE"  },
+                                                      {  "prim": "PAIR"  },
+                                                      {  "prim": "SOME"  },
+                                                      {  "prim": "DUP",
+                                                         "args": [
+                                                           {  "int": "6"  }
+                                                         ]
+                                                      },
+                                                      {  "prim": "UPDATE"  },
+                                                      {  "prim": "DIP",
+                                                         "args": [
+                                                           {  "int": "1"  },
+                                                           [  {  "prim": "DIG",
+                                                                 "args": [
+                                                                   {  "int": "10"  }
+                                                                 ]
+                                                           },
+                                                           {  "prim": "DROP",
+                                                              "args": [
+                                                                {  "int": "1"  }
+                                                              ]
+                                                           }  ]
+                                                         ]
+                                                      },
+                                                      {  "prim": "DUG",
+                                                         "args": [
+                                                           {  "int": "10"  }
+                                                         ]
+                                                      }  ],
+                                                      [    ]
+                                                    ]
+                                                 },
+                                                 {  "prim": "DUP",
+                                                    "args": [
+                                                      {  "int": "11"  }
+                                                    ]
+                                                 },
+                                                 {  "prim": "DUP",
+                                                    "args": [
+                                                      {  "int": "5"  }
+                                                    ]
+                                                 },
+                                                 {  "prim": "MEM"  },
+                                                 {  "prim": "IF",
+                                                    "args": [
+                                                      [  {  "prim": "DUP",
+                                                            "args": [
+                                                              {  "int": "19"  }
+                                                            ]
+                                                      },
+                                                      {  "prim": "DUP",
+                                                         "args": [
+                                                           {  "int": "2"  }
+                                                         ]
+                                                      },
+                                                      {  "prim": "DUP",
+                                                         "args": [
+                                                           {  "int": "12"  }
+                                                         ]
+                                                      },
+                                                      {  "prim": "PAIR"  },
+                                                      {  "prim": "DUP",
+                                                         "args": [
+                                                           {  "int": "16"  }
+                                                         ]
+                                                      },
+                                                      {  "prim": "PAIR"  },
+                                                      {  "prim": "EXEC"  },
+                                                      {  "prim": "NOT"  },
+                                                      {  "prim": "IF",
+                                                         "args": [
+                                                           [  {  "prim": "PUSH",
+                                                                 "args": [
+                                                                   {  "prim": "int"  },
+                                                                   {  "int": "0"  }
+                                                                 ]
+                                                           },
+                                                           {  "prim": "DUP",
+                                                              "args": [
+                                                                {  "int": "4"  }
+                                                              ]
+                                                           },
+                                                           {  "prim": "COMPARE"  },
+                                                           {  "prim": "EQ"  },
+                                                           {  "prim": "IF",
+                                                              "args": [
+                                                                [  {
+                                                                "prim": "DUP",
+                                                                "args": [
+                                                                  {  "int": "10"  }
+                                                                ]
+                                                                },
+                                                                {  "prim": "NONE",
+                                                                   "args": [
+
+                                                                   {
+                                                                   "prim": "pair",
+                                                                   "args": [
+
+                                                                   {  "prim": "timestamp"  },
+                                                                   {
+                                                                   "prim": "option",
+                                                                   "args": [
+
+                                                                   {  "prim": "int"  }
+                                                                   ]
+                                                                   }
+                                                                   ]
+                                                                   }
+                                                                   ]
+                                                                },
+                                                                {  "prim": "DUP",
+                                                                   "args": [
+
+                                                                   {  "int": "3"  }
+                                                                   ]
+                                                                },
+                                                                {  "prim": "UPDATE"  },
+                                                                {  "prim": "DIP",
+                                                                   "args": [
+
+                                                                   {  "int": "1"  },
+                                                                   [  {
+                                                                   "prim": "DIG",
+                                                                   "args": [
+
+                                                                   {  "int": "9"  }
+                                                                   ]
+                                                                   },
+                                                                   {
+                                                                   "prim": "DROP",
+                                                                   "args": [
+
+                                                                   {  "int": "1"  }
+                                                                   ]
+                                                                   }  ]
+                                                                   ]
+                                                                },
+                                                                {  "prim": "DUG",
+                                                                   "args": [
+
+                                                                   {  "int": "9"  }
+                                                                   ]
+                                                                },
+                                                                {  "prim": "DUP",
+                                                                   "args": [
+
+                                                                   {  "int": "11"  }
+                                                                   ]
+                                                                },
+                                                                {  "prim": "DUP",
+                                                                   "args": [
+
+                                                                   {  "int": "12"  }
+                                                                   ]
+                                                                },
+                                                                {  "prim": "DUP",
+                                                                   "args": [
+
+                                                                   {  "int": "6"  }
+                                                                   ]
+                                                                },
+                                                                {  "prim": "GET"  },
+                                                                {  "prim": "IF_NONE",
+                                                                   "args": [
+
+                                                                   [  {
+                                                                   "prim": "PUSH",
+                                                                   "args": [
+
+                                                                   {  "prim": "string"  },
+                                                                   {  "string": "permit"  }
+                                                                   ]
+                                                                   },
+                                                                   {
+                                                                   "prim": "PUSH",
+                                                                   "args": [
+
+                                                                   {  "prim": "string"  },
+                                                                   {  "string": "AssetNotFound"  }
+                                                                   ]
+                                                                   },
+                                                                   {  "prim": "PAIR"  },
+                                                                   {  "prim": "FAILWITH"  }  ],
+                                                                   [    ]
+                                                                   ]
+                                                                },
+                                                                {  "prim": "UNPAIR"  },
+                                                                {  "prim": "DROP",
+                                                                   "args": [
+
+                                                                   {  "int": "1"  }
+                                                                   ]
+                                                                },
+                                                                {  "prim": "DUP",
+                                                                   "args": [
+
+                                                                   {  "int": "13"  }
+                                                                   ]
+                                                                },
+                                                                {  "prim": "DUP",
+                                                                   "args": [
+
+                                                                   {  "int": "7"  }
+                                                                   ]
+                                                                },
+                                                                {  "prim": "GET"  },
+                                                                {  "prim": "IF_NONE",
+                                                                   "args": [
+
+                                                                   [  {
+                                                                   "prim": "PUSH",
+                                                                   "args": [
+
+                                                                   {  "prim": "string"  },
+                                                                   {  "string": "permit"  }
+                                                                   ]
+                                                                   },
+                                                                   {
+                                                                   "prim": "PUSH",
+                                                                   "args": [
+
+                                                                   {  "prim": "string"  },
+                                                                   {  "string": "AssetNotFound"  }
+                                                                   ]
+                                                                   },
+                                                                   {  "prim": "PAIR"  },
+                                                                   {  "prim": "FAILWITH"  }  ],
+                                                                   [    ]
+                                                                   ]
+                                                                },
+                                                                {  "prim": "CAR"  },
+                                                                {  "prim": "PUSH",
+                                                                   "args": [
+
+                                                                   {  "prim": "bool"  },
+                                                                   {  "prim": "False"  }
+                                                                   ]
+                                                                },
+                                                                {  "prim": "DUP",
+                                                                   "args": [
+
+                                                                   {  "int": "5"  }
+                                                                   ]
+                                                                },
+                                                                {  "prim": "UPDATE"  },
+                                                                {  "prim": "PAIR"  },
+                                                                {  "prim": "SOME"  },
+                                                                {  "prim": "DUP",
+                                                                   "args": [
+
+                                                                   {  "int": "6"  }
+                                                                   ]
+                                                                },
+                                                                {  "prim": "UPDATE"  },
+                                                                {  "prim": "DIP",
+                                                                   "args": [
+
+                                                                   {  "int": "1"  },
+                                                                   [  {
+                                                                   "prim": "DIG",
+                                                                   "args": [
+
+                                                                   {  "int": "10"  }
+                                                                   ]
+                                                                   },
+                                                                   {
+                                                                   "prim": "DROP",
+                                                                   "args": [
+
+                                                                   {  "int": "1"  }
+                                                                   ]
+                                                                   }  ]
+                                                                   ]
+                                                                },
+                                                                {  "prim": "DUG",
+                                                                   "args": [
+
+                                                                   {  "int": "10"  }
+                                                                   ]
+                                                                }  ],
+                                                                [  {
+                                                                "prim": "DUP",
+                                                                "args": [
+                                                                  {  "int": "10"  }
+                                                                ]
+                                                                },
+                                                                {  "prim": "DUP",
+                                                                   "args": [
+
+                                                                   {  "int": "2"  }
+                                                                   ]
+                                                                },
+                                                                {  "prim": "MEM"  },
+                                                                {  "prim": "IF",
+                                                                   "args": [
+
+                                                                   [  {
+                                                                   "prim": "DUP",
+                                                                   "args": [
+
+                                                                   {  "int": "11"  }
+                                                                   ]
+                                                                   },
+                                                                   {
+                                                                   "prim": "DUP",
+                                                                   "args": [
+
+                                                                   {  "int": "5"  }
+                                                                   ]
+                                                                   },
+                                                                   {  "prim": "GET"  },
+                                                                   {
+                                                                   "prim": "IF_NONE",
+                                                                   "args": [
+
+                                                                   [  {
+                                                                   "prim": "PUSH",
+                                                                   "args": [
+
+                                                                   {  "prim": "string"  },
+                                                                   {  "string": "permit"  }
+                                                                   ]
+                                                                   },
+                                                                   {
+                                                                   "prim": "PUSH",
+                                                                   "args": [
+
+                                                                   {  "prim": "string"  },
+                                                                   {  "string": "AssetNotFound"  }
+                                                                   ]
+                                                                   },
+                                                                   {  "prim": "PAIR"  },
+                                                                   {  "prim": "FAILWITH"  }  ],
+                                                                   [    ]
+                                                                   ]
+                                                                   },
+                                                                   {  "prim": "CAR"  },
+                                                                   {
+                                                                   "prim": "DUP",
+                                                                   "args": [
+
+                                                                   {  "int": "2"  }
+                                                                   ]
+                                                                   },
+                                                                   {  "prim": "MEM"  },
+                                                                   {
+                                                                   "prim": "IF",
+                                                                   "args": [
+
+                                                                   [  {
+                                                                   "prim": "DUP",
+                                                                   "args": [
+
+                                                                   {  "int": "10"  }
+                                                                   ]
+                                                                   },
+                                                                   {
+                                                                   "prim": "DUP",
+                                                                   "args": [
+
+                                                                   {  "int": "11"  }
+                                                                   ]
+                                                                   },
+                                                                   {
+                                                                   "prim": "DUP",
+                                                                   "args": [
+
+                                                                   {  "int": "3"  }
+                                                                   ]
+                                                                   },
+                                                                   {  "prim": "GET"  },
+                                                                   {
+                                                                   "prim": "IF_NONE",
+                                                                   "args": [
+
+                                                                   [  {
+                                                                   "prim": "PUSH",
+                                                                   "args": [
+
+                                                                   {  "prim": "string"  },
+                                                                   {  "string": "permit_info"  }
+                                                                   ]
+                                                                   },
+                                                                   {
+                                                                   "prim": "PUSH",
+                                                                   "args": [
+
+                                                                   {  "prim": "string"  },
+                                                                   {  "string": "AssetNotFound"  }
+                                                                   ]
+                                                                   },
+                                                                   {  "prim": "PAIR"  },
+                                                                   {  "prim": "FAILWITH"  }  ],
+                                                                   [    ]
+                                                                   ]
+                                                                   },
+                                                                   {  "prim": "UNPAIR"  },
+                                                                   {  "prim": "SWAP"  },
+                                                                   {
+                                                                   "prim": "DROP",
+                                                                   "args": [
+
+                                                                   {  "int": "1"  }
+                                                                   ]
+                                                                   },
+                                                                   {
+                                                                   "prim": "DUP",
+                                                                   "args": [
+
+                                                                   {  "int": "5"  }
+                                                                   ]
+                                                                   },
+                                                                   {  "prim": "SOME"  },
+                                                                   {  "prim": "SWAP"  },
+                                                                   {  "prim": "PAIR"  },
+                                                                   {  "prim": "SOME"  },
+                                                                   {
+                                                                   "prim": "DUP",
+                                                                   "args": [
+
+                                                                   {  "int": "3"  }
+                                                                   ]
+                                                                   },
+                                                                   {  "prim": "UPDATE"  },
+                                                                   {
+                                                                   "prim": "DIP",
+                                                                   "args": [
+
+                                                                   {  "int": "1"  },
+                                                                   [  {
+                                                                   "prim": "DIG",
+                                                                   "args": [
+
+                                                                   {  "int": "9"  }
+                                                                   ]
+                                                                   },
+                                                                   {
+                                                                   "prim": "DROP",
+                                                                   "args": [
+
+                                                                   {  "int": "1"  }
+                                                                   ]
+                                                                   }  ]
+                                                                   ]
+                                                                   },
+                                                                   {
+                                                                   "prim": "DUG",
+                                                                   "args": [
+
+                                                                   {  "int": "9"  }
+                                                                   ]
+                                                                   }  ],
+                                                                   [  {  "prim": "DUP"  },
+                                                                   {
+                                                                   "prim": "PUSH",
+                                                                   "args": [
+
+                                                                   {  "prim": "string"  },
+                                                                   {  "string": "KeyNotFound"  }
+                                                                   ]
+                                                                   },
+                                                                   {  "prim": "PAIR"  },
+                                                                   {  "prim": "FAILWITH"  }  ]
+                                                                   ]
+                                                                   }  ],
+                                                                   [  {
+                                                                   "prim": "DUP",
+                                                                   "args": [
+
+                                                                   {  "int": "10"  }
+                                                                   ]
+                                                                   },
+                                                                   {
+                                                                   "prim": "DUP",
+                                                                   "args": [
+
+                                                                   {  "int": "2"  }
+                                                                   ]
+                                                                   },
+                                                                   {  "prim": "MEM"  },
+                                                                   {
+                                                                   "prim": "IF",
+                                                                   "args": [
+
+                                                                   [  {
+                                                                   "prim": "PUSH",
+                                                                   "args": [
+
+                                                                   {  "prim": "string"  },
+                                                                   {  "string": "permit_info"  }
+                                                                   ]
+                                                                   },
+                                                                   {
+                                                                   "prim": "PUSH",
+                                                                   "args": [
+
+                                                                   {  "prim": "string"  },
+                                                                   {  "string": "KeyExists"  }
+                                                                   ]
+                                                                   },
+                                                                   {  "prim": "PAIR"  },
+                                                                   {  "prim": "FAILWITH"  }  ],
+                                                                   [  {
+                                                                   "prim": "DUP",
+                                                                   "args": [
+
+                                                                   {  "int": "10"  }
+                                                                   ]
+                                                                   },
+                                                                   {
+                                                                   "prim": "DUP",
+                                                                   "args": [
+
+                                                                   {  "int": "4"  }
+                                                                   ]
+                                                                   },
+                                                                   {  "prim": "SOME"  },
+                                                                   {  "prim": "NOW"  },
+                                                                   {  "prim": "PAIR"  },
+                                                                   {  "prim": "SOME"  },
+                                                                   {
+                                                                   "prim": "DUP",
+                                                                   "args": [
+
+                                                                   {  "int": "3"  }
+                                                                   ]
+                                                                   },
+                                                                   {  "prim": "UPDATE"  },
+                                                                   {
+                                                                   "prim": "DIP",
+                                                                   "args": [
+
+                                                                   {  "int": "1"  },
+                                                                   [  {
+                                                                   "prim": "DIG",
+                                                                   "args": [
+
+                                                                   {  "int": "9"  }
+                                                                   ]
+                                                                   },
+                                                                   {
+                                                                   "prim": "DROP",
+                                                                   "args": [
+
+                                                                   {  "int": "1"  }
+                                                                   ]
+                                                                   }  ]
+                                                                   ]
+                                                                   },
+                                                                   {
+                                                                   "prim": "DUG",
+                                                                   "args": [
+
+                                                                   {  "int": "9"  }
+                                                                   ]
+                                                                   }  ]
+                                                                   ]
+                                                                   },
+                                                                   {
+                                                                   "prim": "DUP",
+                                                                   "args": [
+
+                                                                   {  "int": "11"  }
+                                                                   ]
+                                                                   },
+                                                                   {
+                                                                   "prim": "DUP",
+                                                                   "args": [
+
+                                                                   {  "int": "12"  }
+                                                                   ]
+                                                                   },
+                                                                   {
+                                                                   "prim": "DUP",
+                                                                   "args": [
+
+                                                                   {  "int": "6"  }
+                                                                   ]
+                                                                   },
+                                                                   {  "prim": "GET"  },
+                                                                   {
+                                                                   "prim": "IF_NONE",
+                                                                   "args": [
+
+                                                                   [  {
+                                                                   "prim": "PUSH",
+                                                                   "args": [
+
+                                                                   {  "prim": "string"  },
+                                                                   {  "string": "permit"  }
+                                                                   ]
+                                                                   },
+                                                                   {
+                                                                   "prim": "PUSH",
+                                                                   "args": [
+
+                                                                   {  "prim": "string"  },
+                                                                   {  "string": "AssetNotFound"  }
+                                                                   ]
+                                                                   },
+                                                                   {  "prim": "PAIR"  },
+                                                                   {  "prim": "FAILWITH"  }  ],
+                                                                   [    ]
+                                                                   ]
+                                                                   },
+                                                                   {  "prim": "UNPAIR"  },
+                                                                   {
+                                                                   "prim": "DROP",
+                                                                   "args": [
+
+                                                                   {  "int": "1"  }
+                                                                   ]
+                                                                   },
+                                                                   {
+                                                                   "prim": "DUP",
+                                                                   "args": [
+
+                                                                   {  "int": "13"  }
+                                                                   ]
+                                                                   },
+                                                                   {
+                                                                   "prim": "DUP",
+                                                                   "args": [
+
+                                                                   {  "int": "7"  }
+                                                                   ]
+                                                                   },
+                                                                   {  "prim": "GET"  },
+                                                                   {
+                                                                   "prim": "IF_NONE",
+                                                                   "args": [
+
+                                                                   [  {
+                                                                   "prim": "PUSH",
+                                                                   "args": [
+
+                                                                   {  "prim": "string"  },
+                                                                   {  "string": "permit"  }
+                                                                   ]
+                                                                   },
+                                                                   {
+                                                                   "prim": "PUSH",
+                                                                   "args": [
+
+                                                                   {  "prim": "string"  },
+                                                                   {  "string": "AssetNotFound"  }
+                                                                   ]
+                                                                   },
+                                                                   {  "prim": "PAIR"  },
+                                                                   {  "prim": "FAILWITH"  }  ],
+                                                                   [    ]
+                                                                   ]
+                                                                   },
+                                                                   {  "prim": "CAR"  },
+                                                                   {
+                                                                   "prim": "PUSH",
+                                                                   "args": [
+
+                                                                   {  "prim": "bool"  },
+                                                                   {  "prim": "True"  }
+                                                                   ]
+                                                                   },
+                                                                   {
+                                                                   "prim": "DUP",
+                                                                   "args": [
+
+                                                                   {  "int": "5"  }
+                                                                   ]
+                                                                   },
+                                                                   {  "prim": "UPDATE"  },
+                                                                   {  "prim": "PAIR"  },
+                                                                   {  "prim": "SOME"  },
+                                                                   {
+                                                                   "prim": "DUP",
+                                                                   "args": [
+
+                                                                   {  "int": "6"  }
+                                                                   ]
+                                                                   },
+                                                                   {  "prim": "UPDATE"  },
+                                                                   {
+                                                                   "prim": "DIP",
+                                                                   "args": [
+
+                                                                   {  "int": "1"  },
+                                                                   [  {
+                                                                   "prim": "DIG",
+                                                                   "args": [
+
+                                                                   {  "int": "10"  }
+                                                                   ]
+                                                                   },
+                                                                   {
+                                                                   "prim": "DROP",
+                                                                   "args": [
+
+                                                                   {  "int": "1"  }
+                                                                   ]
+                                                                   }  ]
+                                                                   ]
+                                                                   },
+                                                                   {
+                                                                   "prim": "DUG",
+                                                                   "args": [
+
+                                                                   {  "int": "10"  }
+                                                                   ]
+                                                                   }  ]
+                                                                   ]
+                                                                }  ]
+                                                              ]
+                                                           }  ],
+                                                           [  {  "prim": "DUP",
+                                                                 "args": [
+                                                                   {  "int": "10"  }
+                                                                 ]
+                                                           },
+                                                           {  "prim": "NONE",
+                                                              "args": [
+                                                                {  "prim": "pair",
+                                                                   "args": [
+
+                                                                   {  "prim": "timestamp"  },
+                                                                   {
+                                                                   "prim": "option",
+                                                                   "args": [
+
+                                                                   {  "prim": "int"  }
+                                                                   ]
+                                                                   }
+                                                                   ]
+                                                                }
+                                                              ]
+                                                           },
+                                                           {  "prim": "DUP",
+                                                              "args": [
+                                                                {  "int": "3"  }
+                                                              ]
+                                                           },
+                                                           {  "prim": "UPDATE"  },
+                                                           {  "prim": "DIP",
+                                                              "args": [
+                                                                {  "int": "1"  },
+                                                                [  {
+                                                                "prim": "DIG",
+                                                                "args": [
+                                                                  {  "int": "9"  }
+                                                                ]
+                                                                },
+                                                                {  "prim": "DROP",
+                                                                   "args": [
+
+                                                                   {  "int": "1"  }
+                                                                   ]
+                                                                }  ]
+                                                              ]
+                                                           },
+                                                           {  "prim": "DUG",
+                                                              "args": [
+                                                                {  "int": "9"  }
+                                                              ]
+                                                           },
+                                                           {  "prim": "DUP",
+                                                              "args": [
+                                                                {  "int": "11"  }
+                                                              ]
+                                                           },
+                                                           {  "prim": "DUP",
+                                                              "args": [
+                                                                {  "int": "12"  }
+                                                              ]
+                                                           },
+                                                           {  "prim": "DUP",
+                                                              "args": [
+                                                                {  "int": "6"  }
+                                                              ]
+                                                           },
+                                                           {  "prim": "GET"  },
+                                                           {  "prim": "IF_NONE",
+                                                              "args": [
+                                                                [  {
+                                                                "prim": "PUSH",
+                                                                "args": [
+                                                                  {  "prim": "string"  },
+                                                                  {  "string": "permit"  }
+                                                                ]
+                                                                },
+                                                                {  "prim": "PUSH",
+                                                                   "args": [
+
+                                                                   {  "prim": "string"  },
+                                                                   {  "string": "AssetNotFound"  }
+                                                                   ]
+                                                                },
+                                                                {  "prim": "PAIR"  },
+                                                                {  "prim": "FAILWITH"  }  ],
+                                                                [    ]
+                                                              ]
+                                                           },
+                                                           {  "prim": "UNPAIR"  },
+                                                           {  "prim": "DROP",
+                                                              "args": [
+                                                                {  "int": "1"  }
+                                                              ]
+                                                           },
+                                                           {  "prim": "DUP",
+                                                              "args": [
+                                                                {  "int": "13"  }
+                                                              ]
+                                                           },
+                                                           {  "prim": "DUP",
+                                                              "args": [
+                                                                {  "int": "7"  }
+                                                              ]
+                                                           },
+                                                           {  "prim": "GET"  },
+                                                           {  "prim": "IF_NONE",
+                                                              "args": [
+                                                                [  {
+                                                                "prim": "PUSH",
+                                                                "args": [
+                                                                  {  "prim": "string"  },
+                                                                  {  "string": "permit"  }
+                                                                ]
+                                                                },
+                                                                {  "prim": "PUSH",
+                                                                   "args": [
+
+                                                                   {  "prim": "string"  },
+                                                                   {  "string": "AssetNotFound"  }
+                                                                   ]
+                                                                },
+                                                                {  "prim": "PAIR"  },
+                                                                {  "prim": "FAILWITH"  }  ],
+                                                                [    ]
+                                                              ]
+                                                           },
+                                                           {  "prim": "CAR"  },
+                                                           {  "prim": "PUSH",
+                                                              "args": [
+                                                                {  "prim": "bool"  },
+                                                                {  "prim": "False"  }
+                                                              ]
+                                                           },
+                                                           {  "prim": "DUP",
+                                                              "args": [
+                                                                {  "int": "5"  }
+                                                              ]
+                                                           },
+                                                           {  "prim": "UPDATE"  },
+                                                           {  "prim": "PAIR"  },
+                                                           {  "prim": "SOME"  },
+                                                           {  "prim": "DUP",
+                                                              "args": [
+                                                                {  "int": "6"  }
+                                                              ]
+                                                           },
+                                                           {  "prim": "UPDATE"  },
+                                                           {  "prim": "DIP",
+                                                              "args": [
+                                                                {  "int": "1"  },
+                                                                [  {
+                                                                "prim": "DIG",
+                                                                "args": [
+                                                                  {  "int": "10"  }
+                                                                ]
+                                                                },
+                                                                {  "prim": "DROP",
+                                                                   "args": [
+
+                                                                   {  "int": "1"  }
+                                                                   ]
+                                                                }  ]
+                                                              ]
+                                                           },
+                                                           {  "prim": "DUG",
+                                                              "args": [
+                                                                {  "int": "10"  }
+                                                              ]
+                                                           }  ]
+                                                         ]
                                                       }  ],
                                                       [    ]
                                                     ]
@@ -7333,44 +5958,21 @@ export const nft_private_code : any =
                                                  {  "int": "3"  }
                                                ]
                                             },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
+                                            {  "prim": "PAIR",
+                                               "args": [
+                                                 {  "int": "12"  }
+                                               ]
+                                            },
                                             {  "prim": "DIG",
                                                "args": [
                                                  {  "int": "1"  }
                                                ]
                                             },
                                             {  "prim": "PAIR"  }  ],
-                                            [  {  "prim": "DIG",
+                                            [  {  "prim": "DUP",
                                                   "args": [
-                                                    {  "int": "2"  }
+                                                    {  "int": "12"  }
                                                   ]
-                                            },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
-                                               "args": [
-                                                 {  "int": "3"  }
-                                               ]
                                             },
                                             {  "prim": "IF",
                                                "args": [
@@ -7384,49 +5986,31 @@ export const nft_private_code : any =
                                                  [    ]
                                                ]
                                             },
-                                            {  "prim": "DIG",
-                                               "args": [
-                                                 {  "int": "17"  }
-                                               ]
-                                            },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
+                                            {  "prim": "DUP",
                                                "args": [
                                                  {  "int": "18"  }
                                                ]
                                             },
-                                            {  "prim": "DIG",
-                                               "args": [
-                                                 {  "int": "1"  }
-                                               ]
-                                            },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
+                                            {  "prim": "DUP",
                                                "args": [
                                                  {  "int": "2"  }
                                                ]
                                             },
-                                            {  "prim": "DIG",
-                                               "args": [
-                                                 {  "int": "11"  }
-                                               ]
-                                            },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
-                                               "args": [
-                                                 {  "int": "12"  }
-                                               ]
-                                            },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "DIG",
+                                            {  "prim": "DUP",
                                                "args": [
                                                  {  "int": "7"  }
                                                ]
                                             },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
+                                            {  "prim": "PAIR"  },
+                                            {  "prim": "DUP",
                                                "args": [
-                                                 {  "int": "8"  }
+                                                 {  "int": "11"  }
+                                               ]
+                                            },
+                                            {  "prim": "PAIR"  },
+                                            {  "prim": "DUP",
+                                               "args": [
+                                                 {  "int": "6"  }
                                                ]
                                             },
                                             {  "prim": "PAIR"  },
@@ -7434,24 +6018,12 @@ export const nft_private_code : any =
                                             {  "prim": "NOT"  },
                                             {  "prim": "IF",
                                                "args": [
-                                                 [  {  "prim": "DIG",
+                                                 [  {  "prim": "DUP",
                                                        "args": [
-                                                         {  "int": "16"  }
+                                                         {  "int": "17"  }
                                                        ]
                                                  },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
-                                                    "args": [
-                                                      {  "int": "17"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DIG",
-                                                    "args": [
-                                                      {  "int": "1"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
+                                                 {  "prim": "DUP",
                                                     "args": [
                                                       {  "int": "2"  }
                                                     ]
@@ -7467,19 +6039,12 @@ export const nft_private_code : any =
                                                  {  "prim": "IF_NONE",
                                                     "args": [
                                                       [    ],
-                                                      [  {  "prim": "DIG",
+                                                      [  {  "prim": "DUP",
                                                             "args": [
-                                                              {  "int": "14"  }
+                                                              {  "int": "15"  }
                                                             ]
                                                       },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
-                                                         "args": [
-                                                           {  "int": "15"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "SELF"  },
-                                                      {  "prim": "ADDRESS"  },
+                                                      {  "prim": "SELF_ADDRESS"  },
                                                       {  "prim": "CONTRACT",
                                                          "args": [
                                                            {  "prim": "pair",
@@ -7505,9 +6070,16 @@ export const nft_private_code : any =
                                                            [  {  "prim": "PUSH",
                                                                  "args": [
                                                                    {  "prim": "string"  },
-                                                                   {  "string": "NotFound"  }
+                                                                   {  "string": "consumePermit"  }
                                                                  ]
                                                            },
+                                                           {  "prim": "PUSH",
+                                                              "args": [
+                                                                {  "prim": "string"  },
+                                                                {  "string": "EntryNotFound"  }
+                                                              ]
+                                                           },
+                                                           {  "prim": "PAIR"  },
                                                            {  "prim": "FAILWITH"  }  ],
                                                            [    ]
                                                          ]
@@ -7524,13 +6096,7 @@ export const nft_private_code : any =
                                                            {  "string": "FA2_NOT_OPERATOR"  }
                                                          ]
                                                       },
-                                                      {  "prim": "DIG",
-                                                         "args": [
-                                                           {  "int": "5"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
+                                                      {  "prim": "DUP",
                                                          "args": [
                                                            {  "int": "6"  }
                                                          ]
@@ -7538,13 +6104,7 @@ export const nft_private_code : any =
                                                       {  "prim": "PACK"  },
                                                       {  "prim": "BLAKE2B"  },
                                                       {  "prim": "PAIR"  },
-                                                      {  "prim": "DIG",
-                                                         "args": [
-                                                           {  "int": "4"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
+                                                      {  "prim": "DUP",
                                                          "args": [
                                                            {  "int": "5"  }
                                                          ]
@@ -7586,27 +6146,13 @@ export const nft_private_code : any =
                                             {  "prim": "ITER",
                                                "args": [
                                                  [  {  "prim": "DUP"  },
-                                                 {  "prim": "CAR",
-                                                    "args": [
-                                                      {  "int": "0"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DIG",
-                                                    "args": [
-                                                      {  "int": "1"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
+                                                 {  "prim": "CAR"  },
+                                                 {  "prim": "DUP",
                                                     "args": [
                                                       {  "int": "2"  }
                                                     ]
                                                  },
-                                                 {  "prim": "CDR",
-                                                    "args": [
-                                                      {  "int": "1"  }
-                                                    ]
-                                                 },
+                                                 {  "prim": "CDR"  },
                                                  {  "prim": "DUP"  },
                                                  {  "prim": "ITER",
                                                     "args": [
@@ -7616,22 +6162,13 @@ export const nft_private_code : any =
                                                               {  "int": "1"  }
                                                             ]
                                                       },
-                                                      {  "prim": "DIG",
-                                                         "args": [
-                                                           {  "int": "1"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
+                                                      {  "prim": "DUP",
                                                          "args": [
                                                            {  "int": "2"  }
                                                          ]
                                                       },
-                                                      {  "prim": "CDR",
-                                                         "args": [
-                                                           {  "int": "2"  }
-                                                         ]
-                                                      },
+                                                      {  "prim": "CDR"  },
+                                                      {  "prim": "CDR"  },
                                                       {  "prim": "COMPARE"  },
                                                       {  "prim": "EQ"  },
                                                       {  "prim": "NOT"  },
@@ -7648,51 +6185,21 @@ export const nft_private_code : any =
                                                          ]
                                                       },
                                                       {  "prim": "DUP"  },
-                                                      {  "prim": "CDR",
+                                                      {  "prim": "CDR"  },
+                                                      {  "prim": "CAR"  },
+                                                      {  "prim": "DUP",
                                                          "args": [
-                                                           {  "int": "1"  }
+                                                           {  "int": "9"  }
                                                          ]
                                                       },
-                                                      {  "prim": "CAR",
-                                                         "args": [
-                                                           {  "int": "0"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DIG",
-                                                         "args": [
-                                                           {  "int": "15"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
-                                                         "args": [
-                                                           {  "int": "16"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DIG",
-                                                         "args": [
-                                                           {  "int": "2"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
+                                                      {  "prim": "DUP",
                                                          "args": [
                                                            {  "int": "3"  }
                                                          ]
                                                       },
-                                                      {  "prim": "CAR",
-                                                         "args": [
-                                                           {  "int": "0"  }
-                                                         ]
-                                                      },
+                                                      {  "prim": "CAR"  },
                                                       {  "prim": "SOME"  },
-                                                      {  "prim": "DIG",
-                                                         "args": [
-                                                           {  "int": "2"  }
-                                                         ]
-                                                      },
-                                                      {  "prim": "DUP"  },
-                                                      {  "prim": "DUG",
+                                                      {  "prim": "DUP",
                                                          "args": [
                                                            {  "int": "3"  }
                                                          ]
@@ -7703,7 +6210,7 @@ export const nft_private_code : any =
                                                            {  "int": "1"  },
                                                            [  {  "prim": "DIG",
                                                                  "args": [
-                                                                   {  "int": "15"  }
+                                                                   {  "int": "8"  }
                                                                  ]
                                                            },
                                                            {  "prim": "DROP",
@@ -7715,7 +6222,7 @@ export const nft_private_code : any =
                                                       },
                                                       {  "prim": "DUG",
                                                          "args": [
-                                                           {  "int": "15"  }
+                                                           {  "int": "8"  }
                                                          ]
                                                       },
                                                       {  "prim": "DROP",
@@ -7737,28 +6244,11 @@ export const nft_private_code : any =
                                                  {  "int": "1"  }
                                                ]
                                             },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
+                                            {  "prim": "PAIR",
+                                               "args": [
+                                                 {  "int": "12"  }
+                                               ]
+                                            },
                                             {  "prim": "DIG",
                                                "args": [
                                                  {  "int": "1"  }
@@ -7773,16 +6263,10 @@ export const nft_private_code : any =
                                   "args": [
                                     [  {  "prim": "IF_LEFT",
                                           "args": [
-                                            [  {  "prim": "DIG",
+                                            [  {  "prim": "DUP",
                                                   "args": [
-                                                    {  "int": "12"  }
+                                                    {  "int": "2"  }
                                                   ]
-                                            },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
-                                               "args": [
-                                                 {  "int": "13"  }
-                                               ]
                                             },
                                             {  "prim": "SENDER"  },
                                             {  "prim": "COMPARE"  },
@@ -7800,15 +6284,9 @@ export const nft_private_code : any =
                                                  [    ]
                                                ]
                                             },
-                                            {  "prim": "DIG",
+                                            {  "prim": "DUP",
                                                "args": [
-                                                 {  "int": "2"  }
-                                               ]
-                                            },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
-                                               "args": [
-                                                 {  "int": "3"  }
+                                                 {  "int": "12"  }
                                                ]
                                             },
                                             {  "prim": "IF",
@@ -7823,53 +6301,86 @@ export const nft_private_code : any =
                                                  [    ]
                                                ]
                                             },
-                                            {  "prim": "DIG",
+                                            {  "prim": "DUP",
                                                "args": [
-                                                 {  "int": "4"  }
+                                                 {  "int": "10"  }
                                                ]
                                             },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
-                                               "args": [
-                                                 {  "int": "5"  }
-                                               ]
-                                            },
-                                            {  "prim": "PUSH",
-                                               "args": [
-                                                 {  "prim": "bool"  },
-                                                 {  "prim": "True"  }
-                                               ]
-                                            },
-                                            {  "prim": "DIG",
+                                            {  "prim": "DUP",
                                                "args": [
                                                  {  "int": "2"  }
                                                ]
                                             },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
+                                            {  "prim": "MEM"  },
+                                            {  "prim": "IF",
                                                "args": [
-                                                 {  "int": "3"  }
-                                               ]
-                                            },
-                                            {  "prim": "UPDATE"  },
-                                            {  "prim": "DIP",
-                                               "args": [
-                                                 {  "int": "1"  },
-                                                 [  {  "prim": "DIG",
+                                                 [    ],
+                                                 [  {  "prim": "DUP",
                                                        "args": [
-                                                         {  "int": "4"  }
+                                                         {  "int": "10"  }
                                                        ]
                                                  },
-                                                 {  "prim": "DROP",
+                                                 {  "prim": "DUP",
                                                     "args": [
-                                                      {  "int": "1"  }
+                                                      {  "int": "2"  }
+                                                    ]
+                                                 },
+                                                 {  "prim": "MEM"  },
+                                                 {  "prim": "IF",
+                                                    "args": [
+                                                      [  {  "prim": "PUSH",
+                                                            "args": [
+                                                              {  "prim": "string"  },
+                                                              {  "string": "minters"  }
+                                                            ]
+                                                      },
+                                                      {  "prim": "PUSH",
+                                                         "args": [
+                                                           {  "prim": "string"  },
+                                                           {  "string": "KeyExists"  }
+                                                         ]
+                                                      },
+                                                      {  "prim": "PAIR"  },
+                                                      {  "prim": "FAILWITH"  }  ],
+                                                      [  {  "prim": "DUP",
+                                                            "args": [
+                                                              {  "int": "10"  }
+                                                            ]
+                                                      },
+                                                      {  "prim": "PUSH",
+                                                         "args": [
+                                                           {  "prim": "bool"  },
+                                                           {  "prim": "True"  }
+                                                         ]
+                                                      },
+                                                      {  "prim": "DUP",
+                                                         "args": [
+                                                           {  "int": "3"  }
+                                                         ]
+                                                      },
+                                                      {  "prim": "UPDATE"  },
+                                                      {  "prim": "DIP",
+                                                         "args": [
+                                                           {  "int": "1"  },
+                                                           [  {  "prim": "DIG",
+                                                                 "args": [
+                                                                   {  "int": "9"  }
+                                                                 ]
+                                                           },
+                                                           {  "prim": "DROP",
+                                                              "args": [
+                                                                {  "int": "1"  }
+                                                              ]
+                                                           }  ]
+                                                         ]
+                                                      },
+                                                      {  "prim": "DUG",
+                                                         "args": [
+                                                           {  "int": "9"  }
+                                                         ]
+                                                      }  ]
                                                     ]
                                                  }  ]
-                                               ]
-                                            },
-                                            {  "prim": "DUG",
-                                               "args": [
-                                                 {  "int": "4"  }
                                                ]
                                             },
                                             {  "prim": "DROP",
@@ -7877,44 +6388,21 @@ export const nft_private_code : any =
                                                  {  "int": "1"  }
                                                ]
                                             },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
+                                            {  "prim": "PAIR",
+                                               "args": [
+                                                 {  "int": "12"  }
+                                               ]
+                                            },
                                             {  "prim": "DIG",
                                                "args": [
                                                  {  "int": "1"  }
                                                ]
                                             },
                                             {  "prim": "PAIR"  }  ],
-                                            [  {  "prim": "DIG",
+                                            [  {  "prim": "DUP",
                                                   "args": [
-                                                    {  "int": "12"  }
+                                                    {  "int": "2"  }
                                                   ]
-                                            },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
-                                               "args": [
-                                                 {  "int": "13"  }
-                                               ]
                                             },
                                             {  "prim": "SENDER"  },
                                             {  "prim": "COMPARE"  },
@@ -7932,15 +6420,9 @@ export const nft_private_code : any =
                                                  [    ]
                                                ]
                                             },
-                                            {  "prim": "DIG",
+                                            {  "prim": "DUP",
                                                "args": [
-                                                 {  "int": "2"  }
-                                               ]
-                                            },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
-                                               "args": [
-                                                 {  "int": "3"  }
+                                                 {  "int": "12"  }
                                                ]
                                             },
                                             {  "prim": "IF",
@@ -7955,15 +6437,9 @@ export const nft_private_code : any =
                                                  [    ]
                                                ]
                                             },
-                                            {  "prim": "DIG",
+                                            {  "prim": "DUP",
                                                "args": [
-                                                 {  "int": "4"  }
-                                               ]
-                                            },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
-                                               "args": [
-                                                 {  "int": "5"  }
+                                                 {  "int": "10"  }
                                                ]
                                             },
                                             {  "prim": "PUSH",
@@ -7972,13 +6448,7 @@ export const nft_private_code : any =
                                                  {  "prim": "False"  }
                                                ]
                                             },
-                                            {  "prim": "DIG",
-                                               "args": [
-                                                 {  "int": "2"  }
-                                               ]
-                                            },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
+                                            {  "prim": "DUP",
                                                "args": [
                                                  {  "int": "3"  }
                                                ]
@@ -7989,7 +6459,7 @@ export const nft_private_code : any =
                                                  {  "int": "1"  },
                                                  [  {  "prim": "DIG",
                                                        "args": [
-                                                         {  "int": "4"  }
+                                                         {  "int": "9"  }
                                                        ]
                                                  },
                                                  {  "prim": "DROP",
@@ -8001,7 +6471,7 @@ export const nft_private_code : any =
                                             },
                                             {  "prim": "DUG",
                                                "args": [
-                                                 {  "int": "4"  }
+                                                 {  "int": "9"  }
                                                ]
                                             },
                                             {  "prim": "DROP",
@@ -8009,28 +6479,11 @@ export const nft_private_code : any =
                                                  {  "int": "1"  }
                                                ]
                                             },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
+                                            {  "prim": "PAIR",
+                                               "args": [
+                                                 {  "int": "12"  }
+                                               ]
+                                            },
                                             {  "prim": "DIG",
                                                "args": [
                                                  {  "int": "1"  }
@@ -8041,16 +6494,10 @@ export const nft_private_code : any =
                                     }  ],
                                     [  {  "prim": "IF_LEFT",
                                           "args": [
-                                            [  {  "prim": "DIG",
+                                            [  {  "prim": "DUP",
                                                   "args": [
-                                                    {  "int": "12"  }
+                                                    {  "int": "2"  }
                                                   ]
-                                            },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
-                                               "args": [
-                                                 {  "int": "13"  }
-                                               ]
                                             },
                                             {  "prim": "SENDER"  },
                                             {  "prim": "COMPARE"  },
@@ -8074,7 +6521,7 @@ export const nft_private_code : any =
                                                  {  "int": "1"  },
                                                  [  {  "prim": "DIG",
                                                        "args": [
-                                                         {  "int": "12"  }
+                                                         {  "int": "1"  }
                                                        ]
                                                  },
                                                  {  "prim": "DROP",
@@ -8086,7 +6533,7 @@ export const nft_private_code : any =
                                             },
                                             {  "prim": "DUG",
                                                "args": [
-                                                 {  "int": "12"  }
+                                                 {  "int": "1"  }
                                                ]
                                             },
                                             {  "prim": "DROP",
@@ -8094,28 +6541,11 @@ export const nft_private_code : any =
                                                  {  "int": "1"  }
                                                ]
                                             },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
+                                            {  "prim": "PAIR",
+                                               "args": [
+                                                 {  "int": "12"  }
+                                               ]
+                                            },
                                             {  "prim": "DIG",
                                                "args": [
                                                  {  "int": "1"  }
@@ -8124,8 +6554,7 @@ export const nft_private_code : any =
                                             {  "prim": "PAIR"  }  ],
                                             [  {  "prim": "UNPAIR"  },
                                             {  "prim": "SWAP"  },
-                                            {  "prim": "SELF"  },
-                                            {  "prim": "ADDRESS"  },
+                                            {  "prim": "SELF_ADDRESS"  },
                                             {  "prim": "SENDER"  },
                                             {  "prim": "COMPARE"  },
                                             {  "prim": "EQ"  },
@@ -8142,15 +6571,9 @@ export const nft_private_code : any =
                                                  [    ]
                                                ]
                                             },
-                                            {  "prim": "DIG",
+                                            {  "prim": "DUP",
                                                "args": [
-                                                 {  "int": "3"  }
-                                               ]
-                                            },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
-                                               "args": [
-                                                 {  "int": "4"  }
+                                                 {  "int": "13"  }
                                                ]
                                             },
                                             {  "prim": "IF",
@@ -8165,24 +6588,12 @@ export const nft_private_code : any =
                                                  [    ]
                                                ]
                                             },
-                                            {  "prim": "DIG",
+                                            {  "prim": "DUP",
                                                "args": [
-                                                 {  "int": "12"  }
+                                                 {  "int": "4"  }
                                                ]
                                             },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
-                                               "args": [
-                                                 {  "int": "13"  }
-                                               ]
-                                            },
-                                            {  "prim": "DIG",
-                                               "args": [
-                                                 {  "int": "2"  }
-                                               ]
-                                            },
-                                            {  "prim": "DUP"  },
-                                            {  "prim": "DUG",
+                                            {  "prim": "DUP",
                                                "args": [
                                                  {  "int": "3"  }
                                                ]
@@ -8193,40 +6604,29 @@ export const nft_private_code : any =
                                                  [  {  "prim": "PUSH",
                                                        "args": [
                                                          {  "prim": "string"  },
-                                                         {  "string": "KeyExists"  }
+                                                         {  "string": "royalties"  }
                                                        ]
                                                  },
+                                                 {  "prim": "PUSH",
+                                                    "args": [
+                                                      {  "prim": "string"  },
+                                                      {  "string": "KeyExists"  }
+                                                    ]
+                                                 },
+                                                 {  "prim": "PAIR"  },
                                                  {  "prim": "FAILWITH"  }  ],
-                                                 [  {  "prim": "DIG",
+                                                 [  {  "prim": "DUP",
                                                        "args": [
-                                                         {  "int": "12"  }
+                                                         {  "int": "4"  }
                                                        ]
                                                  },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
-                                                    "args": [
-                                                      {  "int": "13"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DIG",
-                                                    "args": [
-                                                      {  "int": "1"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
+                                                 {  "prim": "DUP",
                                                     "args": [
                                                       {  "int": "2"  }
                                                     ]
                                                  },
                                                  {  "prim": "SOME"  },
-                                                 {  "prim": "DIG",
-                                                    "args": [
-                                                      {  "int": "3"  }
-                                                    ]
-                                                 },
-                                                 {  "prim": "DUP"  },
-                                                 {  "prim": "DUG",
+                                                 {  "prim": "DUP",
                                                     "args": [
                                                       {  "int": "4"  }
                                                     ]
@@ -8237,7 +6637,7 @@ export const nft_private_code : any =
                                                       {  "int": "1"  },
                                                       [  {  "prim": "DIG",
                                                             "args": [
-                                                              {  "int": "12"  }
+                                                              {  "int": "3"  }
                                                             ]
                                                       },
                                                       {  "prim": "DROP",
@@ -8249,7 +6649,7 @@ export const nft_private_code : any =
                                                  },
                                                  {  "prim": "DUG",
                                                     "args": [
-                                                      {  "int": "12"  }
+                                                      {  "int": "3"  }
                                                     ]
                                                  }  ]
                                                ]
@@ -8259,28 +6659,11 @@ export const nft_private_code : any =
                                                  {  "int": "2"  }
                                                ]
                                             },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
-                                            {  "prim": "SWAP"  },
-                                            {  "prim": "PAIR"  },
+                                            {  "prim": "PAIR",
+                                               "args": [
+                                                 {  "int": "12"  }
+                                               ]
+                                            },
                                             {  "prim": "DIG",
                                                "args": [
                                                  {  "int": "1"  }
@@ -8301,28 +6684,16 @@ export const nft_private_code : any =
             {  "prim": "SWAP"  },
             {  "prim": "UNPAIR"  },
             {  "prim": "SWAP"  },
-            {  "prim": "DIG",
+            {  "prim": "DUP",
                "args": [
-                 {  "int": "7"  }
-               ]
-            },
-            {  "prim": "DUP"  },
-            {  "prim": "DUG",
-               "args": [
-                 {  "int": "8"  }
+                 {  "int": "13"  }
                ]
             },
             {  "prim": "SENDER"  },
             {  "prim": "MEM"  },
-            {  "prim": "DIG",
+            {  "prim": "DUP",
                "args": [
-                 {  "int": "16"  }
-               ]
-            },
-            {  "prim": "DUP"  },
-            {  "prim": "DUG",
-               "args": [
-                 {  "int": "17"  }
+                 {  "int": "6"  }
                ]
             },
             {  "prim": "SENDER"  },
@@ -8342,15 +6713,9 @@ export const nft_private_code : any =
                  [    ]
                ]
             },
-            {  "prim": "DIG",
+            {  "prim": "DUP",
                "args": [
-                 {  "int": "5"  }
-               ]
-            },
-            {  "prim": "DUP"  },
-            {  "prim": "DUG",
-               "args": [
-                 {  "int": "6"  }
+                 {  "int": "15"  }
                ]
             },
             {  "prim": "IF",
@@ -8365,19 +6730,12 @@ export const nft_private_code : any =
                  [    ]
                ]
             },
-            {  "prim": "DIG",
-               "args": [
-                 {  "int": "16"  }
-               ]
-            },
-            {  "prim": "DUP"  },
-            {  "prim": "DUG",
+            {  "prim": "DUP",
                "args": [
                  {  "int": "17"  }
                ]
             },
-            {  "prim": "SELF"  },
-            {  "prim": "ADDRESS"  },
+            {  "prim": "SELF_ADDRESS"  },
             {  "prim": "CONTRACT",
                "args": [
                  {  "prim": "pair",
@@ -8402,9 +6760,16 @@ export const nft_private_code : any =
                  [  {  "prim": "PUSH",
                        "args": [
                          {  "prim": "string"  },
-                         {  "string": "NotFound"  }
+                         {  "string": "setTokenMetadata"  }
                        ]
                  },
+                 {  "prim": "PUSH",
+                    "args": [
+                      {  "prim": "string"  },
+                      {  "string": "EntryNotFound"  }
+                    ]
+                 },
+                 {  "prim": "PAIR"  },
                  {  "prim": "FAILWITH"  }  ],
                  [    ]
                ]
@@ -8415,24 +6780,12 @@ export const nft_private_code : any =
                  {  "int": "0"  }
                ]
             },
-            {  "prim": "DIG",
-               "args": [
-                 {  "int": "4"  }
-               ]
-            },
-            {  "prim": "DUP"  },
-            {  "prim": "DUG",
+            {  "prim": "DUP",
                "args": [
                  {  "int": "5"  }
                ]
             },
-            {  "prim": "DIG",
-               "args": [
-                 {  "int": "7"  }
-               ]
-            },
-            {  "prim": "DUP"  },
-            {  "prim": "DUG",
+            {  "prim": "DUP",
                "args": [
                  {  "int": "8"  }
                ]
@@ -8460,19 +6813,12 @@ export const nft_private_code : any =
                  {  "int": "16"  }
                ]
             },
-            {  "prim": "DIG",
-               "args": [
-                 {  "int": "16"  }
-               ]
-            },
-            {  "prim": "DUP"  },
-            {  "prim": "DUG",
+            {  "prim": "DUP",
                "args": [
                  {  "int": "17"  }
                ]
             },
-            {  "prim": "SELF"  },
-            {  "prim": "ADDRESS"  },
+            {  "prim": "SELF_ADDRESS"  },
             {  "prim": "CONTRACT",
                "args": [
                  {  "prim": "pair",
@@ -8501,9 +6847,16 @@ export const nft_private_code : any =
                  [  {  "prim": "PUSH",
                        "args": [
                          {  "prim": "string"  },
-                         {  "string": "NotFound"  }
+                         {  "string": "setRoyalties"  }
                        ]
                  },
+                 {  "prim": "PUSH",
+                    "args": [
+                      {  "prim": "string"  },
+                      {  "string": "EntryNotFound"  }
+                    ]
+                 },
+                 {  "prim": "PAIR"  },
                  {  "prim": "FAILWITH"  }  ],
                  [    ]
                ]
@@ -8514,24 +6867,12 @@ export const nft_private_code : any =
                  {  "int": "0"  }
                ]
             },
-            {  "prim": "DIG",
-               "args": [
-                 {  "int": "3"  }
-               ]
-            },
-            {  "prim": "DUP"  },
-            {  "prim": "DUG",
+            {  "prim": "DUP",
                "args": [
                  {  "int": "4"  }
                ]
             },
-            {  "prim": "DIG",
-               "args": [
-                 {  "int": "7"  }
-               ]
-            },
-            {  "prim": "DUP"  },
-            {  "prim": "DUG",
+            {  "prim": "DUP",
                "args": [
                  {  "int": "8"  }
                ]
@@ -8559,24 +6900,12 @@ export const nft_private_code : any =
                  {  "int": "16"  }
                ]
             },
-            {  "prim": "DIG",
+            {  "prim": "DUP",
                "args": [
-                 {  "int": "13"  }
+                 {  "int": "7"  }
                ]
             },
-            {  "prim": "DUP"  },
-            {  "prim": "DUG",
-               "args": [
-                 {  "int": "14"  }
-               ]
-            },
-            {  "prim": "DIG",
-               "args": [
-                 {  "int": "4"  }
-               ]
-            },
-            {  "prim": "DUP"  },
-            {  "prim": "DUG",
+            {  "prim": "DUP",
                "args": [
                  {  "int": "5"  }
                ]
@@ -8587,40 +6916,29 @@ export const nft_private_code : any =
                  [  {  "prim": "PUSH",
                        "args": [
                          {  "prim": "string"  },
-                         {  "string": "KeyExists"  }
+                         {  "string": "ledger"  }
                        ]
                  },
+                 {  "prim": "PUSH",
+                    "args": [
+                      {  "prim": "string"  },
+                      {  "string": "KeyExists"  }
+                    ]
+                 },
+                 {  "prim": "PAIR"  },
                  {  "prim": "FAILWITH"  }  ],
-                 [  {  "prim": "DIG",
+                 [  {  "prim": "DUP",
                        "args": [
-                         {  "int": "13"  }
+                         {  "int": "7"  }
                        ]
                  },
-                 {  "prim": "DUP"  },
-                 {  "prim": "DUG",
-                    "args": [
-                      {  "int": "14"  }
-                    ]
-                 },
-                 {  "prim": "DIG",
-                    "args": [
-                      {  "int": "3"  }
-                    ]
-                 },
-                 {  "prim": "DUP"  },
-                 {  "prim": "DUG",
+                 {  "prim": "DUP",
                     "args": [
                       {  "int": "4"  }
                     ]
                  },
                  {  "prim": "SOME"  },
-                 {  "prim": "DIG",
-                    "args": [
-                      {  "int": "5"  }
-                    ]
-                 },
-                 {  "prim": "DUP"  },
-                 {  "prim": "DUG",
+                 {  "prim": "DUP",
                     "args": [
                       {  "int": "6"  }
                     ]
@@ -8631,7 +6949,7 @@ export const nft_private_code : any =
                       {  "int": "1"  },
                       [  {  "prim": "DIG",
                             "args": [
-                              {  "int": "13"  }
+                              {  "int": "6"  }
                             ]
                       },
                       {  "prim": "DROP",
@@ -8643,7 +6961,7 @@ export const nft_private_code : any =
                  },
                  {  "prim": "DUG",
                     "args": [
-                      {  "int": "13"  }
+                      {  "int": "6"  }
                     ]
                  }  ]
                ]
@@ -8653,28 +6971,11 @@ export const nft_private_code : any =
                  {  "int": "4"  }
                ]
             },
-            {  "prim": "SWAP"  },
-            {  "prim": "PAIR"  },
-            {  "prim": "SWAP"  },
-            {  "prim": "PAIR"  },
-            {  "prim": "SWAP"  },
-            {  "prim": "PAIR"  },
-            {  "prim": "SWAP"  },
-            {  "prim": "PAIR"  },
-            {  "prim": "SWAP"  },
-            {  "prim": "PAIR"  },
-            {  "prim": "SWAP"  },
-            {  "prim": "PAIR"  },
-            {  "prim": "SWAP"  },
-            {  "prim": "PAIR"  },
-            {  "prim": "SWAP"  },
-            {  "prim": "PAIR"  },
-            {  "prim": "SWAP"  },
-            {  "prim": "PAIR"  },
-            {  "prim": "SWAP"  },
-            {  "prim": "PAIR"  },
-            {  "prim": "SWAP"  },
-            {  "prim": "PAIR"  },
+            {  "prim": "PAIR",
+               "args": [
+                 {  "int": "12"  }
+               ]
+            },
             {  "prim": "DIG",
                "args": [
                  {  "int": "1"  }
