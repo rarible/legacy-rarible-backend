@@ -5,6 +5,7 @@ import BigNumber from "@taquito/rpc/node_modules/bignumber.js"
 // edsk3UUamwmemNBJgDvS8jXCgKsvjL2NoTwYRFpGSRPut4Hmfs6dG8 Mxs
 // edsk4RqeRTrhdKfJKBTndA9x1RLp4A3wtNL1iMFRXDvfs5ANeZAncZ ibJ
 // edsk368NmXyps5vKts1TrFTTAgReC5VN9NtPmL9Er86XUdHm2yWiaU aMw
+// edskRsg6YnXooVuL1mdBfiJYkH2sAbeVTLUxBGNiqhbAc76QwStLg61QDHoxV6F2ckfmWv7uBFSmQgRhoDVfhmGZ4CRnvKLG7W iA1
 async function main() {
 
   try {
@@ -15,11 +16,11 @@ async function main() {
       mt_public: "",
     }
 
-    const tezos_u6h = in_memory_provider(
-      'edsk4CmgW9r4fwqtsT6x2bB7BdVcERxLPt6poFXGpk1gTKbqR43G5H',
+    const tezos = in_memory_provider(
+      'edskRsg6YnXooVuL1mdBfiJYkH2sAbeVTLUxBGNiqhbAc76QwStLg61QDHoxV6F2ckfmWv7uBFSmQgRhoDVfhmGZ4CRnvKLG7W',
       'https://hangzhou.tz.functori.com')
-    const provider_u6h = {
-      tezos: tezos_u6h,
+    const provider = {
+      tezos: tezos,
       api: "https://rarible-api.functori.com/v0.1/",
       config
     }
@@ -53,7 +54,7 @@ async function main() {
     //   parameter: [ {string: 'KT1Ex1FBFh8JeGwNU3uZNrV4afU7LoUgLWEK' }, {prim: "Some", args: [{int: '0'}]}, [] ]
     // })
 
-    const s = await sign(provider_u6h, "I would like to save like for itemId: 0xf5de760f2e916647fd766b4ad9e85ff943ce3a2b:16440")
+    const s = await sign(provider, "I would like to save like for itemId: 0xf5de760f2e916647fd766b4ad9e85ff943ce3a2b:16440")
     console.log(s)
 
     // console.log(op)
