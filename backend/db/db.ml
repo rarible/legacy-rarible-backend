@@ -1229,14 +1229,26 @@ let insert_mint_metadata dbh ~contract ~token_id ~block ~level ~tsp ~metadata =
        where tzip21_metadata.contract = $contract and \
        tzip21_metadata.token_id = $token_id"]
 
+let get_uri_pattern ~dbh contract =
+  let>? l =
+    [%pgsql dbh
+        "select uri_pattern from contracts \
+         where main and address = $contract order by level desc"] in
+  match l with
+  | [] -> Lwt.return_ok None
+  | p :: _ -> Lwt.return_ok p
+
 let insert_mint ~dbh ~op ~contract m =
   let block = op.bo_block in
   let level = op.bo_level in
   let tsp = op.bo_tsp in
+  let>? pattern = get_uri_pattern ~dbh contract in
   let token_id, owner, amount, uri = match m with
     | NFTMint m -> m.fa2m_token_id, m.fa2m_owner, Z.one, None
     | MTMint m -> m.fa2m_token_id, m.fa2m_owner, m.fa2m_amount, None
-    | UbiMint m -> m.ubim_token_id, m.ubim_owner, Z.one, m.ubim_uri
+    | UbiMint m ->
+      m.ubim_token_id, m.ubim_owner, Z.one,
+      Option.map (fun pattern -> replace_token_id ~pattern (Z.to_string m.ubim_token_id)) pattern
     | UbiMint2 m ->
       m.ubi2m_token_id, m.ubi2m_owner, m.ubi2m_amount,
       List.assoc_opt "" m.ubi2m_metadata in
@@ -2026,7 +2038,8 @@ let contract_updates dbh main l =
               m.fa2m_token_id, m.fa2m_owner, Z.one, false
             | MTMint m ->
               m.fa2m_token_id, m.fa2m_owner, m.fa2m_amount, false
-            | UbiMint m -> m.ubim_token_id, m.ubim_owner, Z.one, m.ubim_uri <> None
+            | UbiMint m ->
+              m.ubim_token_id, m.ubim_owner, Z.one, m.ubim_uri <> None
             | UbiMint2 m ->
               m.ubi2m_token_id, m.ubi2m_owner, m.ubi2m_amount,
               (List.assoc_opt "" m.ubi2m_metadata) <> None in
