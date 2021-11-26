@@ -473,3 +473,7 @@ let tzip21_attribute_to_rarible_attribute a = {
 
 let tzip21_attributes_to_rarible_attributes l =
   List.map tzip21_attribute_to_rarible_attribute l
+
+let replace_token_id ~pattern token_id =
+  let regexp = Str.regexp "{tokenId}" in
+  Str.global_replace regexp token_id pattern
