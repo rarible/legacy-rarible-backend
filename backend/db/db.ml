@@ -1450,6 +1450,14 @@ let insert_minter ~dbh ~op ~contract ~add a =
        ${op.bo_tsp}, $contract, $a) \
        on conflict do nothing"]
 
+let insert_uri_pattern ~dbh ~op ~contract s =
+  [%pgsql dbh
+      "insert into contract_updates(transaction, index, block, level, tsp, \
+       contract, uri_pattern) \
+       values(${op.bo_hash}, ${op.bo_index}, ${op.bo_block}, ${op.bo_level}, \
+       ${op.bo_tsp}, $contract, $s) \
+       on conflict do nothing"]
+
 let reset_nft_item_meta_by_id ?dbh contract token_id =
   Printf.eprintf "reset_nft_item_meta_by_id %s %s\n%!" contract (Z.to_string token_id) ;
   use dbh @@ fun dbh ->
@@ -1802,6 +1810,10 @@ let insert_transaction ~config ~dbh ~op tr =
         Format.printf "\027[0;35mremove minter %s[%ld] %s %s\027[0m@."
           (short op.bo_hash) op.bo_index (short contract) (short a);
         insert_minter ~dbh ~op ~contract ~add:false a
+      | Ok (Token_uri_pattern s) ->
+        Format.printf "\027[0;35mset token uri pattern %s[%ld] %s %s\027[0m@."
+          (short op.bo_hash) op.bo_index (short contract) s;
+        insert_uri_pattern ~dbh ~op ~contract s
       | Error _ -> Lwt.return_ok ()
 
 let ledger_kind k v = match k, v with
@@ -1817,11 +1829,11 @@ let filter_contracts op ori =
     let allocs = Storage_diff.big_map_allocs meta.op_lazy_storage_diff in
     begin match
         match_entrypoints ~expected:(fa2_entrypoints @ fa2_ext_entrypoints) ~entrypoints,
-        match_fields ~expected:["ledger"; "owner"; "admin"] ~allocs ori.script
+        match_fields ~expected:["ledger"; "owner"; "admin"; "token_metadata_uri"] ~allocs ori.script
       with
       | [ b_balance; b_update; b_transfer; b_update_all; b_mint_nft; b_mint_mt;
           b_burn_nft; b_burn_mt; b_metadata ],
-        Ok [ f_ledger; f_owner; f_admin ] ->
+        Ok [ f_ledger; f_owner; f_admin; f_uri_pattern ] ->
         let fa2_spec = match b_balance && b_update && b_transfer, f_ledger with
           | true, (_, Some (id, k, v)) ->
             begin match ledger_kind k v with
@@ -1829,8 +1841,8 @@ let filter_contracts op ori =
               | _ -> None
             end
           | _ -> None in
-        let ubi_spec = match f_admin with
-          | Some (`address owner), _ -> Some owner
+        let ubi_spec = match f_admin, f_uri_pattern with
+          | (Some (`address owner), _), (Some (`string uri), _) -> Some (owner, uri)
           | _ -> None in
         let rarible_spec =
           match b_update_all && (b_mint_nft || b_mint_mt)
@@ -1840,8 +1852,8 @@ let filter_contracts op ori =
         begin match fa2_spec, rarible_spec, ubi_spec with
           | Some (id, k, v), Some owner, _ ->
             Some (`rarible (id, k, v, owner))
-          | Some (id, k, v), _, Some owner ->
-            Some (`ubi (id, k, v, owner))
+          | Some (id, k, v), _, Some (owner, uri) ->
+            Some (`ubi (id, k, v, owner, uri))
           | Some (id, k, v), _, _ ->
             Some (`fa2 (id, k, v))
           | _ -> None
@@ -1856,30 +1868,33 @@ let insert_origination config dbh op ori =
     Lwt.return_ok ()
   | Some k ->
     let kt1 = Tzfunc.Crypto.op_to_KT1 op.bo_hash in
-    let kind, owner, ledger_id, ledger_key, ledger_value, contract_value = match k with
+    let kind, owner, ledger_id, ledger_key, ledger_value, contract_value, uri = match k with
       | `rarible (id, k, v, owner) ->
         "rarible", Some owner, Z.to_string id,
         EzEncoding.construct micheline_type_short_enc k,
         EzEncoding.construct micheline_type_short_enc v,
-        {nft_id=id; nft_type={ledger_key=k; ledger_value=v}}
-      | `ubi (id, k, v, owner) ->
+        {nft_id=id; nft_type={ledger_key=k; ledger_value=v}},
+        None
+      | `ubi (id, k, v, owner, uri) ->
         "ubi", Some owner, Z.to_string id,
         EzEncoding.construct micheline_type_short_enc k,
         EzEncoding.construct micheline_type_short_enc v,
-        {nft_id=id; nft_type={ledger_key=k; ledger_value=v}}
+        {nft_id=id; nft_type={ledger_key=k; ledger_value=v}},
+        Some uri
       | `fa2 (id, k, v) ->
         "fa2", None, Z.to_string id,
         EzEncoding.construct micheline_type_short_enc k,
         EzEncoding.construct micheline_type_short_enc v,
-        {nft_id=id; nft_type={ledger_key=k; ledger_value=v}} in
+        {nft_id=id; nft_type={ledger_key=k; ledger_value=v}},
+        None in
     Format.printf "\027[0;93morigination %s (%s, %s)\027[0m@."
       (Utils.short kt1) kind (EzEncoding.construct nft_ledger_enc contract_value);
     let|>? () = [%pgsql dbh
         "insert into contracts(kind, address, owner, block, level, tsp, \
-         last_block, last_level, last, ledger_id, ledger_key, ledger_value) \
+         last_block, last_level, last, ledger_id, ledger_key, ledger_value, uri_pattern) \
          values($kind, $kt1, $?owner, ${op.bo_block}, ${op.bo_level}, \
          ${op.bo_tsp}, ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, $ledger_id, \
-         $ledger_key, $ledger_value) \
+         $ledger_key, $ledger_value, $?uri) \
          on conflict do nothing"] in
     let open Crawlori.Config in
     config.extra.contracts <- SMap.add kt1 contract_value config.extra.contracts;
@@ -1991,12 +2006,19 @@ let minter_update dbh ~main ~contract ~block ~level ~tsp minter =
        array_append(minters, $a) else array_remove(minters, $a) end, \
        last_block = $block, last_level = $level, last = $tsp where address = $contract"]
 
+let uri_pattern_update dbh ~main ~contract ~block ~level ~tsp uri =
+  if main then
+    [%pgsql dbh
+        "update contracts set uri_pattern = $uri, \
+         last_block = $block, last_level = $level, last = $tsp where address = $contract"]
+  else Lwt.return_ok ()
+
 let contract_updates dbh main l =
   let>? contracts = fold_rp (fun acc r ->
       let contract, block, level, tsp = r#contract, r#block, r#level, r#tsp in
       let acc = SSet.add contract acc in
-      let>? () = match r#mint, r#burn, r#uri, r#minter with
-        | Some json, _, _, _ ->
+      let>? () = match r#mint, r#burn, r#uri, r#minter, r#uri_pattern with
+        | Some json, _, _, _, _ ->
           let m = EzEncoding.destruct mint_enc json in
           let token_id, owner, amount, has_uri = match m with
             | NFTMint m ->
@@ -2017,7 +2039,7 @@ let contract_updates dbh main l =
               produce_nft_item_event dbh contract token_id
             else Lwt.return_ok () in
           produce_nft_ownership_event dbh contract token_id owner
-        | _, Some json, _, _ ->
+        | _, Some json, _, _, _ ->
           let b, account = EzEncoding.destruct Json_encoding.(tup2 burn_enc string) json in
           let token_id, amount = match b with
             | NFTBurn token_id -> token_id, Z.one
@@ -2028,11 +2050,14 @@ let contract_updates dbh main l =
           let>? () =
             produce_nft_item_event dbh contract token_id in
           produce_nft_ownership_event dbh contract token_id account
-        | _, _, Some uri, _ ->
+        | _, _, Some uri, _, _ ->
           let>? () = metadata_uri_update dbh ~main ~contract ~block ~level ~tsp uri in
           produce_update_collection_event dbh contract
-        | _, _, _, Some minter ->
+        | _, _, _, Some minter, _ ->
           let>? () = minter_update dbh ~main ~contract ~block ~level ~tsp minter in
+          produce_update_collection_event dbh contract
+        | _, _, _, _, Some uri_pattern ->
+          let>? () = uri_pattern_update dbh ~main ~contract ~block ~level ~tsp uri_pattern in
           produce_update_collection_event dbh contract
         | _ -> Lwt.return_ok () in
       Lwt.return_ok (SSet.add contract acc)) SSet.empty l in
