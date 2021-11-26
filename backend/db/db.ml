@@ -1538,7 +1538,8 @@ let insert_order_activity ~decs dbh activity =
         dbh activity.order_act_id left right left transaction block
         level activity.order_act_date "match"
   end >>=? fun () ->
-  Rarible_kafka.produce_order_activity ~decs activity >>= fun () ->
+  let activity = { at_nft_type = None ; at_order_type = Some activity } in
+  Rarible_kafka.produce_activity ~decs activity >>= fun () ->
   Lwt.return_ok ()
 
 let insert_order_activity_new ~decs dbh date order =
@@ -2251,7 +2252,8 @@ let produce_nft_activity_events main l =
   iter_rp (fun r ->
       if main then
         let>? ev = mk_nft_activity r in
-        Rarible_kafka.produce_nft_activity ev >>= fun () ->
+        let activity = { at_nft_type = Some ev ; at_order_type = None } in
+        Rarible_kafka.produce_activity ~decs:(None,None) activity >>= fun () ->
         Lwt.return_ok ()
       else Lwt.return_ok ())
     l
