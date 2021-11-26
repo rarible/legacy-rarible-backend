@@ -841,6 +841,7 @@ type nft_param =
   | Token_metadata of (A.big_integer * (string * string) list)
   | Add_minter of string
   | Remove_minter of string
+  | Token_uri_pattern of string
 [@@deriving encoding]
 
 type ft_param =

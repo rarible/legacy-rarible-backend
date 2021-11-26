@@ -137,6 +137,11 @@ let parse_remove_minter m =
   | Ok (`address a) -> Ok (Remove_minter a)
   | _ -> unexpected_michelson
 
+let parse_set_token_uri_pattern m =
+  match Typed_mich.parse_value `string m with
+  | Ok (`string s) -> Ok (Token_uri_pattern s)
+  | _ -> unexpected_michelson
+
 let parse_fa2 e p =
   match e, p with
   | EPnamed "update_operators", m -> parse_update_operators m
@@ -148,6 +153,7 @@ let parse_fa2 e p =
   | EPnamed "setTokenMetadata", m -> parse_token_metadata m
   | EPnamed "addMinter", m -> parse_add_minter m
   | EPnamed "removeMinter", m -> parse_remove_minter m
+  | EPnamed "setTokenUriPattern", m -> parse_set_token_uri_pattern m
   | _ -> unexpected_michelson
 
 let parse_set_royalties m =
