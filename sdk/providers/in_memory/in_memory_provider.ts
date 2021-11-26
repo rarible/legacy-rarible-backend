@@ -1,6 +1,6 @@
 import { TezosToolkit, TransferParams, OriginateParams, OpKind } from "@taquito/taquito"
 import { InMemorySigner } from '@taquito/signer'
-import { TezosProvider } from "../../common/base"
+import { TezosProvider, to_hex } from "../../common/base"
 
 export function in_memory_provider(edsk: string, endpoint: string) : TezosProvider {
   const tk = new TezosToolkit(endpoint)
@@ -26,8 +26,8 @@ export function in_memory_provider(edsk: string, endpoint: string) : TezosProvid
     const op = await tk.contract.batch(args2).send()
     return { hash: op.hash, confirmation: async() => { await op.confirmation() } }
   }
-  const sign = async(bytes: string, _?: "raw" | "micheline") => {
-    const sig = await tk.signer.sign(bytes)
+  const sign = async(bytes: string, type?: "raw" | "micheline") => {
+    const sig = await tk.signer.sign((type=='raw') ? to_hex(bytes) : bytes)
     return sig.prefixSig
   }
   const address = async() => {
