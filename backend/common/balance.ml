@@ -133,9 +133,11 @@ let z_all_activity_type ?maked ?taked = function
   | OrderActivityType o -> OrderActivityType (z_order_activity_type ?maked ?taked o)
   | NftActivityType o -> NftActivityType (z_nft_activity_type o)
 let dec_activity_type ?maked ?taked a =
-  { a with activity_type = dec_all_activity_type ?maked ?taked a.activity_type }
-let z_activity_type ?maked ?taked a =
-  { a with activity_type = z_all_activity_type ?maked ?taked a.activity_type }
+  { at_nft_type = Option.map dec_nft_act_type a.at_nft_type ;
+    at_order_type = Option.map (dec_order_act_type ?maked ?taked) a.at_order_type }
+let z_activity_type a =
+  { at_nft_type = Option.map z_nft_act_type a.at_nft_type ;
+    at_order_type = Option.map z_order_act_type a.at_order_type }
 let dec_order_activities ~d o =
   { o with order_activities_items =
              List.map2 (fun o (maked, taked) -> dec_order_act_type ?maked ?taked o) o.order_activities_items d }

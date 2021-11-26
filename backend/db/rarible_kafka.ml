@@ -119,29 +119,7 @@ let produce_order_event ~decs:(maked, taked) order_event  =
     |> kafka_produce ~key:order_event.Rtypes.order_event_order_id t
   | _ -> Lwt.return ()
 
-let produce_nft_activity nft_activity =
-  let open Rtypes in
-  match !kafka_config with
-  | Some _c ->
-    begin match !topic_activity with
-      | None ->
-        create topic_activity_name >>= fun t ->
-        topic_activity := Some t ;
-         Lwt.return t
-      | Some t -> Lwt.return t
-    end >>= fun t ->
-    let activity = {
-      activity_id = nft_activity.nft_act_id ;
-      activity_date = nft_activity.nft_act_date ;
-      activity_source = nft_activity.nft_act_source;
-      activity_type = NftActivityType nft_activity.nft_act_type ;
-    } in
-    let activity = Common.Balance.dec_activity_type activity in
-    EzEncoding.construct Rtypes.(activity_type_enc A.big_decimal_enc) activity
-    |> kafka_produce ~key:activity.activity_id t
-  | None -> Lwt.return ()
-
-let produce_order_activity ~decs:(maked, taked) activity =
+let produce_activity ~decs:(maked, taked) activity =
   let open Rtypes in
   match !kafka_config with
   | Some _c ->
@@ -152,15 +130,13 @@ let produce_order_activity ~decs:(maked, taked) activity =
         Lwt.return t
       | Some t -> Lwt.return t
     end >>= fun t ->
-    let activity = {
-      activity_id = activity.order_act_id ;
-      activity_date = activity.order_act_date ;
-      activity_source = activity.order_act_source ;
-      activity_type = OrderActivityType activity.order_act_type ;
-    } in
     let activity = Common.Balance.dec_activity_type ?maked ?taked activity in
+    let id = match activity.at_nft_type, activity.at_order_type with
+      | None, None -> ""
+      | Some a, _ -> a.nft_act_id
+      | _, Some a -> a.order_act_id in
     EzEncoding.construct Rtypes.(activity_type_enc A.big_decimal_enc) activity
-    |> kafka_produce ~key:activity.activity_id t
+    |> kafka_produce ~key:id t
   | None -> Lwt.return ()
 
 let produce_test msg =

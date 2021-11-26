@@ -1459,22 +1459,10 @@ components:
     ActivityType:
       type: object
       properties:
-        id:
-          type: string
-        date:
-          type: string
-          format: date-time
-        source:
-          type: string
-        type:
-          oneOf:
-          - $ref: '#/components/schemas/OrderActivityType'
-          - $ref: '#/components/schemas/NftActivityType'
-      required:
-      - type
-      - source
-      - date
-      - id
+        nftType:
+          $ref: '#/components/schemas/NftActType'
+        orderType:
+          $ref: '#/components/schemas/OrderActType'
       additionalProperties: false
     Address:
       type: string

@@ -664,13 +664,6 @@ type 'a all_activity_type =
   | NftActivityType of 'a nft_activity_type
 [@@deriving encoding]
 
-type 'a activity_type = {
-  activity_id : string ;
-  activity_date : A.date ;
-  activity_source : string ;
-  activity_type : 'a all_activity_type ;
-} [@@deriving encoding {title="ActivityType"; def_title}]
-
 type 'a order_act_type = {
   order_act_id : string ;
   order_act_date : A.date ;
@@ -682,6 +675,11 @@ type 'a order_activities = {
   order_activities_items : 'a order_act_type list [@title "OrderActivitiesItems"];
   order_activities_continuation : string option ; [@opt]
 } [@@deriving encoding {title="OrderActivities"; def_title}]
+
+type 'a activity_type = {
+  at_nft_type : 'a nft_act_type option ;
+  at_order_type : 'a order_act_type option ;
+} [@@deriving encoding {title="ActivityType"; def_title ; camel}]
 
 type order_bid_status =
   | BSACTIVE
