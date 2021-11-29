@@ -1,12 +1,18 @@
 DB=rarible
-CONVERTERS=$(OPAM_SWITCH_PREFIX)/share/crawlori/converters
+CONVERTERS=$(OPAM_SWITCH_PREFIX)/share/crawlori/converters.sexp
 IMAGE=rarible:latest
+POSTGRES_USER ?= postgres
 
 -include Makefile.config
 
 all: copy
 
-build:
+pgmp-extension:
+	@if [ -z "$$(psql -lqt | cut -d \| -f 1 | grep -w $(DB))" ]; then\
+		createdb $(DB) && sudo -i -u $(POSTGRES_USER) -- psql ${DB} -c 'create extension if not exists pgmp';\
+	fi
+
+build: pgmp-extension
 	@CRAWLORI_NO_UPDATE=true PGDATABASE=$(DB) PGCUSTOM_CONVERTERS_CONFIG=$(CONVERTERS) dune build backend
 
 copy: build openapi

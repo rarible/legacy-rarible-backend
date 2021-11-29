@@ -23,12 +23,12 @@ let upgrade_1_to_2 dbh version =
     {|create table ft_contracts(
       address varchar primary key,
       kind varchar not null,
-      ledger_id varchar not null,
+      ledger_id mpz not null,
       ledger_key jsonb,
       ledger_value jsonb,
       crawled boolean not null default false,
       decimals int not null default 0,
-      token_id varchar)|};
+      token_id mpz)|};
 
     {|create table contracts(
       kind varchar not null,
@@ -42,8 +42,8 @@ let upgrade_1_to_2 dbh version =
       last_level int not null,
       last timestamp not null,
       tokens_number bigint not null default 0,
-      next_token_id varchar not null default '0',
-      ledger_id varchar not null,
+      next_token_id mpz not null default '0',
+      ledger_id mpz not null,
       ledger_key jsonb,
       ledger_value jsonb,
       metadata jsonb not null default '{}',
@@ -54,7 +54,7 @@ let upgrade_1_to_2 dbh version =
 
     {|create table tzip21_creators(
       contract varchar not null,
-      token_id varchar not null,
+      token_id mpz not null,
       block varchar not null,
       level int not null,
       tsp timestamp not null,
@@ -65,7 +65,7 @@ let upgrade_1_to_2 dbh version =
 
     {|create table tzip21_formats(
       contract varchar not null,
-      token_id varchar not null,
+      token_id mpz not null,
       block varchar not null,
       level int not null,
       tsp timestamp not null,
@@ -84,7 +84,7 @@ let upgrade_1_to_2 dbh version =
 
     {|create table tzip21_attributes(
       contract varchar not null,
-      token_id varchar not null,
+      token_id mpz not null,
       block varchar not null,
       level int not null,
       tsp timestamp not null,
@@ -96,7 +96,7 @@ let upgrade_1_to_2 dbh version =
 
     {|create table tzip21_metadata(
       contract varchar not null,
-      token_id varchar not null,
+      token_id mpz not null,
       block varchar not null,
       level int not null,
       tsp timestamp not null,
@@ -125,7 +125,7 @@ let upgrade_1_to_2 dbh version =
 
     {|create table royalties(
       contract varchar primary key,
-      token_id varchar,
+      token_id mpz,
       block varchar not null,
       level int not null,
       tsp timestamp not null,
@@ -135,7 +135,7 @@ let upgrade_1_to_2 dbh version =
 
     {|create table tokens(
       contract varchar not null,
-      token_id varchar not null,
+      token_id mpz not null,
       block varchar not null,
       level int not null,
       tsp timestamp not null,
@@ -145,9 +145,9 @@ let upgrade_1_to_2 dbh version =
       last_level int not null,
       last timestamp not null,
       owner varchar not null,
-      amount varchar not null,
-      supply varchar not null,
-      balance varchar,
+      amount mpz not null,
+      supply mpz not null,
+      balance mpz,
       operators varchar[] not null default '{}',
       metadata jsonb not null default '{}',
       royalties jsonb not null default '{}',
@@ -189,8 +189,8 @@ let upgrade_1_to_2 dbh version =
       operator varchar,
       add boolean,
       contract varchar not null,
-      token_id varchar,
-      amount varchar,
+      token_id mpz,
+      amount mpz,
       metadata jsonb,
       royalties jsonb,
       primary key (block, index, transfer_index))|};
@@ -204,9 +204,9 @@ let upgrade_1_to_2 dbh version =
       tsp timestamp not null,
       kind varchar not null,
       contract varchar not null,
-      token_id varchar not null,
+      token_id mpz not null,
       account varchar,
-      balance varchar,
+      balance mpz,
       unique (block, index, contract, token_id, account))|};
 
     {|create table orders(
@@ -216,17 +216,17 @@ let upgrade_1_to_2 dbh version =
       taker_edpk varchar,
       make_asset_type_class varchar not null,
       make_asset_type_contract varchar,
-      make_asset_type_token_id varchar,
-      make_asset_value varchar not null,
+      make_asset_type_token_id mpz,
+      make_asset_value mpz not null,
       make_asset_decimals int,
       take_asset_type_class varchar not null,
       take_asset_type_contract varchar,
-      take_asset_type_token_id varchar,
-      take_asset_value varchar not null,
+      take_asset_type_token_id mpz,
+      take_asset_value mpz not null,
       take_asset_decimals int,
       start_date timestamp,
       end_date timestamp,
-      salt varchar not null,
+      salt mpz not null,
       signature varchar not null,
       created_at timestamp not null,
       last_update_at timestamp not null,
@@ -245,8 +245,8 @@ let upgrade_1_to_2 dbh version =
 
     {|create table order_price_history(
       date timestamp not null,
-      make_value varchar not null,
-      take_value varchar not null,
+      make_value mpz not null,
+      take_value mpz not null,
       hash varchar not null references orders(hash) on delete cascade)|};
 
     {|create table nft_activities(
@@ -258,9 +258,9 @@ let upgrade_1_to_2 dbh version =
       main boolean not null default false,
       date timestamp not null,
       contract varchar not null,
-      token_id varchar not null,
+      token_id mpz not null,
       owner varchar not null,
-      amount varchar not null,
+      amount mpz not null,
       tr_from varchar,
       primary key (transaction, block))|};
 
@@ -274,8 +274,8 @@ let upgrade_1_to_2 dbh version =
       source varchar not null,
       hash_left varchar not null,
       hash_right varchar not null,
-      fill_make_value varchar not null,
-      fill_take_value varchar not null,
+      fill_make_value mpz not null,
+      fill_take_value mpz not null,
       primary key (block, index))|};
 
     {|create table order_cancel(
@@ -304,7 +304,7 @@ let upgrade_1_to_2 dbh version =
     {|create table ft_tokens(
       contract varchar not null,
       account varchar not null,
-      balance varchar not null,
+      balance mpz not null,
       primary key (contract, account))|};
 
     {|create table ft_token_updates(
@@ -318,7 +318,7 @@ let upgrade_1_to_2 dbh version =
       source varchar,
       destination varchar,
       contract varchar not null,
-      amount varchar not null,
+      amount mpz not null,
       primary key (block, index, transfer_index))|};
 
   ]

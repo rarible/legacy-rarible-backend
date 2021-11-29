@@ -163,7 +163,7 @@ let parse_set_royalties m =
       List.filter_map (function
           | (`address account, `nat value) -> Some (account, value)
           | _ -> None) l in
-    Ok {roy_contract; roy_token_id = Z.to_string id; roy_royalties}
+    Ok {roy_contract; roy_token_id = id; roy_royalties}
   | _ -> unexpected_michelson
 
 let parse_royalties e p =
