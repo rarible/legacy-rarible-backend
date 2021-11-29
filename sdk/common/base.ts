@@ -6,18 +6,15 @@ const bs58check = require("bs58check")
 const blake = require('blakejs');
 
 export interface StorageFA2 {
-  owner: string;
-  royaltiesContract: string;
   ledger: BigMapAbstraction;
   operator: BigMapAbstraction;
   operator_for_all: BigMapAbstraction;
+  token_metadata: BigMapAbstraction;
 }
 
 export interface StorageFA1_2 {
-  initialholder: string,
-  totalsupply: BigNumber,
   ledger: BigMapAbstraction;
-  allowance: BigMapAbstraction;
+  token_metadata: BigMapAbstraction;
 }
 
 export interface XTZAssetType  {
@@ -217,6 +214,12 @@ export function to_hex(s: string) : string {
 export function pack_string(s: string) : string {
   const h = to_hex(s)
   return '0501' + Number(h.length/2).toString(16).padStart(8,'0') + h
+}
+
+export function of_hex(s: string) : string {
+  const a = hex_to_uint8array(s)
+  const decoder = new TextDecoder();
+  return decoder.decode(a)
 }
 
 export async function sign(p : Provider, message: string) : Promise<SignatureResult> {

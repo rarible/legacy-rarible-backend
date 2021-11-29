@@ -1,5 +1,5 @@
 import { MichelsonData, MichelsonType, packDataBytes } from "@taquito/michel-codec"
-import { Provider, AssetType, Asset } from "../common/base"
+import { Provider, AssetType, Asset, StorageFA1_2, StorageFA2, of_hex } from "../common/base"
 import { OrderForm, OrderRaribleV2DataV1 } from "./utils"
 import BigNumber from "@taquito/rpc/node_modules/bignumber.js"
 const keccak_base = require("keccak")
@@ -91,11 +91,26 @@ export function asset_type_to_struct(p: Provider, a : AssetType) : MichelsonData
   }
 }
 
-export function asset_to_struct(p: Provider, a: Asset) : MichelsonData {
+export async function get_decimals(p: Provider, contract: string, token_id = new BigNumber(0)) : Promise<BigNumber> {
+  const st : StorageFA1_2 | StorageFA2 = await p.tezos.storage(contract)
+  let v : any = await st.token_metadata.get(token_id.toString())
+  if (v==undefined) return new BigNumber(0)
+  else {
+    let v2 = v[Object.keys(v)[1]].get('decimals')
+    if (v2==undefined) return new BigNumber(0)
+    else return new BigNumber(of_hex(v2))
+  }
+}
+
+export async function asset_to_struct(p: Provider, a: Asset) : Promise<MichelsonData> {
   let value : string
   switch (a.asset_type.asset_class) {
     case "XTZ":
-      value = a.value.multipliedBy(new BigNumber(1000000)).toString()
+      value = a.value.times(new BigNumber(1000000)).toString()
+      break
+    case "FT":
+      let decimals = await get_decimals(p, a.asset_type.contract, a.asset_type.token_id)
+      value = a.value.times((new BigNumber(10).pow(decimals))).toString()
       break
     default:
       value = a.value.toString()
@@ -114,7 +129,7 @@ export function data_to_struct(data: OrderRaribleV2DataV1) : MichelsonData {
   ] }
 }
 
-export function order_to_struct(p: Provider, order: OrderForm) : MichelsonData {
+export async function order_to_struct(p: Provider, order: OrderForm) : Promise<MichelsonData> {
   let data_type = keccak(
     pack({ string: order.data.data_type }, { prim: 'string'} ))
   let data = pack(data_to_struct(order.data), order_data_type)
@@ -122,11 +137,11 @@ export function order_to_struct(p: Provider, order: OrderForm) : MichelsonData {
     prim: "Pair", args: [
       some_struct({string: order.maker_edpk}),
       { prim: "Pair", args: [
-        asset_to_struct(p, order.make),
+        await asset_to_struct(p, order.make),
         { prim: "Pair", args: [
           (order.taker_edpk) ? some_struct({string: order.taker_edpk}) : none_struct(),
           { prim: "Pair", args: [
-            asset_to_struct(p, order.take),
+            await asset_to_struct(p, order.take),
             { prim: "Pair", args: [
               { int: order.salt },
               { prim: "Pair", args: [
@@ -141,7 +156,7 @@ export function order_to_struct(p: Provider, order: OrderForm) : MichelsonData {
 export async function sign_order(
   provider: Provider,
   order: OrderForm) : Promise<string> {
-  let o = order_to_struct(provider, order)
+  let o = await order_to_struct(provider, order)
   let h = pack(o, order_type)
   const signature = provider.tezos.sign(h)
   return signature

@@ -13,14 +13,19 @@ export async function approve_fa1_2_arg(
   const spender = provider.config.exchange
   const st : StorageFA1_2 = await provider.tezos.storage(contract)
   let key_exists = false
+  let balance = undefined
   try {
-    let r = await st.allowance.get({ 0 : owner, 1 : spender })
-    key_exists = (r!=undefined && r!=0)
+    let r : any = await st.ledger.get(owner)
+    key_exists = r!=undefined
+    if (r!=undefined) balance = r[Object.keys(r)[0]]
   } catch {
     key_exists = false
   }
   if (!key_exists) {
-    let v = (infinite) ? st.totalsupply.toString() : value.toString()
+    let v =
+      (!infinite) ? value.toString() :
+      (balance) ? balance.toString() :
+      Number.MAX_SAFE_INTEGER.toString()
     const parameter : MichelsonData = [ { prim: 'Pair', args : [ { string: spender }, { int: v } ] } ]
     return { destination: contract, entrypoint: "approve", parameter }
   }

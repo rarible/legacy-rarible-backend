@@ -1,4 +1,4 @@
-import { deploy_nft_public, mint, make_permit, add_permit, send, sign } from "../main"
+import { deploy_fa1, mint, make_permit, add_permit, send, sign, StorageFA1_2, of_hex } from "../main"
 import { in_memory_provider } from '../providers/in_memory/in_memory_provider'
 import BigNumber from "@taquito/rpc/node_modules/bignumber.js"
 
@@ -54,11 +54,23 @@ async function main() {
     //   parameter: [ {string: 'KT1Ex1FBFh8JeGwNU3uZNrV4afU7LoUgLWEK' }, {prim: "Some", args: [{int: '0'}]}, [] ]
     // })
 
-    const s = await sign(provider, "I would like to save like for itemId: 0xf5de760f2e916647fd766b4ad9e85ff943ce3a2b:16440")
-    console.log(s)
+    // const s = await sign(provider, "I would like to save like for itemId: 0xf5de760f2e916647fd766b4ad9e85ff943ce3a2b:16440")
+    // console.log(s)
+    // const op = await deploy_fa1(provider, await provider.tezos.address(), new BigNumber(1000), 2)
+
+    // const op = await send(provider, {
+    //   destination: "KT1XZCojvmT858LXRmgAa7NFqAFkS35hs4fH",
+    //   entrypoint: 'approve',
+    //   parameter: [ {string: 'tz1iA1KggftRjKtAxQs9QbGra2YdsB5MZmgX' }, {int: "42"} ] })
 
     // console.log(op)
     // await op.confirmation()
+
+    const st : StorageFA1_2 = await provider.tezos.storage('KT1L5WyeKsBMTvseptzcX9Vtbn7Qw4naW98X')
+    const v : any = await st.token_metadata.get('0')
+    console.log(v)
+    console.log(v[Object.keys(v)[1]].get('decimals'))
+    console.log(of_hex(v[Object.keys(v)[1]].get('decimals')))
 
   } catch (e) {
     console.error(e)
