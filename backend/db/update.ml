@@ -42,7 +42,7 @@ let upgrade_1_to_2 dbh version =
       last_level int not null,
       last timestamp not null,
       tokens_number bigint not null default 0,
-      next_token_id mpz not null default '0',
+      last_token_id mpz not null default 0::mpz,
       ledger_id mpz not null,
       ledger_key jsonb,
       ledger_value jsonb,
@@ -50,7 +50,8 @@ let upgrade_1_to_2 dbh version =
       name varchar,
       symbol varchar,
       minters varchar[],
-      uri_pattern varchar)|};
+      uri_pattern varchar,
+      counter mpz not null default 0::mpz)|};
 
     {|create table tzip21_creators(
       contract varchar not null,
