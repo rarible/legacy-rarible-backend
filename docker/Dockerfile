@@ -5,8 +5,9 @@ WORKDIR ./rarible
 RUN $(pg_config --bindir)/pg_ctl start -D ../data && \
 opam switch create --no-install . ocaml-system && \
 eval $(opam env) && \
-make deps && \
 sudo apt-get install postgresql-13-pgmp && \
+createdb crawlori && sudo -i -u functori -- psql crawlori -c 'create extension if not exists pgmp;' && \
+make deps && \
 POSTGRES_USER=functori make pgmp-extension && \
 make clean && \
 make

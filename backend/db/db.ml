@@ -2058,15 +2058,15 @@ let contract_updates dbh main l =
       let>? l =
         [%pgsql dbh
             "select count(distinct token_id), max(token_id) from tokens where contract = $c"] in
-      let tokens_number, next_token_id = match l with
+      let tokens_number, last_token_id = match l with
         | [] | _ :: _ :: _ -> 0L, Z.zero
         | [ tokens_number, last_token_id ] ->
           Option.value ~default:0L tokens_number,
-          Option.fold ~none:Z.zero ~some:Z.succ last_token_id in
+          Option.value ~default:Z.zero last_token_id in
       [%pgsql dbh
           "update contracts set \
            tokens_number = $tokens_number, \
-           next_token_id = $next_token_id \
+           last_token_id = $last_token_id \
            where address = $c"]) (SSet.elements contracts)
 
 let operator_updates dbh ?token_id ~operator ~add ~contract ~block ~level ~tsp ~source main =
@@ -2851,7 +2851,10 @@ let generate_nft_token_id ?dbh contract =
   Format.eprintf "generate_nft_token_id %s@."
     contract ;
   use dbh @@ fun dbh ->
-  let>? r = [%pgsql dbh "select next_token_id from contracts where address = $contract"] in
+  let>? r = [%pgsql dbh
+      "update contracts set counter = case when counter > last_token_id \
+       then counter + 1 else last_token_id + 1 end \
+       where address = $contract returning counter"] in
   match r with
   | [ i ] -> Lwt.return_ok {
       nft_token_id = i;
