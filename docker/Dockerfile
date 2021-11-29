@@ -6,6 +6,8 @@ RUN $(pg_config --bindir)/pg_ctl start -D ../data && \
 opam switch create --no-install . ocaml-system && \
 eval $(opam env) && \
 make deps && \
+sudo apt-get install postgresql-13-pgmp && \
+POSTGRES_USER=functori make pgmp-extension && \
 make clean && \
 make
 
@@ -13,7 +15,7 @@ FROM debian:latest as target
 LABEL Description="functori-nft container" Vendor="Functori"
 
 RUN apt-get update && \
-apt-get install -y sudo postgresql libcurl4-gnutls-dev librdkafka-dev zlib1g-dev && \
+apt-get install -y sudo postgresql libcurl4-gnutls-dev librdkafka-dev zlib1g-dev postgresql-13-pgmp && \
 addgroup --system functori && adduser --system --group --shell /bin/sh functori && \
 echo 'functori ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers && \
 sudo chown functori:functori /var/run/postgresql/
@@ -26,7 +28,7 @@ echo "listen_addresses='*'" >> data/postgresql.conf
 
 COPY --from=compilation --chown=functori /home/functori/rarible/deployment/crawler_config.json /home/functori/rarible/docker/entrypoint.sh /home/functori/rarible/_bin/* /home/functori/
 
-RUN $(pg_config --bindir)/pg_ctl start -D data && ./update_db
+RUN $(pg_config --bindir)/pg_ctl start -D data && createdb rarible && sudo -i -u functori -- psql rarible -c 'create extension if not exists pgmp' && ./update_db
 EXPOSE 5432
 VOLUME  ["/home/functori/data"]
 ENTRYPOINT [ "./entrypoint.sh" ]

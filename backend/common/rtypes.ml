@@ -852,7 +852,7 @@ type ft_param =
 
 type set_royalties = {
   roy_contract: string;
-  roy_token_id: string;
+  roy_token_id: A.big_integer;
   roy_royalties: token_royalties;
 } [@@deriving encoding]
 
@@ -928,12 +928,12 @@ type micheline_type_short = micheline_type_short micheline_type_aux
 
 module SMap = Map.Make(String)
 module TMap = Map.Make(struct
-    type t = (string * string * string)
+    type t = (string * z * string)
     let compare (c1, id1, o1) (c2, id2, o2) =
       let c = String.compare c1 c2 in
       if c <> 0 then c
       else
-        let id = String.compare id1 id2 in
+        let id = Z.compare id1 id2 in
         if id <> 0 then id
         else String.compare o1 o2
   end)
