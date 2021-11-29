@@ -35,17 +35,17 @@ function get_real_value(provider: Provider, order: OrderForm) : BigNumber {
   return make.value
 }
 
-export function match_order_to_struct(
+export async function match_order_to_struct(
   p: Provider,
   left : OrderForm,
-  right: OrderForm) : MichelsonData {
+  right: OrderForm) : Promise<MichelsonData> {
   return {
     prim: "Pair", args:[
-      order_to_struct(p, left),
+      await order_to_struct(p, left),
       { prim: "Pair", args:[
         (left.signature) ? some_struct({string : left.signature}) : none_struct(),
         { prim: "Pair", args:[
-          order_to_struct(p, right),
+          await order_to_struct(p, right),
           (right.signature) ? some_struct({string : right.signature}) : none_struct() ] } ] }] }
 }
 
@@ -78,7 +78,7 @@ export async function fill_order_arg(
     : (right.make.asset_type.asset_class === "XTZ" && right.salt == '0')
     ? get_real_value(provider, right)
     : undefined
-  const parameter = match_order_to_struct(provider, left, right)
+  const parameter = await match_order_to_struct(provider, left, right)
   return args.concat([{
     destination: provider.config.exchange, entrypoint: "matchOrders", parameter, amount }])
 }

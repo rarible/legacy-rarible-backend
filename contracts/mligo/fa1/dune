@@ -1,0 +1,4 @@
+(rule
+ (deps fa1.mligo)
+ (targets fa1.json)
+ (action (run ligo compile contract fa1.mligo --michelson-format json --protocol hangzhou -o fa1.json)))
