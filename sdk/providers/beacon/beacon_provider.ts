@@ -1,7 +1,7 @@
 import { BeaconWallet } from '@taquito/beacon-wallet'
 import { NetworkType, SigningType } from "@airgap/beacon-sdk"
 import { TezosToolkit, TransferParams, OriginateParams, OpKind } from "@taquito/taquito"
-import { TezosProvider } from "../../common/base"
+import { TezosProvider, b58enc, hex_to_uint8array, edpk_prefix } from "../../common/base"
 
 interface Network {
   node: string;
@@ -50,7 +50,10 @@ export async function beacon_provider(network: Network, name = "rarible") : Prom
   }
   const public_key = async() => {
     const account = await wallet.client.getActiveAccount()
-    if (account) return account.publicKey
+    if (account) {
+      if (account.publicKey.substring(0, 4) == 'edpk') return account.publicKey
+      else return b58enc(hex_to_uint8array(account.publicKey), edpk_prefix)
+    }
     else return undefined
   }
   const storage = async(contract: string) => {
