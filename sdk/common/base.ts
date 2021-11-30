@@ -228,10 +228,10 @@ export async function sign(p : Provider, message: string) : Promise<SignatureRes
   return { signature: await p.tezos.sign(message, "raw"), edpk }
 }
 
-const tz1_prefix =  new Uint8Array([6, 161, 159])
-const edpk_prefix =  new Uint8Array([13, 15, 37, 217])
+export const tz1_prefix =  new Uint8Array([6, 161, 159])
+export const edpk_prefix =  new Uint8Array([13, 15, 37, 217])
 
-export function b58enc(payload: Uint8Array, prefix: Uint8Array) {
+export function b58enc(payload: Uint8Array, prefix: Uint8Array) : string {
   const n = new Uint8Array(prefix.length + payload.length);
   n.set(prefix);
   n.set(payload, prefix.length);

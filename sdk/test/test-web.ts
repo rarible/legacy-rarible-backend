@@ -317,8 +317,6 @@ export default new Vue({
           if (op.contract) {
             this.deploy.result = `operation ${op.hash} confirmed -> new contract: ${op.contract}`
             this.nft_contracts.add({contract: op.contract, owner: this.deploy.owner })
-            console.log(this.nft_contracts)
-            console.log(JSON.stringify(Array.from(this.nft_contracts)))
             localStorage.setItem('nft_contracts', JSON.stringify(Array.from(this.nft_contracts)))
           } else {
             this.deploy.result = `operation ${op.hash} confirmed`
@@ -456,8 +454,6 @@ export default new Vue({
           this.sell.status = 'danger'
           this.sell.result = "invalid take asset"
         } else {
-          const p = (this.provider) ? this.provider : await provider(this.node, this.api_url)
-          this.provider = p
           const request : SellRequest = {
             maker,
             maker_edpk,
@@ -508,8 +504,6 @@ export default new Vue({
           this.bid.status = 'danger'
           this.bid.result = "invalid take asset"
         } else {
-          const p = (this.provider) ? this.provider : await provider(this.node, this.api_url)
-          this.provider = p
           const request : BidRequest = {
             maker,
             maker_edpk,
