@@ -513,7 +513,7 @@ let get_nft_item_creators dbh ~contract ~token_id =
 let get_nft_item_owners dbh ~contract ~token_id =
   [%pgsql dbh
       "select owner FROM tokens where main and \
-       amount > '0' and contract = $contract and token_id = $token_id"]
+       amount > 0::mpz and contract = $contract and token_id = $token_id"]
 
 let mk_nft_ownership dbh obj =
   let contract = obj#contract in
@@ -541,7 +541,7 @@ let get_nft_ownership_by_id ?dbh ?(old=false) contract token_id owner =
        contract, token_id, owner, last, tsp, amount, supply, metadata \
        from tokens where \
        main and contract = $contract and token_id = $token_id and \
-       owner = $owner and (amount > '0' or $old)"] in
+       owner = $owner and (amount > 0::mpz or $old)"] in
   match l with
   | [] -> Lwt.return_error (`hook_error "not found")
   | _ ->
@@ -1958,8 +1958,8 @@ let contract_updates_base dbh ~main ~contract ~block ~level ~tsp ~burn
   let factor = if burn then Z.neg main_s else main_s in
   let>? new_amount =
     let>? l = [%pgsql dbh
-        "update tokens set supply = supply + $factor::mpz * amount, \
-         amount = amount + $factor::mpz * amount, \
+        "update tokens set supply = supply + $factor * $amount::mpz, \
+         amount = amount + $factor * $amount::mpz, \
          last_block = case when $main then $block else last_block end, \
          last_level = case when $main then $level else last_level end, \
          last = case when $main then $tsp else last end \
@@ -1967,7 +1967,7 @@ let contract_updates_base dbh ~main ~contract ~block ~level ~tsp ~burn
          returning amount"] in
     one l in
   let>? () = [%pgsql dbh
-      "update tokens set supply = supply + $factor::mpz * amount, \
+      "update tokens set supply = supply + $factor::mpz * $amount, \
        last_block = case when $main then $block else last_block end, \
        last_level = case when $main then $level else last_level end, \
        last = case when $main then $tsp else last end
@@ -2112,10 +2112,10 @@ let transfer_updates dbh main ~contract ~block ~level ~tsp ~token_id ~source amo
   let>? new_dst_amount =
     let>? l = [%pgsql dbh
         "update tokens set amount = amount + $amount::mpz, \
-         metadata = case when amount = '0' then $meta else metadata end, \
-         royalties = case when amount = '0' then $royalties else royalties end, \
-         supply = case when amount = '0' then $supply else supply end, \
-         transaction = case when amount = '0' then $transaction else transaction end, \
+         metadata = case when amount = 0::mpz then $meta else metadata end, \
+         royalties = case when amount = 0::mpz then $royalties else royalties end, \
+         supply = case when amount = 0::mpz then $supply else supply end, \
+         transaction = case when amount = 0::mpz then $transaction else transaction end, \
          last_block = case when $main then $block else block end, \
          last_level = case when $main then $level else level end, \
          last = case when $main then $tsp else last end where token_id = $token_id and \
@@ -2372,7 +2372,7 @@ let get_nft_items_by_owner ?dbh ?include_meta ?continuation ?(size=50) owner =
       "select concat(contract, ':', token_id) as id, \
        contract, token_id, \
        last, amount, supply, metadata, tsp from tokens where \
-       main and metadata <> '{}' and owner = $owner and amount > '0' and \
+       main and metadata <> '{}' and owner = $owner and amount > 0::mpz and \
        ($no_continuation or \
        (last = $ts and \
        concat(contract, ':', token_id) collate \"C\" < $id) or \
@@ -2382,7 +2382,7 @@ let get_nft_items_by_owner ?dbh ?include_meta ?continuation ?(size=50) owner =
        limit $size64"] in
   let>? nft_items_total = [%pgsql dbh
       "select count(distinct (contract, token_id)) from tokens where \
-       main and metadata <> '{}' and owner = $owner and amount > '0'"] in
+       main and metadata <> '{}' and owner = $owner and amount > 0::mpz"] in
   let>? nft_items_total = match nft_items_total with
     | [ None ] -> Lwt.return_ok 0L
     | [ Some i64 ] -> Lwt.return_ok i64
@@ -2416,7 +2416,7 @@ let get_nft_items_by_creator ?dbh ?include_meta ?continuation ?(size=50) creator
        from tokens as t \
        left join tzip21_creators as c on t.token_id = c.token_id and t.contract = c.contract \
        where c.account = $creator and \
-       t.main and metadata <> '{}' and amount > '0' and \
+       t.main and metadata <> '{}' and amount > 0::mpz and \
        ($no_continuation or \
        (last = $ts and \
        concat(t.contract, ':', t.token_id) collate \"C\" < $id) or \
@@ -2428,7 +2428,7 @@ let get_nft_items_by_creator ?dbh ?include_meta ?continuation ?(size=50) creator
       "select count(distinct (t.token_id, t.contract, t,owner)) from tokens as t \
        left join tzip21_creators as c on t.token_id = c.token_id and t.contract = c.contract \
        where c.account = $creator and \
-       t.main and metadata <> '{}' and amount > '0'"] in
+       t.main and metadata <> '{}' and amount > 0::mpz"] in
   let>? nft_items_total = match nft_items_total with
     | [ None ] -> Lwt.return_ok 0L
     | [ Some i64 ] -> Lwt.return_ok i64
@@ -2460,7 +2460,7 @@ let get_nft_items_by_collection ?dbh ?include_meta ?continuation ?(size=50) cont
        contract, token_id, \
        last, amount, supply, metadata, tsp \
        from tokens where \
-       main and metadata <> '{}' and contract = $contract and amount > '0' and \
+       main and metadata <> '{}' and contract = $contract and amount > 0::mpz and \
        ($no_continuation or \
        (last = $ts and \
        concat(contract, ':', token_id) collate \"C\" < $id) or \
@@ -2470,7 +2470,7 @@ let get_nft_items_by_collection ?dbh ?include_meta ?continuation ?(size=50) cont
        limit $size64"] in
   let>? nft_items_total = [%pgsql dbh
       "select count(distinct (token_id, owner)) from tokens where \
-       main and metadata <> '{}' and contract = $contract and amount > '0'"] in
+       main and metadata <> '{}' and contract = $contract and amount > 0::mpz"] in
   let>? nft_items_total = match nft_items_total with
     | [ None ] -> Lwt.return_ok 0L
     | [ Some i64 ] -> Lwt.return_ok i64
@@ -2531,7 +2531,7 @@ let get_nft_all_items
        last, amount, supply, metadata, tsp \
        from tokens where \
        main and metadata <> '{}' and \
-       (supply > '0' and amount > '0' or (not $no_show_deleted and $show_deleted_v)) and \
+       (supply > 0::mpz and amount > 0::mpz or (not $no_show_deleted and $show_deleted_v)) and \
        ($no_last_updated_to or (last <= $last_updated_to_v)) and \
        ($no_last_updated_from or (last >= $last_updated_from_v)) and \
        ($no_continuation or \
@@ -2544,7 +2544,7 @@ let get_nft_all_items
   let>? nft_items_total = [%pgsql dbh
       "select count(distinct (owner, contract, token_id)) from tokens where \
        main and metadata <> '{}' and \
-       (supply > '0' and amount > '0' or (not $no_show_deleted and $show_deleted_v)) and \
+       (supply > 0::mpz and amount > 0::mpz or (not $no_show_deleted and $show_deleted_v)) and \
        ($no_last_updated_to or (last <= $last_updated_to_v)) and \
        ($no_last_updated_from or (last >= $last_updated_from_v))"] in
   let>? nft_items_total = match nft_items_total with
@@ -2804,7 +2804,7 @@ let get_nft_ownerships_by_item ?dbh ?continuation ?(size=50) contract token_id =
       "select concat(contract, ':', token_id, ':', owner) as id, \
        contract, token_id, owner, tsp, last, amount, supply, metadata \
        from tokens where \
-       main and contract = $contract and token_id = $token_id and amount > '0' and \
+       main and contract = $contract and token_id = $token_id and amount > 0::mpz and \
        ($no_continuation or \
        (last = $ts and concat(contract, ':', token_id, ':', owner) collate \"C\" < $id) or \
        (last < $ts)) \
@@ -2843,7 +2843,7 @@ let get_nft_all_ownerships ?dbh ?continuation ?(size=50) () =
       "select concat(contract, ':', token_id, ':', owner) as id, \
        contract, token_id, owner, tsp, last, amount, supply, metadata \
        from tokens where \
-       main and amount > '0' and \
+       main and amount > 0::mpz and \
        ($no_continuation or \
        (last = $ts and concat(contract, ':', token_id, ':', owner) collate \"C\" < $id) or \
        (last < $ts)) \
@@ -2852,7 +2852,7 @@ let get_nft_all_ownerships ?dbh ?continuation ?(size=50) () =
        limit $size64"] in
   let>? nft_ownerships_total = [%pgsql dbh
       "select count(distinct owner) from tokens where \
-       main and amount > '0'"] in
+       main and amount > 0::mpz"] in
   let>? nft_ownerships_total = match nft_ownerships_total with
     | [ None ] -> Lwt.return_ok 0L
     | [ Some i64 ] -> Lwt.return_ok i64
@@ -2872,7 +2872,7 @@ let generate_nft_token_id ?dbh contract =
   use dbh @@ fun dbh ->
   let>? r = [%pgsql dbh
       "update contracts set counter = case when counter > last_token_id \
-       then counter + 1 else last_token_id + 1 end \
+       then counter + 1::mpz else last_token_id + 1::mpz end \
        where address = $contract returning counter"] in
   match r with
   | [ i ] -> Lwt.return_ok {
