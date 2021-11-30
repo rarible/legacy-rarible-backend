@@ -67,8 +67,8 @@ let origin_param = pstring ~enc:A.address_enc "origin"
 (* TODO : ALL | RARIBLE | OPEN_SEA *)
 let platform_param = pstring "platform"
 let maker_param = pstring ~enc:A.address_enc "maker"
-let start_date_param = pint ~required:true ~enc:A.uint53 "startDate"
-let end_date_param = pint ~required:true ~enc:A.uint53 "endDate"
+let start_date_param = pint ~enc:A.uint53 "startDate"
+let end_date_param = pint ~enc:A.uint53 "endDate"
 (* TODO : ALL | RARIBLE | OPEN_SEA *)
 let source_param = pstring "source"
 let status_param = pstring ~enc:(Json_encoding.list order_status_enc) "status"
@@ -373,9 +373,9 @@ let get_required_status_param req =
   | None -> mk_invalid_argument status_param "param is required"
   | Some o ->
     try
-      match String.split_on_char ',' o with
-      | [] -> Ok [ EzEncoding.destruct order_bid_status_enc o ]
-      | l -> Ok (List.map (EzEncoding.destruct order_bid_status_enc) l)
+      let l = List.map (fun s -> EzEncoding.destruct order_bid_status_enc (Format.sprintf "%S" s))
+        @@ String.split_on_char ',' o in
+      Ok (Some l)
     with _ ->
       mk_invalid_argument
         status_param
@@ -386,9 +386,9 @@ let get_status_param req =
   | None -> Ok None
   | Some o ->
     try
-      match String.split_on_char ',' o with
-      | [] -> Ok (Some [ EzEncoding.destruct order_status_enc o ])
-      | l -> Ok (Some (List.map (EzEncoding.destruct order_status_enc) l))
+      let l = List.map (fun s -> EzEncoding.destruct order_status_enc (Format.sprintf "%S" s))
+        @@ String.split_on_char ',' o in
+      Ok (Some l)
     with _ ->
       mk_invalid_argument
         status_param
