@@ -897,14 +897,14 @@ paths:
             $ref: '#/components/schemas/OrderStatus'
       - name: startDate
         in: query
-        required: true
+        required: false
         schema:
           type: integer
           minimum: 0
           maximum: 9007199254740992
       - name: endDate
         in: query
-        required: true
+        required: false
         schema:
           type: integer
           minimum: 0
@@ -1128,14 +1128,14 @@ paths:
             $ref: '#/components/schemas/OrderStatus'
       - name: startDate
         in: query
-        required: true
+        required: false
         schema:
           type: integer
           minimum: 0
           maximum: 9007199254740992
       - name: endDate
         in: query
-        required: true
+        required: false
         schema:
           type: integer
           minimum: 0
