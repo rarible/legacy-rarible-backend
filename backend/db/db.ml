@@ -818,6 +818,23 @@ let produce_order_event_hash dbh hash =
   end >>= fun () ->
   Lwt.return_ok ()
 
+let produce_order_event_item dbh contract token_id =
+  let>? l =
+    [%pgsql.object dbh
+        "select hash from orders where \
+         (make_asset_type_contract = $contract and \
+         make_asset_type_token_id = $token_id) or
+         (take_asset_type_contract = $contract and \
+         take_asset_type_token_id = $token_id)"] in
+  iter_rp (fun r ->
+      let>? order = get_order ~dbh r#hash in
+      match order with
+      | Some (order, decs) ->
+        Rarible_kafka.produce_order_event ~decs (mk_order_event order) >>= fun () ->
+        Lwt.return_ok ()
+      | None -> Lwt.return_ok ())
+    l
+
 let produce_nft_item_event dbh contract token_id =
   let> item = get_nft_item_by_id ~dbh ~include_meta:true contract token_id in
   match item with
@@ -2041,7 +2058,8 @@ let contract_updates dbh main l =
               dbh ~main ~contract ~block ~level ~tsp ~burn:true ~account ~token_id ~amount in
           let>? () =
             produce_nft_item_event dbh contract token_id in
-          produce_nft_ownership_event dbh contract token_id account
+          let>? () = produce_nft_ownership_event dbh contract token_id account in
+          produce_order_event_item dbh contract token_id
         | _, _, Some uri, _, _ ->
           let>? () = metadata_uri_update dbh ~main ~contract ~block ~level ~tsp uri in
           produce_update_collection_event dbh contract
@@ -2107,7 +2125,8 @@ let transfer_updates dbh main ~contract ~block ~level ~tsp ~token_id ~source amo
     if main then
       let>? () = produce_nft_item_event dbh contract token_id in
       let>? () = produce_nft_ownership_event dbh contract token_id source in
-      produce_nft_ownership_event dbh contract token_id destination
+      let>? () = produce_nft_ownership_event dbh contract token_id destination in
+      produce_order_event_item dbh contract token_id
     else Lwt.return_ok () in
   let at = { at_token_id = token_id; at_contract = contract;
              at_amount = new_src_amount } in
