@@ -617,10 +617,10 @@ let get_metadata_formats dbh ~contract ~token_id =
     Lwt.return_ok (Some formats)
 
 let mk_tzip21_attribute r =
-  Lwt.return_ok {
+  Lwt.return_ok @@ {
     attribute_name = r#name ;
-    attribute_value = r#value ;
     attribute_type = r#typ ;
+    attribute_value = Ezjsonm.value_from_string r#value ;
   }
 
 let get_metadata_attributes dbh ~contract ~token_id =
@@ -690,12 +690,7 @@ let rarible_attributes_of_tzip21_attributes = function
   | None -> None
   | Some attr ->
     Option.some @@
-    List.map (fun a ->
-        { nft_item_attribute_key = a.attribute_name ;
-          nft_item_attribute_value = Some a.attribute_value ;
-          nft_item_attribute_type = a.attribute_type ;
-          nft_item_attribute_format = None ;
-        }) attr
+    List.map tzip21_attribute_to_rarible_attribute attr
 
 let rarible_meta_of_tzip21_meta meta =
   match meta with
@@ -1165,13 +1160,14 @@ let insert_mint_metadata_attributes dbh ~contract ~token_id ~block ~level ~tsp ~
   match metadata.tzip21_tm_attributes with
   | Some attributes ->
     iter_rp (fun a ->
+        let value = Ezjsonm.value_to_string a.attribute_value in
         [%pgsql dbh
             "insert into tzip21_attributes(contract, token_id, block, level, \
              tsp, name, value, type) \
              values($contract, $token_id, $block, $level, $tsp, \
-             ${a.attribute_name}, ${a.attribute_value}, $?{a.attribute_type}) \
+             ${a.attribute_name}, $value, $?{a.attribute_type}) \
              on conflict (name, contract, token_id) do update set \
-             value = ${a.attribute_value}, \
+             value = $value, \
              type = $?{a.attribute_type} \
              where tzip21_attributes.contract = $contract and \
              tzip21_attributes.token_id = $token_id and \

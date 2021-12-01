@@ -91,7 +91,7 @@ let upgrade_1_to_2 dbh version =
       tsp timestamp not null,
       main boolean not null default false,
       name varchar not null,
-      value varchar not null,
+      value jsonb not null,
       type varchar,
       primary key(name, contract, token_id))|};
 

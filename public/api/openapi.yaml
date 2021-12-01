@@ -1938,13 +1938,13 @@ components:
       properties:
         key:
           type: string
-        value:
-          type: string
+        value: {}
         type:
           type: string
         format:
           type: string
       required:
+      - value
       - key
       additionalProperties: false
     NftItemEvent:
