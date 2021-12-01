@@ -133,7 +133,7 @@ let update_extra_config ?dbh e =
 let price left right =
   if left.asset_value > Z.zero then
     if Z.rem right.asset_value left.asset_value <> Z.zero then
-      Error (`hook_error ("nft cannot be split"))
+      Ok Z.zero
     else
       Ok (Z.div right.asset_value left.asset_value)
   else Ok Z.zero
@@ -228,7 +228,7 @@ let mk_right_side obj =
       obj#oright_take_asset_type_token_id
       obj#oright_take_asset_value in
   {
-    order_activity_match_side_maker = Option.get obj#oright_taker ;
+    order_activity_match_side_maker = obj#oright_maker ;
     order_activity_match_side_hash = obj#oright_hash ;
     order_activity_match_side_asset = asset ;
     order_activity_match_side_type = mk_side_type asset ;
@@ -302,8 +302,7 @@ let mk_order_activity obj =
     | "match" ->
       let|$ matched, decs = mk_order_activity_match obj in
       OrderActivityMatch matched, decs
-    | "cancel" ->
-      mk_order_activity_cancel obj
+    | "cancel" -> mk_order_activity_cancel obj
     | _ as t -> Error (`hook_error ("unknown order activity type " ^ t)) in
   {
     order_act_id = obj#id ;
@@ -1507,6 +1506,27 @@ let reset_nft_item_meta_by_id ?dbh contract token_id =
   | _ ->
     Lwt.return_error (`hook_error (Printf.sprintf "several results on LIMIT 1"))
 
+let db_from_asset ?dbh asset =
+  match asset.asset_type with
+  | ATXTZ ->
+    Lwt.return_ok (string_of_asset_type asset.asset_type, None, None,
+                   asset.asset_value, Some 6l)
+  | ATFT {contract; token_id} ->
+    let no_token_id = Option.is_none token_id in
+    use dbh @@ fun dbh ->
+    let>? l = [%pgsql dbh "select decimals from ft_contracts where address = $contract \
+                           and ($no_token_id or token_id = $?token_id)"] in
+    begin match l with
+      | [] | _ :: _ :: _ -> Lwt.return_error (`hook_error "ft_contract_not_found")
+      | [ decimals ] ->
+        Lwt.return_ok
+          (string_of_asset_type asset.asset_type, Some contract, None,
+           asset.asset_value, Some decimals)
+    end
+  | ATNFT fa2 | ATMT fa2 ->
+    Lwt.return_ok (string_of_asset_type asset.asset_type, Some fa2.asset_contract,
+                   Some fa2.asset_token_id, asset.asset_value, None)
+
 let insert_royalties ~dbh ~op roy =
   let royalties = EzEncoding.(construct token_royalties_enc roy.roy_royalties) in
   let source = op.bo_op.source in
@@ -1695,12 +1715,64 @@ let insert_cancel ~dbh ~op (hash : Tzfunc.H.t) =
     dbh op.bo_hash op.bo_block op.bo_index op.bo_level op.bo_tsp hash
 
 let insert_do_transfers ~dbh ~op
-    ~(left : Tzfunc.H.t) ~left_maker ~left_asset ~left_salt
-    ~(right : Tzfunc.H.t) ~right_maker ~right_asset ~right_salt
+    ~(left : Tzfunc.H.t) ~left_maker_edpk ~left_maker ~left_make_asset
+    ~left_take_asset ~left_salt
+    ~(right : Tzfunc.H.t) ~right_maker_edpk ~right_maker ~right_make_asset
+    ~right_take_asset ~right_salt
     ~fill_make_value ~fill_take_value =
   let left = ( left :> string ) in
   let right = ( right :> string ) in
   let source = op.bo_op.source in
+  let>? () = match left_maker_edpk with
+    | None -> Lwt.return_ok ()
+    | Some maker_edpk ->
+      let signature = "NO_SIGNATURE" in
+      let>? left_make_class, left_make_contract,
+            left_make_token_id, left_make_asset_value, left_make_decimals =
+        db_from_asset left_make_asset in
+      let>? left_take_class, left_take_contract,
+            left_take_token_id, left_take_asset_value, left_take_decimals =
+        db_from_asset left_take_asset in
+      let created_at = CalendarLib.Calendar.now () in
+      [%pgsql dbh
+          "insert into orders(maker, maker_edpk, \
+           make_asset_type_class, make_asset_type_contract, make_asset_type_token_id, \
+           make_asset_value, make_asset_decimals, \
+           take_asset_type_class, take_asset_type_contract, take_asset_type_token_id, \
+           take_asset_value, take_asset_decimals, \
+           salt, signature, created_at, last_update_at, hash) \
+           values($?left_maker, $maker_edpk, \
+           $left_make_class, $?left_make_contract, $?left_make_token_id, \
+           $left_make_asset_value, $?left_make_decimals, \
+           $left_take_class, $?left_take_contract, $?left_take_token_id, \
+           $left_take_asset_value, $?left_take_decimals, \
+           $left_salt, $signature, $created_at, $created_at, $left) \
+           on conflict do nothing"] in
+  let>? () = match right_maker_edpk with
+    | None -> Lwt.return_ok ()
+    | Some maker_edpk ->
+      let signature = "NO_SIGNATURE" in
+      let>? right_make_class, right_make_contract,
+            right_make_token_id, right_make_asset_value, right_make_decimals =
+        db_from_asset right_make_asset in
+      let>? right_take_class, right_take_contract,
+            right_take_token_id, right_take_asset_value, right_take_decimals =
+        db_from_asset right_take_asset in
+      let created_at = CalendarLib.Calendar.now () in
+      [%pgsql dbh
+          "insert into orders(maker, maker_edpk, \
+           make_asset_type_class, make_asset_type_contract, make_asset_type_token_id, \
+           make_asset_value, make_asset_decimals, \
+           take_asset_type_class, take_asset_type_contract, take_asset_type_token_id, \
+           take_asset_value, take_asset_decimals, \
+           salt, signature, created_at, last_update_at, hash) \
+           values($?right_maker, $maker_edpk, \
+           $right_make_class, $?right_make_contract, $?right_make_token_id, \
+           $right_make_asset_value, $?right_make_decimals, \
+           $right_take_class, $?right_take_contract, $?right_take_token_id, \
+           $right_take_asset_value, $?right_take_decimals, \
+           $right_salt, $signature, $created_at, $created_at, $right) \
+           on conflict do nothing"] in
   [%pgsql dbh
       "insert into order_match(transaction, index, block, level, tsp, source, \
        hash_left, hash_right, fill_make_value, fill_take_value) \
@@ -1710,8 +1782,8 @@ let insert_do_transfers ~dbh ~op
        on conflict do nothing"] >>=? fun () ->
   insert_order_activity_match
     dbh op.bo_hash op.bo_block op.bo_index op.bo_level op.bo_tsp
-    left left_maker left_asset left_salt
-    right right_maker right_asset right_salt
+    left left_maker left_make_asset left_salt
+    right right_maker right_make_asset right_salt
 
 let check_ft_status ~dbh ~config ~crawled contract =
   if crawled then Lwt.return_ok true
@@ -1763,15 +1835,17 @@ let insert_transaction ~config ~dbh ~op tr =
             (short op.bo_hash) op.bo_index (hash :> string);
           insert_cancel ~dbh ~op hash
         | Ok (DoTransfers
-                {left; left_maker; left_asset; left_salt;
-                 right; right_maker; right_asset; right_salt;
+                {left; left_maker_edpk; left_maker; left_make_asset;
+                 left_take_asset; left_salt;
+                 right; right_maker_edpk; right_maker; right_make_asset;
+                 right_take_asset; right_salt;
                  fill_make_value; fill_take_value}) ->
           Format.printf "\027[0;35mdo transfers %s %ld %s %s\027[0m@."
             (short op.bo_hash) op.bo_index (short (left :> string)) (short (right :> string));
           insert_do_transfers
             ~dbh ~op
-            ~left ~left_maker ~left_asset ~left_salt
-            ~right ~right_maker ~right_asset ~right_salt
+            ~left ~left_maker_edpk ~left_maker ~left_make_asset ~left_take_asset ~left_salt
+            ~right ~right_maker_edpk ~right_maker ~right_make_asset ~right_take_asset ~right_salt
             ~fill_make_value ~fill_take_value
         | _ ->
           (* todo : match order *)
@@ -3663,29 +3737,6 @@ let insert_payouts dbh p hash_key =
           "insert into payouts (account, value, hash) \
            values ($account, $value, $hash_key)"])
     p
-
-
-
-let db_from_asset ?dbh asset =
-  match asset.asset_type with
-  | ATXTZ ->
-    Lwt.return_ok (string_of_asset_type asset.asset_type, None, None,
-                   asset.asset_value, Some 6l)
-  | ATFT {contract; token_id} ->
-    let no_token_id = Option.is_none token_id in
-    use dbh @@ fun dbh ->
-    let>? l = [%pgsql dbh "select decimals from ft_contracts where address = $contract \
-                           and ($no_token_id or token_id = $?token_id)"] in
-    begin match l with
-      | [] | _ :: _ :: _ -> Lwt.return_error (`hook_error "ft_contract_not_found")
-      | [ decimals ] ->
-        Lwt.return_ok
-          (string_of_asset_type asset.asset_type, Some contract, None,
-           asset.asset_value, Some decimals)
-    end
-  | ATNFT fa2 | ATMT fa2 ->
-    Lwt.return_ok (string_of_asset_type asset.asset_type, Some fa2.asset_contract,
-                   Some fa2.asset_token_id, asset.asset_value, None)
 
 let upsert_order ?dbh order =
   let order_elt = order.order_elt in

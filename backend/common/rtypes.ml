@@ -859,9 +859,11 @@ type set_royalties = {
 type exchange_param =
   | Cancel of Tzfunc.H.t
   | DoTransfers of
-      {left: Tzfunc.H.t; left_maker : string option; left_asset: A.big_integer asset ;
+      {left: Tzfunc.H.t; left_maker_edpk : string option; left_maker : string option;
+       left_make_asset: A.big_integer asset ; left_take_asset: A.big_integer asset ;
        left_salt: z ;
-       right: Tzfunc.H.t ; right_maker: string option; right_asset: A.big_integer asset ;
+       right: Tzfunc.H.t ; right_maker_edpk: string option; right_maker: string option;
+       right_make_asset: A.big_integer asset ; right_take_asset: A.big_integer asset ;
        right_salt: z;
        fill_make_value: A.big_integer; fill_take_value: A.big_integer}
 

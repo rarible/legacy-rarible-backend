@@ -2355,11 +2355,17 @@ let sell_nft_for_nft ?salt collection item1 item2 =
   | Error _err -> Lwt.fail_with "order_from"
   | Ok form -> call_upsert_order ~d:(None, None) form
 
-let sell_nft_for_tezos ?(salt=0) collection item1 amount =
+let sell_nft_for_tezos ?(no_upsert=false) ?(salt=0) collection item1 amount =
   let take = { asset_type = ATXTZ ; asset_value = Z.of_int amount } in
   match sell_order_form_from_item ~salt collection item1 take with
   | Error _err -> Lwt.fail_with "order_from"
-  | Ok form -> call_upsert_order ~d:(None, Some 6l) form
+  | Ok form ->
+    if not no_upsert then call_upsert_order ~d:(None, Some 6l) form
+    else
+      match order_from_order_form form with
+      | Ok order ->
+        Lwt.return_ok @@ Common.Balance.dec_order ~taked:6l order
+      | Error _err -> Lwt.fail_with "order_convert"
 
 let sell_nft_for_lugh ?(salt=0) collection item1 amount =
   let lugh = ATNFT { asset_contract = lugh_contract ; asset_token_id = Z.zero } in
@@ -2368,11 +2374,17 @@ let sell_nft_for_lugh ?(salt=0) collection item1 amount =
   | Error _err -> Lwt.fail_with "order_from"
   | Ok form -> call_upsert_order ~d:(None, None) form
 
-let buy_nft_for_tezos ?(salt=0) collection maker item1 amount =
+let buy_nft_for_tezos ?(no_upsert=false) ?(salt=0) collection maker item1 amount =
   let make = { asset_type = ATXTZ ; asset_value = Z.of_int amount } in
   match buy_order_form_from_item ~salt collection item1 maker make with
   | Error _err -> Lwt.fail_with "order_from"
-  | Ok form -> call_upsert_order ~d:(Some 6l, None) form
+  | Ok form ->
+    if not no_upsert then call_upsert_order ~d:(Some 6l, None) form
+    else
+      match order_from_order_form form with
+      | Ok order ->
+        Lwt.return_ok @@ Common.Balance.dec_order ~maked:6l order
+      | Error _err -> Lwt.fail_with "order_convert"
 
 let buy_nft_for_lugh ?(salt=0) collection maker item1 amount =
   let lugh = ATNFT { asset_contract = lugh_contract ; asset_token_id = Z.zero } in

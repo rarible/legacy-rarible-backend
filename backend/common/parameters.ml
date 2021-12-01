@@ -217,7 +217,6 @@ let parse_cancel m =
     Ok (Cancel hash)
   | _ -> unexpected_michelson
 
-
 let parse_do_transfers m =
   match Typed_mich.(parse_value do_transfers_type m) with
   | Ok (`tuple [
@@ -228,13 +227,13 @@ let parse_do_transfers m =
         left_maker;
         `tuple [ `tuple [ left_m_asset_class; left_m_asset_data ]; `nat left_m_asset_value ];
         _left_taker;
-        `tuple [ `tuple [ left_t_asset_class; left_t_asset_data ]; _ ];
+        `tuple [ `tuple [ left_t_asset_class; left_t_asset_data ]; `nat left_t_asset_value ];
         `nat left_salt; _; _; _; _ ];
       `tuple [
         right_maker;
         `tuple [ `tuple [ right_m_asset_class; right_m_asset_data ]; `nat right_m_asset_value ];
         _right_taker;
-        `tuple [ `tuple [ right_t_asset_class; right_t_asset_data ]; _ ];
+        `tuple [ `tuple [ right_t_asset_class; right_t_asset_data ]; `nat right_t_asset_value ];
         `nat right_salt; _; _; _; _ ];
       _fee_side; _royalties ]) ->
     let$ left_maker_edpk = parse_option_key left_maker in
@@ -242,16 +241,18 @@ let parse_do_transfers m =
     let$ left_mat = parse_asset_type left_m_asset_class left_m_asset_data in
     let$ left_tat = parse_asset_type left_t_asset_class left_t_asset_data in
     let$ left = Utils.hash_key left_maker_edpk left_mat left_tat left_salt in
-    let left_asset = { asset_type = left_mat ; asset_value = left_m_asset_value } in
+    let left_make_asset = { asset_type = left_mat ; asset_value = left_m_asset_value } in
+    let left_take_asset = { asset_type = left_tat ; asset_value = left_t_asset_value } in
     let$ right_maker_edpk = parse_option_key right_maker in
     let right_maker = Option.map pk_to_pkh_exn right_maker_edpk in
     let$ right_mat = parse_asset_type right_m_asset_class right_m_asset_data in
     let$ right_tat = parse_asset_type right_t_asset_class right_t_asset_data in
     let$ right = Utils.hash_key right_maker_edpk right_mat right_tat right_salt in
-    let right_asset = { asset_type = right_mat ; asset_value = right_m_asset_value } in
+    let right_make_asset = { asset_type = right_mat ; asset_value = right_m_asset_value } in
+    let right_take_asset = { asset_type = right_tat ; asset_value = right_t_asset_value } in
     Ok (DoTransfers
-          {left; left_maker; left_asset; left_salt;
-           right; right_maker; right_asset; right_salt;
+          {left; left_maker_edpk; left_maker; left_make_asset; left_take_asset; left_salt;
+           right; right_maker_edpk; right_maker; right_make_asset; right_take_asset; right_salt;
            fill_make_value; fill_take_value})
   | _ -> unexpected_michelson
 
