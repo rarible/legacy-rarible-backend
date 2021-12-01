@@ -9,8 +9,8 @@ interface Network {
 }
 
 export async function beacon_provider(network: Network, name = "rarible") : Promise<TezosProvider> {
-  const wallet = new BeaconWallet({ name })
   const type = (!network.network) ? NetworkType.CUSTOM : network.network
+  const wallet = new BeaconWallet({ name, preferredNetwork: type })
   await wallet.requestPermissions({ network: {type, rpcUrl: network.node} })
   const tk = new TezosToolkit(network.node)
   tk.setProvider({ wallet })
