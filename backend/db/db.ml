@@ -406,7 +406,7 @@ let get_order_updates ?dbh obj make maker take data =
          where main and \
          (hash_left = $hash or hash_right = $hash) order by tsp"] in
     let fill = get_fill hash matches in
-    let|>? make_balance = get_make_balance make maker in
+    let|>? make_balance = get_make_balance ~dbh make maker in
     let cancelled = false in
     let make_stock =
       calculate_make_stock make take data fill make_balance cancelled in
@@ -830,7 +830,7 @@ let produce_order_event_item dbh old_owner contract token_id =
       | None -> Lwt.return_ok ()
       | Some (order, decs) ->
         match order.order_elt.order_elt_status with
-        | OINACTIVE ->
+        | OINACTIVE | OACTIVE ->
           Rarible_kafka.produce_order_event ~decs (mk_order_event order) >>= fun () ->
           Lwt.return_ok ()
         | _ -> Lwt.return_ok ())
