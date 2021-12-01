@@ -135,7 +135,7 @@ type item_transfer = {
 
 type nft_item_attribute = {
   nft_item_attribute_key : string ;
-  nft_item_attribute_value : string option ; [@opt]
+  nft_item_attribute_value : Json_repr.ezjsonm ;
   nft_item_attribute_type : string option; [@opt]
   nft_item_attribute_format : string option; [@opt]
 } [@@deriving encoding {title="NftItemAttribute"; def_title}]
@@ -999,11 +999,25 @@ type tzip21_format = {
 
 type tzip21_formats = tzip21_format list [@@deriving encoding]
 
+let name_or_trait_type_enc = Json_encoding.(union [
+    case (obj1 (req "name" string)) (fun s -> Some s ) (fun s -> s) ;
+    case (obj1 (req "trait_type" string)) (fun s -> Some s ) (fun s -> s) ;
+  ])
+
+let type_or_display_type_enc =
+  let open Json_encoding in
+  conv
+    (fun s -> (s, None))
+    (function None, None -> None | Some s, _ -> Some s | None, Some s -> Some s)
+    (obj2
+       (opt "type" string)
+       (opt "display_type" string))
+
 type tzip21_attribute = {
-  attribute_name : string ;
-  attribute_value : string ;
-  attribute_type : string option ;
-} [@@deriving encoding]
+  attribute_name : string ; [@encoding name_or_trait_type_enc] [@merge]
+  attribute_type : string option ; [@encoding type_or_display_type_enc] [@merge]
+  attribute_value : Json_repr.ezjsonm ;
+} [@@deriving encoding {debug}]
 
 type tzip21_attributes = tzip21_attribute list [@@deriving encoding]
 
