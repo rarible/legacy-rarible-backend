@@ -582,17 +582,21 @@ let call_get_nft_ownerships_by_item contract tid =
 let call_get_nft_all_ownerships () =
   let open EzAPI in
   let url = BASE !api in
-  let rec aux ?continuation acc =
-    let params = match continuation with
-      | None -> [ ]
-      | Some c -> [ Api.continuation_param, S c ] in
-    let> r = EzReq_lwt.get0 url ~params Api.get_nft_all_ownerships_s in
-    let>? ownerships = Lwt.return @@ handle_ezreq_result r in
-    match ownerships.nft_ownerships_continuation with
-    | None -> Lwt.return_ok @@ ownerships.nft_ownerships_ownerships @ acc
-    | Some continuation ->
-      aux ~continuation (ownerships.nft_ownerships_ownerships @ acc) in
-  aux []
+  let> r = EzReq_lwt.get0 url ~params:[] Api.get_nft_all_ownerships_s in
+  let>? ownerships = Lwt.return @@ handle_ezreq_result r in
+  Lwt.return_ok @@ ownerships.nft_ownerships_ownerships
+
+  (* let rec aux ?continuation acc =
+   *   let params = match continuation with
+   *     | None -> [ ]
+   *     | Some c -> [ Api.continuation_param, S c ] in
+   *   let> r = EzReq_lwt.get0 url ~params Api.get_nft_all_ownerships_s in
+   *   let>? ownerships = Lwt.return @@ handle_ezreq_result r in
+   *   match ownerships.nft_ownerships_continuation with
+   *   | None -> Lwt.return_ok @@ ownerships.nft_ownerships_ownerships @ acc
+   *   | Some continuation ->
+   *     aux ~continuation (ownerships.nft_ownerships_ownerships @ acc) in
+   * aux [] *)
 
 let call_get_activities filter =
   (* Format.eprintf "%s\n%!" (EzEncoding.construct nft_activity_filter_enc filter) ; *)
@@ -2465,7 +2469,7 @@ let match_orders_tezos ?royalties ?(exchange=exchange_v2) ~kind ~privacy () =
     let order1 = Common.Balance.z_order ~taked:6l order1 in
     (* TODO : check order *)
     let source2 = generate_address ~diff:item1.it_owner.tz1 () in
-    let>? order2 = buy_nft_for_tezos c.col_kt1 source2 item1 1 in
+    let>? order2 = buy_nft_for_tezos ~no_upsert:true c.col_kt1 source2 item1 1 in
     let order2 = Common.Balance.z_order ~maked:6l order2 in
     (* TODO : check order *)
     begin
