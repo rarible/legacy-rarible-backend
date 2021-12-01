@@ -817,21 +817,23 @@ let produce_order_event_hash dbh hash =
   end >>= fun () ->
   Lwt.return_ok ()
 
-let produce_order_event_item dbh contract token_id =
+let produce_order_event_item dbh old_owner contract token_id =
   let>? l =
     [%pgsql.object dbh
-        "select hash from orders where \
-         (make_asset_type_contract = $contract and \
-         make_asset_type_token_id = $token_id) or
-         (take_asset_type_contract = $contract and \
-         take_asset_type_token_id = $token_id)"] in
+        "select hash from orders \
+         where make_asset_type_contract = $contract and \
+         make_asset_type_token_id = $token_id and \
+         maker = $old_owner"] in
   iter_rp (fun r ->
       let>? order = get_order ~dbh r#hash in
       match order with
+      | None -> Lwt.return_ok ()
       | Some (order, decs) ->
-        Rarible_kafka.produce_order_event ~decs (mk_order_event order) >>= fun () ->
-        Lwt.return_ok ()
-      | None -> Lwt.return_ok ())
+        match order.order_elt.order_elt_status with
+        | OINACTIVE ->
+          Rarible_kafka.produce_order_event ~decs (mk_order_event order) >>= fun () ->
+          Lwt.return_ok ()
+        | _ -> Lwt.return_ok ())
     l
 
 let produce_nft_item_event dbh contract token_id =
@@ -2133,7 +2135,7 @@ let contract_updates dbh main l =
           let>? () =
             produce_nft_item_event dbh contract token_id in
           let>? () = produce_nft_ownership_event dbh contract token_id account in
-          produce_order_event_item dbh contract token_id
+          produce_order_event_item dbh account contract token_id
         | _, _, Some uri, _, _ ->
           let>? () = metadata_uri_update dbh ~main ~contract ~block ~level ~tsp uri in
           produce_update_collection_event dbh contract
@@ -2200,7 +2202,7 @@ let transfer_updates dbh main ~contract ~block ~level ~tsp ~token_id ~source amo
       let>? () = produce_nft_item_event dbh contract token_id in
       let>? () = produce_nft_ownership_event dbh contract token_id source in
       let>? () = produce_nft_ownership_event dbh contract token_id destination in
-      produce_order_event_item dbh contract token_id
+      produce_order_event_item dbh source contract token_id
     else Lwt.return_ok () in
   let at = { at_token_id = token_id; at_contract = contract;
              at_amount = new_src_amount } in
