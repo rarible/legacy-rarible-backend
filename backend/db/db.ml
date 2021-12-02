@@ -262,7 +262,7 @@ let mk_order_activity_match obj =
     order_activity_match_log_index = 0 ;
   }, (left_decimals, right_decimals)
 
-let mk_order_activity_cancel obj =
+let mk_order_activity_cancel_list obj =
   let$ make = mk_asset
       obj#make_asset_type_class
       obj#make_asset_type_contract
@@ -284,11 +284,31 @@ let mk_order_activity_cancel obj =
     order_activity_cancel_bid_log_index = 0
   } in
   let decs = (obj#make_asset_decimals, obj#take_asset_decimals) in
-  match make.asset_type with
-  | ATNFT _ | ATMT _ ->
-    OrderActivityCancelList bid, decs
-  | _ ->
-    OrderActivityCancelBid bid, decs
+  OrderActivityCancelList bid, decs
+
+let mk_order_activity_cancel_bid obj =
+  let$ make = mk_asset
+      obj#make_asset_type_class
+      obj#make_asset_type_contract
+      obj#make_asset_type_token_id
+      obj#make_asset_value in
+  let|$ take = mk_asset
+      obj#take_asset_type_class
+      obj#take_asset_type_contract
+      obj#take_asset_type_token_id
+      obj#take_asset_value in
+  let bid = {
+    order_activity_cancel_bid_hash = obj#o_hash;
+    order_activity_cancel_bid_maker = obj#maker ;
+    order_activity_cancel_bid_make = make.asset_type ;
+    order_activity_cancel_bid_take = take.asset_type ;
+    order_activity_cancel_bid_transaction_hash = Option.get obj#transaction ;
+    order_activity_cancel_bid_block_hash = Option.get obj#block ;
+    order_activity_cancel_bid_block_number = Int64.of_int32 @@ Option.get obj#level ;
+    order_activity_cancel_bid_log_index = 0
+  } in
+  let decs = (obj#make_asset_decimals, obj#take_asset_decimals) in
+  OrderActivityCancelBid bid, decs
 
 let mk_order_activity obj =
   let|$ act, decs =
@@ -302,7 +322,8 @@ let mk_order_activity obj =
     | "match" ->
       let|$ matched, decs = mk_order_activity_match obj in
       OrderActivityMatch matched, decs
-    | "cancel" -> mk_order_activity_cancel obj
+    | "cancel_list" -> mk_order_activity_cancel_list obj
+    | "cancel_bid" -> mk_order_activity_cancel_bid obj
     | _ as t -> Error (`hook_error ("unknown order activity type " ^ t)) in
   {
     order_act_id = obj#id ;
@@ -1530,7 +1551,7 @@ let insert_order_activity ~decs dbh activity =
       let level = Some (Int64.to_int32 act.order_activity_cancel_bid_block_number) in
       insert_order_activity
         dbh activity.order_act_id None None hash transaction block
-        level activity.order_act_date "cancel"
+        level activity.order_act_date "cancel_list"
     | OrderActivityCancelBid act ->
       let hash = Some act.order_activity_cancel_bid_hash in
       let transaction = Some act.order_activity_cancel_bid_transaction_hash in
@@ -1538,7 +1559,7 @@ let insert_order_activity ~decs dbh activity =
       let level = Some (Int64.to_int32 act.order_activity_cancel_bid_block_number) in
       insert_order_activity
         dbh activity.order_act_id None None hash transaction block
-        level activity.order_act_date "cancel"
+        level activity.order_act_date "cancel_bid"
     | OrderActivityMatch act ->
       let left = Some act.order_activity_match_left.order_activity_match_side_hash in
       let right = Some act.order_activity_match_right.order_activity_match_side_hash in

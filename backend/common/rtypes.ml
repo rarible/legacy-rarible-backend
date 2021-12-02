@@ -556,9 +556,13 @@ type order_activity_filter_all_type =
   | OALLBID
   | OALLLIST
   | OALLMATCH
+  | OALLCANCEL_LIST
+  | OALLCANCEL_BID
 [@@deriving encoding {enum; title="OrderActivityFilterAllType"; def_title}]
 
 type order_activity_filter_user_type = [
+  | `CANCEL_LIST
+  | `CANCEL_BID
   | `MAKE_BID
   | `GET_BID
   | `LIST
