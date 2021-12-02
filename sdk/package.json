@@ -17,6 +17,7 @@
     "bs58check": "^2.1.2",
     "json-formatter-js": "^2.3.4",
     "keccak": "^3.0.2",
+    "kukai-embed": "^0.7.0-beta.0",
     "vue": "^2.6.14",
     "yargs": "^17.2.1"
   },

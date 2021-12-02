@@ -158,7 +158,7 @@ export async function sign_order(
   order: OrderForm) : Promise<string> {
   let o = await order_to_struct(provider, order)
   let h = pack(o, order_type)
-  const signature = provider.tezos.sign(h)
+  const {signature} = await provider.tezos.sign(h)
   return signature
 }
 

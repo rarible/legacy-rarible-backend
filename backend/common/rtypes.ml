@@ -1,20 +1,5 @@
 type z = Z.t [@encoding Json_encoding.(conv Z.to_string Z.of_string string)] [@@deriving encoding]
 
-(* module ZQ = struct
- *   type t =
- *     | Q of {v: Z.t; d: int}
- *     | Z of Q.t
- *   let add t1 t2 = {v=Z.add t1.v t2.v; d=t1.d}
- *   let sub t1 t2 = {v=Z.sub t1.v t2.v; d=t1.d}
- *   let div t1 t2 = {v=Z.div t1.v t2.v; d=t1.d}
- *   let mul t1 t2 = {v=Z.mul t1.v t2.v; d=t1.d}
- *   let pow t n = Z.pow t.v n
- *
- *   let enc = Json_encoding.(conv to_string of_string string)
- *   let encd decimals = Json_encoding.(conv to_string (of_string ~decimals) string)
- * end *)
-
-
 module A = struct
   let uint53 =
     Json_encoding.ranged_int53 ~minimum:0L ~maximum:(Int64.shift_left 1L 53) "uint53"

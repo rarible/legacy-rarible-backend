@@ -1330,6 +1330,7 @@ let get_order_activities req input =
    section=order_activities_section}]
 
 let validate _req input =
+  (* todo check for secp256k1 and p256 *)
   match Tzfunc.Crypto.pk_to_pkh input.svf_edpk with
   | Error e -> return (Error {code=`BAD_REQUEST; message=Let.string_of_error e})
   | Ok addr ->

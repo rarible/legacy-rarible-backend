@@ -24,6 +24,7 @@
             <b-nav-item :active="path=='tokens'" @click="path='tokens'">Tokens</b-nav-item>
             <b-nav-item :active="path=='orders'" @click="path='orders'">Orders</b-nav-item>
             <b-nav-item :active="path=='api'" @click="path='api'">API</b-nav-item>
+            <b-nav-item :active="path=='sign'" @click="path='sign'">Sign</b-nav-item>
             <b-nav-item :active="path=='test'" @click="path='test'">Test</b-nav-item>
           </b-navbar-nav>
           <b-navbar-nav class="ms-auto">
@@ -32,6 +33,9 @@
               </b-input-group>
               <b-input-group prepend="API" class="mx-2">
                 <b-form-input size="sm" v-model="api_url"></b-form-input>
+              </b-input-group>
+              <b-input-group prepend="Wallet" class="mx-2">
+                <b-form-input size="sm" v-model="wallet"></b-form-input>
               </b-input-group>
           </b-navbar-nav>
         </b-collapse>
@@ -378,6 +382,17 @@
         <div v-if="api.result" :class="'text-center text-'+api.status">{{ api.result }}</div>
         <div id="api-request-result"></div>
       </b-container>
+
+      <b-container v-if="path=='sign'" class="mt-4">
+        <b-form-group label="Message *" class="mb-2">
+          <b-form-textarea v-model="sign.message"></b-form-textarea>
+        </b-form-group>
+        <div class="text-center" class="mb-2">
+          <b-button @click="sign_message()">SIGN</b-button>
+        </div>
+        <div id="sign-result"></div>
+      </b-container>
+
 
       <b-container v-if="path=='test'" class="mt-4">
         <h3 class="text-center mt-5 pt-5">

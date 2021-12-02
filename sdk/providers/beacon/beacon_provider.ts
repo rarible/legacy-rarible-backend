@@ -1,20 +1,21 @@
 import { BeaconWallet } from '@taquito/beacon-wallet'
 import { NetworkType, SigningType } from "@airgap/beacon-sdk"
 import { TezosToolkit, TransferParams, OriginateParams, OpKind } from "@taquito/taquito"
-import { TezosProvider, b58enc, hex_to_uint8array, edpk_prefix } from "../../common/base"
+import { TezosProvider, b58enc, hex_to_uint8array, edpk_prefix, tezos_signed_message } from "../../common/base"
 
-interface Network {
+export interface BeaconNetwork {
   node: string;
   network?: NetworkType;
 }
 
-export async function beacon_provider(network: Network, name = "rarible") : Promise<TezosProvider> {
+export type BeaconWalletKind = "temple" | "kukai" | "spire" | "airgap" | "galleon" | "umami"
+
+export async function beacon_provider(network: BeaconNetwork, name = "rarible", preferred_wallet ?: BeaconWalletKind) : Promise<TezosProvider> {
   const type = (!network.network) ? NetworkType.CUSTOM : network.network
   const wallet = new BeaconWallet({ name, preferredNetwork: type })
   await wallet.requestPermissions({ network: {type, rpcUrl: network.node} })
   const tk = new TezosToolkit(network.node)
   tk.setProvider({ wallet })
-
   const transfer = async(arg: TransferParams) => {
     const op = await tk.wallet.transfer(arg).send()
     return { hash: op.opHash, confirmation: async() => { await op.confirmation() } }
@@ -38,12 +39,24 @@ export async function beacon_provider(network: Network, name = "rarible") : Prom
     const op = await tk.wallet.batch(args2).send()
     return { hash: op.opHash, confirmation: async() => { await op.confirmation() } }
   }
-  const sign = async(bytes: string, type?: "raw" | "micheline") => {
-    const { signature } = await wallet.client.requestSignPayload({
-      signingType: (type=="raw") ? SigningType.RAW : SigningType.MICHELINE,
-      payload: bytes
-    })
-    return signature
+  const sign = async(bytes: string, type?: "message" | "operation") => {
+    let signingType = SigningType.MICHELINE
+    let payload = bytes
+    if (type=='message') {
+      switch (preferred_wallet) {
+        case 'spire':
+        case 'airgap':
+        case 'galleon':
+        case 'umami':
+          signingType = SigningType.RAW
+        case 'temple':
+        case 'kukai':
+          signingType = SigningType.MICHELINE
+          payload = tezos_signed_message(bytes)
+      }
+    }
+    const { signature } = await wallet.client.requestSignPayload({ signingType, payload })
+    return { signature, message: payload }
   }
   const address = async() => {
     return wallet.getPKH()
@@ -51,7 +64,7 @@ export async function beacon_provider(network: Network, name = "rarible") : Prom
   const public_key = async() => {
     const account = await wallet.client.getActiveAccount()
     if (account) {
-      if (account.publicKey.substring(0, 4) == 'edpk') return account.publicKey
+      if (['edpk', 'sppk', 'p2pk'].includes(account.publicKey.substring(0, 4))) return account.publicKey
       else return b58enc(hex_to_uint8array(account.publicKey), edpk_prefix)
     }
     else return undefined
