@@ -225,7 +225,7 @@ export function of_hex(s: string) : string {
 
 export function tezos_signed_message(msg: string, domain = "rarible.com") : string {
   const date = new Date()
-  return pack_string(`Tezos Signed Message: ${domain} ${date.toISOString()} ${msg}`)
+  return `Tezos Signed Message: ${domain} ${date.toISOString()} ${msg}`
 }
 
 export async function sign(p : Provider, message: string, type: "operation" | "message") : Promise<SignatureResult> {
