@@ -686,36 +686,6 @@ let mk_nft_item_meta dbh ~contract ~token_id =
       tzip21_tm_should_prefer_symbol = r#should_prefer_symbol ;
     }
 
-let rarible_attributes_of_tzip21_attributes = function
-  | None -> None
-  | Some attr ->
-    Option.some @@
-    List.map tzip21_attribute_to_rarible_attribute attr
-
-let rarible_meta_of_tzip21_meta meta =
-  match meta with
-  | None -> None
-  | Some m ->
-    Some {
-      nft_item_meta_name = Option.value ~default:"Unnamed item" m.tzip21_tm_name ;
-      nft_item_meta_description = m.tzip21_tm_description ;
-      nft_item_meta_attributes = rarible_attributes_of_tzip21_attributes m.tzip21_tm_attributes ;
-      nft_item_meta_image =
-        begin match m.tzip21_tm_display_uri with
-          | Some _ as uri -> uri
-          | None ->
-            begin match m.tzip21_tm_thumbnail_uri with
-              | Some _ as uri -> uri
-              | None ->
-                begin match m.tzip21_tm_artifact_uri with
-                  | Some _ as uri -> uri
-                  | None -> None
-                end
-            end
-        end ;
-      nft_item_meta_animation = None ;
-    }
-
 let mk_nft_item dbh ?include_meta obj =
   let contract = obj#contract in
   let token_id = obj#token_id in
