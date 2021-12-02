@@ -455,7 +455,7 @@ let mk_order ?dbh order_obj =
   let>? origin_fees = get_order_origin_fees ?dbh order_obj#hash in
   let>? payouts = get_order_payouts ?dbh order_obj#hash in
   let data = {
-    order_rarible_v2_data_v1_data_type = "RARIBLE_V2_DATA_V1" ;
+    order_rarible_v2_data_v1_data_type = "V1" ;
     order_rarible_v2_data_v1_payouts = payouts ;
     order_rarible_v2_data_v1_origin_fees = origin_fees ;
   } in
