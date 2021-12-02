@@ -1,7 +1,7 @@
 import { BeaconWallet } from '@taquito/beacon-wallet'
 import { NetworkType, SigningType } from "@airgap/beacon-sdk"
 import { TezosToolkit, TransferParams, OriginateParams, OpKind } from "@taquito/taquito"
-import { TezosProvider, b58enc, hex_to_uint8array, edpk_prefix, tezos_signed_message, pack_string } from "../../common/base"
+import { TezosProvider, b58enc, hex_to_uint8array, edpk_prefix, tezos_signed_message_prefix, pack_string } from "../../common/base"
 
 export interface BeaconNetwork {
   node: string;
@@ -41,7 +41,7 @@ export async function beacon_provider(network: BeaconNetwork, name = "rarible", 
   }
   const sign = async(bytes: string, type?: "message" | "operation") => {
     let signingType = SigningType.MICHELINE
-    let message = bytes
+    let prefix = ''
     let payload = bytes
     if (type=='message') {
       switch (preferred_wallet) {
@@ -53,12 +53,12 @@ export async function beacon_provider(network: BeaconNetwork, name = "rarible", 
         case 'temple':
         case 'kukai':
           signingType = SigningType.MICHELINE
-          message = tezos_signed_message(bytes)
-          payload = pack_string(message)
+          prefix = tezos_signed_message_prefix()
+          payload = pack_string(prefix + bytes)
       }
     }
     const { signature } = await wallet.client.requestSignPayload({ signingType, payload })
-    return { signature, message }
+    return { signature, prefix }
   }
   const address = async() => {
     return wallet.getPKH()

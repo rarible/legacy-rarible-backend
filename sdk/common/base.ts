@@ -59,7 +59,7 @@ export interface TezosProvider {
   transfer: (arg: TransferParams) => Promise<OperationResult>;
   originate: (arg: OriginateParams) => Promise<OperationResult>;
   batch: (args: TransferParams[]) => Promise<OperationResult>;
-  sign: (bytes: string, type?: "operation" | "message") => Promise<{signature: string, message: string}>;
+  sign: (bytes: string, type?: "operation" | "message") => Promise<{signature: string, prefix: string}>;
   address: () => Promise<string>;
   public_key: () => Promise<string | undefined>;
   storage: (contract: string) => Promise<any>;
@@ -83,7 +83,7 @@ export interface TransactionArg {
 export interface SignatureResult {
   signature: string;
   edpk: string;
-  message: string;
+  prefix: string;
 }
 
 export function asset_type_to_json(a: AssetType) : any {
@@ -223,9 +223,9 @@ export function of_hex(s: string) : string {
   return decoder.decode(a)
 }
 
-export function tezos_signed_message(msg: string, domain = "rarible.com") : string {
+export function tezos_signed_message_prefix(domain = "rarible.com") : string {
   const date = new Date()
-  return `Tezos Signed Message: ${domain} ${date.toISOString()} ${msg}`
+  return `Tezos Signed Message: ${domain} ${date.toISOString()} `
 }
 
 export async function sign(p : Provider, message: string, type: "operation" | "message") : Promise<SignatureResult> {

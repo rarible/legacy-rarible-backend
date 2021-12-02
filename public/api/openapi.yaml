@@ -2687,6 +2687,8 @@ components:
           type: string
         signature:
           $ref: '#/components/schemas/Edsig'
+        prefix:
+          type: string
       required:
       - signature
       - message

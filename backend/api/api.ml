@@ -1331,17 +1331,18 @@ let get_order_activities req input =
 
 let validate _req input =
   (* todo check for secp256k1 and p256 *)
+  let message = input.svf_prefix ^ input.svf_message in
   match Tzfunc.Crypto.pk_to_pkh input.svf_edpk with
   | Error e -> return (Error {code=`BAD_REQUEST; message=Let.string_of_error e})
   | Ok addr ->
     if addr <> input.svf_address then return_ok false
     else
       match Tzfunc.Crypto.Ed25519.verify ~edpk:input.svf_edpk ~edsig:input.svf_signature
-              ~bytes:(Tzfunc.Raw.mk input.svf_message) with
+              ~bytes:(Tzfunc.Raw.mk message) with
       | Ok true -> return_ok true
       | Error e -> return (Error {code=`BAD_REQUEST; message=Let.string_of_error e})
       | Ok false ->
-        match Tzfunc.Forge.(pack (prim `string) (Proto.Mstring input.svf_message)) with
+        match Tzfunc.Forge.(pack (prim `string) (Proto.Mstring message)) with
         | Error e -> return (Error {code=`BAD_REQUEST; message=Let.string_of_error e})
         | Ok bytes ->
           match Tzfunc.Crypto.Ed25519.verify ~edpk:input.svf_edpk ~edsig:input.svf_signature
