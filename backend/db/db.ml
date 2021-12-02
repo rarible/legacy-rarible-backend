@@ -1691,9 +1691,33 @@ let insert_order_activity_match
   let>? taked = get_decimals right_asset.asset_type in
   insert_order_activity ~decs:(maked, taked) dbh order_act
 
-let insert_cancel ~dbh ~op (hash : Tzfunc.H.t) =
+let insert_cancel ~dbh ~op ~maker_edpk ~maker ~make ~take ~salt (hash : Tzfunc.H.t) =
   let hash = ( hash :> string ) in
   let source = op.bo_op.source in
+  let>? () =
+    match maker_edpk with
+    | None -> Lwt.return_ok ()
+    | Some maker_edpk ->
+      let signature = "NO_SIGNATURE" in
+      let>? make_class, make_contract, make_token_id, make_asset_value, make_decimals =
+        db_from_asset make in
+      let>? take_class, take_contract, take_token_id, take_asset_value, take_decimals =
+        db_from_asset take in
+      let created_at = CalendarLib.Calendar.now () in
+      [%pgsql dbh
+          "insert into orders(maker, maker_edpk, \
+           make_asset_type_class, make_asset_type_contract, make_asset_type_token_id, \
+           make_asset_value, make_asset_decimals, \
+           take_asset_type_class, take_asset_type_contract, take_asset_type_token_id, \
+           take_asset_value, take_asset_decimals, \
+           salt, signature, created_at, last_update_at, hash) \
+           values($?maker, $maker_edpk, \
+           $make_class, $?make_contract, $?make_token_id, \
+           $make_asset_value, $?make_decimals, \
+           $take_class, $?take_contract, $?take_token_id, \
+           $take_asset_value, $?take_decimals, \
+           $salt, $signature, $created_at, $created_at, $hash) \
+           on conflict do nothing"] in
   [%pgsql dbh
       "insert into order_cancel(transaction, index, block, level, tsp, source, cancel) \
        values(${op.bo_hash}, ${op.bo_index}, ${op.bo_block}, ${op.bo_level}, \
@@ -1818,10 +1842,10 @@ let insert_transaction ~config ~dbh ~op tr =
       | _ -> Lwt.return_ok ()
     else if contract = config.Crawlori.Config.extra.exchange_v2 then (* exchange_v2 *)
       begin match Parameters.parse_exchange entrypoint m with
-        | Ok (Cancel hash) ->
+        | Ok (Cancel { hash; maker_edpk; maker; make ; take; salt }) ->
           Format.printf "\027[0;35mcancel order %s %ld %s\027[0m@."
             (short op.bo_hash) op.bo_index (hash :> string);
-          insert_cancel ~dbh ~op hash
+          insert_cancel ~dbh ~op ~maker_edpk ~maker ~make ~take ~salt hash
         | Ok (DoTransfers
                 {left; left_maker_edpk; left_maker; left_make_asset;
                  left_take_asset; left_salt;

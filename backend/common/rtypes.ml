@@ -861,7 +861,8 @@ type set_royalties = {
 } [@@deriving encoding]
 
 type exchange_param =
-  | Cancel of Tzfunc.H.t
+  | Cancel of { hash:Tzfunc.H.t; maker_edpk: string option; maker: string option;
+                make: A.big_integer asset; take: A.big_integer asset; salt : z }
   | DoTransfers of
       {left: Tzfunc.H.t; left_maker_edpk : string option; left_maker : string option;
        left_make_asset: A.big_integer asset ; left_take_asset: A.big_integer asset ;
@@ -1021,7 +1022,7 @@ type tzip21_attribute = {
   attribute_name : string ; [@encoding name_or_trait_type_enc] [@merge]
   attribute_type : string option ; [@encoding type_or_display_type_enc] [@merge]
   attribute_value : Json_repr.ezjsonm ;
-} [@@deriving encoding {debug}]
+} [@@deriving encoding]
 
 type tzip21_attributes = tzip21_attribute list [@@deriving encoding]
 

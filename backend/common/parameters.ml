@@ -203,18 +203,18 @@ let parse_cancel m =
   match Typed_mich.(parse_value order_type m) with
   | Ok (`tuple [
       maker;
-      `tuple [ `tuple [ make_asset_class; make_asset_data ]; _ ];
+      `tuple [ `tuple [ make_asset_class; make_asset_data ]; `nat m_asset_value ];
       _;
-      `tuple [ `tuple [ take_asset_class; take_asset_data ]; _ ];
+      `tuple [ `tuple [ take_asset_class; take_asset_data ]; `nat t_asset_value ];
       `nat salt; _; _; _; _ ]) ->
-    let$ maker = match maker with
-      | `none -> Ok None
-      | `some (`key maker) -> Ok (Some maker)
-      | _ -> unexpected_michelson in
+    let$ maker_edpk = parse_option_key maker in
     let$ mat = parse_asset_type make_asset_class make_asset_data in
     let$ tat = parse_asset_type take_asset_class take_asset_data in
-    let$ hash = Utils.hash_key maker mat tat salt in
-    Ok (Cancel hash)
+    let make = { asset_type = mat ; asset_value = m_asset_value } in
+    let take = { asset_type = tat ; asset_value = t_asset_value } in
+    let$ hash = Utils.hash_key maker_edpk mat tat salt in
+    let maker = Option.map pk_to_pkh_exn maker_edpk in
+    Ok (Cancel { hash ; maker_edpk; maker ; make ; take ; salt})
   | _ -> unexpected_michelson
 
 let parse_do_transfers m =
