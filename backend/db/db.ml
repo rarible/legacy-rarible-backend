@@ -1478,9 +1478,8 @@ let reset_nft_item_meta_by_id ?dbh contract token_id =
       "select block, level, tsp, metadata from token_updates where \
        main and contract = $contract and token_id = $token_id ORDER BY block desc LIMIT 1"] in
   match l with
-  | [] -> Lwt.return_error (`hook_error (Printf.sprintf "no %s:%s item" contract (Z.to_string token_id)))
-  | [ _, _, _, None ] ->
-    Lwt.return_error (`hook_error (Printf.sprintf "no metadata for %s:%s item" contract (Z.to_string token_id)))
+  | [] -> Lwt.return_ok ()
+  | [ _, _, _, None ] ->  Lwt.return_ok ()
   | [ block, level, tsp, Some json ] ->
     begin
       try
