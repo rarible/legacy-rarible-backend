@@ -1338,8 +1338,17 @@ let validate _req input =
     else
       match Tzfunc.Crypto.Ed25519.verify ~edpk:input.svf_edpk ~edsig:input.svf_signature
               ~bytes:(Tzfunc.Raw.mk input.svf_message) with
-      | Ok b -> return_ok b
+      | Ok true -> return_ok true
       | Error e -> return (Error {code=`BAD_REQUEST; message=Let.string_of_error e})
+      | Ok false ->
+        match Tzfunc.Forge.(pack (prim `string) (Proto.Mstring input.svf_message)) with
+        | Error e -> return (Error {code=`BAD_REQUEST; message=Let.string_of_error e})
+        | Ok bytes ->
+          match Tzfunc.Crypto.Ed25519.verify ~edpk:input.svf_edpk ~edsig:input.svf_signature
+                  ~bytes with
+          | Ok b -> return_ok b
+          | Error e -> return (Error {code=`BAD_REQUEST; message=Let.string_of_error e})
+
 [@@post
   {path="/v0.1/order/signature/validate";
    name="validate";
