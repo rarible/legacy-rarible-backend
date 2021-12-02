@@ -50,11 +50,13 @@ export async function beacon_provider(network: BeaconNetwork, name = "rarible", 
         case 'galleon':
         case 'umami':
           signingType = SigningType.RAW
+          break
         case 'temple':
         case 'kukai':
           signingType = SigningType.MICHELINE
           prefix = tezos_signed_message_prefix()
           payload = pack_string(prefix + bytes)
+          break
       }
     }
     const { signature } = await wallet.client.requestSignPayload({ signingType, payload })
