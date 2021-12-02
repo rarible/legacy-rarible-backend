@@ -2326,6 +2326,8 @@ components:
       - BID
       - LIST
       - MATCH
+      - CANCEL_LIST
+      - CANCEL_BID
     OrderActivityFilterByCollection:
       type: object
       properties:
@@ -2388,6 +2390,8 @@ components:
     OrderActivityFilterUserType:
       type: string
       enum:
+      - CANCEL_LIST
+      - CANCEL_BID
       - MAKE_BID
       - GET_BID
       - LIST
