@@ -29,7 +29,7 @@ export function in_memory_provider(edsk: string, endpoint: string) : TezosProvid
   const sign = async(bytes: string, type?: "message" | "operation") => {
     let message = (type=='message') ? to_hex(bytes) : bytes
     const sig = await tk.signer.sign(message)
-    return {signature: sig.prefixSig, message}
+    return {signature: sig.prefixSig, prefix:''}
   }
   const address = async() => {
     return tk.signer.publicKeyHash()

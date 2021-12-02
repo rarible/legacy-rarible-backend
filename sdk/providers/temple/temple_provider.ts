@@ -1,6 +1,6 @@
 import { TempleWallet, TempleDAppNetwork } from '@temple-wallet/dapp'
 import { TezosToolkit, TransferParams, OriginateParams, OpKind } from "@taquito/taquito"
-import { TezosProvider, tezos_signed_message, pack_string } from "../../common/base"
+import { TezosProvider, tezos_signed_message_prefix, pack_string } from "../../common/base"
 
 export async function temple_provider(endpoint: string, network: TempleDAppNetwork, name = "rarible") : Promise<TezosProvider> {
   const wallet = new TempleWallet(name)
@@ -32,10 +32,11 @@ export async function temple_provider(endpoint: string, network: TempleDAppNetwo
     return { hash: op.opHash, confirmation: async() => { await op.confirmation() } }
   }
   const sign = async(bytes: string, type?: "operation" | "message") => {
-    let message = (type=="message") ? tezos_signed_message(bytes) : bytes
+    let prefix = (type=="message") ? tezos_signed_message_prefix() : ''
+    let message = prefix + bytes
     let payload = pack_string(message)
     const signature = await wallet.sign(payload)
-    return {signature, message}
+    return {signature, prefix}
   }
   const address = async() => {
     return wallet.getPKH()

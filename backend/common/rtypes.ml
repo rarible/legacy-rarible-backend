@@ -738,6 +738,7 @@ type signature_validation_form = {
   svf_edpk: A.edpk;
   svf_message: string;
   svf_signature: A.edsig;
+  svf_prefix: string; [@dft ""]
 } [@@deriving encoding {title="SignatureValidationForm"; def_title}]
 
 type 'a ft_balance = {

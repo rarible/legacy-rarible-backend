@@ -1,4 +1,4 @@
-import { Provider, transfer, mint, burn, deploy_nft_private, deploy_mt_private, upsert_order, bid, sell, Part, AssetType, OrderForm, SellRequest, BidRequest, ExtendedAssetType, XTZAssetType, FTAssetType, TokenAssetType, approve_token, fill_order, get_public_key, order_of_json, salt, pk_to_pkh, get_address, OperationResult, sign, tezos_signed_message } from "../main"
+import { Provider, transfer, mint, burn, deploy_nft_private, deploy_mt_private, upsert_order, bid, sell, Part, AssetType, OrderForm, SellRequest, BidRequest, ExtendedAssetType, XTZAssetType, FTAssetType, TokenAssetType, approve_token, fill_order, get_public_key, order_of_json, salt, pk_to_pkh, get_address, OperationResult, sign } from "../main"
 import { beacon_provider, BeaconWalletKind } from '../providers/beacon/beacon_provider'
 import JSONFormatter from "json-formatter-js"
 import Vue from "vue"
