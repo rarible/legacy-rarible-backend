@@ -85,7 +85,7 @@ export async function make_permit(
     ]
   }
   const permit = pack(permit_data, permit_type)
-  const signature = await provider.tezos.sign(permit)
+  const {signature} = await provider.tezos.sign(permit)
   return {
     permit: { hash, signature, pk, contract },
     transfer: {

@@ -26,9 +26,10 @@ export function in_memory_provider(edsk: string, endpoint: string) : TezosProvid
     const op = await tk.contract.batch(args2).send()
     return { hash: op.hash, confirmation: async() => { await op.confirmation() } }
   }
-  const sign = async(bytes: string, type?: "raw" | "micheline") => {
-    const sig = await tk.signer.sign((type=='raw') ? to_hex(bytes) : bytes)
-    return sig.prefixSig
+  const sign = async(bytes: string, type?: "message" | "operation") => {
+    let message = (type=='message') ? to_hex(bytes) : bytes
+    const sig = await tk.signer.sign(message)
+    return {signature: sig.prefixSig, message}
   }
   const address = async() => {
     return tk.signer.publicKeyHash()

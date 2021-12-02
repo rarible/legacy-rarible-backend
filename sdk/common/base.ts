@@ -59,7 +59,7 @@ export interface TezosProvider {
   transfer: (arg: TransferParams) => Promise<OperationResult>;
   originate: (arg: OriginateParams) => Promise<OperationResult>;
   batch: (args: TransferParams[]) => Promise<OperationResult>;
-  sign: (bytes: string, type?: "raw" | "micheline") => Promise<string>;
+  sign: (bytes: string, type?: "operation" | "message") => Promise<{signature: string, message: string}>;
   address: () => Promise<string>;
   public_key: () => Promise<string | undefined>;
   storage: (contract: string) => Promise<any>;
@@ -82,7 +82,8 @@ export interface TransactionArg {
 
 export interface SignatureResult {
   signature: string;
-  edpk: string
+  edpk: string;
+  message: string;
 }
 
 export function asset_type_to_json(a: AssetType) : any {
@@ -222,14 +223,25 @@ export function of_hex(s: string) : string {
   return decoder.decode(a)
 }
 
-export async function sign(p : Provider, message: string) : Promise<SignatureResult> {
+export function tezos_signed_message(msg: string, domain = "rarible.com") : string {
+  const date = new Date()
+  return pack_string(`Tezos Signed Message: ${domain} ${date.toISOString()} ${msg}`)
+}
+
+export async function sign(p : Provider, message: string, type: "operation" | "message") : Promise<SignatureResult> {
+  type = type || "message"
   const edpk = await p.tezos.public_key()
   if (edpk==undefined) throw new Error("cannot get public key from provider")
-  return { signature: await p.tezos.sign(message, "raw"), edpk }
+  const r = await p.tezos.sign(message, type)
+  return { edpk, ...r }
 }
 
 export const tz1_prefix =  new Uint8Array([6, 161, 159])
+export const tz2_prefix =  new Uint8Array([6, 161, 161])
+export const tz3_prefix =  new Uint8Array([6, 161, 164])
 export const edpk_prefix =  new Uint8Array([13, 15, 37, 217])
+export const sppk_prefix =  new Uint8Array([3, 254, 226, 86])
+export const p2pk_prefix =  new Uint8Array([3, 178, 139, 127])
 
 export function b58enc(payload: Uint8Array, prefix: Uint8Array) : string {
   const n = new Uint8Array(prefix.length + payload.length);
@@ -242,8 +254,25 @@ export function b58dec(enc : string, prefix : Uint8Array) : Uint8Array {
   return bs58check.decode(enc).slice(prefix.length)
 }
 
-export function pk_to_pkh(edpk: string) : string {
-  const pk_bytes = b58dec(edpk, edpk_prefix)
+export function pk_to_pkh(pk: string) : string {
+  let pkh_prefix: Uint8Array;
+  let pk_prefix: Uint8Array;
+  switch (pk.substring(0,2)) {
+    case 'ed':
+      pkh_prefix = tz1_prefix
+      pk_prefix = edpk_prefix
+      break
+    case 'sp':
+      pkh_prefix = tz2_prefix
+      pk_prefix = sppk_prefix
+      break
+    case 'p2':
+      pkh_prefix = tz3_prefix
+      pk_prefix = p2pk_prefix
+      break
+    default: throw new Error(`don't handle base58 key ${pk}`)
+  }
+  const pk_bytes = b58dec(pk, pk_prefix)
   const hash = blake.blake2b(pk_bytes, null, 20)
-  return b58enc(hash, tz1_prefix)
+  return b58enc(hash, pkh_prefix)
 }
