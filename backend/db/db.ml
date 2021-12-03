@@ -3742,6 +3742,8 @@ let insert_origin_fees dbh fees hash_key =
     fees
 
 let insert_payouts dbh p hash_key =
+  [%pgsql dbh
+      "delete from payouts where hash = $hash_key"] >>=? fun () ->
   iter_rp (fun part ->
       let account = part.part_account in
       let value = part.part_value in
