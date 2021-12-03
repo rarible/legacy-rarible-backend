@@ -402,8 +402,7 @@ let order_form_from_items ?(salt=0) collection item1 item2 =
       maker.tz1 maker.edpk taker taker_pk make take salt start_date end_date signature data_type payouts origin_fees in
   Ok order_form
 
-let sell_order_form_from_item ?(salt=0) collection item1 take =
-  let maker = maker_from_item item1 in
+let sell_order_form_from_item ?(salt=0) collection item1 maker take =
   let taker, taker_pk = None, None in
   let make = asset_from_item collection item1 in
   let salt = Z.of_int salt in
@@ -2376,9 +2375,9 @@ let sell_nft_for_nft ?salt collection item1 item2 =
   | Error _err -> Lwt.fail_with "order_from"
   | Ok form -> call_upsert_order ~d:(None, None) form
 
-let sell_nft_for_tezos ?(no_upsert=false) ?(salt=0) collection item1 amount =
+let sell_nft_for_tezos ?(no_upsert=false) ?(salt=0) collection maker item1 amount =
   let take = { asset_type = ATXTZ ; asset_value = Z.of_int amount } in
-  match sell_order_form_from_item ~salt collection item1 take with
+  match sell_order_form_from_item ~salt collection maker item1 take with
   | Error _err -> Lwt.fail_with "order_from"
   | Ok form ->
     if not no_upsert then call_upsert_order ~d:(None, Some 6l) form
@@ -2388,14 +2387,14 @@ let sell_nft_for_tezos ?(no_upsert=false) ?(salt=0) collection item1 amount =
         Lwt.return_ok @@ Common.Balance.dec_order ~taked:6l order
       | Error _err -> Lwt.fail_with "order_convert"
 
-let sell_nft_for_lugh ?(salt=0) collection item1 amount =
+let sell_nft_for_lugh ?(salt=0) collection maker item1 amount =
   let lugh = ATNFT { asset_contract = lugh_contract ; asset_token_id = Z.zero } in
   let take = { asset_type = lugh ; asset_value = Z.of_int amount } in
-  match sell_order_form_from_item ~salt collection item1 take with
+  match sell_order_form_from_item ~salt collection maker item1 take with
   | Error _err -> Lwt.fail_with "order_from"
   | Ok form -> call_upsert_order ~d:(None, None) form
 
-let buy_nft_for_tezos ?(no_upsert=false) ?(salt=0) collection maker item1 amount =
+let buy_nft_for_tezos ?(no_upsert=false) ?(salt=0) collection item1 maker amount =
   let make = { asset_type = ATXTZ ; asset_value = Z.of_int amount } in
   match buy_order_form_from_item ~salt collection item1 maker make with
   | Error _err -> Lwt.fail_with "order_from"
@@ -2407,7 +2406,7 @@ let buy_nft_for_tezos ?(no_upsert=false) ?(salt=0) collection maker item1 amount
         Lwt.return_ok @@ Common.Balance.dec_order ~maked:6l order
       | Error _err -> Lwt.fail_with "order_convert"
 
-let buy_nft_for_lugh ?(salt=0) collection maker item1 amount =
+let buy_nft_for_lugh ?(salt=0) collection item1 maker amount =
   let lugh = ATNFT { asset_contract = lugh_contract ; asset_token_id = Z.zero } in
   let make = { asset_type = lugh ; asset_value = Z.of_int amount } in
   match buy_order_form_from_item ~salt collection item1 maker make with
@@ -2465,6 +2464,47 @@ let match_orders_nft ?royalties ?(exchange=exchange_v2) ~kind ~privacy () =
           check_item {item1 with it_owner = item2.it_owner} in
       Lwt.return_ok ()
 
+let match_orders_tezos_2 ?royalties ?(exchange=exchange_v2) ~kind ~privacy () =
+  let c = create_collection ?royalties ~kind ~privacy () in
+  let>? c = deploy_collection c in
+  let>? () = check_collection c in
+  let> () = wait_next_block () in
+  let>? item1 = mint_one_with_token_id_from_api c in
+  wait_next_block () >>= fun () ->
+  let> () = check_item item1 in
+  update_operators
+    item1.it_token_id item1.it_owner.tz1 exchange
+    (item1.it_owner.tz1, item1.it_owner.edsk) item1.it_collection >>= function
+  | Error err ->
+    Lwt.return_ok @@
+    Printf.eprintf "match_orders_tezos error %s" @@
+    Crp.string_of_error err
+  | Ok () ->
+    wait_next_block () >>= fun () ->
+    let source2 = generate_address ~diff:item1.it_owner.tz1 () in
+    let>? order1 = buy_nft_for_tezos ~salt:1 c.col_kt1 item1 source2 1 in
+    let order1 = Common.Balance.z_order ~maked:6l order1 in
+    let>? order2 = sell_nft_for_tezos ~no_upsert:true c.col_kt1 item1 item1.it_owner 1 in
+    let order2 = Common.Balance.z_order ~taked:6l order2 in
+    (* TODO : check order *)
+    (* TODO : check order *)
+    begin
+      match_orders ~amount:1L ~source:item1.it_owner ~contract:exchange order1 order2
+      >>= function
+      | Error err ->
+        Printf.eprintf "match_orders error %s" @@ Tzfunc.Rp.string_of_error err ;
+        Lwt.return_unit
+      | Ok op_hash ->
+        wait_op_included op_hash >>= function
+        | Error err ->
+          Printf.eprintf "match_orders error %s" @@ Crp.string_of_error err ;
+          Lwt.return_unit
+        | Ok () ->
+          check_item {item1 with it_owner = source2}
+          (* check_orders *)
+    end >>= fun () ->
+    Lwt.return_ok ()
+
 let match_orders_tezos ?royalties ?(exchange=exchange_v2) ~kind ~privacy () =
   let c = create_collection ?royalties ~kind ~privacy () in
   let>? c = deploy_collection c in
@@ -2482,15 +2522,15 @@ let match_orders_tezos ?royalties ?(exchange=exchange_v2) ~kind ~privacy () =
     Crp.string_of_error err
   | Ok () ->
     wait_next_block () >>= fun () ->
-    let>? order1 = sell_nft_for_tezos ~salt:1 c.col_kt1 item1 1 in
+    let>? order1 = sell_nft_for_tezos ~salt:1 c.col_kt1 item1 item1.it_owner 20 in
     let order1 = Common.Balance.z_order ~taked:6l order1 in
     (* TODO : check order *)
     let source2 = generate_address ~diff:item1.it_owner.tz1 () in
-    let>? order2 = buy_nft_for_tezos ~no_upsert:true c.col_kt1 source2 item1 1 in
+    let>? order2 = buy_nft_for_tezos ~no_upsert:true c.col_kt1 item1 source2 20 in
     let order2 = Common.Balance.z_order ~maked:6l order2 in
     (* TODO : check order *)
     begin
-      match_orders ~amount:1L ~source:source2 ~contract:exchange order2 order1
+      match_orders ~amount:20L ~source:source2 ~contract:exchange order2 order1
       >>= function
       | Error err ->
         Printf.eprintf "match_orders error %s" @@ Tzfunc.Rp.string_of_error err ;
@@ -2523,11 +2563,11 @@ let match_orders_lugh ?royalties ?(exchange=exchange_v2) ~kind ~privacy () =
     Crp.string_of_error err
   | Ok () ->
     wait_next_block () >>= fun () ->
-    let>? order1 = sell_nft_for_lugh ~salt:1 c.col_kt1 item1 1 in
+    let>? order1 = sell_nft_for_lugh ~salt:1 c.col_kt1 item1 item1.it_owner 1 in
     let order1 = Common.Balance.z_order ~taked:6l order1 in
     (* TODO : check order *)
     let source2 = generate_address ~alias:"rarible1" () in
-    let>? order2 = buy_nft_for_lugh c.col_kt1 source2 item1 1 in
+    let>? order2 = buy_nft_for_lugh c.col_kt1 item1 source2 1 in
     let order2 = Common.Balance.z_order ~maked:6l order2 in
     (* TODO : check order *)
     begin
@@ -2571,23 +2611,23 @@ let fill_orders_db ?royalties ~exchange ~kind ~privacy () =
     Crp.string_of_error err
   | Ok () ->
     (* SELL ORDERS *)
-    let>? _sell1_1 = sell_nft_for_tezos ~salt:1 c.col_kt1 item1 5 in
+    let>? _sell1_1 = sell_nft_for_tezos ~salt:1 c.col_kt1 item1 item1.it_owner 5 in
     let> () = Lwt_unix.sleep 1. in
-    let>? _sell2 = sell_nft_for_tezos ~salt:1 c.col_kt1 item2 1 in
+    let>? _sell2 = sell_nft_for_tezos ~salt:1 c.col_kt1 item2 item2.it_owner 1 in
     let> () = Lwt_unix.sleep 1. in
-    let>? _sell3 = sell_nft_for_tezos ~salt:1 c.col_kt1 item3 1 in
+    let>? _sell3 = sell_nft_for_tezos ~salt:1 c.col_kt1 item3 item3.it_owner 1 in
     let> () = Lwt_unix.sleep 1. in
-    let>? _sell4 = sell_nft_for_tezos ~salt:1 c.col_kt1 item4 1 in
+    let>? _sell4 = sell_nft_for_tezos ~salt:1 c.col_kt1 item4 item4.it_owner 1 in
     let> () = Lwt_unix.sleep 1. in
-    let>? _sell5 = sell_nft_for_tezos ~salt:1 c.col_kt1 item5 1 in
+    let>? _sell5 = sell_nft_for_tezos ~salt:1 c.col_kt1 item5 item5.it_owner 1 in
     (* BIDS ORDERS *)
     let source2 = generate_address ~diff:item1.it_owner.tz1 () in
-    let>? _buy1_1 = buy_nft_for_tezos c.col_kt1 source2 item1 1 in
+    let>? _buy1_1 = buy_nft_for_tezos c.col_kt1 item1 source2 1 in
     let> () = Lwt_unix.sleep 1. in
     let source3 = generate_address ~diff:item2.it_owner.tz1 () in
-    let>? _buy1_2 = buy_nft_for_tezos c.col_kt1 source3 item1 1 in
+    let>? _buy1_2 = buy_nft_for_tezos c.col_kt1 item1 source3 1 in
     let> () = Lwt_unix.sleep 1. in
-    let>? _buy4 = buy_nft_for_tezos c.col_kt1 source2 item4 1 in
+    let>? _buy4 = buy_nft_for_tezos c.col_kt1 item4 source2 1 in
     let> () = Lwt_unix.sleep 1. in
     Lwt.return_ok ()
 
@@ -2605,7 +2645,7 @@ let cancel_order ?royalties ?(exchange=exchange_v2) ~kind ~privacy () =
   let>? item1 = mint_one_with_token_id_from_api c in
   wait_next_block () >>= fun () ->
   let> () = check_item item1 in
-  let>? order = sell_nft_for_tezos ~salt:1 c.col_kt1 item1 1 in
+  let>? order = sell_nft_for_tezos ~salt:1 c.col_kt1 item1 item1.it_owner 1 in
   let order = Common.Balance.z_order ~taked:6l order in
   (* TODO : check order *)
   begin cancel_order ~source:item1.it_owner ~contract:exchange order >>= function
@@ -2864,14 +2904,29 @@ let main () =
            begin match !api_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
            begin match !crawler_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
            Lwt.return_unit))
-  | [ "match_order_tezos_bid" ] ->
+  | [ "match_order_tezos_list" ] ->
     Lwt_main.run (
       Lwt.catch (fun () ->
-          let kind = `nft in
+          let kind = `mt in
           let privacy = `priv in
           setup_test_env () >>= function
           | Ok (royalties, exchange) ->
             match_orders_tezos ~royalties ~exchange ~kind ~privacy () >>= fun _ ->
+            Lwt.return @@ clean_test_env ()
+          | Error _err -> Lwt.return @@ clean_test_env ())
+        (fun exn ->
+           Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
+           begin match !api_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
+           begin match !crawler_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
+           Lwt.return_unit))
+  | [ "match_order_tezos_accept_bid" ] ->
+    Lwt_main.run (
+      Lwt.catch (fun () ->
+          let kind = `mt in
+          let privacy = `priv in
+          setup_test_env () >>= function
+          | Ok (royalties, exchange) ->
+            match_orders_tezos_2 ~royalties ~exchange ~kind ~privacy () >>= fun _ ->
             Lwt.return @@ clean_test_env ()
           | Error _err -> Lwt.return @@ clean_test_env ())
         (fun exn ->

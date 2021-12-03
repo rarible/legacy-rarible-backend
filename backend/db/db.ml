@@ -363,8 +363,8 @@ let get_fill hash rows =
   List.fold_left (fun acc_fill r ->
       let fill =
         match r#hash_left, r#hash_right with
-        | hl, _hr when hl = hash -> r#fill_make_value
-        | _hl, hr when hr = hash -> r#fill_take_value
+        | hl, _hr when hl = hash -> r#fill_take_value
+        | _hl, hr when hr = hash -> r#fill_make_value
         | _ -> Z.zero in
       Z.add acc_fill fill)
     Z.zero rows
