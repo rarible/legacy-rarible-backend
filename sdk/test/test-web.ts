@@ -4,6 +4,8 @@ import JSONFormatter from "json-formatter-js"
 import Vue from "vue"
 import BigNumber from "@taquito/rpc/node_modules/bignumber.js"
 import { NetworkType } from "@airgap/beacon-sdk"
+import { Networks } from "kukai-embed"
+import { kukai_provider } from '../providers/kukai/kukai_provider'
 
 function parse_parts(s : string) : Array<Part> {
   try {
@@ -59,6 +61,7 @@ function parse_asset_type(r : RawAssetType) : AssetType | ExtendedAssetType | un
 async function provider(node: string, api:string, wallet:BeaconWalletKind | string) : Promise<Provider> {
   let w = (wallet == '') ? undefined : wallet as BeaconWalletKind
   const tezos = await beacon_provider({node, network: NetworkType.HANGZHOUNET}, undefined, w)
+  // const tezos = await kukai_provider({node, network: Networks.dev})
   const config = {
     exchange: "KT1AguExF32Z9UEKzD5nuixNmqrNs1jBKPT8",
     fees: new BigNumber(300),

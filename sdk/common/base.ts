@@ -55,7 +55,7 @@ export interface OperationResult {
 }
 
 export interface TezosProvider {
-  kind: 'in_memory' | "temple" | "beacon";
+  kind: 'in_memory' | "temple" | "beacon" | "kukai";
   transfer: (arg: TransferParams) => Promise<OperationResult>;
   originate: (arg: OriginateParams) => Promise<OperationResult>;
   batch: (args: TransferParams[]) => Promise<OperationResult>;
@@ -242,6 +242,13 @@ export const tz3_prefix =  new Uint8Array([6, 161, 164])
 export const edpk_prefix =  new Uint8Array([13, 15, 37, 217])
 export const sppk_prefix =  new Uint8Array([3, 254, 226, 86])
 export const p2pk_prefix =  new Uint8Array([3, 178, 139, 127])
+export const edsk_prefix =  new Uint8Array([13, 15, 58, 7])
+export const spsk_prefix =  new Uint8Array([17, 162, 224, 201])
+export const p2sk_prefix =  new Uint8Array([16, 81, 238, 189])
+export const edsig_prefix =  new Uint8Array([9, 245, 205, 134, 18])
+export const spsig1_prefix =  new Uint8Array([13, 115, 101, 19, 63])
+export const p2sig_prefix =  new Uint8Array([54, 240, 44, 52])
+export const sig_prefix =  new Uint8Array([4, 130, 43])
 
 export function b58enc(payload: Uint8Array, prefix: Uint8Array) : string {
   const n = new Uint8Array(prefix.length + payload.length);

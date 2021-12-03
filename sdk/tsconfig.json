@@ -1,13 +1,14 @@
 {
   "compilerOptions": {
-    "lib": ["es5", "dom", "esnext"],
+    "lib": ["es6", "dom", "esnext"],
     "strict": true,
     "module": "commonjs",
     "moduleResolution": "node",
     "outDir": "dist",
-    "target": "es5",
+    "target": "es6",
     "downlevelIteration": true,
     "declaration": true
   },
-  "include": [ "main/*.ts", "test/*.ts", "providers/in_memory/*.ts", "providers/beacon/*.ts" ]
+  "include": [ "main/*.ts", "test/*.ts", "providers/in_memory/*.ts", "providers/beacon/*.ts",
+               "providers/kukai/*.ts"]
 }
