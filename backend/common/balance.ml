@@ -64,8 +64,8 @@ let z_order_activity_match_side ?d o =
   { o with order_activity_match_side_asset = z_asset ?d o.order_activity_match_side_asset }
 let priced ?maked ?taked make take =
   match make.asset_type, take.asset_type with
-  | ATNFT _, _ | ATMT _, _ -> maked
-  | _ -> taked
+  | ATNFT _, _ | ATMT _, _ -> taked
+  | _ -> maked
 let dec_order_activity_match ?maked ?taked o =
   let priced = priced ?maked ?taked
       o.order_activity_match_left.order_activity_match_side_asset
