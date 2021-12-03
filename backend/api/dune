@@ -1,8 +1,13 @@
 (library
+ (name secp256k1)
+ (modules secp256k1)
+ (libraries secp256k1-internal tzfunc))
+
+(library
  (name api)
  (modules api errors kafka_openapi)
  (preprocess (pps ppx_deriving_encoding ez_api.ppx_err_case ez_api.ppx))
- (libraries db let rtypes ez_api.server))
+ (libraries db let rtypes ez_api.server secp256k1))
 
 (executable
  (name main_api)

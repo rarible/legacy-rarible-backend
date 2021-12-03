@@ -12,6 +12,7 @@ depends: [
   "ez_pgocaml"
   "kafka_lwt"
   "ocurl"
+  "secp256k1-internal"
 ]
 build: [
   ["dune" "subst"] {pinned}
