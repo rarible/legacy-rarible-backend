@@ -223,16 +223,16 @@ let mk_left_side obj =
 
 let mk_right_side obj =
   let|$ asset = mk_asset
-      obj#oright_take_asset_type_class
-      obj#oright_take_asset_type_contract
-      obj#oright_take_asset_type_token_id
-      obj#oright_take_asset_value in
+      obj#oright_make_asset_type_class
+      obj#oright_make_asset_type_contract
+      obj#oright_make_asset_type_token_id
+      obj#oright_make_asset_value in
   {
     order_activity_match_side_maker = obj#oright_maker ;
     order_activity_match_side_hash = obj#oright_hash ;
     order_activity_match_side_asset = asset ;
     order_activity_match_side_type = mk_side_type asset ;
-  }, obj#oright_take_asset_decimals
+  }, obj#oright_make_asset_decimals
 
 let mk_order_activity_match obj =
   let$ left, left_decimals = mk_left_side obj in
