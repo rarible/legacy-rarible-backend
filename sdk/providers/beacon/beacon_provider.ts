@@ -53,6 +53,7 @@ export async function beacon_provider(network: BeaconNetwork, name = "rarible", 
           break
         case 'temple':
         case 'kukai':
+        default:
           signingType = SigningType.MICHELINE
           prefix = tezos_signed_message_prefix()
           payload = pack_string(prefix + bytes)

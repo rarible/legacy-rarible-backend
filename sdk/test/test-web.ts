@@ -56,8 +56,9 @@ function parse_asset_type(r : RawAssetType) : AssetType | ExtendedAssetType | un
   } else return undefined
 }
 
-async function provider(node: string, api:string, wallet:BeaconWalletKind) : Promise<Provider> {
-  const tezos = await beacon_provider({node, network: NetworkType.HANGZHOUNET}, undefined, wallet)
+async function provider(node: string, api:string, wallet:BeaconWalletKind | string) : Promise<Provider> {
+  let w = (wallet == '') ? undefined : wallet as BeaconWalletKind
+  const tezos = await beacon_provider({node, network: NetworkType.HANGZHOUNET}, undefined, w)
   const config = {
     exchange: "KT1AguExF32Z9UEKzD5nuixNmqrNs1jBKPT8",
     fees: new BigNumber(300),
@@ -72,7 +73,7 @@ export default new Vue({
   data: {
     api_url: "http://localhost:8080/v0.1/",
     node: 'https://hangzhou.tz.functori.com',
-    wallet: 'temple' as BeaconWalletKind,
+    wallet: '' as BeaconWalletKind | string,
     provider: undefined as Provider | undefined,
     path: "home",
     transfer : {
