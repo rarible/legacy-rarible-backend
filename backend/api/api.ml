@@ -1329,11 +1329,11 @@ let get_order_activities req input =
    errors=[bad_request_case;unexpected_case];
    section=order_activities_section}]
 
-let verify ~pk58 ~sign58 ~bytes =
+let verify ~pk58 ~sig58 ~bytes =
   let open Tzfunc.Crypto in
   Result.bind (Pk.b58dec pk58) @@ fun pk ->
-  Result.bind (Signature.b58dec sign58) @@ fun signature ->
-  match Curve.from_b58 pk58, Curve.from_b58 sign58 with
+  Result.bind (Signature.b58dec sig58) @@ fun signature ->
+  match Curve.from_b58 pk58, Curve.from_b58 sig58 with
   | Ok `ed25519, Ok `ed25519 -> Ed25519.verify_bytes ~pk ~signature ~bytes
   | Ok `secp256k1, Ok `secp256k1 -> Secp256k1.verify_bytes ~pk ~signature ~bytes
   | Error e, _ | _, Error e -> Error e
@@ -1348,7 +1348,7 @@ let validate _req input =
   | Ok addr ->
     if addr <> input.svf_address then return_ok false
     else
-      match Tzfunc.Crypto.Ed25519.verify ~edpk:input.svf_edpk ~edsig:input.svf_signature
+      match verify ~pk58:input.svf_edpk ~sig58:input.svf_signature
               ~bytes:(Tzfunc.Raw.mk message) with
       | Ok true -> return_ok true
       | Error e -> return (Error {code=`BAD_REQUEST; message=Let.string_of_error e})
@@ -1356,7 +1356,7 @@ let validate _req input =
         match Tzfunc.Forge.(pack (prim `string) (Proto.Mstring message)) with
         | Error e -> return (Error {code=`BAD_REQUEST; message=Let.string_of_error e})
         | Ok bytes ->
-          match Tzfunc.Crypto.Ed25519.verify ~edpk:input.svf_edpk ~edsig:input.svf_signature
+          match verify ~pk58:input.svf_edpk ~sig58:input.svf_signature
                   ~bytes with
           | Ok b -> return_ok b
           | Error e -> return (Error {code=`BAD_REQUEST; message=Let.string_of_error e})
