@@ -1735,42 +1735,44 @@ let insert_do_transfers ~dbh ~op
   let left = ( left :> string ) in
   let right = ( right :> string ) in
   let source = op.bo_op.source in
-  let>? () = match left_maker_edpk with
-    | None -> Lwt.return_ok ()
-    | Some maker_edpk ->
-      let signature = "NO_SIGNATURE" in
+  let>? left_order_opt = get_order ~dbh left in
+  let>? right_order_opt = get_order ~dbh right in
+  let created_at = CalendarLib.Calendar.now () in
+  let signature = "NO_SIGNATURE" in
+
+  let>? () =
+    match left_order_opt, right_order_opt with
+    | Some _, Some _ -> Lwt.return_ok ()
+    | None, None ->
+      let left_maker_edpk = match left_maker_edpk with Some s -> s | None -> "None" in
+      let right_maker_edpk = match right_maker_edpk with Some s -> s | None -> "None" in
       let>? left_make_class, left_make_contract,
             left_make_token_id, left_make_asset_value, left_make_decimals =
         db_from_asset left_make_asset in
       let>? left_take_class, left_take_contract,
             left_take_token_id, left_take_asset_value, left_take_decimals =
         db_from_asset left_take_asset in
-      let created_at = CalendarLib.Calendar.now () in
-      [%pgsql dbh
-          "insert into orders(maker, maker_edpk, \
-           make_asset_type_class, make_asset_type_contract, make_asset_type_token_id, \
-           make_asset_value, make_asset_decimals, \
-           take_asset_type_class, take_asset_type_contract, take_asset_type_token_id, \
-           take_asset_value, take_asset_decimals, \
-           salt, signature, created_at, last_update_at, hash) \
-           values($?left_maker, $maker_edpk, \
-           $left_make_class, $?left_make_contract, $?left_make_token_id, \
-           $left_make_asset_value, $?left_make_decimals, \
-           $left_take_class, $?left_take_contract, $?left_take_token_id, \
-           $left_take_asset_value, $?left_take_decimals, \
-           $left_salt, $signature, $created_at, $created_at, $left) \
-           on conflict do nothing"] in
-  let>? () = match right_maker_edpk with
-    | None -> Lwt.return_ok ()
-    | Some maker_edpk ->
-      let signature = "NO_SIGNATURE" in
       let>? right_make_class, right_make_contract,
             right_make_token_id, right_make_asset_value, right_make_decimals =
         db_from_asset right_make_asset in
       let>? right_take_class, right_take_contract,
             right_take_token_id, right_take_asset_value, right_take_decimals =
         db_from_asset right_take_asset in
-      let created_at = CalendarLib.Calendar.now () in
+      let>? () =
+        [%pgsql dbh
+            "insert into orders(maker, maker_edpk, \
+             make_asset_type_class, make_asset_type_contract, make_asset_type_token_id, \
+             make_asset_value, make_asset_decimals, \
+             take_asset_type_class, take_asset_type_contract, take_asset_type_token_id, \
+             take_asset_value, take_asset_decimals, \
+             salt, signature, created_at, last_update_at, hash) \
+             values($?left_maker, $left_maker_edpk, \
+             $left_make_class, $?left_make_contract, $?left_make_token_id, \
+             $left_make_asset_value, $?left_make_decimals, \
+             $left_take_class, $?left_take_contract, $?left_take_token_id, \
+             $left_take_asset_value, $?left_take_decimals, \
+             $left_salt, $signature, $created_at, $created_at, $left) \
+             on conflict do nothing"] in
       [%pgsql dbh
           "insert into orders(maker, maker_edpk, \
            make_asset_type_class, make_asset_type_contract, make_asset_type_token_id, \
@@ -1778,7 +1780,67 @@ let insert_do_transfers ~dbh ~op
            take_asset_type_class, take_asset_type_contract, take_asset_type_token_id, \
            take_asset_value, take_asset_decimals, \
            salt, signature, created_at, last_update_at, hash) \
-           values($?right_maker, $maker_edpk, \
+           values($?right_maker, $right_maker_edpk, \
+           $right_make_class, $?right_make_contract, $?right_make_token_id, \
+           $right_make_asset_value, $?right_make_decimals, \
+           $right_take_class, $?right_take_contract, $?right_take_token_id, \
+           $right_take_asset_value, $?right_take_decimals, \
+           $right_salt, $signature, $created_at, $created_at, $right) \
+           on conflict do nothing"]
+    | None, Some (o, _decs) ->
+      let left_maker_edpk = match left_maker_edpk with Some s -> s | None -> "None" in
+      let>? _left_make_class, left_make_contract,
+            left_make_token_id, left_make_asset_value, left_make_decimals =
+        db_from_asset left_make_asset in
+      let>? right_take_class, _right_take_contract,
+            _right_take_token_id, _right_take_asset_value, _right_take_decimals =
+        db_from_asset o.order_elt.order_elt_take in
+      let left_make_class = right_take_class in
+      let>? _left_take_class, left_take_contract,
+            left_take_token_id, left_take_asset_value, left_take_decimals =
+        db_from_asset left_take_asset in
+      let>? right_make_class, _right_make_contract,
+            _right_make_token_id, _right_make_asset_value, _right_make_decimals =
+        db_from_asset o.order_elt.order_elt_make in
+      let left_take_class = right_make_class in
+      [%pgsql dbh
+          "insert into orders(maker, maker_edpk, \
+           make_asset_type_class, make_asset_type_contract, make_asset_type_token_id, \
+           make_asset_value, make_asset_decimals, \
+           take_asset_type_class, take_asset_type_contract, take_asset_type_token_id, \
+           take_asset_value, take_asset_decimals, \
+           salt, signature, created_at, last_update_at, hash) \
+           values($?left_maker, $left_maker_edpk, \
+           $left_make_class, $?left_make_contract, $?left_make_token_id, \
+           $left_make_asset_value, $?left_make_decimals, \
+           $left_take_class, $?left_take_contract, $?left_take_token_id, \
+           $left_take_asset_value, $?left_take_decimals, \
+           $left_salt, $signature, $created_at, $created_at, $left) \
+           on conflict do nothing"]
+    | Some (o, _decs), None ->
+      let right_maker_edpk = match right_maker_edpk with Some s -> s | None -> "None" in
+      let>? _right_make_class, right_make_contract,
+            right_make_token_id, right_make_asset_value, right_make_decimals =
+        db_from_asset right_make_asset in
+      let>? left_take_class, _left_take_contract,
+            _left_take_token_id, _left_take_asset_value, _left_take_decimals =
+        db_from_asset o.order_elt.order_elt_take in
+      let right_make_class = left_take_class in
+      let>? _right_take_class, right_take_contract,
+            right_take_token_id, right_take_asset_value, right_take_decimals =
+        db_from_asset right_take_asset in
+      let>? left_make_class, _left_make_contract,
+            _left_make_token_id, _left_make_asset_value, _left_make_decimals =
+        db_from_asset o.order_elt.order_elt_make in
+      let right_take_class = left_make_class in
+      [%pgsql dbh
+          "insert into orders(maker, maker_edpk, \
+           make_asset_type_class, make_asset_type_contract, make_asset_type_token_id, \
+           make_asset_value, make_asset_decimals, \
+           take_asset_type_class, take_asset_type_contract, take_asset_type_token_id, \
+           take_asset_value, take_asset_decimals, \
+           salt, signature, created_at, last_update_at, hash) \
+           values($?right_maker, $right_maker_edpk, \
            $right_make_class, $?right_make_contract, $?right_make_token_id, \
            $right_make_asset_value, $?right_make_decimals, \
            $right_take_class, $?right_take_contract, $?right_take_token_id, \
