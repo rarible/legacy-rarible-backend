@@ -1,6 +1,7 @@
 type error = [
   | Crawlori.Rp.error
   | `unexpected_michelson_value
+  | `unmatched_curve
 ]
 
 let (let>) = Lwt.bind
@@ -47,3 +48,4 @@ let map_res f l =
 let string_of_error : error -> string = function
   | #Crawlori.Rp.error as e -> Crawlori.Rp.string_of_error e
   | `unexpected_michelson_value -> "unexpected_michelson_value"
+  | `unmatched_curve -> "unmatched_curve"

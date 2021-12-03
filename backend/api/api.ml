@@ -1329,8 +1329,19 @@ let get_order_activities req input =
    errors=[bad_request_case;unexpected_case];
    section=order_activities_section}]
 
+let verify ~pk58 ~sign58 ~bytes =
+  let open Tzfunc.Crypto in
+  Result.bind (Pk.b58dec pk58) @@ fun pk ->
+  Result.bind (Signature.b58dec sign58) @@ fun signature ->
+  match Curve.from_b58 pk58, Curve.from_b58 sign58 with
+  | Ok `ed25519, Ok `ed25519 -> Ed25519.verify_bytes ~pk ~signature ~bytes
+  | Ok `secp256k1, Ok `secp256k1 -> Secp256k1.verify_bytes ~pk ~signature ~bytes
+  | Error e, _ | _, Error e -> Error e
+  | _ -> Error `unmatched_curve
+
+
+
 let validate _req input =
-  (* todo check for secp256k1 and p256 *)
   let message = input.svf_prefix ^ input.svf_message in
   match Tzfunc.Crypto.pk_to_pkh input.svf_edpk with
   | Error e -> return (Error {code=`BAD_REQUEST; message=Let.string_of_error e})
