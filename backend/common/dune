@@ -15,4 +15,4 @@
  (name common)
  (package rarible)
  (modules typed_mich utils parameters contract_spec storage_diff balance)
- (libraries let))
+ (libraries let ezjsonm))

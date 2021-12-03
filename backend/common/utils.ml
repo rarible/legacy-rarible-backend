@@ -465,12 +465,23 @@ let pk_to_pkh_exn pk = match Tzfunc.Crypto.pk_to_pkh pk with
   | Ok pkh -> pkh
 
 let tzip21_attribute_to_rarible_attribute a =
-  {
-    nft_item_attribute_key = a.attribute_name ;
-    nft_item_attribute_value = a.attribute_value ;
-    nft_item_attribute_type = a.attribute_type ;
-    nft_item_attribute_format = None ;
-  }
+  let v = match a.attribute_value with
+    | `String s -> Some s
+    | `Float f ->
+      begin
+        try Some (string_of_int @@ int_of_float f)
+        with _ -> Some (string_of_float f)
+      end
+    | _ -> None in
+  match v with
+  | Some v ->
+    Some {
+      nft_item_attribute_key = a.attribute_name ;
+      nft_item_attribute_value = v ;
+      nft_item_attribute_type = a.attribute_type ;
+      nft_item_attribute_format = None ;
+    }
+  | None -> None
 
 let tzip21_attributes_to_rarible_attributes l =
   List.map tzip21_attribute_to_rarible_attribute l
@@ -488,7 +499,7 @@ let rarible_attributes_of_tzip21_attributes = function
   | None -> None
   | Some attr ->
     Option.some @@
-    List.map tzip21_attribute_to_rarible_attribute attr
+    List.filter_map tzip21_attribute_to_rarible_attribute attr
 
 let rarible_meta_of_tzip21_meta meta =
   match meta with
@@ -497,7 +508,8 @@ let rarible_meta_of_tzip21_meta meta =
     Some {
       nft_item_meta_name = Option.value ~default:"Unnamed item" m.tzip21_tm_name ;
       nft_item_meta_description = m.tzip21_tm_description ;
-      nft_item_meta_attributes = rarible_attributes_of_tzip21_attributes m.tzip21_tm_attributes ;
+      nft_item_meta_attributes =
+        rarible_attributes_of_tzip21_attributes m.tzip21_tm_attributes ;
       nft_item_meta_image =
         begin match m.tzip21_tm_display_uri with
           | Some _ as uri -> uri
