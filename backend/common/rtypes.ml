@@ -120,7 +120,7 @@ type item_transfer = {
 
 type nft_item_attribute = {
   nft_item_attribute_key : string ;
-  nft_item_attribute_value : Json_repr.ezjsonm ;
+  nft_item_attribute_value : string ;
   nft_item_attribute_type : string option; [@opt]
   nft_item_attribute_format : string option; [@opt]
 } [@@deriving encoding {title="NftItemAttribute"; def_title}]
