@@ -1,0 +1,20 @@
+{
+  "nodes": [
+    "https://teznode.letzbake.com/"
+  ],
+  "start": 1365000,
+  "confirmations_needed": 5,
+  "step_forward": 30,
+  "register_kinds": [],
+  "exchange": "KT198mqFKkiWerXLmMCw69YB1i6yzYtmGVrC",
+  "royalties": "KT1HNNrmCk1fpqveRDz8Fvww2GM4gPzmA7fo",
+  "transfer_manager": "KT1HTmwHGvxYgACDr1oJhMNZGzxHCAnNHaHi",
+  "ft_contracts": {
+    "KT1JBNFcB5tiycHNdYGYCtR3kk6JaJysUCi8": {
+      "kind": "lugh",
+      "ledger_id": "44140",
+      "decimals": 6,
+      "token_id": "0"
+    }
+  }
+}

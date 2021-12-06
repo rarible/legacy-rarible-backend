@@ -2,6 +2,7 @@
   "nodes":["https://hangzhounet.smartpy.io"],
   "start":96750,
   "step_forward": 30,
+  "register_kinds": [],
   "exchange":"KT1ULGjK8FtaJ9QqCgJVN14B6tY76Ykaz6M8",
   "royalties":"KT1WKRXswxEpTbVg2pGgofzwZCNKjAVcuMgh",
   "transfer_manager": "KT1DyDkW16XBuFzpLkXKraD46SAxQDrha5gm",

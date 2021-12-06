@@ -848,62 +848,77 @@ let get_nft_collection_by_id ?dbh collection =
     Lwt.return @@ mk_nft_collection obj
 
 let produce_order_event_hash dbh hash =
-  let>? order = get_order ~dbh hash in
-  begin
-    match order with
-    | Some (order, decs) ->
-      Rarible_kafka.produce_order_event ~decs (mk_order_event order)
-    | None -> Lwt.return ()
-  end >>= fun () ->
-  Lwt.return_ok ()
+  match !Rarible_kafka.kafka_config with
+  | None -> Lwt.return_ok ()
+  | Some _ ->
+    let>? order = get_order ~dbh hash in
+    begin
+      match order with
+      | Some (order, decs) ->
+        Rarible_kafka.produce_order_event ~decs (mk_order_event order)
+      | None -> Lwt.return ()
+    end >>= fun () ->
+    Lwt.return_ok ()
 
 let produce_order_event_item dbh old_owner contract token_id =
-  let>? l =
-    [%pgsql.object dbh
-        "select hash from orders \
-         where make_asset_type_contract = $contract and \
-         make_asset_type_token_id = ${Z.to_string token_id} and \
-         maker = $old_owner"] in
-  iter_rp (fun r ->
-      let>? order = get_order ~dbh r#hash in
-      match order with
-      | None -> Lwt.return_ok ()
-      | Some (order, decs) ->
-        match order.order_elt.order_elt_status with
-        | OINACTIVE | OACTIVE ->
-          Rarible_kafka.produce_order_event ~decs (mk_order_event order) >>= fun () ->
-          Lwt.return_ok ()
-        | _ -> Lwt.return_ok ())
-    l
+  match !Rarible_kafka.kafka_config with
+  | None -> Lwt.return_ok ()
+  | Some _ ->
+    let>? l =
+      [%pgsql.object dbh
+          "select hash from orders \
+           where make_asset_type_contract = $contract and \
+           make_asset_type_token_id = ${Z.to_string token_id} and \
+           maker = $old_owner"] in
+    iter_rp (fun r ->
+        let>? order = get_order ~dbh r#hash in
+        match order with
+        | None -> Lwt.return_ok ()
+        | Some (order, decs) ->
+          match order.order_elt.order_elt_status with
+          | OINACTIVE | OACTIVE ->
+            Rarible_kafka.produce_order_event ~decs (mk_order_event order) >>= fun () ->
+            Lwt.return_ok ()
+          | _ -> Lwt.return_ok ())
+      l
 
 let produce_nft_item_event dbh contract token_id =
-  let> item = get_nft_item_by_id ~dbh ~include_meta:true contract token_id in
-  match item with
-  | Ok item ->
-    if item.nft_item_supply = Z.zero then
-      Rarible_kafka.produce_item_event (mk_delete_item_event item)
-      >>= fun () ->
+  match !Rarible_kafka.kafka_config with
+  | None -> Lwt.return_ok ()
+  | Some _ ->
+    let> item = get_nft_item_by_id ~dbh ~include_meta:true contract token_id in
+    match item with
+    | Ok item ->
+      if item.nft_item_supply = Z.zero then
+        Rarible_kafka.produce_item_event (mk_delete_item_event item)
+        >>= fun () ->
+        Lwt.return_ok ()
+      else
+        Rarible_kafka.produce_item_event (mk_update_item_event item)
+        >>= fun () ->
+        Lwt.return_ok ()
+    | Error err ->
+      Printf.eprintf "couldn't produce nft event %S\n%!" @@ Crp.string_of_error err ;
       Lwt.return_ok ()
-    else
-      Rarible_kafka.produce_item_event (mk_update_item_event item)
-      >>= fun () ->
-      Lwt.return_ok ()
-  | Error err ->
-    Printf.eprintf "couldn't produce nft event %S\n%!" @@ Crp.string_of_error err ;
-    Lwt.return_ok ()
 
 let produce_nft_collection_event c =
-  Rarible_kafka.produce_collection_event (mk_nft_collection_event c)
-  >>= fun () ->
-  Lwt.return_ok ()
+  match !Rarible_kafka.kafka_config with
+  | None -> Lwt.return_ok ()
+  | Some _ ->
+    Rarible_kafka.produce_collection_event (mk_nft_collection_event c)
+    >>= fun () ->
+    Lwt.return_ok ()
 
 let produce_update_collection_event dbh contract =
-  let> c = get_nft_collection_by_id ~dbh contract in
-  match c with
-  | Ok c -> produce_nft_collection_event c
-  | Error e ->
-    Printf.eprintf "couldn't produce collection event %S\n%!" @@ Crp.string_of_error e ;
-    Lwt.return_ok ()
+  match !Rarible_kafka.kafka_config with
+  | None -> Lwt.return_ok ()
+  | Some _ ->
+    let> c = get_nft_collection_by_id ~dbh contract in
+    match c with
+    | Ok c -> produce_nft_collection_event c
+    | Error e ->
+      Printf.eprintf "couldn't produce collection event %S\n%!" @@ Crp.string_of_error e ;
+      Lwt.return_ok ()
 
 let produce_nft_ownership_update_event os =
   if os.nft_ownership_value = Z.zero then
@@ -912,15 +927,18 @@ let produce_nft_ownership_update_event os =
     Rarible_kafka.produce_ownership_event (mk_update_ownership_event os)
 
 let produce_nft_ownership_event dbh contract token_id owner =
-  begin
-    get_nft_ownership_by_id
-      ~old:true ~dbh contract token_id owner >>= function
-    | Ok os -> produce_nft_ownership_update_event os
-    | Error err ->
-      Printf.eprintf "Couldn't produce ownership event %S\n%!" @@ Crp.string_of_error err ;
-      Lwt.return_unit
-  end >>= fun () ->
-  Lwt.return_ok ()
+  match !Rarible_kafka.kafka_config with
+  | None -> Lwt.return_ok ()
+  | Some _ ->
+    begin
+      get_nft_ownership_by_id
+        ~old:true ~dbh contract token_id owner >>= function
+      | Ok os -> produce_nft_ownership_update_event os
+      | Error err ->
+        Printf.eprintf "Couldn't produce ownership event %S\n%!" @@ Crp.string_of_error err ;
+        Lwt.return_unit
+    end >>= fun () ->
+    Lwt.return_ok ()
 
 let insert_fake ?dbh address =
   use dbh @@ fun dbh ->
