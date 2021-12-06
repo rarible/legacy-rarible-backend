@@ -152,6 +152,7 @@ let upgrade_1_to_2 dbh version =
       operators varchar[] not null default '{}',
       metadata jsonb not null default '{}',
       royalties jsonb not null default '{}',
+      creators jsonb[] not null default '{}',
       primary key (contract, owner, token_id))|};
 
     {|create table accounts(
