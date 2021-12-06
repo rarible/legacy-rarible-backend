@@ -64,6 +64,7 @@ async function provider(node: string, api:string, wallet:BeaconWalletKind | stri
   // const tezos = await kukai_provider({node, network: Networks.dev})
   const config = {
     exchange: "KT1AguExF32Z9UEKzD5nuixNmqrNs1jBKPT8",
+    exchange_proxy: "KT1AguExF32Z9UEKzD5nuixNmqrNs1jBKPT8",
     fees: new BigNumber(300),
     nft_public: "",
     mt_public: "",

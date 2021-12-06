@@ -44,6 +44,7 @@ async function main() {
 
   const config = {
     exchange: argv.exchange,
+    exchange_proxy: argv.exchange,
     fees: new BigNumber(0),
     nft_public: "",
     mt_public: "",

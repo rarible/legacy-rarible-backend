@@ -11,6 +11,7 @@ async function main() {
   try {
     const config = {
       exchange: "KT1KkUufmRPjK6SBNZVvAYniAY5F9czYmgwu",
+      exchange_proxy: "KT1KkUufmRPjK6SBNZVvAYniAY5F9czYmgwu",
       fees: new BigNumber(0),
       nft_public: "",
       mt_public: "",

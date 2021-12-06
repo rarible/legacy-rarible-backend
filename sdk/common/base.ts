@@ -1,5 +1,4 @@
 import { BigMapAbstraction, TransferParams, OriginateParams } from "@taquito/taquito"
-import { Config } from "../config/type"
 import { MichelsonData } from "@taquito/michel-codec"
 import BigNumber from "@taquito/rpc/node_modules/bignumber.js"
 const bs58check = require("bs58check")
@@ -65,6 +64,14 @@ export interface TezosProvider {
   storage: (contract: string) => Promise<any>;
   balance: () => Promise<BigNumber>;
   chain_id: () => Promise<string>;
+}
+
+export interface Config {
+  exchange: string;
+  exchange_proxy: string;
+  fees: BigNumber;
+  nft_public: string;
+  mt_public: string;
 }
 
 export interface Provider {
