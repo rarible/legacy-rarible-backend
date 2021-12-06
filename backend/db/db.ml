@@ -2133,36 +2133,38 @@ let contract_updates_base dbh ~main ~contract ~block ~level ~tsp ~burn
       Some (EzEncoding.construct part_enc {
           part_account;
           part_value = Z.(to_int32 @@ div v new_supply)})) creator_values_new in
-  let>? new_amount =
-    let>? l = [%pgsql dbh
-        "update tokens set supply = $new_supply, creators = $creators, \
-         amount = amount + $factor * $amount::mpz, \
-         last_block = case when $main then $block else last_block end, \
-         last_level = case when $main then $level else last_level end, \
-         last = case when $main then $tsp else last end \
-         where token_id = $token_id and contract = $contract and owner = $account \
-         returning amount"] in
-    one l in
+  let>? l_amount = [%pgsql dbh
+      "update tokens set supply = $new_supply, creators = $creators, \
+       amount = amount + $factor * $amount::mpz, \
+       last_block = case when $main then $block else last_block end, \
+       last_level = case when $main then $level else last_level end, \
+       last = case when $main then $tsp else last end \
+       where token_id = $token_id and contract = $contract and owner = $account \
+       returning amount"] in
   let>? () = [%pgsql dbh
       "update tokens set supply = $new_supply, creators = $creators, \
        last_block = case when $main then $block else last_block end, \
        last_level = case when $main then $level else last_level end, \
        last = case when $main then $tsp else last end
        where token_id = $token_id and contract = $contract and owner <> $account"] in
-  (* update account *)
-  let new_token = EzEncoding.construct account_token_enc {
-      at_token_id = token_id;
-      at_contract = contract;
-      at_amount = new_amount } in
-  let old_token = EzEncoding.construct account_token_enc {
-      at_token_id = token_id;
-      at_contract = contract;
-      at_amount = Z.(sub new_amount (mul main_s amount))  } in
-  [%pgsql dbh
-      "update accounts set tokens = array_append(array_remove(tokens, $old_token), $new_token), \
-       last_block = case when $main then $block else last_block end, \
-       last_level = case when $main then $level else last_level end, \
-       last = case when $main then $tsp else last end where address = $account"]
+
+  match l_amount with
+  | [ new_amount ] ->
+    (* update account *)
+    let new_token = EzEncoding.construct account_token_enc {
+        at_token_id = token_id;
+        at_contract = contract;
+        at_amount = new_amount } in
+    let old_token = EzEncoding.construct account_token_enc {
+        at_token_id = token_id;
+        at_contract = contract;
+        at_amount = Z.(sub new_amount (mul main_s amount))  } in
+    [%pgsql dbh
+        "update accounts set tokens = array_append(array_remove(tokens, $old_token), $new_token), \
+         last_block = case when $main then $block else last_block end, \
+         last_level = case when $main then $level else last_level end, \
+         last = case when $main then $tsp else last end where address = $account"]
+  | _ -> Lwt.return_ok ()
 
 let metadata_uri_enc =
   EzEncoding.ignore_enc @@ Json_encoding.(obj2 (req "name" string) (opt "symbol" string))
