@@ -10,16 +10,17 @@ let api = ref "http://localhost:8080"
 let sdk = ref false
 let endpoint = ref "http://hangzhou.tz.functori.com"
 
-let royalties = "KT1Ebv7msgzT9tRGjcWHMnnb6Rm8mAy6b9dq"
-let validator = "KT1U8NoG9oiBYWtszvQ6WiSJyvmeDxo8ZcoT"
-let exchange_v2 = "KT1AguExF32Z9UEKzD5nuixNmqrNs1jBKPT8"
-let fill = "KT1GwQQ2HL8JW931AMod49fmNmS2kfjqAtS7"
+let royalties = "KT1GCPRRohM4snqj4Mav3iDU1R3hwkuc1wAi"
+let validator = "KT19QCfMQVdnWLbdcyFMpo4QB9hEB8b4ex4j"
+let exchange = "KT19dxaDFiN1SPFH5xen65htDemQfsfbJzWo"
+let fill = "KT1WnaYEjR6Dd7g3dBs5iQrGqHBrcEBv8c95"
+let transfer_proxy = "KT1Gc6sUeBgDH2MpfiWV63DtDvSeT1J9dCyx"
 
 let lugh_contract = "KT1StBf222xBLfLTChsute8F9HSt9kVHpqdY"
 
 let config = {
   admin_wallet = "" ;
-  exchange_v2 ;
+  exchange ;
   validator ;
   royalties = "" ;
   contracts = SMap.empty;
@@ -2171,7 +2172,7 @@ let get_head () =
   EzReq_lwt.get
     (EzAPI.URL "https://api.hangzhou2net.tzkt.io/v1/blocks/count")
 
-let make_config admin_wallet validator exchange_v2 royalties contracts ft_contracts
+let make_config admin_wallet validator exchange royalties contracts ft_contracts
     kafka_broker kafka_username kafka_password =
   let open Crawlori.Config in
   get_head () >>= function
@@ -2191,7 +2192,7 @@ let make_config admin_wallet validator exchange_v2 royalties contracts ft_contra
       register_kinds = None ;
       allow_no_metadata = false ;
       extra = {
-        admin_wallet ; validator ; exchange_v2 ; royalties; contracts; ft_contracts;
+        admin_wallet ; validator ; exchange ; royalties; contracts; ft_contracts;
       } ;
     } in
     let temp_fn = Filename.temp_file "config" "" in
@@ -2212,10 +2213,10 @@ let make_config admin_wallet validator exchange_v2 royalties contracts ft_contra
       close_out c ;
       Lwt.return (temp_fn, Some kafka_temp_fn)
 
-let start_crawler admin_wallet validator exchange_v2 royalties
+let start_crawler admin_wallet validator exchange royalties
     contracts ft_contracts kafka_broker kafka_username kafka_password =
   make_config
-    admin_wallet validator exchange_v2 royalties contracts ft_contracts
+    admin_wallet validator exchange royalties contracts ft_contracts
     kafka_broker kafka_username kafka_password  >>= fun (config, kafka_config) ->
   let prog = "./_bin/crawler" in
   let args =
@@ -2256,14 +2257,14 @@ let setup_test_env ?(spawn_exchange_infra=false) () =
     Lwt.return_ok (r_kt1, ex_kt1)
   else
     start_crawler ""
-      validator exchange_v2 royalties
+      validator exchange royalties
       SMap.empty SMap.empty "" "" ""
     >>= fun (cpid, kafka_config) ->
     api_pid := Some (start_api kafka_config) ;
     crawler_pid := Some cpid ;
     Printf.eprintf "Waiting 6sec to let crawler catch up...\n%!" ;
     Lwt_unix.sleep 6. >>= fun () ->
-    Lwt.return_ok (royalties, exchange_v2)
+    Lwt.return_ok (royalties, exchange)
 
 let clean_test_env () =
   begin match !api_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
@@ -2419,7 +2420,7 @@ let get_source_from_item ((owner, owner_sk), _amount, _token_id, _royalties, _me
 let get_token_id_from_item (_owner, _amount, token_id, _royalties, _metadata) =
   token_id
 
-let match_orders_nft ?royalties ?(exchange=exchange_v2) ~kind ~privacy () =
+let match_orders_nft ?royalties ?(exchange=exchange) ?(transfer_proxy=transfer_proxy) ~kind ~privacy () =
   let c = create_collection ?royalties ~kind ~privacy () in
   let>? c = deploy_collection c in
   let>? () = check_collection c in
@@ -2427,7 +2428,7 @@ let match_orders_nft ?royalties ?(exchange=exchange_v2) ~kind ~privacy () =
   let>? item1 = mint_one_with_token_id_from_api c in
   let> () = check_item item1 in
   update_operators
-    item1.it_token_id item1.it_owner.tz1 exchange
+    item1.it_token_id item1.it_owner.tz1 transfer_proxy
     (item1.it_owner.tz1, item1.it_owner.edsk) item1.it_collection >>= function
   | Error err ->
     Lwt.return_ok @@
@@ -2436,7 +2437,7 @@ let match_orders_nft ?royalties ?(exchange=exchange_v2) ~kind ~privacy () =
   | Ok () ->
     let>? item2 = mint_one_with_token_id_from_api ~diff:item1.it_owner.tz1 c in
     let> () = check_item item2 in
-    update_operators_for_all exchange item2.it_owner item2.it_collection >>= function
+    update_operators_for_all transfer_proxy item2.it_owner item2.it_collection >>= function
     | Error err ->
       Lwt.return_ok @@
       Printf.eprintf "match_orders_nft error %s" @@
@@ -2464,7 +2465,7 @@ let match_orders_nft ?royalties ?(exchange=exchange_v2) ~kind ~privacy () =
           check_item {item1 with it_owner = item2.it_owner} in
       Lwt.return_ok ()
 
-let match_orders_tezos_2 ?royalties ?(exchange=exchange_v2) ~kind ~privacy () =
+let match_orders_tezos_2 ?royalties ?(exchange=exchange) ?(transfer_proxy=transfer_proxy) ~kind ~privacy () =
   let c = create_collection ?royalties ~kind ~privacy () in
   let>? c = deploy_collection c in
   let>? () = check_collection c in
@@ -2473,7 +2474,7 @@ let match_orders_tezos_2 ?royalties ?(exchange=exchange_v2) ~kind ~privacy () =
   wait_next_block () >>= fun () ->
   let> () = check_item item1 in
   update_operators
-    item1.it_token_id item1.it_owner.tz1 exchange
+    item1.it_token_id item1.it_owner.tz1 transfer_proxy
     (item1.it_owner.tz1, item1.it_owner.edsk) item1.it_collection >>= function
   | Error err ->
     Lwt.return_ok @@
@@ -2505,7 +2506,7 @@ let match_orders_tezos_2 ?royalties ?(exchange=exchange_v2) ~kind ~privacy () =
     end >>= fun () ->
     Lwt.return_ok ()
 
-let match_orders_tezos ?royalties ?(exchange=exchange_v2) ~kind ~privacy () =
+let match_orders_tezos ?royalties ?(exchange=exchange) ?(transfer_proxy=transfer_proxy) ~kind ~privacy () =
   let c = create_collection ?royalties ~kind ~privacy () in
   let>? c = deploy_collection c in
   let>? () = check_collection c in
@@ -2514,7 +2515,7 @@ let match_orders_tezos ?royalties ?(exchange=exchange_v2) ~kind ~privacy () =
   wait_next_block () >>= fun () ->
   let> () = check_item item1 in
   update_operators
-    item1.it_token_id item1.it_owner.tz1 exchange
+    item1.it_token_id item1.it_owner.tz1 transfer_proxy
     (item1.it_owner.tz1, item1.it_owner.edsk) item1.it_collection >>= function
   | Error err ->
     Lwt.return_ok @@
@@ -2546,7 +2547,7 @@ let match_orders_tezos ?royalties ?(exchange=exchange_v2) ~kind ~privacy () =
     end >>= fun () ->
     Lwt.return_ok ()
 
-let match_orders_lugh ?royalties ?(exchange=exchange_v2) ~kind ~privacy () =
+let match_orders_lugh ?royalties ?(exchange=exchange) ?(transfer_proxy=transfer_proxy) ~kind ~privacy () =
   let c = create_collection ?royalties ~kind ~privacy () in
   let>? c = deploy_collection c in
   let>? () = check_collection c in
@@ -2555,7 +2556,7 @@ let match_orders_lugh ?royalties ?(exchange=exchange_v2) ~kind ~privacy () =
   wait_next_block () >>= fun () ->
   let> () = check_item item1 in
   update_operators
-    item1.it_token_id item1.it_owner.tz1 exchange
+    item1.it_token_id item1.it_owner.tz1 transfer_proxy
     (item1.it_owner.tz1, item1.it_owner.edsk) item1.it_collection >>= function
   | Error err ->
     Lwt.return_ok @@
@@ -2587,7 +2588,7 @@ let match_orders_lugh ?royalties ?(exchange=exchange_v2) ~kind ~privacy () =
     end >>= fun () ->
     Lwt.return_ok ()
 
-let fill_orders_db ?royalties ~exchange ~kind ~privacy () =
+let fill_orders_db ?royalties ~transfer_proxy ~kind ~privacy () =
   let c = create_collection ?royalties ~kind ~privacy () in
   let>? c = deploy_collection c in
   let>? () = check_collection c in
@@ -2604,7 +2605,7 @@ let fill_orders_db ?royalties ~exchange ~kind ~privacy () =
   let> () = check_item item3 in
   let> () = check_item item4 in
   let> () = check_item item5 in
-  update_operators_for_all exchange item1.it_owner c.col_kt1 >>= function
+  update_operators_for_all transfer_proxy item1.it_owner c.col_kt1 >>= function
   | Error err ->
     Lwt.return_ok @@
     Printf.eprintf "fill_orders_db error %s" @@
@@ -2631,13 +2632,13 @@ let fill_orders_db ?royalties ~exchange ~kind ~privacy () =
     let> () = Lwt_unix.sleep 1. in
     Lwt.return_ok ()
 
-let fill_orders ?royalties ?(exchange=exchange_v2) ~kind ~privacy () =
-  fill_orders_db ?royalties ~exchange ~kind ~privacy () >>=? fun () ->
-  fill_orders_db ?royalties ~exchange ~kind ~privacy () >>=? fun () ->
-  fill_orders_db ?royalties ~exchange ~kind ~privacy ()
+let fill_orders ?royalties ?(transfer_proxy=transfer_proxy) ~kind ~privacy () =
+  fill_orders_db ?royalties ~transfer_proxy ~kind ~privacy () >>=? fun () ->
+  fill_orders_db ?royalties ~transfer_proxy ~kind ~privacy () >>=? fun () ->
+  fill_orders_db ?royalties ~transfer_proxy ~kind ~privacy ()
   (* TODO : check order *)
 
-let cancel_order ?royalties ?(exchange=exchange_v2) ~kind ~privacy () =
+let cancel_order ?royalties ?(exchange=exchange) ~kind ~privacy () =
   let c = create_collection ?royalties ~kind ~privacy () in
   let>? c = deploy_collection c in
   let>? () = check_collection c in
@@ -2957,8 +2958,8 @@ let main () =
           let kind = `nft in
           let privacy = `priv in
           setup_test_env () >>= function
-          | Ok (royalties, exchange) ->
-            fill_orders ~royalties ~exchange ~kind ~privacy () >>= fun _ ->
+          | Ok (royalties, _exchange) ->
+            fill_orders ~royalties ~kind ~privacy () >>= fun _ ->
             Lwt.return @@ clean_test_env ()
           | Error _err ->Lwt.return @@ clean_test_env ())
         (fun exn ->

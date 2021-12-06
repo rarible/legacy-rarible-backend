@@ -8,18 +8,18 @@ let kafka_config_file = ref ""
 let filename = ref None
 
 let dummy_extra = {
-  admin_wallet = ""; exchange_v2 = ""; royalties = ""; validator = "";
+  admin_wallet = ""; exchange = ""; royalties = ""; validator = "";
   contracts = SMap.empty; ft_contracts = SMap.empty
 }
 
 let rarible_contracts ?(db=dummy_extra) config =
   let extra = config.extra in
-  if extra.exchange_v2 = "" && db.exchange_v2 = "" ||
+  if extra.exchange = "" && db.exchange = "" ||
        extra.royalties = "" && db.royalties = "" ||
        extra.validator = "" && db.validator = "" then
     Lwt.return_error (`hook_error ("missing_rarible_contracts"))
   else
-    let extra = if extra.exchange_v2 = "" then { extra with exchange_v2 = db.exchange_v2 } else extra in
+    let extra = if extra.exchange = "" then { extra with exchange = db.exchange } else extra in
     let extra = if extra.royalties = "" then { extra with royalties = db.royalties } else extra in
     let extra = if extra.validator = "" then { extra with validator = db.validator } else extra in
     let extra = { extra with ft_contracts = SMap.union (fun _ _ v -> Some v) extra.ft_contracts db.ft_contracts } in
@@ -27,7 +27,7 @@ let rarible_contracts ?(db=dummy_extra) config =
     let s = match config.accounts with
       | None -> SSet.empty
       | Some s -> s in
-    let s = SSet.add extra.exchange_v2 s in
+    let s = SSet.add extra.exchange s in
     let s = SSet.add extra.validator s in
     let s = SMap.fold (fun a _ acc -> SSet.add a acc) extra.ft_contracts s in
     let s = SMap.fold (fun a _ acc -> SSet.add a acc) extra.contracts s in

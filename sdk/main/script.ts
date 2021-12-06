@@ -1,4 +1,4 @@
-import { transfer, mint, burn, deploy_nft_public, deploy_royalties, set_token_metadata, set_metadata, deploy_exchangeV2, deploy_validator, deploy_fill, send, TransactionArg} from "."
+import { transfer, mint, burn, deploy_nft_public, deploy_royalties, set_token_metadata, set_metadata, deploy_exchange, deploy_validator, deploy_fill, deploy_transfer_proxy, send, TransactionArg} from "."
 import { in_memory_provider } from '../providers/in_memory/in_memory_provider'
 import yargs from 'yargs'
 import BigNumber from "@taquito/rpc/node_modules/bignumber.js"
@@ -7,9 +7,9 @@ async function main() {
   const argv = await yargs(process.argv.slice(2)).options({
     edsk: {type: 'string', default: 'edsk4CmgW9r4fwqtsT6x2bB7BdVcERxLPt6poFXGpk1gTKbqR43G5H'},
     endpoint: {type: 'string', default: 'https://hangzhou.tz.functori.com'},
-    exchange: {type: 'string', default: 'KT1AguExF32Z9UEKzD5nuixNmqrNs1jBKPT8'},
+    exchange: {type: 'string', default: 'KT19dxaDFiN1SPFH5xen65htDemQfsfbJzWo'},
     contract: {type: 'string', default: ''},
-    royalties_contract: {type: 'string', default: 'KT1Ebv7msgzT9tRGjcWHMnnb6Rm8mAy6b9dq'},
+    royalties_contract: {type: 'string', default: 'KT1GCPRRohM4snqj4Mav3iDU1R3hwkuc1wAi'},
     token_id: {type : 'number'},
     royalties: {type: 'string', default: '{}'},
     amount: {type: 'number'},
@@ -20,9 +20,11 @@ async function main() {
     owner: {type: 'string'},
     receiver: {type: 'string'},
     fee: {type: 'number', default: 0},
-    validator: {type: 'string', default: 'KT1U8NoG9oiBYWtszvQ6WiSJyvmeDxo8ZcoT'},
+    validator: {type: 'string', default: 'KT19QCfMQVdnWLbdcyFMpo4QB9hEB8b4ex4j'},
     operator: {type: 'string', default: ''},
-    fill: {type: 'string', default: 'KT1GwQQ2HL8JW931AMod49fmNmS2kfjqAtS7'},
+    fill: {type: 'string', default: 'KT1WnaYEjR6Dd7g3dBs5iQrGqHBrcEBv8c95'},
+    transfer_proxy: {type: 'string', default: 'KT1Gc6sUeBgDH2MpfiWV63DtDvSeT1J9dCyx'},
+    transfer_manager: {type: 'string', default: 'KT1BpwcJn16LTJ2imi7VUXtb5UnJTFDsjYMe'},
   }).argv
 
   const token_id_opt = (argv.token_id!=undefined) ? new BigNumber(argv.token_id) : undefined
@@ -44,6 +46,7 @@ async function main() {
 
   const config = {
     exchange: argv.exchange,
+    exchange_proxy: argv.exchange,
     fees: new BigNumber(0),
     nft_public: "",
     mt_public: "",
@@ -56,7 +59,6 @@ async function main() {
   }
   const to = (argv.to) ? argv.to : await provider.tezos.address()
   const owner = (argv.owner) ? argv.owner : await provider.tezos.address()
-  const receiver = (argv.receiver) ? argv.receiver : await provider.tezos.address()
   const asset_class = (amount==undefined) ? "NFT" : "MT"
 
   switch(argv._[0]) {
@@ -125,9 +127,16 @@ async function main() {
 
     case 'deploy_exchange':
       console.log("deploy exchange")
-      const op_deploy_exchange = await deploy_exchangeV2(provider, owner, receiver, new BigNumber(argv.fee))
+      const op_deploy_exchange = await deploy_exchange(provider, owner, argv.transfer_manager, argv.royalties_contract, argv.fill)
       await op_deploy_exchange.confirmation()
       console.log(op_deploy_exchange.contract)
+      break
+
+    case 'deploy_transfer_proxy':
+      console.log("deploy exchange")
+      const op_deploy_transfer_proxy = await deploy_transfer_proxy(provider, owner)
+      await op_deploy_transfer_proxy.confirmation()
+      console.log(op_deploy_transfer_proxy.contract)
       break
 
     case 'set_validator':

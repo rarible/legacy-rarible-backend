@@ -90,7 +90,7 @@ let get_extra_config ?dbh () =
     let ft_contracts = db_ft_contracts ft_contracts in
     Lwt.return_ok (Some {
       admin_wallet = r#admin_wallet;
-      exchange_v2 = r#exchange_v2_contract;
+      exchange = r#exchange_v2_contract;
       royalties = r#royalties_contract;
       validator = r#validator_contract;
       ft_contracts; contracts
@@ -106,10 +106,10 @@ let update_extra_config ?dbh e =
       [%pgsql dbh
           "insert into state(exchange_v2_contract, royalties_contract, \
            validator_contract) \
-           values (${e.exchange_v2}, ${e.royalties}, ${e.validator})"]
+           values (${e.exchange}, ${e.royalties}, ${e.validator})"]
     | _ ->
       [%pgsql dbh
-          "update state set exchange_v2_contract = ${e.exchange_v2}, \
+          "update state set exchange_v2_contract = ${e.exchange}, \
            royalties_contract = ${e.royalties}, validator_contract = ${e.validator}"] in
   iter_rp (fun (address, lk) ->
       let id = lk.ft_ledger_id in
@@ -1906,7 +1906,7 @@ let insert_transaction ~config ~dbh ~op tr =
         Format.printf "\027[0;35mset royalties %s %ld\027[0m@." (Utils.short op.bo_hash) op.bo_index;
         insert_royalties ~dbh ~op roy
       | _ -> Lwt.return_ok ()
-    else if contract = config.Crawlori.Config.extra.exchange_v2 then (* exchange_v2 *)
+    else if contract = config.Crawlori.Config.extra.exchange then (* exchange_v2 *)
       begin match Parameters.parse_exchange entrypoint m with
         | Ok (Cancel { hash; maker_edpk; maker; make ; take; salt }) ->
           Format.printf "\027[0;35mcancel order %s %ld %s\027[0m@."
