@@ -1,4 +1,4 @@
-archetype fill_storage(owner : address)
+archetype transfer_proxy(owner : address)
 
 variable owner_candidate : option<address> = none
 
@@ -17,46 +17,23 @@ entry claim_ownership() {
   }
 }
 
-variable fill : big_map<bytes, option<nat>> = []
-
 asset user {
   addr : address
 }
 
 entry add_user(new_user : address) {
   called by owner
-  effect {
-    user.add({ new_user })
-  }
+  effect { user.add({ new_user }) }
 }
 
 entry rm_user(old_user : address) {
   called by owner
-  effect {
-    user.remove(old_user)
-  }
+  effect { user.remove(old_user) }
 }
 
-// READ
-view get(k : bytes) : option<nat> {
-  return fill[k]
-}
-
-view contains(k : bytes) : bool {
-  return fill.contains(k)
-}
-
-// WRITE
-entry remove(k : bytes) {
+entry do_transfers(arg : lambda<unit,list<operation>>) {
   called by user
   effect {
-    fill.put(k, none<nat>)
-  }
-}
-
-entry put(k : bytes, v : nat) {
-  called by user
-  effect {
-    fill.put(k, some(v))
+    operations := exec_lambda(arg, Unit)
   }
 }

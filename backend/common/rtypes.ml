@@ -959,7 +959,7 @@ type ft_ledger = {
 
 type config = {
   admin_wallet: string; [@dft ""]
-  exchange_v2: string; [@dft ""]
+  exchange: string; [@dft ""]
   validator: string; [@dft ""]
   royalties: string; [@dft ""]
   mutable ft_contracts: ft_ledger SMap.t; [@map] [@dft SMap.empty]
