@@ -990,9 +990,9 @@ let get_metadata meta =
   with _ ->
     None, None, None, None, None
 
-let get_or_timeout url =
+let get_or_timeout ?msg url =
   let timeout = Lwt_unix.sleep 30. >>= fun () -> Lwt.return_error (-1, Some "timeout") in
-  Lwt.pick [ timeout ; EzReq_lwt.get url ]
+  Lwt.pick [ timeout ; EzReq_lwt.get ?msg url ]
 
 let get_metadata_json meta =
   Format.eprintf "get_metadata_json %s@." meta ;
@@ -1013,8 +1013,7 @@ let get_metadata_json meta =
               "ipns/", String.sub url 5 ((String.length meta) - 5)
             else "ipfs/", url
           with _ -> "", url in
-        Format.eprintf "get_metadata_json %s %s@." fs url ;
-        get_or_timeout
+        get_or_timeout ~msg:"get_metadata_json"
           (EzAPI.URL (Printf.sprintf "https://cloudflare-ipfs.com/%s%s" fs url))
       else Lwt.return_error (0, Some (Printf.sprintf "unknow scheme %s"proto))
     end >>= function
@@ -1470,12 +1469,13 @@ let reset_nft_item_meta_by_id ?dbh contract token_id =
   Printf.eprintf "reset_nft_item_meta_by_id %s %s\n%!" contract (Z.to_string token_id) ;
   use dbh @@ fun dbh ->
   let>? l = [%pgsql dbh
-      "select block, level, tsp, metadata from token_updates where \
-       main and contract = $contract and token_id = $token_id ORDER BY block desc LIMIT 1"] in
+      "select main, block, level, tsp, metadata from token_updates where \
+       main and contract = $contract and token_id = $token_id and metadata is not null \
+       ORDER BY block desc LIMIT 1"] in
   match l with
   | [] -> Lwt.return_ok ()
-  | [ _, _, _, None ] ->  Lwt.return_ok ()
-  | [ block, level, tsp, Some json ] ->
+  | [ _, _, _, _, None ] ->  Lwt.return_ok ()
+  | [ main, block, level, tsp, Some json ] ->
     begin
       try
         let l = EzEncoding.destruct Rtypes.token_metadata_enc json in
@@ -1484,7 +1484,19 @@ let reset_nft_item_meta_by_id ?dbh contract token_id =
           begin
             get_metadata_json meta >>= function
             | Ok (_json, metadata) ->
-              insert_mint_metadata dbh ~contract ~token_id ~block ~level ~tsp ~metadata
+              let>? () =
+                insert_mint_metadata dbh ~contract ~token_id ~block ~level ~tsp ~metadata in
+              let>? () =
+                [%pgsql dbh
+                    "update tzip21_metadata set main = $main where block = $block"] in
+              let>? () =
+                [%pgsql dbh
+                    "update tzip21_formats set main = $main where block = $block"] in
+              let>? () =
+                [%pgsql dbh
+                    "update tzip21_attributes set main = $main where block = $block"] in
+              [%pgsql dbh
+                  "update tzip21_creators set main = $main where block = $block"]
             | Error (code, str) ->
               Lwt.return_error
                 (`hook_error
