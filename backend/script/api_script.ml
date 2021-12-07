@@ -759,39 +759,49 @@ let update_order_make_value hash make_value =
             end_date signature data_type payouts origin_fees in
         call_upsert_order ~d:decs order_form
 
-(* let update_order_take_value hash take_value =
- *   Db.get_order hash >|= function
- *   | Error err -> Format.eprintf "ERROR %s\n%!" @@ Crp.string_of_error err ;
- *   | Ok None -> Format.eprintf "get_order None"
- *   | Ok (Some order) ->
- *     let order_form = order_form_from_order order in
- *     let maker = order_form.order_form_elt.order_form_elt_maker in
- *     let _, _, maker_sk = by_pk maker in
- *     let taker = order_form.order_form_elt.order_form_elt_taker in
- *     let make = order_form.order_form_elt.order_form_elt_make in
- *     let take = order_form.order_form_elt.order_form_elt_take in
- *     let take = { take with asset_value = take_value } in
- *     let salt = order_form.order_form_elt.order_form_elt_salt in
- *     let start_date = order_form.order_form_elt.order_form_elt_start in
- *     let end_date = order_form.order_form_elt.order_form_elt_end in
- *     match order_form.order_form_data with
- *     | RaribleV2Order data ->
- *       let data_type = data.order_rarible_v2_data_v1_data_type in
- *       let payouts = data.order_rarible_v2_data_v1_payouts in
- *       let origin_fees = data.order_rarible_v2_data_v1_origin_fees in
- *       begin match
- *           hash_order_form
- *             maker make taker take salt start_date end_date data_type payouts origin_fees with
- *       | Ok to_sign ->
- *         let signature = sign ~edsk:maker_sk ~bytes:to_sign in
- *         let order_form =
- *           mk_order_form
- *             maker taker make take salt start_date end_date signature data_type payouts origin_fees in
- *         call_upsert_order order_form
- *       | Error err -> Format.eprintf "Error %s\n%!" @@ string_of_error err
- *       end
- *     | _ ->
- *       Format.eprintf "Wrong order type \n%!" *)
+let update_order_take_value hash take_value =
+  Db.get_order hash >>= function
+  | Error err ->
+    let err = Format.sprintf "ERROR %s" @@ Crp.string_of_error err in
+    Lwt.fail_with err
+  | Ok None ->
+    let err = Format.sprintf "order none" in
+    Lwt.fail_with err
+  | Ok (Some res) ->
+    let order, decs = res in
+    let order_form = order_form_from_order order in
+    let maker = order_form.order_form_elt.order_form_elt_maker in
+    let maker = by_tz1 maker in
+    let taker = order_form.order_form_elt.order_form_elt_taker in
+    let taker = Option.map by_tz1 taker in
+    let taker, taker_edpk =
+      Option.fold ~none:(None, None) ~some:(fun a -> Some a.tz1, Some a.edpk) taker in
+    let take = order_form.order_form_elt.order_form_elt_take in
+    let take = { take with asset_value = Z.of_string take_value } in
+    let make = order_form.order_form_elt.order_form_elt_make in
+    let salt = order_form.order_form_elt.order_form_elt_salt in
+    let start_date = order_form.order_form_elt.order_form_elt_start in
+    let end_date = order_form.order_form_elt.order_form_elt_end in
+    let data_type = order.order_data.order_rarible_v2_data_v1_data_type in
+    let payouts = order.order_data.order_rarible_v2_data_v1_payouts in
+    let origin_fees = order.order_data.order_rarible_v2_data_v1_origin_fees in
+    match
+      hash_order_form
+        maker.edpk make taker_edpk take salt start_date end_date data_type payouts origin_fees with
+    | Error err ->
+      let err =Format.sprintf "ERROR %s" @@ Crp.string_of_error err in
+      Lwt.fail_with err
+    | Ok to_sign ->
+      match Tzfunc.Crypto.Ed25519.sign ~edsk:maker.edsk to_sign with
+      | Error err ->
+        let err =Format.sprintf "ERROR %s" @@ Crp.string_of_error err in
+        Lwt.fail_with err
+      | Ok signature ->
+        let order_form =
+          mk_order_form
+            maker.tz1 maker.edpk taker taker_edpk make take salt start_date
+            end_date signature data_type payouts origin_fees in
+        call_upsert_order ~d:decs order_form
 
 (* let update_order_taker hash taker =
  *   Db.get_order hash >|= function
@@ -2708,11 +2718,16 @@ let main () =
         (fun exn ->
            Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
            Lwt.return_unit))
+  | "update_order_take_value" :: hash :: take_value :: [] ->
+    Lwt_main.run (
+      Lwt.catch (fun () ->
+          update_order_take_value hash take_value >>= function
+          | Ok _ -> Lwt.return_unit
+          | Error err -> Lwt.fail_with @@ Api.Errors.string_of_error err)
+        (fun exn ->
+           Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
+           Lwt.return_unit))
 
-    (* Lwt_main.run (update_order_make_value hash make_value >>= fun _ -> Lwt.return_unit) *)
-
-  (* | "update_order_take_value" :: hash :: take_value :: [] ->
-   *   Lwt_main.run (update_order_take_value hash take_value) *)
   (* | "update_order_date" :: hash :: start_date :: end_date :: [] ->
    *   update_order_date hash start_date end_date *)
   (* | "update_order_taker" :: hash :: taker :: [] ->
