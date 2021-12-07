@@ -1021,7 +1021,7 @@ let get_metadata_json meta =
             else "ipfs/", url
           with _ -> "", url in
         get_or_timeout ~msg:"get_metadata_json"
-          (EzAPI.URL (Printf.sprintf "https://cloudflare-ipfs.com/%s%s" fs url))
+          (EzAPI.URL (Printf.sprintf "https://rarible.mypinata.cloud/%s%s" fs url))
       else Lwt.return_error (0, Some (Printf.sprintf "unknow scheme %s"proto))
     end >>= function
     | Ok json ->
