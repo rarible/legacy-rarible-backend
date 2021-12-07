@@ -1252,7 +1252,9 @@ let insert_mint ~dbh ~op ~contract m =
       Option.map (fun pattern -> replace_token_id ~pattern (Z.to_string m.ubim_token_id)) pattern
     | UbiMint2 m ->
       m.ubi2m_token_id, m.ubi2m_owner, m.ubi2m_amount,
-      List.assoc_opt "" m.ubi2m_metadata in
+      List.assoc_opt "" m.ubi2m_metadata
+    | HENMint m ->
+      m.fa2m_token_id, m.fa2m_owner, m.fa2m_amount, List.assoc_opt "" m.fa2m_metadata in
   let>? () = insert_account dbh owner ~block:op.bo_block ~level:op.bo_level ~tsp:op.bo_tsp in
   let>? () = match uri with
     | Some meta ->
@@ -2228,7 +2230,10 @@ let contract_updates dbh main l =
               m.ubim_token_id, m.ubim_owner, Z.one, m.ubim_uri <> None
             | UbiMint2 m ->
               m.ubi2m_token_id, m.ubi2m_owner, m.ubi2m_amount,
-              (List.assoc_opt "" m.ubi2m_metadata) <> None in
+              (List.assoc_opt "" m.ubi2m_metadata) <> None
+            | HENMint m ->
+              m.fa2m_token_id, m.fa2m_owner, m.fa2m_amount,
+              (List.assoc_opt "" m.fa2m_metadata) <> None in
           let>? () =
             contract_updates_base
               dbh ~main ~contract ~block ~level ~tsp ~burn:false

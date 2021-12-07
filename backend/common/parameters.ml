@@ -76,11 +76,11 @@ let parse_mint m =
     | Ok (`tuple [`nat fa2m_token_id; `address fa2m_owner; `assoc meta; `seq _royalties]) ->
       let fa2m_metadata = List.filter_map (function
           | (`string k, `string v) ->
-          begin
-            match Uutf.decode (Uutf.decoder ~encoding:`UTF_8 (`String v)) with
-            | `Malformed _ -> None
-            | _ -> Some (k, v)
-          end
+            begin
+              match Uutf.decode (Uutf.decoder ~encoding:`UTF_8 (`String v)) with
+              | `Malformed _ -> None
+              | _ -> Some (k, v)
+            end
           | _ -> None) meta in
       Ok (Mint_tokens
             (NFTMint
@@ -90,18 +90,36 @@ let parse_mint m =
       | Ok (`tuple [ `address ubim_owner; `nat ubim_token_id ]) ->
         let ubim_uri = Some "" in
         Ok (Mint_tokens (UbiMint { ubim_owner ; ubim_token_id ; ubim_uri }))
-    | _ ->
-      match Typed_mich.parse_value Contract_spec.mint_ubi2_entry m with
-      | Ok (`tuple [ `tuple [ `address ubi2m_owner; `nat ubi2m_amount ]; `assoc meta; `nat ubi2m_token_id ]) ->
-        let ubi2m_metadata =  List.filter_map (function
-            | (`string k, `bytes v) ->
-              let s = (Tzfunc.Crypto.hex_to_raw v :> string) in
-              if decode s then Some (k, s)
-              else None
-            | _ -> None) meta in
-        Ok (Mint_tokens
-              (UbiMint2 { ubi2m_owner ; ubi2m_amount ; ubi2m_token_id ; ubi2m_metadata }))
-      | _ -> unexpected_michelson
+      | _ ->
+        match Typed_mich.parse_value Contract_spec.mint_ubi2_entry m with
+        | Ok (`tuple [ `tuple [ `address ubi2m_owner; `nat ubi2m_amount ]; `assoc meta; `nat ubi2m_token_id ]) ->
+          let ubi2m_metadata =  List.filter_map (function
+              | (`string k, `bytes v) ->
+                let s = (Tzfunc.Crypto.hex_to_raw v :> string) in
+                if decode s then Some (k, s)
+                else None
+              | _ -> None) meta in
+          Ok (Mint_tokens
+                (UbiMint2 { ubi2m_owner ; ubi2m_amount ; ubi2m_token_id ; ubi2m_metadata }))
+
+        | _ ->
+          match Typed_mich.parse_value Contract_spec.mint_hen_entry m with
+          | Ok (`tuple [
+              `tuple [ `address fa2m_owner; `nat fa2m_amount ] ;
+              `tuple [ `nat fa2m_token_id ; `assoc meta ] ]) ->
+            let fa2m_metadata = List.filter_map (function
+                | (`string k, `bytes v) ->
+                  Some (k, (Tzfunc.Crypto.hex_to_raw v :> string))
+                | (`string k, `string v) ->
+                  begin
+                    match Uutf.decode (Uutf.decoder ~encoding:`UTF_8 (`String v)) with
+                    | `Malformed _ -> None
+                    | _ -> Some (k, v)
+                  end
+                | _ -> None) meta in
+            Ok (Mint_tokens
+                  (HENMint { fa2m_token_id ; fa2m_owner ; fa2m_amount ; fa2m_metadata }))
+          | _ -> unexpected_michelson
 
 let parse_burn m =
   match Typed_mich.parse_value Contract_spec.burn_mt_entry m with

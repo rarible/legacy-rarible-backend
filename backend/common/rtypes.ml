@@ -808,6 +808,7 @@ type mint =
   | UbiMint2 of ubi_mint2
   | NFTMint of unit fa2_mint
   | MTMint of A.big_integer fa2_mint
+  | HENMint of A.big_integer fa2_mint
 [@@deriving encoding]
 
 type burn =
