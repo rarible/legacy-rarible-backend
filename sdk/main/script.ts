@@ -1,7 +1,7 @@
 import { transfer, mint, burn, deploy_nft_public, deploy_royalties, set_token_metadata, set_metadata, deploy_exchange, deploy_validator, deploy_fill, deploy_transfer_proxy, send, TransactionArg} from "."
 import { in_memory_provider } from '../providers/in_memory/in_memory_provider'
 import yargs from 'yargs'
-import BigNumber from "@taquito/rpc/node_modules/bignumber.js"
+import BigNumber from "bignumber.js"
 
 async function main() {
   const argv = await yargs(process.argv.slice(2)).options({

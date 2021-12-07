@@ -1,11 +1,11 @@
 {
   "name": "tezos-api-client",
-  "version": "0.0.1",
+  "version": "0.0.11",
   "description": "",
   "main": "build/index.js",
   "types": "build/index.d.js",
   "scripts": {
-    "build": "rimraf ./src ./dist && cp ../public/api/openapi.yaml ./api-docs/ && openapi-generator-cli generate",
+    "build": "rimraf ./src ./build && cp ../public/api/openapi.yaml ./api-docs/ && openapi-generator-cli generate",
     "tsc": "tsc"
   },
   "files": [

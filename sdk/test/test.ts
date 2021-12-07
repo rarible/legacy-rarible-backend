@@ -1,6 +1,6 @@
 import { deploy_fa1, mint, make_permit, add_permit, send, sign, StorageFA1_2, of_hex } from "../main"
 import { in_memory_provider } from '../providers/in_memory/in_memory_provider'
-import BigNumber from "@taquito/rpc/node_modules/bignumber.js"
+import BigNumber from "bignumber.js"
 
 // edsk3UUamwmemNBJgDvS8jXCgKsvjL2NoTwYRFpGSRPut4Hmfs6dG8 Mxs
 // edsk4RqeRTrhdKfJKBTndA9x1RLp4A3wtNL1iMFRXDvfs5ANeZAncZ ibJ

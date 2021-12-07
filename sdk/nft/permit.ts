@@ -2,7 +2,7 @@ import { Provider, send, OperationResult, TransactionArg, hex_to_uint8array, uin
 import { pk_to_pkh } from "../common/base"
 import { BigMapAbstraction } from "@taquito/taquito"
 import { MichelsonData, MichelsonType, packDataBytes } from "@taquito/michel-codec"
-import BigNumber from "@taquito/rpc/node_modules/bignumber.js"
+import BigNumber from "bignumber.js"
 const blake = require('blakejs');
 
 function pack(data: MichelsonData, type: MichelsonType) : string {

@@ -4,6 +4,7 @@ import { get_make_fee } from "./get-make-fee"
 import { add_fee } from "./add-fee"
 import { approve } from "./approve"
 import { sign_order } from "./sign-order"
+import fetch from "node-fetch"
 
 export async function upsert_order(
   provider: Provider,

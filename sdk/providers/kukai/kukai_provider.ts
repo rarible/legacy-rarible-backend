@@ -1,6 +1,6 @@
-import { TezosProvider, pack_string, tezos_signed_message_prefix, edsig_prefix, spsig1_prefix, p2sig_prefix, sig_prefix, uint8array_to_hex, b58dec, b58enc } from "../../common/base"
+import { TezosProvider, pack_string, tezos_signed_message_prefix } from "../../common/base"
 import { KukaiEmbed, Networks, LoginInfo } from 'kukai-embed'
-import BigNumber from "@taquito/rpc/node_modules/bignumber.js"
+import BigNumber from "bignumber.js"
 import { TezosOperationType, PartialTezosTransactionOperation, TezosTransactionParameters } from '@airgap/beacon-sdk'
 import { TezosToolkit, TransferParams, OriginateParams, Signer } from "@taquito/taquito"
 
@@ -57,10 +57,8 @@ function mk_transfer_params(arg: TransferParams) : PartialTezosTransactionOperat
 //   }
 // }
 
-export async function kukai_provider(network: {node: string, network: Networks}) : Promise<TezosProvider> {
-  const embed = new KukaiEmbed({net: network.network, enableLogging:true})
+export async function kukai_provider(embed: KukaiEmbed, tk: TezosToolkit) : Promise<TezosProvider> {
   await embed.init()
-  const tk = new TezosToolkit(network.node)
   const transfer = async(arg: TransferParams) => {
     const hash = await embed.send([mk_transfer_params(arg)])
     const confirmation = async() => {

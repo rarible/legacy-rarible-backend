@@ -1,7 +1,7 @@
 import { MichelsonData } from "@taquito/michel-codec"
 import { Provider, send, StorageFA1_2, StorageFA2,
          Asset, TransactionArg, OperationResult } from "../common/base"
-import BigNumber from "@taquito/rpc/node_modules/bignumber.js"
+import BigNumber from "bignumber.js"
 
 export async function approve_fa1_2_arg(
   provider: Provider,

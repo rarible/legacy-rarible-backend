@@ -1,5 +1,5 @@
 import { Provider, OperationResult, to_hex } from "../common/base"
-import BigNumber from "@taquito/rpc/node_modules/bignumber.js"
+import BigNumber from "bignumber.js"
 
 export const fa1_code : any =
   [ { "prim": "parameter",

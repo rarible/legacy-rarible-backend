@@ -6,7 +6,7 @@ import { get_make_fee } from "./get-make-fee"
 import { add_fee } from "./add-fee"
 import { approve_arg } from "./approve"
 import { order_to_struct, some_struct, none_struct } from "./sign-order"
-import BigNumber from "@taquito/rpc/node_modules/bignumber.js"
+import BigNumber from "bignumber.js"
 
 export interface FillOrderRequest {
   amount: BigNumber;

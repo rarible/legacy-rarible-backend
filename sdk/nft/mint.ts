@@ -1,6 +1,7 @@
 import { MichelsonData } from "@taquito/michel-codec"
 import { Provider, send, TransactionArg, get_address, OperationResult, to_hex } from "../common/base"
-import BigNumber from "@taquito/rpc/node_modules/bignumber.js"
+import BigNumber from "bignumber.js"
+import fetch from "node-fetch"
 
 function mint_param(
   token_id: BigNumber,

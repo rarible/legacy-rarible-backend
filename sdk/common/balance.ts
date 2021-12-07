@@ -1,4 +1,5 @@
 import { Provider, XTZAssetType, FTAssetType } from "./base"
+import fetch from 'node-fetch'
 
 export async function get_balance(
   provider: Provider,

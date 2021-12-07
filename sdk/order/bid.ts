@@ -2,7 +2,7 @@ import { Provider, XTZAssetType, FTAssetType } from "../common/base"
 import { ExtendedAssetType, check_asset_type } from "../common/check-asset-type"
 import { Part, OrderForm, salt } from "./utils"
 import { upsert_order } from "./upsert-order"
-import BigNumber from "@taquito/rpc/node_modules/bignumber.js"
+import BigNumber from "bignumber.js"
 
 export type BidRequest = {
   maker: string
