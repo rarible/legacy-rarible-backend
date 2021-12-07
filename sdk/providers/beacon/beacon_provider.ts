@@ -1,21 +1,10 @@
 import { BeaconWallet } from '@taquito/beacon-wallet'
-import { NetworkType, SigningType } from "@airgap/beacon-sdk"
+import { SigningType } from "@airgap/beacon-sdk"
 import { TezosToolkit, TransferParams, OriginateParams, OpKind } from "@taquito/taquito"
 import { TezosProvider, b58enc, hex_to_uint8array, edpk_prefix, tezos_signed_message_prefix, pack_string } from "../../common/base"
 
-export interface BeaconNetwork {
-  node: string;
-  network?: NetworkType;
-}
-
-export type BeaconWalletKind = "temple" | "kukai" | "spire" | "airgap" | "galleon" | "umami"
-
-export async function beacon_provider(network: BeaconNetwork, name = "rarible", preferred_wallet ?: BeaconWalletKind) : Promise<TezosProvider> {
-  const type = (!network.network) ? NetworkType.CUSTOM : network.network
-  const wallet = new BeaconWallet({ name, preferredNetwork: type })
-  await wallet.requestPermissions({ network: {type, rpcUrl: network.node} })
-  const tk = new TezosToolkit(network.node)
-  tk.setProvider({ wallet })
+export async function beacon_provider(wallet: BeaconWallet, tk: TezosToolkit) : Promise<TezosProvider> {
+  tk.setWalletProvider(wallet)
   const transfer = async(arg: TransferParams) => {
     const op = await tk.wallet.transfer(arg).send()
     return { hash: op.opHash, confirmation: async() => { await op.confirmation() } }
@@ -40,25 +29,12 @@ export async function beacon_provider(network: BeaconNetwork, name = "rarible", 
     return { hash: op.opHash, confirmation: async() => { await op.confirmation() } }
   }
   const sign = async(bytes: string, type?: "message" | "operation") => {
-    let signingType = SigningType.MICHELINE
+    const signingType = SigningType.MICHELINE
     let prefix = ''
     let payload = bytes
     if (type=='message') {
-      switch (preferred_wallet) {
-        case 'spire':
-        case 'airgap':
-        case 'galleon':
-        case 'umami':
-          signingType = SigningType.RAW
-          break
-        case 'temple':
-        case 'kukai':
-        default:
-          signingType = SigningType.MICHELINE
-          prefix = tezos_signed_message_prefix()
-          payload = pack_string(prefix + bytes)
-          break
-      }
+      prefix = tezos_signed_message_prefix()
+      payload = pack_string(prefix + bytes)
     }
     const { signature } = await wallet.client.requestSignPayload({ signingType, payload })
     return { signature, prefix }

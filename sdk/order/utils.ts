@@ -1,5 +1,6 @@
 import { Asset, asset_to_json, asset_of_json } from "../common/base"
-import BigNumber from "@taquito/rpc/node_modules/bignumber.js"
+import BigNumber from "bignumber.js"
+const getRandomValues = require('get-random-values')
 
 export interface Part {
   account: string;
@@ -79,6 +80,6 @@ export function order_of_json(order: any ) : OrderForm {
 
 export function salt() : string {
   let a = new Uint8Array(32)
-  a = crypto.getRandomValues(a)
+  a = getRandomValues(a)
   return a.reduce((acc, x) => acc + x.toString(10).padStart(2, '0'), '')
 }

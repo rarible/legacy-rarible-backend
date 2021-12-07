@@ -1,7 +1,7 @@
 import { MichelsonData, MichelsonType, packDataBytes } from "@taquito/michel-codec"
 import { Provider, AssetType, Asset, StorageFA1_2, StorageFA2, of_hex } from "../common/base"
 import { OrderForm, OrderRaribleV2DataV1 } from "./utils"
-import BigNumber from "@taquito/rpc/node_modules/bignumber.js"
+import BigNumber from "bignumber.js"
 const keccak_base = require("keccak")
 
 export function keccak(s : string) : string {

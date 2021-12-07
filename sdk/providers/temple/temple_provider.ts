@@ -1,13 +1,9 @@
-import { TempleWallet, TempleDAppNetwork } from '@temple-wallet/dapp'
+import { TempleWallet } from '@temple-wallet/dapp'
 import { TezosToolkit, TransferParams, OriginateParams, OpKind } from "@taquito/taquito"
 import { TezosProvider, tezos_signed_message_prefix, pack_string } from "../../common/base"
 
-export async function temple_provider(endpoint: string, network: TempleDAppNetwork, name = "rarible") : Promise<TezosProvider> {
-  const wallet = new TempleWallet(name)
-  await wallet.connect(network)
-  const tk = new TezosToolkit(endpoint)
-  tk.setProvider({ wallet })
-
+export async function temple_provider(wallet: TempleWallet, tk: TezosToolkit) : Promise<TezosProvider> {
+  tk.setWalletProvider(wallet)
   const transfer = async(arg: TransferParams) => {
     const op = await tk.wallet.transfer(arg).send()
     return { hash: op.opHash, confirmation: async() => { await op.confirmation() } }

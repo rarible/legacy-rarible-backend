@@ -1,6 +1,8 @@
 import { BigMapAbstraction, TransferParams, OriginateParams } from "@taquito/taquito"
 import { MichelsonData } from "@taquito/michel-codec"
-import BigNumber from "@taquito/rpc/node_modules/bignumber.js"
+import BigNumber from "bignumber.js"
+import fetch from "node-fetch"
+const {TextEncoder, TextDecoder} = require("text-encoder")
 const bs58check = require("bs58check")
 const blake = require('blakejs');
 

@@ -1,11 +1,16 @@
-import { Provider, transfer, mint, burn, deploy_nft_private, deploy_mt_private, upsert_order, bid, sell, Part, AssetType, OrderForm, SellRequest, BidRequest, ExtendedAssetType, XTZAssetType, FTAssetType, TokenAssetType, approve_token, fill_order, get_public_key, order_of_json, salt, pk_to_pkh, get_address, OperationResult, sign } from "../main"
-import { beacon_provider, BeaconWalletKind } from '../providers/beacon/beacon_provider'
+import { Provider, transfer, mint, burn, deploy_nft_private, deploy_mt_private, upsert_order, bid, sell, Part, AssetType, OrderForm, SellRequest, BidRequest, ExtendedAssetType, XTZAssetType, FTAssetType, TokenAssetType, approve_token, fill_order, get_public_key, order_of_json, salt, pk_to_pkh, get_address, OperationResult, sign, TezosProvider } from "../main"
+import { beacon_provider } from '../providers/beacon/beacon_provider'
+import { temple_provider } from '../providers/temple/temple_provider'
+import { kukai_provider } from '../providers/kukai/kukai_provider'
+import { BeaconWallet } from "@taquito/beacon-wallet"
+import { TezosToolkit } from "@taquito/taquito"
 import JSONFormatter from "json-formatter-js"
 import Vue from "vue"
-import BigNumber from "@taquito/rpc/node_modules/bignumber.js"
+import BigNumber from "bignumber.js"
 import { NetworkType } from "@airgap/beacon-sdk"
-import { Networks } from "kukai-embed"
-import { kukai_provider } from '../providers/kukai/kukai_provider'
+import { Networks, KukaiEmbed } from "kukai-embed"
+import { TempleWallet } from "@temple-wallet/dapp"
+import fetch from "node-fetch"
 
 function parse_parts(s : string) : Array<Part> {
   try {
@@ -58,10 +63,26 @@ function parse_asset_type(r : RawAssetType) : AssetType | ExtendedAssetType | un
   } else return undefined
 }
 
-async function provider(node: string, api:string, wallet:BeaconWalletKind | string) : Promise<Provider> {
-  let w = (wallet == '') ? undefined : wallet as BeaconWalletKind
-  const tezos = await beacon_provider({node, network: NetworkType.HANGZHOUNET}, undefined, w)
-  // const tezos = await kukai_provider({node, network: Networks.dev})
+async function provider(node: string, api:string, wallet: 'temple' | 'beacon' | 'kukai') : Promise<Provider> {
+  const tk = new TezosToolkit(node)
+  let tezos : TezosProvider
+  switch (wallet) {
+    case 'beacon':
+      const network = NetworkType.HANGZHOUNET
+      const wallet_beacon = new BeaconWallet({ name : 'rarible', preferredNetwork: network })
+      await wallet_beacon.requestPermissions({ network: {type: network, rpcUrl: node} })
+      tezos = await beacon_provider(wallet_beacon, tk)
+      break
+    case 'temple':
+      const wallet_temple = new TempleWallet('rarible')
+      await wallet_temple.connect({name: 'hangzhounet', rpc: node})
+      tezos = await temple_provider(wallet_temple, tk)
+      break
+    case 'kukai':
+      const wallet_kukai = new KukaiEmbed({net: Networks.dev, enableLogging:true})
+      tezos = await kukai_provider(wallet_kukai, tk)
+      break
+  }
   const config = {
     exchange: "KT1AguExF32Z9UEKzD5nuixNmqrNs1jBKPT8",
     exchange_proxy: "KT1AguExF32Z9UEKzD5nuixNmqrNs1jBKPT8",
@@ -77,8 +98,8 @@ export default new Vue({
   data: {
     api_url: "http://localhost:8080/v0.1/",
     node: 'https://hangzhou.tz.functori.com',
-    wallet: '' as BeaconWalletKind | string,
-    provider: undefined as Provider | undefined,
+    wallet: 'beacon' as 'temple' | 'beacon' | 'kukai',
+    provider: {} as Provider,
     path: "home",
     transfer : {
       asset_type: {
@@ -230,8 +251,8 @@ export default new Vue({
       if (r2.nft_contracts) r2.nft_contracts.forEach((c : StorageContract) => this.nft_contracts.add(c))
       if (r2.api_url) { this.api_url = r2.api_url }
       if (r2.node) { this.node = r2.node }
-      if (r2.wallet) { this.wallet = r2.wallet }
     }
+    this.provider = await provider(this.node, this.api_url, this.wallet)
     let nft_contracts_s = JSON.parse(localStorage.getItem('nft_contracts') || '[]')
     nft_contracts_s.forEach((c : StorageContract) => this.nft_contracts.add(c))
     localStorage.setItem('nft_contracts', JSON.stringify(Array.from(this.nft_contracts)))
@@ -249,15 +270,25 @@ export default new Vue({
     }
   },
 
+  watch: {
+    async node(new_node) {
+      this.provider = await provider(new_node, this.api_url, this.wallet)
+    },
+    async api_url(new_api_url) {
+      this.provider = await provider(this.node, new_api_url, this.wallet)
+    },
+    async wallet(new_wallet) {
+      this.provider = await provider(this.node, this.api_url, new_wallet)
+    }
+  },
+
   methods: {
     async ftransfer() {
       this.transfer.status = 'info'
       this.transfer.result = ''
       const asset_type = parse_asset_type(this.transfer.asset_type) as TokenAssetType
-      const p = (this.provider) ? this.provider : await provider(this.node, this.api_url, this.wallet)
-      this.provider = p
       const transfer_amount = (this.transfer.amount) ? new BigNumber(this.transfer.amount) : undefined
-      const op = await transfer(p, asset_type, this.transfer.destination, transfer_amount)
+      const op = await transfer(this.provider, asset_type, this.transfer.destination, transfer_amount)
       this.transfer.result = `operation ${op.hash} injected`
       await op.confirmation()
       this.transfer.status = 'success'
@@ -273,8 +304,6 @@ export default new Vue({
       } else {
         if (!this.mint.royalties) this.mint.royalties = '{}'
         if (this.mint.token_id=='') this.mint.token_id = undefined
-        const p = (this.provider) ? this.provider : await provider(this.node, this.api_url, this.wallet)
-        this.provider = p
         const royalties0 = JSON.parse(this.mint.royalties) as { [key:string] : number }
         const royalties : { [key:string] : BigNumber } = {}
         const contract = (this.mint.contract=="custom") ? this.mint.contract_custom : this.mint.contract
@@ -285,7 +314,7 @@ export default new Vue({
           })
         const metadata = (this.mint.metadata) ? JSON.parse(this.mint.metadata) : undefined
         const token_id = (this.mint.token_id!=undefined) ? new BigNumber(this.mint.token_id) : undefined
-        const op = await mint(p, contract, royalties, mint_amount, token_id, metadata)
+        const op = await mint(this.provider, contract, royalties, mint_amount, token_id, metadata)
         this.mint.result = `operation ${op.hash} injected`
         await op.confirmation()
         this.mint.status = 'success'
@@ -297,9 +326,7 @@ export default new Vue({
       this.burn.status = 'info'
       this.burn.result = ''
       const asset_type = parse_asset_type(this.burn.asset_type) as TokenAssetType
-      const p = (this.provider) ? this.provider : await provider(this.node, this.api_url, this.wallet)
-      this.provider = p
-      const op = await burn(p, asset_type, (this.burn.amount) ? new BigNumber(this.burn.amount) : undefined)
+      const op = await burn(this.provider, asset_type, (this.burn.amount) ? new BigNumber(this.burn.amount) : undefined)
       this.burn.result = `operation ${op.hash} injected`
       await op.confirmation()
       this.burn.status = 'success'
@@ -313,11 +340,9 @@ export default new Vue({
         this.deploy.status = 'danger'
         this.deploy.result = "no owner given"
       } else {
-        const p = (this.provider) ? this.provider : await provider(this.node, this.api_url, this.wallet)
-        this.provider = p
         let op : OperationResult | undefined ;
-        if (this.deploy.kind == 'NFT') op = await deploy_nft_private(p, this.deploy.owner)
-        else if (this.deploy.kind == 'MT') op = await deploy_mt_private(p, this.deploy.owner)
+        if (this.deploy.kind == 'NFT') op = await deploy_nft_private(this.provider, this.deploy.owner)
+        else if (this.deploy.kind == 'MT') op = await deploy_mt_private(this.provider, this.deploy.owner)
         if (!op) {
           this.deploy.status = 'danger'
           this.deploy.result = "kind not understood"
@@ -344,10 +369,8 @@ export default new Vue({
         this.approve.status = 'danger'
         this.approve.result = "invalid asset type"
       } else {
-        const p = (this.provider) ? this.provider : await provider(this.node, this.api_url, this.wallet)
-        this.provider = p
-        const owner = await p.tezos.address()
-        const op = await approve_token(p, owner, { asset_type, value: new BigNumber(this.approve.value) })
+        const owner = await this.provider.tezos.address()
+        const op = await approve_token(this.provider, owner, { asset_type, value: new BigNumber(this.approve.value) })
         if (!op) {
           this.approve.status = 'warning'
           this.approve.result = "asset already approved"
@@ -390,9 +413,7 @@ export default new Vue({
       const elt = document.getElementById("upsert-result")
       if (!elt) throw new Error('element "upsert-result" not found')
       elt.innerHTML = ''
-      const p = (this.provider) ? this.provider : await provider(this.node, this.api_url, this.wallet)
-      this.provider = p
-      const maker_edpk = this.upsert.maker || await get_public_key(p)
+      const maker_edpk = this.upsert.maker || await get_public_key(this.provider)
       if (!maker_edpk) {
         this.upsert.status = 'danger'
         this.upsert.result = "no maker given"
@@ -425,7 +446,7 @@ export default new Vue({
             signature: undefined,
             data: { data_type: "V1", payouts, origin_fees } }
           try {
-            const r = await upsert_order(p, order)
+            const r = await upsert_order(this.provider, order)
             this.upsert.status = 'success'
             const formatter = new JSONFormatter(r, 3)
             elt.appendChild(formatter.render())
@@ -443,9 +464,7 @@ export default new Vue({
       const elt = document.getElementById("sell-result")
       if (!elt) throw new Error('element "sell-result" not found')
       elt.innerHTML = ''
-      const p = (this.provider) ? this.provider : await provider(this.node, this.api_url, this.wallet)
-      this.provider = p
-      const maker_edpk = this.upsert.maker || await get_public_key(p)
+      const maker_edpk = this.upsert.maker || await get_public_key(this.provider)
       if (!maker_edpk) {
         this.sell.status = 'danger'
         this.sell.result = "no maker given"
@@ -475,7 +494,7 @@ export default new Vue({
             payouts,
             origin_fees }
           try {
-            const r = await sell(p, request)
+            const r = await sell(this.provider, request)
             this.sell.status = 'success'
             const formatter = new JSONFormatter(r, 3)
             elt.appendChild(formatter.render())
@@ -493,9 +512,7 @@ export default new Vue({
       const elt = document.getElementById("bid-result")
       if (!elt) throw new Error('element "bid-result" not found')
       elt.innerHTML = ''
-      const p = (this.provider) ? this.provider : await provider(this.node, this.api_url, this.wallet)
-      this.provider = p
-      const maker_edpk = this.bid.maker || await get_public_key(p)
+      const maker_edpk = this.bid.maker || await get_public_key(this.provider)
       if (!maker_edpk) {
         this.bid.status = 'danger'
         this.bid.result = "no maker given"
@@ -525,7 +542,7 @@ export default new Vue({
             payouts,
             origin_fees }
           try {
-            const r = await bid(p, request)
+            const r = await bid(this.provider, request)
             this.bid.status = 'success'
             const formatter = new JSONFormatter(r, 3)
             elt.appendChild(formatter.render())
@@ -566,13 +583,11 @@ export default new Vue({
         this.fill.status = 'danger'
         this.fill.result = 'no order selected'
       } else {
-        const p = (this.provider) ? this.provider : await provider(this.node, this.api_url, this.wallet)
-        this.provider = p
         let payouts = parse_parts(this.upsert.payouts)
         const origin_fees = parse_parts(this.upsert.origin_fees)
-        let account = await get_address(p)
+        let account = await get_address(this.provider)
         if (payouts.length == 0) payouts = [ { account, value: new BigNumber(10000)} ]
-        const op = await fill_order(p, this.fill.selected, {
+        const op = await fill_order(this.provider, this.fill.selected, {
           amount: new BigNumber(this.fill.amount),
           payouts, origin_fees
         })
@@ -584,12 +599,10 @@ export default new Vue({
     },
 
     async sign_message() {
-      const p = (this.provider) ? this.provider : await provider(this.node, this.api_url, this.wallet)
-      this.provider = p
       const elt = document.getElementById("sign-result")
       if (!elt) throw new Error('element "sign-result" not found')
       elt.innerHTML = ''
-      let r = await sign(p, this.sign.message, "message")
+      let r = await sign(this.provider, this.sign.message, "message")
       const formatter = new JSONFormatter(r, 3)
       elt.appendChild(formatter.render())
     },

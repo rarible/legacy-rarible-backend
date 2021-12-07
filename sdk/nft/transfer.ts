@@ -1,7 +1,7 @@
 import { MichelsonData } from "@taquito/michel-codec"
 import { Provider, send, TransactionArg, get_address, OperationResult } from "../common/base"
 import { check_asset_type, ExtendedAssetType } from "../common/check-asset-type"
-import BigNumber from "@taquito/rpc/node_modules/bignumber.js"
+import BigNumber from "bignumber.js"
 
 function transfer_param(
   from: string,

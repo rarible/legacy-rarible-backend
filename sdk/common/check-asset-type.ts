@@ -1,5 +1,6 @@
 import { Provider, TokenAssetType } from "./base"
-import BigNumber from "@taquito/rpc/node_modules/bignumber.js"
+import BigNumber from "bignumber.js"
+import fetch from "node-fetch"
 
 export interface UnknownTokenAssetType {
   contract: string;
