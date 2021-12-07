@@ -186,18 +186,41 @@ let mk_asset asset_class contract token_id asset_value =
   | _ ->
     Error (`hook_error ("invalid asset class " ^ asset_class))
 
-let mk_order_activity_bid obj =
+let get_order_price_history ?dbh hash_key =
+  use dbh @@ fun dbh ->
+  let|>? l = [%pgsql dbh
+      "select date, make_value, take_value \
+       from order_price_history where hash = $hash_key \
+       order by date desc"] in
+  List.map
+    (fun (date, make_value, take_value) ->
+       {
+         order_price_history_record_date = date ;
+         order_price_history_record_make_value = make_value ;
+         order_price_history_record_take_value = take_value ;
+       }) l
+
+let mk_order_activity_bid ~dbh obj =
+  let|> ph = get_order_price_history ~dbh obj#o_hash in
+  let make_value, take_value = match ph with
+    | Ok [] | Error _ -> obj#make_asset_value, obj#take_asset_value
+    | Ok ph ->
+      begin match List.find_opt (fun p -> p.order_price_history_record_date = obj#date) ph with
+        | None -> obj#make_asset_value, obj#take_asset_value
+        | Some p ->
+          p.order_price_history_record_make_value, p.order_price_history_record_take_value
+      end
+  in
   let$ make = mk_asset
       obj#make_asset_type_class
       obj#make_asset_type_contract
       obj#make_asset_type_token_id
-      obj#make_asset_value in
+      make_value in
   let$ take = mk_asset
       obj#take_asset_type_class
       obj#take_asset_type_contract
       obj#take_asset_type_token_id
-      obj#take_asset_value in
-
+      take_value in
   let|$ price = nft_price make take in
   {
     order_activity_bid_hash = obj#o_hash;
@@ -240,27 +263,28 @@ let mk_order_activity_match obj =
   let|$ price = nft_price
       left.order_activity_match_side_asset
       right.order_activity_match_side_asset in
-  {
-    order_activity_match_left = left ;
-    order_activity_match_right = right ;
-    order_activity_match_price = price ;
-    order_activity_match_type =
-      if obj#oleft_salt <> Z.zero then
-        begin match left.order_activity_match_side_asset.asset_type with
-          | ATNFT _ | ATMT _ -> MTSELL
-          | _ -> MTACCEPT_BID
-        end
-      else if obj#oright_salt <> Z.zero then
-        begin match right.order_activity_match_side_asset.asset_type with
-          | ATNFT _ | ATMT _ -> MTSELL
-          | _ -> MTACCEPT_BID
-        end
-      else MTSELL ;
-    order_activity_match_transaction_hash = Option.get obj#transaction ;
-    order_activity_match_block_hash = Option.get obj#block ;
-    order_activity_match_block_number = Int64.of_int32 @@ Option.get obj#level ;
-    order_activity_match_log_index = 0 ;
-  }, (left_decimals, right_decimals)
+  OrderActivityMatch
+    {
+      order_activity_match_left = left ;
+      order_activity_match_right = right ;
+      order_activity_match_price = price ;
+      order_activity_match_type =
+        if obj#oleft_salt <> Z.zero then
+          begin match left.order_activity_match_side_asset.asset_type with
+            | ATNFT _ | ATMT _ -> MTSELL
+            | _ -> MTACCEPT_BID
+          end
+        else if obj#oright_salt <> Z.zero then
+          begin match right.order_activity_match_side_asset.asset_type with
+            | ATNFT _ | ATMT _ -> MTSELL
+            | _ -> MTACCEPT_BID
+          end
+        else MTSELL ;
+      order_activity_match_transaction_hash = Option.get obj#transaction ;
+      order_activity_match_block_hash = Option.get obj#block ;
+      order_activity_match_block_number = Int64.of_int32 @@ Option.get obj#level ;
+      order_activity_match_log_index = 0 ;
+    }, (left_decimals, right_decimals)
 
 let mk_order_activity_cancel_list obj =
   let$ make = mk_asset
@@ -292,7 +316,7 @@ let mk_order_activity_cancel_bid obj =
       obj#make_asset_type_contract
       obj#make_asset_type_token_id
       obj#make_asset_value in
-  let|$ take = mk_asset
+  let$ take = mk_asset
       obj#take_asset_type_class
       obj#take_asset_type_contract
       obj#take_asset_type_token_id
@@ -308,44 +332,27 @@ let mk_order_activity_cancel_bid obj =
     order_activity_cancel_bid_log_index = 0
   } in
   let decs = (obj#make_asset_decimals, obj#take_asset_decimals) in
-  OrderActivityCancelBid bid, decs
+  Ok (OrderActivityCancelBid bid, decs)
 
-let mk_order_activity obj =
-  let|$ act, decs =
+let mk_order_activity ~dbh obj =
+  let|>? act, decs =
     match obj#order_activity_type with
     | "list" ->
-      let|$ listing, decs = mk_order_activity_bid obj in
-      OrderActivityList listing, decs
+      let>? act, decs = mk_order_activity_bid ~dbh obj in
+      Lwt.return_ok (OrderActivityList act, decs)
     | "bid" ->
-      let|$ listing, decs = mk_order_activity_bid obj in
-      OrderActivityBid listing, decs
-    | "match" ->
-      let|$ matched, decs = mk_order_activity_match obj in
-      OrderActivityMatch matched, decs
-    | "cancel_list" -> mk_order_activity_cancel_list obj
-    | "cancel_bid" -> mk_order_activity_cancel_bid obj
-    | _ as t -> Error (`hook_error ("unknown order activity type " ^ t)) in
+      let>? act, decs = mk_order_activity_bid ~dbh obj in
+      Lwt.return_ok (OrderActivityBid act, decs)
+    | "match" -> Lwt.return @@ mk_order_activity_match obj
+    | "cancel_list" -> Lwt.return @@ mk_order_activity_cancel_list obj
+    | "cancel_bid" -> Lwt.return @@ mk_order_activity_cancel_bid obj
+    | _ as t -> Lwt.return_error (`hook_error ("unknown order activity type " ^ t)) in
   {
     order_act_id = obj#id ;
     order_act_date = obj#date ;
     order_act_source = "RARIBLE";
     order_act_type = act ;
   }, decs
-
-
-let get_order_price_history ?dbh hash_key =
-  use dbh @@ fun dbh ->
-  let|>? l = [%pgsql dbh
-      "select date, make_value, take_value \
-       from order_price_history where hash = $hash_key \
-       order by date desc"] in
-  List.map
-    (fun (date, make_value, take_value) ->
-       {
-         order_price_history_record_date = date ;
-         order_price_history_record_make_value = make_value ;
-         order_price_history_record_take_value = take_value ;
-       }) l
 
 let get_order_origin_fees ?dbh hash_key =
   use dbh @@ fun dbh ->
@@ -3898,7 +3905,8 @@ let upsert_order ?dbh order =
        on conflict (hash) do update set (\
        make_asset_value, take_asset_value, last_update_at, signature) = \
        ($make_asset_value, $take_asset_value, $last_update_at, $signature)"] in
-  insert_order_activity_new ~decs:(make_decimals, take_decimals) dbh created_at order >>=? fun () ->
+  insert_order_activity_new ~decs:(make_decimals, take_decimals) dbh last_update_at order
+  >>=? fun () ->
   insert_price_history dbh last_update_at make_asset_value take_asset_value hash_key >>=? fun () ->
   begin
     if last_update_at = created_at then insert_origin_fees dbh origin_fees hash_key
@@ -4046,7 +4054,7 @@ let get_order_activities_by_collection ?dbh ?(sort=LATEST_FIRST) ?continuation ?
            id collate \"C\" asc \
            limit $size64"] in
   let>? activities = map_rp (fun r ->
-      let|>? (a, decs) = Lwt.return @@ mk_order_activity r in
+      let|>? (a, decs) = mk_order_activity ~dbh r in
       (a, r), decs) l in
   let activities, decs = List.split activities in
   let len = List.length activities in
@@ -4199,7 +4207,7 @@ let get_order_activities_by_item ?dbh ?(sort=LATEST_FIRST) ?continuation ?(size=
            id collate \"C\" asc \
            limit $size64"] in
   let>? activities = map_rp (fun r ->
-      let|>? a, decs = Lwt.return @@ mk_order_activity r in
+      let|>? a, decs = mk_order_activity ~dbh r in
       (a, r), decs) l in
   let len = List.length activities in
   let activities, decs = List.split activities in
@@ -4326,7 +4334,7 @@ let get_order_activities_all ?dbh ?(sort=LATEST_FIRST) ?continuation ?(size=50) 
            order by date asc, \
            id collate \"C\" asc limit $size64"] in
   let>? activities = map_rp (fun r ->
-      let|>? a, decs = Lwt.return @@ mk_order_activity r in
+      let|>? a, decs = mk_order_activity ~dbh r in
       (a, r), decs) l in
   let len = List.length activities in
   let activities, decs = List.split activities in
@@ -4463,7 +4471,7 @@ let get_order_activities_by_user ?dbh ?(sort=LATEST_FIRST) ?continuation ?(size=
            id collate \"C\" asc \
            limit $size64"] in
   let>? activities = map_rp (fun r ->
-      let|>? a, decs = Lwt.return @@ mk_order_activity r in
+      let|>? a, decs = mk_order_activity ~dbh r in
       (a, r), decs) l in
   let len = List.length activities in
   let activities, decs = List.split activities in
