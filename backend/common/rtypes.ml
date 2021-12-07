@@ -1017,6 +1017,7 @@ type ext_creators =
   | CParts of part list
   | CAssoc of (string * int32) list
   | CTZIP12 of string list
+  | CNull of string option list
 [@@deriving encoding]
 
 type tzip21_token_metadata = {
@@ -1024,7 +1025,7 @@ type tzip21_token_metadata = {
   tzip21_tm_symbol : string option ;
   tzip21_tm_decimals : int option ;
   tzip21_tm_artifact_uri : string option ;
-  tzip21_tm_display_uri : string option ;
+  tzip21_tm_display_uri : string option ; [@dft None]
   tzip21_tm_thumbnail_uri : string option ;
   tzip21_tm_description : string option ;
   tzip21_tm_minter : string option ;
