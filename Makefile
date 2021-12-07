@@ -42,7 +42,7 @@ deps:
 	PGDATABASE=$(DB) opam install --deps-only .
 
 ts-deps:
-	@npm --prefix sdk --no-audit --no-fund --force i
+	@npm --prefix sdk --no-audit --no-fund i
 
 ts:
 	@tsc -p sdk/tsconfig.json
