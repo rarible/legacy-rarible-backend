@@ -2,9 +2,11 @@ open Api
 open Let
 
 let kafka_config_file = ref ""
+let port = ref 8080
 
 let args = [
-  ("--kafka-config", Arg.Set_string kafka_config_file, "set kafka configuration")
+  ("--kafka-config", Arg.Set_string kafka_config_file, "set kafka configuration");
+  ("--port", Arg.Set_int port, "set api port (default: 8080)")
 ]
 
 let usage = "usage: " ^ Sys.argv.(0) ^ " [-kafka-config string]"
@@ -14,5 +16,5 @@ let () =
   EzLwtSys.run (fun () ->
       Db.Rarible_kafka.may_set_kafka_config !kafka_config_file >>= function
       | Ok () ->
-        EzAPIServer.server [ 8080, EzAPIServerUtils.API ppx_dir ]
+        EzAPIServer.server [ !port, EzAPIServerUtils.API ppx_dir ]
       | Error err -> Lwt.fail_with @@ Crp.string_of_error err)
