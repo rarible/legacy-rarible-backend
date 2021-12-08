@@ -57,34 +57,39 @@ let decode s =
     | `Await -> false in
   aux decoder
 
+let parse_metadata l =
+  List.filter_map (function
+      | (`string k, `bytes v) ->
+        let s = (Tzfunc.Crypto.hex_to_raw v :> string) in
+        if decode s then Some (k, s)
+        else None
+      | _ -> None) l
+
+let parse_royalties l =
+  List.filter_map (function
+      | `tuple [`address part_account; `nat value] ->
+        begin
+          try Some { part_account; part_value = Z.to_int32 value }
+          with _ -> None
+        end
+      | _ -> None) l
+
 let parse_mint m =
   match Typed_mich.parse_value Contract_spec.mint_mt_entry m with
   | Ok (`tuple [`nat fa2m_token_id; `address fa2m_owner; `nat fa2m_amount;
-                `assoc meta; `seq _royalties]) ->
-    let fa2m_metadata = List.filter_map (function
-        | (`string k, `string v) ->
-          begin
-            match Uutf.decode (Uutf.decoder ~encoding:`UTF_8 (`String v)) with
-            | `Malformed _ -> None
-            | _ -> Some (k, v)
-          end
-        | _ -> None) meta in
+                `assoc meta; `seq royalties]) ->
+    let fa2m_metadata = parse_metadata meta in
+    let fa2m_royalties =  parse_royalties royalties in
     Ok (Mint_tokens
-          (MTMint { fa2m_token_id ; fa2m_owner ; fa2m_amount ; fa2m_metadata }))
+          (MTMint { fa2m_token_id ; fa2m_owner ; fa2m_amount ; fa2m_metadata; fa2m_royalties }))
   | _ ->
     match Typed_mich.parse_value Contract_spec.mint_nft_entry m with
-    | Ok (`tuple [`nat fa2m_token_id; `address fa2m_owner; `assoc meta; `seq _royalties]) ->
-      let fa2m_metadata = List.filter_map (function
-          | (`string k, `string v) ->
-            begin
-              match Uutf.decode (Uutf.decoder ~encoding:`UTF_8 (`String v)) with
-              | `Malformed _ -> None
-              | _ -> Some (k, v)
-            end
-          | _ -> None) meta in
+    | Ok (`tuple [`nat fa2m_token_id; `address fa2m_owner; `assoc meta; `seq royalties]) ->
+      let fa2m_metadata = parse_metadata meta in
+      let fa2m_royalties = parse_royalties royalties in
       Ok (Mint_tokens
             (NFTMint
-               { fa2m_token_id ; fa2m_owner ; fa2m_amount = () ; fa2m_metadata }))
+               { fa2m_token_id ; fa2m_owner ; fa2m_amount = () ; fa2m_metadata; fa2m_royalties }))
     | _ ->
       match Typed_mich.parse_value Contract_spec.mint_ubi_entry m with
       | Ok (`tuple [ `address ubim_owner; `nat ubim_token_id ]) ->
@@ -93,12 +98,7 @@ let parse_mint m =
       | _ ->
         match Typed_mich.parse_value Contract_spec.mint_ubi2_entry m with
         | Ok (`tuple [ `tuple [ `address ubi2m_owner; `nat ubi2m_amount ]; `assoc meta; `nat ubi2m_token_id ]) ->
-          let ubi2m_metadata =  List.filter_map (function
-              | (`string k, `bytes v) ->
-                let s = (Tzfunc.Crypto.hex_to_raw v :> string) in
-                if decode s then Some (k, s)
-                else None
-              | _ -> None) meta in
+          let ubi2m_metadata = parse_metadata meta in
           Ok (Mint_tokens
                 (UbiMint2 { ubi2m_owner ; ubi2m_amount ; ubi2m_token_id ; ubi2m_metadata }))
 
@@ -107,18 +107,9 @@ let parse_mint m =
           | Ok (`tuple [
               `tuple [ `address fa2m_owner; `nat fa2m_amount ] ;
               `tuple [ `nat fa2m_token_id ; `assoc meta ] ]) ->
-            let fa2m_metadata = List.filter_map (function
-                | (`string k, `bytes v) ->
-                  Some (k, (Tzfunc.Crypto.hex_to_raw v :> string))
-                | (`string k, `string v) ->
-                  begin
-                    match Uutf.decode (Uutf.decoder ~encoding:`UTF_8 (`String v)) with
-                    | `Malformed _ -> None
-                    | _ -> Some (k, v)
-                  end
-                | _ -> None) meta in
+            let fa2m_metadata = parse_metadata meta in
             Ok (Mint_tokens
-                  (HENMint { fa2m_token_id ; fa2m_owner ; fa2m_amount ; fa2m_metadata }))
+                  (HENMint { fa2m_token_id ; fa2m_owner ; fa2m_amount ; fa2m_metadata; fa2m_royalties = [] }))
           | _ -> unexpected_michelson
 
 let parse_burn m =
@@ -129,20 +120,9 @@ let parse_burn m =
     | Ok (`nat id) -> Ok (Burn_tokens (NFTBurn id))
     | _ -> unexpected_michelson
 
-let parse_metadata_uri = function
-  | Mbytes h -> Ok (Metadata_uri (Tzfunc.Crypto.hex_to_raw h :> string))
-  | _ -> unexpected_michelson
-
-let parse_token_metadata m =
-  match Typed_mich.parse_value Contract_spec.set_token_metadata_entry m with
-  | Ok (`tuple [ `nat id; `assoc l ]) ->
-    let l = List.filter_map (function
-        | (`string k, `bytes v) ->
-          Some (k, (Tzfunc.Crypto.hex_to_raw v :> string))
-        | (`string k, `string v) ->
-          Some (k, v)
-        | _ -> None) l in
-    Ok (Token_metadata (id, l))
+let parse_metadata_uri m =
+  match Typed_mich.parse_value (`tuple [`string; `bytes]) m with
+  | Ok (`tuple [ `string k; `bytes h ]) -> Ok (Metadata (k, (Tzfunc.Crypto.hex_to_raw h :> string)))
   | _ -> unexpected_michelson
 
 let parse_add_minter m =
@@ -167,26 +147,26 @@ let parse_fa2 e p =
   | EPnamed "transfer", m -> parse_transfer m
   | EPnamed "mint", m -> parse_mint m
   | EPnamed "burn", m -> parse_burn m
-  | EPnamed "setMetadataUri", m -> parse_metadata_uri m
-  | EPnamed "setTokenMetadata", m -> parse_token_metadata m
-  | EPnamed "addMinter", m -> parse_add_minter m
-  | EPnamed "removeMinter", m -> parse_remove_minter m
-  | EPnamed "setTokenUriPattern", m -> parse_set_token_uri_pattern m
+  | EPnamed "set_metadata", m -> parse_metadata_uri m
+  | EPnamed "add_minter", m -> parse_add_minter m
+  | EPnamed "remove_minter", m -> parse_remove_minter m
+  | EPnamed "set_token_uri_pattern", m -> parse_set_token_uri_pattern m
   | _ -> unexpected_michelson
 
 let parse_set_royalties m =
   match Typed_mich.parse_value Contract_spec.set_royalties_entry m with
-  | Ok (`tuple [ `address roy_contract; `nat id; `assoc l ]) ->
-    let roy_royalties =
-      List.filter_map (function
-          | (`address account, `nat value) -> Some (account, value)
-          | _ -> None) l in
-    Ok {roy_contract; roy_token_id = id; roy_royalties}
+  | Ok (`tuple [ `address roy_contract; token_id; `seq l ]) ->
+    let$ roy_token_id = match token_id with
+      | `some (`nat id) -> Ok (Some id)
+      | `none -> Ok None
+      | _ -> unexpected_michelson in
+    let roy_royalties = parse_royalties l in
+    Ok {roy_contract; roy_token_id; roy_royalties}
   | _ -> unexpected_michelson
 
 let parse_royalties e p =
   match e, p with
-  | EPnamed "setRoyalties", m -> parse_set_royalties m
+  | EPnamed "set_royalties", m -> parse_set_royalties m
   | _ -> unexpected_michelson
 
 let parse_option_key : micheline_value -> (string option, _) result = function
@@ -277,7 +257,7 @@ let parse_do_transfers m =
 let parse_exchange e p =
   match e, p with
   | EPnamed "cancel", m -> parse_cancel m
-  | EPnamed "doTransfers", m -> parse_do_transfers m
+  | EPnamed "do_transfers", m -> parse_do_transfers m
   | _ -> unexpected_michelson
 
 let parse_ft_fa1_transfer m =

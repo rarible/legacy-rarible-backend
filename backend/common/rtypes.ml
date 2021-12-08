@@ -770,9 +770,6 @@ type operator_update = {
 type token_metadata = ((string * string) list [@assoc])
 [@@deriving encoding]
 
-type token_royalties = ((string * A.big_integer) list [@assoc])
-[@@deriving encoding]
-
 type token_op = {
   tk_token_id: string;
   tk_amount: A.big_integer;
@@ -787,7 +784,8 @@ type 'a fa2_mint = {
   fa2m_token_id: A.big_integer;
   fa2m_amount: 'a;
   fa2m_owner: string;
-  fa2m_metadata: (string * string) list
+  fa2m_metadata: (string * string) list;
+  fa2m_royalties: part list;
 } [@@deriving encoding]
 
 type ubi_mint = {
@@ -828,8 +826,7 @@ type nft_param =
   | Operator_updates_all of (string * bool) list
   | Mint_tokens of mint
   | Burn_tokens of burn
-  | Metadata_uri of string
-  | Token_metadata of (A.big_integer * (string * string) list)
+  | Metadata of (string * string)
   | Add_minter of string
   | Remove_minter of string
   | Token_uri_pattern of string
@@ -843,8 +840,8 @@ type ft_param =
 
 type set_royalties = {
   roy_contract: string;
-  roy_token_id: A.big_integer;
-  roy_royalties: token_royalties;
+  roy_token_id: A.big_integer option;
+  roy_royalties: part list;
 } [@@deriving encoding]
 
 type exchange_param =
@@ -961,7 +958,6 @@ type ft_ledger = {
 type config = {
   admin_wallet: string; [@dft ""]
   exchange: string; [@dft ""]
-  validator: string; [@dft ""]
   royalties: string; [@dft ""]
   mutable ft_contracts: ft_ledger SMap.t; [@map] [@dft SMap.empty]
   mutable contracts: nft_ledger SMap.t; [@map] [@dft SMap.empty]

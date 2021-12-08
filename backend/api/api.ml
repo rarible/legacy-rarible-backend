@@ -1376,8 +1376,9 @@ let validate _req input =
    section=signature_section}]
 
 (* ft-balance-controller *)
-let get_ft_balance ((_, contract), ft_owner) () =
-  let> r = Db.get_ft_balance ~contract ft_owner in
+let get_ft_balance ((req, contract), ft_owner) () =
+  let token_id = Option.map Z.of_string (EzAPI.Req.find_param origin_param req) in
+  let> r = Db.get_ft_balance ?token_id ~contract ft_owner in
   match r with
   | Error (`hook_error "contract_not_found") ->
     return (Error {code=`TOKEN_NOT_FOUND; message=contract})
@@ -1394,6 +1395,7 @@ let get_ft_balance ((_, contract), ft_owner) () =
 [@@get
   {path="/v0.1/balances/{contract : string}/{owner : string}";
    name="ft_balance";
+   params=[token_id_param];
    output=ft_balance_enc A.big_decimal_enc;
    errors=[unexpected_case;entity_not_found_case];
    section=balance_section}]

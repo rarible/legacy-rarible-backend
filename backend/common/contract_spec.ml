@@ -64,7 +64,6 @@ let fa2_ext_entrypoints : (string * micheline_type_short) list = [
   "mint", mint_nft_entry;
   "burn", burn_mt_entry;
   "burn", burn_nft_entry;
-  "setTokenMetadata", set_token_metadata_entry;
 ]
 
 let get_storage_fields script =

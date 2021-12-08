@@ -1,6 +1,25 @@
+/**
+ * The Fill contract provides the fill data to the Exchange contract.
+ */
 archetype fill_storage(owner : address)
+with metadata ""
 
-variable owner_candidate : option<address> = none
+//----------------------------------------------------------------------------
+// Metadata
+//----------------------------------------------------------------------------
+
+entry set_metadata_uri(idata : bytes) {
+  called by owner
+  effect {
+    metadata := put(metadata, "", idata)
+  }
+}
+
+//----------------------------------------------------------------------------
+// Owner role transfer
+//----------------------------------------------------------------------------
+
+variable owner_candidate : option<address>       = none
 
 entry declare_ownership(candidate : address) {
   called by owner
@@ -17,7 +36,9 @@ entry claim_ownership() {
   }
 }
 
-variable fill : big_map<bytes, option<nat>> = []
+//----------------------------------------------------------------------------
+// User role
+//----------------------------------------------------------------------------
 
 asset user {
   addr : address
@@ -37,6 +58,12 @@ entry rm_user(old_user : address) {
   }
 }
 
+//----------------------------------------------------------------------------
+// Fill storage
+//----------------------------------------------------------------------------
+
+variable fill : big_map<bytes, option<nat>> = []
+
 // READ
 view get(k : bytes) : option<nat> {
   return fill[k]
@@ -46,7 +73,10 @@ view contains(k : bytes) : bool {
   return fill.contains(k)
 }
 
-// WRITE
+/**
+* Called by the cancel entrypoint of the Exchange contract.
+* It sets the value to none because a canceled order can never be filled again.
+*/
 entry remove(k : bytes) {
   called by user
   effect {

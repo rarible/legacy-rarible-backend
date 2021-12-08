@@ -1339,6 +1339,11 @@ paths:
       summary: ft_balance
       operationId: ft_balance
       parameters:
+      - name: tokenId
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/schemas/BigInteger'
       - name: contract
         in: path
         required: true

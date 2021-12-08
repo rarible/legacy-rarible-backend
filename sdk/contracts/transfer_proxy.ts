@@ -21,13 +21,27 @@ export const transfer_proxy_code : any =
                          "%owner_candidate"
                        ]
                     },
-                    {  "prim": "set",
+                    {  "prim": "pair",
                        "args": [
-                         {  "prim": "address"  }
-                       ]
-                       ,
-                       "annots": [
-                         "%user"
+                         {  "prim": "set",
+                            "args": [
+                              {  "prim": "address"  }
+                            ]
+                            ,
+                            "annots": [
+                              "%user"
+                            ]
+                         },
+                         {  "prim": "big_map",
+                            "args": [
+                              {  "prim": "string"  },
+                              {  "prim": "bytes"  }
+                            ]
+                            ,
+                            "annots": [
+                              "%metadata"
+                            ]
+                         }
                        ]
                     }
                   ]
@@ -42,16 +56,30 @@ export const transfer_proxy_code : any =
           "args": [
             {  "prim": "or",
                "args": [
+                 {  "prim": "bytes",
+                    "annots": [
+                      "%set_metadata_uri"
+                    ]
+                 },
+                 {  "prim": "address",
+                    "annots": [
+                      "%declare_ownership"
+                    ]
+                 }
+               ]
+            },
+            {  "prim": "or",
+               "args": [
                  {  "prim": "or",
                     "args": [
-                      {  "prim": "address",
-                         "annots": [
-                           "%declare_ownership"
-                         ]
-                      },
                       {  "prim": "unit",
                          "annots": [
                            "%claim_ownership"
+                         ]
+                      },
+                      {  "prim": "address",
+                         "annots": [
+                           "%add_user"
                          ]
                       }
                     ]
@@ -60,30 +88,25 @@ export const transfer_proxy_code : any =
                     "args": [
                       {  "prim": "address",
                          "annots": [
-                           "%add_user"
+                           "%rm_user"
                          ]
                       },
-                      {  "prim": "address",
+                      {  "prim": "lambda",
+                         "args": [
+                           {  "prim": "unit"  },
+                           {  "prim": "list",
+                              "args": [
+                                {  "prim": "operation"  }
+                              ]
+                           }
+                         ]
+                         ,
                          "annots": [
-                           "%rm_user"
+                           "%do_transfers"
                          ]
                       }
                     ]
                  }
-               ]
-            },
-            {  "prim": "lambda",
-               "args": [
-                 {  "prim": "unit"  },
-                 {  "prim": "list",
-                    "args": [
-                      {  "prim": "operation"  }
-                    ]
-                 }
-               ]
-               ,
-               "annots": [
-                 "%do_transfers"
                ]
             }
           ]
@@ -108,7 +131,7 @@ export const transfer_proxy_code : any =
             {  "int": "1"  },
             [  {  "prim": "UNPAIR",
                   "args": [
-                    {  "int": "3"  }
+                    {  "int": "4"  }
                   ]
             }  ]
           ]
@@ -117,67 +140,131 @@ export const transfer_proxy_code : any =
           "args": [
             [  {  "prim": "IF_LEFT",
                   "args": [
-                    [  {  "prim": "IF_LEFT",
+                    [  {  "prim": "DUP",
                           "args": [
-                            [  {  "prim": "DUP",
-                                  "args": [
-                                    {  "int": "2"  }
-                                  ]
-                            },
-                            {  "prim": "SENDER"  },
-                            {  "prim": "COMPARE"  },
-                            {  "prim": "EQ"  },
-                            {  "prim": "NOT"  },
-                            {  "prim": "IF",
+                            {  "int": "2"  }
+                          ]
+                    },
+                    {  "prim": "SENDER"  },
+                    {  "prim": "COMPARE"  },
+                    {  "prim": "EQ"  },
+                    {  "prim": "NOT"  },
+                    {  "prim": "IF",
+                       "args": [
+                         [  {  "prim": "PUSH",
                                "args": [
-                                 [  {  "prim": "PUSH",
-                                       "args": [
-                                         {  "prim": "string"  },
-                                         {  "string": "InvalidCaller"  }
-                                       ]
-                                 },
-                                 {  "prim": "FAILWITH"  }  ],
-                                 [    ]
+                                 {  "prim": "string"  },
+                                 {  "string": "InvalidCaller"  }
                                ]
-                            },
-                            {  "prim": "DUP"  },
-                            {  "prim": "SOME"  },
-                            {  "prim": "DIP",
+                         },
+                         {  "prim": "FAILWITH"  }  ],
+                         [    ]
+                       ]
+                    },
+                    {  "prim": "DIG",
+                       "args": [
+                         {  "int": "4"  }
+                       ]
+                    },
+                    {  "prim": "DUP",
+                       "args": [
+                         {  "int": "2"  }
+                       ]
+                    },
+                    {  "prim": "SOME"  },
+                    {  "prim": "PUSH",
+                       "args": [
+                         {  "prim": "string"  },
+                         {  "string": ""  }
+                       ]
+                    },
+                    {  "prim": "UPDATE"  },
+                    {  "prim": "DUG",
+                       "args": [
+                         {  "int": "4"  }
+                       ]
+                    },
+                    {  "prim": "DROP",
+                       "args": [
+                         {  "int": "1"  }
+                       ]
+                    },
+                    {  "prim": "PAIR",
+                       "args": [
+                         {  "int": "4"  }
+                       ]
+                    },
+                    {  "prim": "DIG",
+                       "args": [
+                         {  "int": "1"  }
+                       ]
+                    },
+                    {  "prim": "PAIR"  }  ],
+                    [  {  "prim": "DUP",
+                          "args": [
+                            {  "int": "2"  }
+                          ]
+                    },
+                    {  "prim": "SENDER"  },
+                    {  "prim": "COMPARE"  },
+                    {  "prim": "EQ"  },
+                    {  "prim": "NOT"  },
+                    {  "prim": "IF",
+                       "args": [
+                         [  {  "prim": "PUSH",
                                "args": [
-                                 {  "int": "1"  },
-                                 [  {  "prim": "DIG",
-                                       "args": [
-                                         {  "int": "2"  }
-                                       ]
-                                 },
-                                 {  "prim": "DROP",
-                                    "args": [
-                                      {  "int": "1"  }
-                                    ]
-                                 }  ]
+                                 {  "prim": "string"  },
+                                 {  "string": "InvalidCaller"  }
                                ]
-                            },
-                            {  "prim": "DUG",
+                         },
+                         {  "prim": "FAILWITH"  }  ],
+                         [    ]
+                       ]
+                    },
+                    {  "prim": "DUP"  },
+                    {  "prim": "SOME"  },
+                    {  "prim": "DIP",
+                       "args": [
+                         {  "int": "1"  },
+                         [  {  "prim": "DIG",
                                "args": [
                                  {  "int": "2"  }
                                ]
-                            },
-                            {  "prim": "DROP",
-                               "args": [
-                                 {  "int": "1"  }
-                               ]
-                            },
-                            {  "prim": "PAIR",
-                               "args": [
-                                 {  "int": "3"  }
-                               ]
-                            },
-                            {  "prim": "DIG",
-                               "args": [
-                                 {  "int": "1"  }
-                               ]
-                            },
-                            {  "prim": "PAIR"  }  ],
+                         },
+                         {  "prim": "DROP",
+                            "args": [
+                              {  "int": "1"  }
+                            ]
+                         }  ]
+                       ]
+                    },
+                    {  "prim": "DUG",
+                       "args": [
+                         {  "int": "2"  }
+                       ]
+                    },
+                    {  "prim": "DROP",
+                       "args": [
+                         {  "int": "1"  }
+                       ]
+                    },
+                    {  "prim": "PAIR",
+                       "args": [
+                         {  "int": "4"  }
+                       ]
+                    },
+                    {  "prim": "DIG",
+                       "args": [
+                         {  "int": "1"  }
+                       ]
+                    },
+                    {  "prim": "PAIR"  }  ]
+                  ]
+            }  ],
+            [  {  "prim": "IF_LEFT",
+                  "args": [
+                    [  {  "prim": "IF_LEFT",
+                          "args": [
                             [  {  "prim": "DROP",
                                   "args": [
                                     {  "int": "1"  }
@@ -266,7 +353,7 @@ export const transfer_proxy_code : any =
                             },
                             {  "prim": "PAIR",
                                "args": [
-                                 {  "int": "3"  }
+                                 {  "int": "4"  }
                                ]
                             },
                             {  "prim": "DIG",
@@ -274,11 +361,7 @@ export const transfer_proxy_code : any =
                                  {  "int": "1"  }
                                ]
                             },
-                            {  "prim": "PAIR"  }  ]
-                          ]
-                    }  ],
-                    [  {  "prim": "IF_LEFT",
-                          "args": [
+                            {  "prim": "PAIR"  }  ],
                             [  {  "prim": "DUP",
                                   "args": [
                                     {  "int": "2"  }
@@ -373,7 +456,7 @@ export const transfer_proxy_code : any =
                             },
                             {  "prim": "PAIR",
                                "args": [
-                                 {  "int": "3"  }
+                                 {  "int": "4"  }
                                ]
                             },
                             {  "prim": "DIG",
@@ -381,7 +464,11 @@ export const transfer_proxy_code : any =
                                  {  "int": "1"  }
                                ]
                             },
-                            {  "prim": "PAIR"  }  ],
+                            {  "prim": "PAIR"  }  ]
+                          ]
+                    }  ],
+                    [  {  "prim": "IF_LEFT",
+                          "args": [
                             [  {  "prim": "DUP",
                                   "args": [
                                     {  "int": "2"  }
@@ -447,7 +534,71 @@ export const transfer_proxy_code : any =
                             },
                             {  "prim": "PAIR",
                                "args": [
-                                 {  "int": "3"  }
+                                 {  "int": "4"  }
+                               ]
+                            },
+                            {  "prim": "DIG",
+                               "args": [
+                                 {  "int": "1"  }
+                               ]
+                            },
+                            {  "prim": "PAIR"  }  ],
+                            [  {  "prim": "DUP",
+                                  "args": [
+                                    {  "int": "4"  }
+                                  ]
+                            },
+                            {  "prim": "SENDER"  },
+                            {  "prim": "MEM"  },
+                            {  "prim": "NOT"  },
+                            {  "prim": "IF",
+                               "args": [
+                                 [  {  "prim": "PUSH",
+                                       "args": [
+                                         {  "prim": "string"  },
+                                         {  "string": "InvalidCaller"  }
+                                       ]
+                                 },
+                                 {  "prim": "FAILWITH"  }  ],
+                                 [    ]
+                               ]
+                            },
+                            {  "prim": "DUP"  },
+                            {  "prim": "PUSH",
+                               "args": [
+                                 {  "prim": "unit"  },
+                                 {  "prim": "Unit"  }
+                               ]
+                            },
+                            {  "prim": "EXEC"  },
+                            {  "prim": "DIP",
+                               "args": [
+                                 {  "int": "1"  },
+                                 [  {  "prim": "DIG",
+                                       "args": [
+                                         {  "int": "5"  }
+                                       ]
+                                 },
+                                 {  "prim": "DROP",
+                                    "args": [
+                                      {  "int": "1"  }
+                                    ]
+                                 }  ]
+                               ]
+                            },
+                            {  "prim": "DUG",
+                               "args": [
+                                 {  "int": "5"  }
+                               ]
+                            },
+                            {  "prim": "DROP",
+                               "args": [
+                                 {  "int": "1"  }
+                               ]
+                            },
+                            {  "prim": "PAIR",
+                               "args": [
+                                 {  "int": "4"  }
                                ]
                             },
                             {  "prim": "DIG",
@@ -459,71 +610,7 @@ export const transfer_proxy_code : any =
                           ]
                     }  ]
                   ]
-            }  ],
-            [  {  "prim": "DUP",
-                  "args": [
-                    {  "int": "4"  }
-                  ]
-            },
-            {  "prim": "SENDER"  },
-            {  "prim": "MEM"  },
-            {  "prim": "NOT"  },
-            {  "prim": "IF",
-               "args": [
-                 [  {  "prim": "PUSH",
-                       "args": [
-                         {  "prim": "string"  },
-                         {  "string": "InvalidCaller"  }
-                       ]
-                 },
-                 {  "prim": "FAILWITH"  }  ],
-                 [    ]
-               ]
-            },
-            {  "prim": "DUP"  },
-            {  "prim": "PUSH",
-               "args": [
-                 {  "prim": "unit"  },
-                 {  "prim": "Unit"  }
-               ]
-            },
-            {  "prim": "EXEC"  },
-            {  "prim": "DIP",
-               "args": [
-                 {  "int": "1"  },
-                 [  {  "prim": "DIG",
-                       "args": [
-                         {  "int": "4"  }
-                       ]
-                 },
-                 {  "prim": "DROP",
-                    "args": [
-                      {  "int": "1"  }
-                    ]
-                 }  ]
-               ]
-            },
-            {  "prim": "DUG",
-               "args": [
-                 {  "int": "4"  }
-               ]
-            },
-            {  "prim": "DROP",
-               "args": [
-                 {  "int": "1"  }
-               ]
-            },
-            {  "prim": "PAIR",
-               "args": [
-                 {  "int": "3"  }
-               ]
-            },
-            {  "prim": "DIG",
-               "args": [
-                 {  "int": "1"  }
-               ]
-            },
-            {  "prim": "PAIR"  }  ]
+            }  ]
           ]
        }  ]
      ]
@@ -536,7 +623,17 @@ export function transfer_proxy_storage(owner: string) : any {
               {  "prim": "Pair",
                  "args": [
                    {  "prim": "None"  },
-                   [    ]
+                   {  "prim": "Pair",
+                      "args": [
+                        [    ],
+                        [  {  "prim": "Elt",
+                              "args": [
+                                {  "string": ""  },
+                                {  "bytes": ""  }
+                              ]
+                        }  ]
+                      ]
+                   }
                  ]
               }
             ]

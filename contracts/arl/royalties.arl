@@ -1,9 +1,43 @@
 archetype royalties(
   owner : address
 )
+with metadata ""
 
-variable owner_candidate : option<address> = none
-variable validator : option<address> = none
+//----------------------------------------------------------------------------
+// Metadata
+//----------------------------------------------------------------------------
+
+entry set_metadata_uri(idata : bytes) {
+  called by owner
+  effect {
+    metadata := put(metadata, "", idata)
+  }
+}
+
+//----------------------------------------------------------------------------
+// Owner role transfer
+//----------------------------------------------------------------------------
+
+variable owner_candidate : option<address>       = none
+
+entry declare_ownership(candidate : address) {
+  called by owner
+  effect {
+    owner_candidate := some(candidate);
+  }
+}
+
+entry claim_ownership() {
+  called by opt_get(owner_candidate)
+  effect {
+    owner := opt_get(owner_candidate);
+    owner_candidate := none
+  }
+}
+
+//----------------------------------------------------------------------------
+// User role
+//----------------------------------------------------------------------------
 
 asset user {
   addr : address
@@ -23,20 +57,9 @@ entry rm_user(old_user : address) {
   }
 }
 
-entry transfer_ownership(candidate : address) {
-  called by owner
-  effect {
-    owner_candidate := some(candidate);
-  }
-}
-
-entry claim_ownership() {
-  called by opt_get(owner_candidate)
-  effect {
-    owner := opt_get(owner_candidate);
-    owner_candidate := none
-  }
-}
+//----------------------------------------------------------------------------
+// Royalties contract
+//----------------------------------------------------------------------------
 
 record part {
   partAccount : address;

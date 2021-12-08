@@ -1,15 +1,25 @@
 archetype nft(owner : address)
 with metadata ""
 
-constant FA2_NOT_OPERATOR : string = "FA2_NOT_OPERATOR"
+constant FA2_NOT_OPERATOR         : string = "FA2_NOT_OPERATOR"
+constant CALLER_NOT_OWNER         : string = "CALLER_NOT_OWNER"
+constant FA2_INSUFFICIENT_BALANCE : string = "FA2_INSUFFICIENT_BALANCE"
+constant TOKEN_NOT_FOUND          : string = "FA2_TOKEN_UNDEFINED"
+constant FA2_INVALID_AMOUNT       : string = "INVALID_AMOUNT"
+constant MISSIGNED                : string = "MISSIGNED"
+constant EXPIRED_PERMIT           : string = "EXPIRED_PERMIT"
+constant CONTRACT_PAUSED          : string = "CONTRACT_PAUSED"
+constant SIGNER_IS_NOT_FROM       : string = "SIGNER_IS_NOT_FROM"
+constant NO_ENTRY_FOR_USER        : string = "NO_ENTRY_FOR_USER"
+
 
 record part {
   partAccount : address;
   partValue   : nat;
 }
 
-asset royalties identified by rtokenId to big_map {
-  rtokenId : nat;
+asset royalties identified by rtokenid to big_map {
+  rtokenid : nat;
   rvalue : list<part>;
 }
 
@@ -54,17 +64,16 @@ record balance_of_response {
   balance_ : nat;
 } as ((request, balance))
 
-asset permit_info to big_map {
-  pid       : bytes;
-  createdAt : date = now;
-  expiry    : option<duration> = none;
+record user_permit {
+  expiry : option<nat>;
+  created_at : date;
 }
 
-asset permit to big_map {
-  mandator      : address;
-  permits       : partition<permit_info> = [];
-  globalExpiry  : option<duration> = none;
-  counter       : nat = 0
+asset permits to big_map {
+  user_address : address;
+  counter      : nat = 0;
+  user_expiry  : option<nat> = none;
+  user_permits : map<bytes, user_permit> = [];
 }
 
 asset operator_for_all identified by fa_oaddr fa_oowner to big_map {
@@ -77,50 +86,61 @@ asset minters identified by minter {
   minter: address
 }
 
-variable defaultExpiry : duration = 1000 * 365d
+variable default_expiry : nat =  31556952
 
-variable pause : bool = false
+variable paused : bool = false
+
+function is_not_paused() : bool {
+  if (not paused)
+  then return true
+  else fail(CONTRACT_PAUSED)
+}
 
 entry update_operators (upl : list<or<operator_param, operator_param>>) {
-  dorequire(not pause, "CONTRACT_PAUSED");
-  for up in upl do
-    match up with
-    | left(param)  -> (* add *)
-      dorequire(param.opp_owner = caller , "CALLER NOT OWNER");
-      operator.add({oaddr = param.opp_operator; otoken = param.opp_token_id; oowner = param.opp_owner})
-    | right(param) -> (* remove *)
-      dorequire(param.opp_owner = caller , "CALLER NOT OWNER");
-      operator.remove((param.opp_operator, param.opp_token_id, param.opp_owner))
-    end;
-  done;
+  require { r0 : is_not_paused() }
+  effect {
+    for up in upl do
+      match up with
+      | left(param)  -> (* add *)
+        dorequire(param.opp_owner = caller , "CALLER NOT OWNER");
+        operator.add({oaddr = param.opp_operator; otoken = param.opp_token_id; oowner = param.opp_owner})
+      | right(param) -> (* remove *)
+        dorequire(param.opp_owner = caller , "CALLER NOT OWNER");
+        operator.remove((param.opp_operator, param.opp_token_id, param.opp_owner))
+      end;
+    done;
+  }
 }
 
 entry update_operators_for_all (upl : list<or<address, address>>) {
-  for up in upl do
-    match up with
-    | left(op)  -> (* add *)
-      operator_for_all.add({fa_oaddr = op; fa_oowner = caller})
-    | right(op) -> (* remove *)
-      operator_for_all.remove((op, caller))
-    end;
-  done;
+  require { r1 : is_not_paused() }
+  effect {
+    for up in upl do
+      match up with
+      | left(op)  -> (* add *)
+        operator_for_all.add({fa_oaddr = op; fa_oowner = caller})
+      | right(op) -> (* remove *)
+        operator_for_all.remove((op, caller))
+      end;
+    done;
+  }
 }
 
-function checkOwnerAndOperator(txs : list<address * list<transfer_destination>>) : bool {
+function check_owner_and_operator(txs : list<address * list<transfer_destination>>) : bool {
   var res = true;
 
   for tx in txs do
     var %from = tx[0];
     var tds = tx[1];
     for td in tds do begin
-      res &= if caller <> %from then (operator.contains((caller,td.token_id_dest,%from)) or operator_for_all.contains((%from, caller))) else true
+      res &= if caller <> %from then (operator.contains((caller,td.token_id_dest,%from)) or operator_for_all.contains((%from, caller))) else ledger.contains((td.token_id_dest, caller));
     end
     done
   done;
   return res
 }
 
-function getFromAddress(txs : list<address * list<transfer_destination>>) : option<address> {
+function get_from_address(txs : list<address * list<transfer_destination>>) : option<address> {
   match txs with
   | hd::tl -> begin
     var %from = hd[0];
@@ -144,191 +164,243 @@ getter balance_of (requests : list<balance_of_request>) : list<balance_of_respon
   })
 }
 
-
 entry burn(itokenid : nat, iamount : nat) {
-    dorequire(not pause, "CONTRACT_PAUSED");
-    var vamount = ledger[(itokenid, caller)].lamount;
-    if (vamount > iamount)
-    then ledger.update((itokenid, caller), { lamount -= iamount })
-    else if (vamount = iamount)
-      then ledger.remove((itokenid, caller))
-      else fail("FA2_INSUFFICIENT_BALANCE");
+  require { r2 : is_not_paused() }
+  effect {
+    if (ledger.contains((itokenid, caller))) then
+    begin
+      var vamount = ledger[(itokenid, caller)].lamount;
+      if (vamount > iamount)
+      then ledger.update((itokenid, caller), { lamount -= iamount })
+      else if (vamount = iamount)
+        then ledger.remove((itokenid, caller))
+        else fail("FA2_INSUFFICIENT_BALANCE");
+    end
+    else
+      fail("FA2_INSUFFICIENT_BALANCE");
+  }
 }
 
-entry setMetadata(ikey: string, idata : bytes) {
+entry set_metadata(ikey: string, idata : bytes) {
   called by owner
+  require { r3 : is_not_paused() }
   effect {
-    dorequire(not pause, "CONTRACT_PAUSED");
     metadata := put(metadata, ikey, idata)
   }
 }
 
-entry setTokenMetadata(iTokenId : nat, iExtras : map<string, bytes>) {
-  called by selfaddress
-  effect {
-    dorequire(not pause, "CONTRACT_PAUSED");
-    token_metadata.addupdate(iTokenId, {token_id = iTokenId; token_info = iExtras});
-  }
-}
-
-entry setPause(apause : bool) {
+entry set_pause(apause : bool) {
   called by owner
   effect {
-    pause := apause
+    paused := apause
   }
 }
 
-function hasExpired(permitkey : bytes) : bool {
-  if permit_info.contains(permitkey) then begin
-    var expiryValue =
-      match permit_info[permitkey].expiry with
-      | some(v) -> v
-      | none -> defaultExpiry
-      end;
-      return (expiryValue + permit_info[permitkey].createdAt < now)
-    end
-  else
-    return false
-}
-
-entry addPermit(pk : key, s : signature, permitkey : bytes) {
-  dorequire(not pause, "CONTRACT_PAUSED");
-  var issuer : address = key_address(pk);
-  if permit.contains(issuer) then begin
-    permit[issuer].permits.removeif(hasExpired(the.pid));
+function get_default_expiry(addr : address) : nat {
+  var res = default_expiry;
+  if permits.contains(addr) then
+  match permits[addr].user_expiry with
+  | some v -> res := v
+  | none -> res := default_expiry
   end;
-
-  var lcounter =
-    if permit.contains(issuer)
-    then permit[issuer].counter
-    else 0;
-  var tosign : bytes = pack(((selfaddress, chainid), (lcounter, permitkey)));
-  dorequire(check_signature(pk, s, tosign), ("MISSIGNED", tosign));
-  dorequire(not hasExpired(permitkey), "EXPIRED_PERMIT");
-  permit.addupdate(issuer, { counter += 1 });
-  permit[issuer].permits.addupdate(permitkey, { });
-  permit[issuer].permits.removeif(hasExpired(the.pid))
+  return res
 }
 
-function checkpermit(expectedUser : address, permitkey : bytes, errMessage : string) : bool {
-  if (caller <> expectedUser) then begin
-    dorequire(permit.contains(expectedUser), errMessage);
-    dorequire(permit_info.contains(permitkey), errMessage);
-    dofailif(hasExpired(permitkey), "EXPIRED_PERMIT");
-    return true
-  end else
-    return false
+function get_expiry(addr : address, ipermitkey : bytes) : nat {
+  var res : nat = get_default_expiry(addr);
+  if permits.contains(addr)
+  then if permits[addr].user_permits.contains(ipermitkey)
+      then match permits[addr].user_permits[ipermitkey].expiry with
+           | some (v) -> res := v
+           | none -> ()
+           end;
+  return res
 }
 
-entry consumePermit(expectedUser : address, permitkey : bytes, errMessage : string) {
-  called by selfaddress
-  effect{
-    if checkpermit(expectedUser, permitkey, errMessage) then begin
-      permit[expectedUser].permits.remove(permitkey);
-    end
+function has_expired(iuser_permit : user_permit, iexpiry: nat) : bool {
+  match iuser_permit.expiry with
+  | some(v) -> return (iuser_permit.created_at + (v * 1s) < now)
+  | none -> return (iuser_permit.created_at + (iexpiry * 1s) < now)
+  end
+}
+
+entry permit(pk : key, sig : signature, data : bytes) {
+  require { r5: is_not_paused() }
+  effect {
+    var user : address = key_address(pk);
+    var empty : map<bytes, user_permit> = [];
+    var pcounter_user_permits : (nat * map<bytes, user_permit>) = if permits.contains(user) then (permits[user].counter, permits[user].user_permits) else (0, empty);
+    var pcounter = pcounter_user_permits[0];
+    var puser_permits = pcounter_user_permits[1];
+    var tosign : bytes = pack(((selfaddress, chainid), (pcounter, data)));
+    dorequire(check_signature(pk, sig, tosign), ("MISSIGNED", tosign));
+    var lexpiry = get_default_expiry(user);
+    permits.addupdate(user, { counter += 1; user_permits = put(puser_permits, data, { expiry = some(lexpiry); created_at = now})});
+    for (k, v) in permits[user].user_permits do
+      if has_expired(v, lexpiry)
+      then permits[user].user_permits.remove(k)
+    done
   }
 }
 
-entry setExpiry (powner: address, newExpiry: duration, specificPermitOrDefault: option<bytes>) {
-  dorequire(not pause, "CONTRACT_PAUSED");
-  if permit.contains(powner) then begin
-    permit[powner].permits.removeif(hasExpired(the.pid));
-  end;
-  dofailif(newExpiry >= defaultExpiry, "EXPIRY_TOO_BIG");
-  dofailif(newExpiry < 0, "EXPIRY_NEGATIVE");
+entry set_default_expiry(v : nat) {
+  called by owner
+  require { r6: is_not_paused() }
+  effect {
+    default_expiry := v
+  }
+}
 
-  match specificPermitOrDefault with
-  | some (permitkey) -> begin
-      dofailif(powner <> caller, "NOT_PERMIT_ISSUER");
-      if checkpermit(powner, permitkey, "PERMIT_MISSING") then begin
-        permit[powner].permits.remove(permitkey);
-      end;
-      if (permit.contains(powner)) then
-        if (not hasExpired(permitkey)) then begin
-          if (newExpiry = 0s) then begin
-            permit[powner].permits.remove(permitkey);
-          end
-          else begin
-            permit[powner].permits.addupdate(permitkey, { expiry = some(newExpiry) });
+entry set_expiry(v : option<nat>, p : option<bytes>) {
+  require { r7: is_not_paused() }
+  effect {
+    match v with
+      | some v_expiry ->
+          dofailif(v_expiry >= default_expiry, "EXPIRY_TOO_BIG")
+      | none -> ()
+    end;
+    if permits.contains(caller)
+    then begin
+      match p with
+      | some lpermit ->
+        if permits[caller].user_permits.contains(lpermit)
+        then begin
+          var need_update = true;
+          match v with
+            | some v_expiry ->
+              begin
+                if v_expiry = 0 then
+                begin
+                  need_update := false;
+                  permits[caller].user_permits.remove(lpermit)
+                end
+              end
+            | none -> ()
+          end;
+          if need_update then
+          begin
+            var up : user_permit = permits[caller].user_permits[lpermit];
+            permits[caller].user_permits.update(lpermit, some({up with expiry = v}))
           end
         end
-        else begin
-          permit[powner].permits.remove(permitkey);
-        end
-  end
-  | none -> permit.addupdate(powner, { globalExpiry = some(newExpiry) })
-  end
+        else fail (("PERMIT_NOT_FOUND", (caller, lpermit)))
+      | none -> permits.update(caller, { user_expiry = v })
+      end
+    end
+    else fail (("PERMIT_USER_NOT_FOUND", caller))
+  }
 }
 
 entry %transfer (txs : list<address * list<transfer_destination>>) {
-  dorequire(not pause, "CONTRACT_PAUSED");
-  if not checkOwnerAndOperator(txs) then begin
-    match getFromAddress(txs) with
-    | some(%from) -> begin
-      transfer 0tz to entry self.consumePermit(%from, blake2b(pack(txs)), FA2_NOT_OPERATOR)
-    end
-    | none -> ()
-    end
-  end;
-  for tx in txs do
-    var %from = tx[0];
-    var tds = tx[1];
-    for td in tds do begin
-      (* set token ownership *)
-      var tokenid = td.token_id_dest;
-      var amount = ledger[(tokenid, %from)].lamount;
-      if td.token_amount_dest > amount then
-        fail("FA2_INSUFFICIENT_BALANCE")
-      else if td.token_amount_dest = amount then
-        ledger.remove((tokenid, %from))
-      else
-        ledger.update((tokenid, %from), { lamount -= td.token_amount_dest });
-      ledger.addupdate((tokenid, td.to_dest), { lamount += td.token_amount_dest })
-    end done;
+  require { r8 : is_not_paused() }
+  effect {
+    if not check_owner_and_operator(txs) then begin
+      match get_from_address(txs) with
+      | some(%from) -> begin
+          var permit_key = blake2b(pack(txs));
+          if not permits.contains(%from)
+          then fail(NO_ENTRY_FOR_USER)
+          else if not permits[%from].user_permits.contains(permit_key)
+          then fail(FA2_NOT_OPERATOR)
+          else (
+            var iuser_permit = permits[%from].user_permits[permit_key];
+            var iexpiry = get_expiry(%from, permit_key);
+            if has_expired(iuser_permit, iexpiry)
+            then fail(EXPIRED_PERMIT)
+            else permits[%from].user_permits.remove(permit_key)
+          );
+          end
+      | none -> ()
+      end
+    end;
+
+    for tx in txs do
+      var %from = tx[0];
+      var tds = tx[1];
+      for td in tds do begin
+        (* set token ownership *)
+        var tokenid = td.token_id_dest;
+        var amount = ledger[(tokenid, %from)].lamount;
+        if td.token_amount_dest > amount then
+          fail("FA2_INSUFFICIENT_BALANCE")
+        else if td.token_amount_dest = amount then
+          ledger.remove((tokenid, %from))
+        else
+          ledger.update((tokenid, %from), { lamount -= td.token_amount_dest });
+        ledger.addupdate((tokenid, td.to_dest), { lamount += td.token_amount_dest })
+      end done;
+    done
+  }
+}
+
+entry transfer_gasless (batch : list<list<address * list<transfer_destination>> * (key * signature)>) {
+  for b in batch do
+    var pk  = b[1][0];
+    var sig = b[1][1];
+    var pkh = key_address(pk);
+
+    var lcounter = if permits.contains(pkh) then permits[pkh].counter else 0;
+    var data : bytes = pack((selfaddress, lcounter, blake2b(pack(b[0]))));
+    if not check_signature(pk, sig, data) then fail((MISSIGNED, data));
+    permits.addupdate(pkh, { counter = (lcounter + 1)});
+
+    for tx in b[0] do
+      var %from = tx[0];
+      var tds = tx[1];
+      dorequire(pkh = %from, ("SIGNER_IS_NOT_FROM", (pkh, %from)));
+      for td in tds do begin
+        var %to = td.to_dest;
+        (* set token ownership *)
+        var tokenid = td.token_id_dest;
+        var amount = ledger[(tokenid, %from)].lamount;
+        if td.token_amount_dest > amount then
+          fail("FA2_INSUFFICIENT_BALANCE")
+        else if td.token_amount_dest = amount then
+          ledger.remove((tokenid, %from))
+        else
+          ledger.update((tokenid, %from), { lamount -= td.token_amount_dest });
+        ledger.addupdate((tokenid, td.to_dest), { lamount += td.token_amount_dest })
+      end done;
+    done
   done
 }
 
-entry addMinter(aminter: address) {
-  called by owner
-  effect {
-    dorequire(not pause, "CONTRACT_PAUSED");
-    minters.addupdate(aminter, {})
-  }
-}
-
-entry removeMinter(rminter: address) {
-  called by owner
-  effect {
-    dorequire(not pause, "CONTRACT_PAUSED");
-    minters.remove(rminter)
-  }
-}
-
-entry transferOwnership(newOwner: address) {
+entry transfer_ownership(newOwner: address) {
   called by owner
   effect {
     owner := newOwner
   }
 }
 
-entry setRoyalties(tokenId : nat, value : list<part>) {
-  called by selfaddress
+view get_royalties(tokenId : nat) : list<part> {
+  return ((royalties[tokenId].rvalue))
+}
+
+entry add_minter(aminter: address) {
+  called by owner
+  require { r10: is_not_paused() }
+
   effect {
-    dorequire(not pause, "CONTRACT_PAUSED");
-    royalties.add({ rtokenId = tokenId; rvalue = value });
+    minters.addupdate(aminter, {})
   }
 }
 
-getter getRoyalties(tokenId : nat) : list<part> {
-  return ((royalties[tokenId].rvalue))
+entry remove_minter(rminter: address) {
+  called by owner
+  require { r11: is_not_paused() }
+
+  effect {
+    minters.remove(rminter)
+  }
 }
 
 entry mint (itokenid : nat, iowner : address, iamount : nat, itokenMetadata: map<string, bytes>, iroyalties : list<part>) {
   called by owner or minters
+  require { r12: is_not_paused() }
+
   effect {
-    dorequire(not pause, "CONTRACT_PAUSED");
-    transfer 0tz to entry self.setTokenMetadata(itokenid, itokenMetadata);
-    transfer 0tz to entry self.setRoyalties(itokenid, iroyalties);
+    token_metadata.add({ftoken_metadata = itokenid; token_id = itokenid; token_info = itokenMetadata});
+    royalties.add({ rtokenid = itokenid; rvalue = iroyalties });
     ledger.add({ ltoken = itokenid; lowner = iowner; lamount= iamount });
   }
 }

@@ -102,7 +102,7 @@ export async function add_permit(
   const parameter : MichelsonData = [
     {string: permit.pk}, {string: permit.signature}, {bytes: permit.hash} ]
   const arg = {
-    destination: permit.contract, entrypoint: "addPermit", parameter, amount: new BigNumber(0)}
+    destination: permit.contract, entrypoint: "permit", parameter, amount: new BigNumber(0)}
   return send(provider, arg)
 }
 
@@ -112,10 +112,10 @@ export async function set_expiry(
   expiry: Date,
   global=false) : Promise<OperationResult> {
   const parameter : MichelsonData = [
-    { string: pk_to_pkh(permit.pk) }, { int: (expiry.valueOf() / 1000).toString() },
+    { prim: "Some", args: [ { int: (expiry.valueOf() / 1000).toString() } ] },
     (global) ? { prim: "None" } : { prim: "Some", args: [ { bytes: permit.hash } ] }
   ]
   const arg = {
-    destination: permit.contract, entrypoint: "setExpiry", parameter, amount: new BigNumber(0)}
+    destination: permit.contract, entrypoint: "set_expiry", parameter, amount: new BigNumber(0)}
   return send(provider, arg)
 }

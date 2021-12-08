@@ -1,9 +1,8 @@
 {
-  "nodes": [ "https://granadanet.smartpy.io" ],
-  "start": 542173,
+  "nodes": [ "https://hangzhounet.smartpy.io" ],
+  "start": 156000,
   "db_kind": "pg",
   "step_forward": 30,
-  "validator": "KT1RtsevY6b6izV12QMxvVZviSTy4Mcu2apg",
-  "exchange_v2": "KT1XgQ52NeNdjo3jLpbsPBRfg8YhWoQ5LB7g",
-  "royalties": "KT1KrzCSQs6XMMRsQ7dqCVcYQeGs7d512zzb"
+  "exchange": "KT1DiqMxwkRhtcbAqJeajYcy75VBzxcnsSn8",
+  "royalties": "KT1LDzj3qDGtSLaMCgW8hZ96ZoeiJZnDCYFG"
 }
