@@ -778,13 +778,20 @@ let mk_nft_collection obj =
   let nft_collection_minters = match obj#minters with
     | None -> None
     | Some a -> Some (List.filter_map (fun x -> x) a) in
+  let nft_collection_features = match obj#kind with
+    | "rarible" -> [ NCFSECONDARY_SALE_FEES ; NCFBURN ]
+    | "ubi" -> []
+    | "fa2" -> []
+    | _ ->
+      Format.eprintf "warning: can't get features for unknow kind %s@." obj#kind;
+      [] in
   Ok {
     nft_collection_id = obj#address ;
     nft_collection_owner = obj#owner ;
     nft_collection_type ;
     nft_collection_name = name ;
     nft_collection_symbol = symbol ;
-    nft_collection_features = [] ;
+    nft_collection_features ;
     nft_collection_supports_lazy_mint = false ;
     nft_collection_minters
   }

@@ -1412,22 +1412,3 @@ let get_ft_balance ((_, contract), ft_owner) () =
  *   end
  *
  * end *)
-
-(* Update Order *)
-(* - core/service/OrderReduceService: event of exchange contract
- * - listener/job/OrderPricesUpdateJob: daemon that updates the usd price of erc20 assets
- * - listener/service/order/OrderUpdateTaskHandler: deamon that updates make_balance field
- * - listener/service/order/OrderBalanceService: deamon that updates make_balance field (in case of ownerhsip event or erc20 balance event)
- * - api/service/order/OrderService: upsert *)
-
-(* Update OrderVersion *)
-(* - listener/listener/job/OrderPricesUpdateJob *)
-(* - api/service/order/OrderService: upsert *)
-
-(* Order Activities *)
-(* Merge de history et Orderversion *)
-
-(* ExchangeHistoryRepo saves *)
-(* Log event of exchange contract *)
-(* -> ENTRYPOINT CANCEL MATCH_ORDERS *)
-(* VOIR ExchangeOrderMatchDescriptor OnExchangeLogEventListener et OrderReduceService *)
