@@ -121,8 +121,14 @@ let get_continuation_last_update_param req =
       | ts :: h :: [] ->
         let ts = CalendarLib.Calendar.from_unixfloat (float_of_string ts /. 1000.) in
         Ok (Some (ts, h))
-      | _ ->
-        mk_invalid_argument continuation_param "must be in format TIMETAMP_HASH"
+      | ts :: tl ->
+        begin match tl with
+          | [] -> mk_invalid_argument continuation_param "must be in format TIMETAMP_HASH"
+          | _ ->
+            let ts = CalendarLib.Calendar.from_unixfloat (float_of_string ts /. 1000.) in
+            Ok (Some (ts, String.concat "_" tl))
+        end
+      | [] -> mk_invalid_argument continuation_param "must be in format TIMETAMP_HASH"
     with _ ->
       mk_invalid_argument continuation_param "must be in format TIMETAMP_HASH"
 
