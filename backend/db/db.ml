@@ -1402,7 +1402,7 @@ let insert_transfer ~dbh ~op ~contract lt =
         ) transfer_index tr_txs) 0l lt in
   ()
 
-let insert_token_balances ~dbh ~op ~contract ?(ft=false) balances =
+let insert_token_balances ~dbh ~op ~contract ?(ft=false) ?token_id balances =
   iter_rp (fun (k, v) ->
       let kind, token_id, account, balance = match k, v, ft with
         | `nat id, Some (`address a), false ->
@@ -1416,16 +1416,25 @@ let insert_token_balances ~dbh ~op ~contract ?(ft=false) balances =
           "mt", id, Some a, None
         | `tuple [`nat id; `address a], Some (`nat bal), true
         | `tuple [`address a; `nat id], Some (`nat bal), true ->
-          "ft_multi", id, Some a, Some bal
+          begin match token_id with
+            | Some tid when tid <> id -> "", Z.minus_one, None, None
+            | _ -> "ft_multi", id, Some a, Some bal
+          end
         | `tuple [`nat id; `address a], None, true
         | `tuple [`address a; `nat id], None, true ->
-          "ft_multi", id, Some a, None
+          begin match token_id with
+            | Some tid when id <> tid -> "", Z.minus_one, None, None
+            | _ -> "ft_multi", id, Some a, None
+          end
         | `address a, Some (`nat bal), true ->
           "ft", Z.minus_one, Some a, Some bal
         | `address a, None, true ->
           "ft", Z.minus_one, Some a, None
-        | `tuple [`address a; `nat _], Some (`tuple (`nat bal :: _)), true ->
-          "ft", Z.minus_one, Some a, Some bal
+        | `tuple [`address a; `nat id], Some (`tuple (`nat bal :: _)), true ->
+          begin match token_id with
+            | Some tid when id <> tid -> "", Z.minus_one, None, None
+            | _ -> "ft", id, Some a, Some bal
+          end
         | _ -> "", Z.minus_one, None, None in
       if kind <> "" then
         let>? () = [%pgsql dbh
@@ -1905,7 +1914,7 @@ let insert_ft ~dbh ~config ~op ~contract ft =
       | Fa2_multiple_inversed -> Contract_spec.ledger_fa2_multiple_inversed_field
       | Custom {ledger_key; ledger_value} -> ledger_key, ledger_value in
     let balances = Storage_diff.get_big_map_updates ~id key value meta.op_lazy_storage_diff in
-    insert_token_balances ~dbh ~op ~contract ~ft:true balances
+    insert_token_balances ~dbh ~op ~contract ~ft:true ?token_id:ft.ft_token_id balances
 
 let insert_transaction ~config ~dbh ~op tr =
   let contract = tr.destination in
