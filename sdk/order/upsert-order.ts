@@ -11,7 +11,7 @@ export async function upsert_order(
   order: OrderForm,
   infinite: boolean = false) {
   const make_fee = get_make_fee(provider.config.fees, order)
-  const make = add_fee(order.make, make_fee)
+  const make = await add_fee(provider, order.make, make_fee)
   if (make.asset_type.asset_class != "XTZ" ) {
     await approve(provider, order.maker, order.make, infinite)
   }

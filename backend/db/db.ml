@@ -63,7 +63,7 @@ let db_ft_contract r =
   match v with
   | None -> None
   | Some ft_kind -> Some {
-      ft_kind; ft_ledger_id = r#ledger_id;
+      ft_kind; ft_ledger_id = r#ledger_id; ft_decimals = r#decimals;
       ft_crawled=r#crawled; ft_token_id = r#token_id}
 
 let db_ft_contracts =
@@ -79,8 +79,8 @@ let get_extra_config ?dbh () =
                  from contracts where main"] in
   let>? ft_contracts =
     [%pgsql.object dbh
-        "select address, kind, ledger_id, ledger_key, ledger_value, crawled, token_id \
-         from ft_contracts"] in
+        "select address, kind, ledger_id, ledger_key, ledger_value, crawled, \
+         token_id, decimals from ft_contracts"] in
   let>? r = [%pgsql.object dbh
       "select exchange, royalties, transfer_manager from state"] in
   match r with
@@ -122,8 +122,8 @@ let update_extra_config ?dbh e =
           Some (EzEncoding.construct micheline_type_short_enc ledger_key),
           Some (EzEncoding.construct micheline_type_short_enc ledger_value) in
       [%pgsql dbh
-          "insert into ft_contracts(address, kind, ledger_id, ledger_key, ledger_value, crawled, token_id) \
-           values($address, $kind, $id, $?k, $?v, ${lk.ft_crawled}, $?token_id) on conflict do nothing"])
+          "insert into ft_contracts(address, kind, ledger_id, ledger_key, ledger_value, crawled, token_id, decimals) \
+           values($address, $kind, $id, $?k, $?v, ${lk.ft_crawled}, $?token_id, ${lk.ft_decimals}) on conflict do nothing"])
     (SMap.bindings e.ft_contracts)
 
 (* Normalize here in case of ERC20 like asset *)
@@ -376,21 +376,33 @@ let get_fill hash rows =
 let get_cancelled hash l =
   List.exists (fun r -> r#cancel = Some hash) l
 
-let get_ft_balance ?dbh ?token_id ~contract account =
+let get_decimals ?dbh ?(do_error=false) = function
+  | ATXTZ -> Lwt.return_ok (Some 6l)
+  | ATNFT _ | ATMT _ -> Lwt.return_ok None
+  | ATFT {contract; token_id} ->
+    let no_token_id = Option.is_none token_id in
+    use dbh @@ fun dbh ->
+    let>? l = [%pgsql dbh
+        "select decimals from ft_contracts where address = $contract \
+         and ($no_token_id or token_id = $?token_id)"] in
+    match l with
+    | [] | _ :: _ :: _ ->
+      if do_error then Lwt.return_error (`hook_error "contract_not_found")
+      else Lwt.return_ok None
+    | [ i ] -> Lwt.return_ok (Some i)
+
+let get_ft_balance ?dbh ?token_id ?(do_error=false) ~contract account =
+  let>? decimals = get_decimals ?dbh (ATFT {contract; token_id}) in
   let no_token_id = Option.is_none token_id in
   use dbh @@ fun dbh ->
   let>? l = [%pgsql dbh
-      "select decimals from ft_contracts where address = $contract and \
-       ($no_token_id or token_id = $?token_id)"] in
+      "select balance from token_balance_updates where contract = $contract \
+       and account = $account and main and ($no_token_id or token_id = $?token_id) order by level desc limit 1"] in
   match l with
-  | [] | _ :: _ :: _ -> Lwt.return_error (`hook_error "contract_not_found")
-  | [ decimals ] ->
-    let>? l = [%pgsql dbh
-        "select balance from token_balance_updates where contract = $contract \
-         and account = $account and main and ($no_token_id or token_id = $?token_id) order by level desc limit 1"] in
-    match l with
-    | [] | _ :: _ :: _ | [ None ] -> Lwt.return_error (`hook_error "balance_not_found")
-    | [ Some b ] -> Lwt.return_ok (b, Some decimals)
+  | [] | _ :: _ :: _ | [ None ] ->
+    if do_error then Lwt.return_error (`hook_error "balance_not_found")
+    else Lwt.return_ok (Z.zero, None)
+  | [ Some b ] -> Lwt.return_ok (b, decimals)
 
 let get_make_balance ?dbh make owner = match make.asset_type with
   | ATXTZ -> Lwt.return_ok Z.zero
@@ -1518,22 +1530,15 @@ let reset_nft_item_meta_by_id ?dbh contract token_id =
     Lwt.return_error (`hook_error (Printf.sprintf "several results on LIMIT 1"))
 
 let db_from_asset ?dbh asset =
+  let>? decimals = get_decimals ?dbh asset.asset_type in
   match asset.asset_type with
   | ATXTZ ->
     Lwt.return_ok (string_of_asset_type asset.asset_type, None, None,
-                   asset.asset_value, Some 6l)
-  | ATFT {contract; token_id} ->
-    let no_token_id = Option.is_none token_id in
-    use dbh @@ fun dbh ->
-    let>? l = [%pgsql dbh "select decimals from ft_contracts where address = $contract \
-                           and ($no_token_id or token_id = $?token_id)"] in
-    begin match l with
-      | [] | _ :: _ :: _ -> Lwt.return_error (`hook_error "ft_contract_not_found")
-      | [ decimals ] ->
-        Lwt.return_ok
-          (string_of_asset_type asset.asset_type, Some contract, None,
-           asset.asset_value, Some decimals)
-    end
+                   asset.asset_value, decimals)
+  | ATFT {contract; _} ->
+    Lwt.return_ok
+      (string_of_asset_type asset.asset_type, Some contract, None,
+       asset.asset_value, decimals)
   | ATNFT fa2 | ATMT fa2 ->
     Lwt.return_ok (string_of_asset_type asset.asset_type, Some fa2.asset_contract,
                    Some fa2.asset_token_id, asset.asset_value, None)
@@ -1651,18 +1656,6 @@ let insert_order_activity_cancel dbh transaction block index level date hash =
     insert_order_activity ~decs dbh order_act
   | None ->
     Lwt.return_ok ()
-
-let get_decimals ?dbh = function
-  | ATXTZ -> Lwt.return_ok (Some 6l)
-  | ATNFT _ | ATMT _ -> Lwt.return_ok None
-  | ATFT {contract; token_id} ->
-    let no_token_id = Option.is_none token_id in
-    use dbh @@ fun dbh ->
-    let>? l = [%pgsql dbh
-        "select decimals from ft_contracts where address = $contract \
-         and ($no_token_id or token_id = $?token_id)"] in
-    let|>? i = one l in
-    Some i
 
 let insert_order_activity_match
     dbh transaction block index level date

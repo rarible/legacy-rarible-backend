@@ -955,6 +955,7 @@ type ft_ledger = {
   ft_ledger_id: z;
   ft_crawled: bool; [@dft false]
   ft_token_id: z option;
+  ft_decimals: int32; [@dft 0l]
 } [@@deriving encoding]
 
 type config = {
