@@ -232,12 +232,11 @@ let burn_tokens_repr ~id ~kind =
       Format.sprintf "{%s%s}" (Z.to_string id)
         (match kind with `nft -> "" | `mt amount -> Format.sprintf "; %s" (Z.to_string amount))
 
-let set_royalties_repr ~contract ~id ~royalties =
-  Format.sprintf "{%S; Some %s; {%s}}" contract (Z.to_string id)
-    (String.concat "; " @@ List.map (fun (ad, am) -> Format.sprintf "{%S; %Ld}" ad  am) royalties)
-
-let ubi_set_royalties_repr ~id ~royalties =
-  Format.sprintf "{%s; {%s}}" (Z.to_string id)
+let set_royalties_repr ?token_id ~contract royalties =
+  let token_id = match token_id with
+    | None -> ""
+    | Some i -> Format.sprintf "Some %s; " (Z.to_string i) in
+  Format.sprintf "{%S; %s{%s}}" contract token_id
     (String.concat "; " @@ List.map (fun (ad, am) -> Format.sprintf "{%S; %Ld}" ad  am) royalties)
 
 type transfer_dest = {
@@ -306,13 +305,9 @@ let mint_tokens ~id ~owner ~kind royalties =
   call ~entrypoint:"mint" @@
   mint_tokens_repr ~owner ~kind ~royalties (Z.of_string id)
 
-let set_royalties_aux ?endpoint ~contract ~id ~royalties source contract_royalties =
-  let param = set_royalties_repr ~id ~contract ~royalties in
+let set_royalties_aux ?endpoint ?token_id ~contract ~royalties source contract_royalties =
+  let param = set_royalties_repr ?token_id ~contract royalties in
   call_aux ?endpoint ~entrypoint:"set_royalties" ~param source contract_royalties
-
-let ubi_set_royalties_aux ?endpoint ~id ~royalties source contract =
-  let param = ubi_set_royalties_repr ~id ~royalties in
-  call_aux ?endpoint ~entrypoint:"setRoyalties" ~param source contract
 
 let burn_tokens_aux ?endpoint ~id ~kind source contract =
   let param = burn_tokens_repr ~id ~kind in

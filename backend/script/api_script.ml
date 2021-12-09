@@ -1101,19 +1101,7 @@ let set_royalties ~contract ~id ~royalties source contract_royalties =
   else
     let cmd =
       Script.set_royalties_aux
-        ~endpoint:!endpoint ~contract ~id ~royalties source.tz1 contract_royalties in
-    let code, out, err = sys_command cmd in
-    if code <> 0 then
-      Lwt.return @@
-      Printf.eprintf "set_royalties failure (log %s err %s)\n%!" out err
-    else Lwt.return_unit
-
-let ubi_set_royalties id royalties source contract =
-  if !js then
-    Lwt.fail_with "TODO"
-  else
-    let cmd =
-      Script.ubi_set_royalties_aux ~endpoint:!endpoint ~id ~royalties source.tz1 contract in
+        ~endpoint:!endpoint ~contract ~token_id:id ~royalties source.tz1 contract_royalties in
     let code, out, err = sys_command cmd in
     if code <> 0 then
       Lwt.return @@
