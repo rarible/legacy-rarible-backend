@@ -7,9 +7,9 @@ async function main() {
   const argv = await yargs(process.argv.slice(2)).options({
     edsk: {type: 'string', default: 'edsk4CmgW9r4fwqtsT6x2bB7BdVcERxLPt6poFXGpk1gTKbqR43G5H'},
     endpoint: {type: 'string', default: 'https://hangzhou.tz.functori.com'},
-    exchange: {type: 'string', default: 'KT1DiqMxwkRhtcbAqJeajYcy75VBzxcnsSn8'},
+    exchange: {type: 'string', default: 'KT1ULGjK8FtaJ9QqCgJVN14B6tY76Ykaz6M8'},
     contract: {type: 'string', default: ''},
-    royalties_contract: {type: 'string', default: 'KT1LDzj3qDGtSLaMCgW8hZ96ZoeiJZnDCYFG'},
+    royalties_contract: {type: 'string', default: 'KT1WKRXswxEpTbVg2pGgofzwZCNKjAVcuMgh'},
     token_id: {type : 'number'},
     royalties: {type: 'string', default: '{}'},
     amount: {type: 'number'},
@@ -21,9 +21,9 @@ async function main() {
     receiver: {type: 'string'},
     fee: {type: 'number', default: 0},
     operator: {type: 'string', default: ''},
-    fill: {type: 'string', default: 'KT1CXaJDtffkDjMB1Aadj4gUzRemMM1tF3KK'},
-    transfer_proxy: {type: 'string', default: 'KT1Qc2Y55SqpQ7WtRAN9q6A82WYEpzYZjdzW'},
-    transfer_manager: {type: 'string', default: 'KT1PpBJBMBWWbMY1J1abSXUKPCCPr5nN6tcx'},
+    fill: {type: 'string', default: 'KT1FAndThSQsVqYQVPHGSG5sQPk1XZycNBvL'},
+    transfer_proxy: {type: 'string', default: 'KT1Qypf9A7DHoAeesu5hj8v6iKwHsJb1RUR2'},
+    transfer_manager: {type: 'string', default: 'KT1DyDkW16XBuFzpLkXKraD46SAxQDrha5gm'},
     fee_receiver: {type: 'string'},
     protocol_fee: {type: 'number', default: 300},
   }).argv
@@ -47,7 +47,7 @@ async function main() {
 
   const config = {
     exchange: argv.exchange,
-    exchange_proxy: argv.exchange,
+    transfer_proxy: argv.transfer_proxy,
     fees: new BigNumber(argv.protocol_fee),
     nft_public: "",
     mt_public: "",

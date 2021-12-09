@@ -84,8 +84,8 @@ async function provider(node: string, api:string, wallet: 'temple' | 'beacon' | 
       break
   }
   const config = {
-    exchange: "KT1AguExF32Z9UEKzD5nuixNmqrNs1jBKPT8",
-    exchange_proxy: "KT1AguExF32Z9UEKzD5nuixNmqrNs1jBKPT8",
+    exchange: "KT1ULGjK8FtaJ9QqCgJVN14B6tY76Ykaz6M8",
+    transfer_proxy: "KT1Qypf9A7DHoAeesu5hj8v6iKwHsJb1RUR2",
     fees: new BigNumber(300),
     nft_public: "",
     mt_public: "",

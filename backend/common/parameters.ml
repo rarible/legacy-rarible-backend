@@ -218,9 +218,6 @@ let parse_cancel e m =
 let parse_do_transfers e m =
   match e, Typed_mich.(parse_value do_transfers_type m) with
   | EPnamed "do_transfers", Ok (`tuple [
-      _make_asset_type; _take_asset_type;
-      _order_data_left; _order_data_right;
-      `tuple [ `nat dt_fill_make_value; `nat dt_fill_take_value ];
       `tuple [
         left_maker;
         `tuple [ `tuple [ left_m_asset_class; left_m_asset_data ]; `nat left_m_asset_value ];
@@ -233,6 +230,9 @@ let parse_do_transfers e m =
         _right_taker;
         `tuple [ `tuple [ right_t_asset_class; right_t_asset_data ]; `nat right_t_asset_value ];
         `nat dt_right_salt; _; _; _; _ ];
+      _make_asset_type; _take_asset_type;
+      _order_data_left; _order_data_right;
+      `tuple [ `nat dt_fill_make_value; `nat dt_fill_take_value ];
       _fee_side; _royalties ]) ->
     let$ dt_left_maker_edpk = parse_option_key left_maker in
     let dt_left_maker = Option.map pk_to_pkh_exn dt_left_maker_edpk in

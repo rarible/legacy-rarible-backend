@@ -150,6 +150,18 @@ record %asset {
   asset_value : nat;
 }
 
+record order {
+  maker      : option<key>;
+  make_asset : %asset;
+  taker      : option<key>;
+  take_asset : %asset;
+  salt       : nat;
+  start      : option<date>;
+  %end       : option<date>;
+  data_type  : bytes;
+  data       : bytes;
+}
+
 record fill_result {
   make_value : nat;
   take_value : nat;
@@ -351,19 +363,22 @@ function doTransfersWithFees(
 }
 
 entry do_transfers(
+  order_left        : order,
+  order_right       : order,
   make_match        : rec_asset_type,
   take_match        : rec_asset_type,
   left_order_data   : DataV2,
   right_order_data  : DataV2,
   ifill             : fill_result,
-  left_order_maker  : address,
-  right_order_maker : address,
   side_of_fee       : fee_side,
   iroyalties        : list<part>) {
     called by exchange
     effect {
       var totalMakeValue = ifill.make_value;
       var totalTakeValue = ifill.take_value;
+
+      var left_order_maker  : address = key_address(opt_get(order_left.maker));
+      var right_order_maker : address = key_address(opt_get(order_right.maker));
 
       var ops1 : list<transfer_arg> = [];
       var ops2 : list<transfer_arg> = [];
