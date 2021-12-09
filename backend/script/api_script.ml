@@ -1524,7 +1524,7 @@ let check_nft_item ?(verbose=0) ?(strict=true) itm it =
   itm.nft_item_id = (Printf.sprintf "%s:%s" it.it_collection (Z.to_string it.it_token_id)) &&
   itm.nft_item_contract = it.it_collection &&
   itm.nft_item_token_id = it.it_token_id &&
-  (* check_royalties itm.nft_item_royalties royalties && *)
+  check_royalties itm.nft_item_royalties it.it_royalties &&
   (if strict then check_strict_owners itm.nft_item_owners it.it_owner.tz1
    else check_owners itm.nft_item_owners it.it_owner.tz1) &&
   (if strict then check_strict_supply itm.nft_item_supply it.it_kind
