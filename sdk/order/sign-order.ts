@@ -93,12 +93,15 @@ export function asset_type_to_struct(p: Provider, a : AssetType) : MichelsonData
 
 export async function get_decimals(p: Provider, contract: string, token_id = new BigNumber(0)) : Promise<BigNumber> {
   const st : StorageFA1_2 | StorageFA2 = await p.tezos.storage(contract)
-  let v : any = await st.token_metadata.get(token_id.toString())
-  if (v==undefined) return new BigNumber(0)
+  if (st.token_metadata==undefined) return new BigNumber(0)
   else {
-    let v2 = v[Object.keys(v)[1]].get('decimals')
-    if (v2==undefined) return new BigNumber(0)
-    else return new BigNumber(of_hex(v2))
+    let v : any = await st.token_metadata.get(token_id.toString())
+    if (v==undefined) return new BigNumber(0)
+    else {
+      let v2 = v[Object.keys(v)[1]].get('decimals')
+      if (v2==undefined) return new BigNumber(0)
+      else return new BigNumber(of_hex(v2))
+    }
   }
 }
 

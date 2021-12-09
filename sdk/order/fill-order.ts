@@ -1,5 +1,5 @@
 import { MichelsonData } from "@taquito/michel-codec"
-import { Provider, send, send_batch, TransactionArg, get_public_key, OperationResult } from "../common/base"
+import { Provider, send, send_batch, TransactionArg, get_public_key, OperationResult, Asset } from "../common/base"
 import { Part, OrderForm } from "./utils"
 import { invert_order } from "./invert-order"
 import { get_make_fee } from "./get-make-fee"
@@ -16,20 +16,20 @@ export interface FillOrderRequest {
   edpk?: string
 }
 
-function get_make_asset(
+async function get_make_asset(
   provider: Provider,
   order: OrderForm,
   amount: BigNumber,
   edpk: string
-  ) {
+) : Promise<Asset> {
   const inverted = invert_order(order, amount, edpk)
   const make_fee = get_make_fee(provider.config.fees, inverted)
-  return add_fee(inverted.make, make_fee)
+  return add_fee(provider, inverted.make, make_fee)
 }
 
-function get_real_value(provider: Provider, order: OrderForm) : BigNumber {
+async function get_real_value(provider: Provider, order: OrderForm) : Promise<BigNumber> {
   const fee = get_make_fee(provider.config.fees, order)
-  const make = add_fee(order.make, fee)
+  const make = await add_fee(provider, order.make, fee)
   return make.value
 }
 
@@ -55,7 +55,7 @@ export async function fill_order_arg(
   const pk = (request.edpk) ? request.edpk : await get_public_key(provider)
   if (!pk) throw new Error("cannot get public key")
 
-  const make = get_make_asset(provider, left, request.amount, pk)
+  const make = await get_make_asset(provider, left, request.amount, pk)
   const arg_approve =
     (make.asset_type.asset_class != "XTZ" )
     ? await approve_arg(provider, left.maker, left.make, request.infinite)
@@ -72,9 +72,9 @@ export async function fill_order_arg(
   }
   const amount =
     (left.make.asset_type.asset_class === "XTZ" && left.salt == '0')
-    ? get_real_value(provider, left)
+    ? await get_real_value(provider, left)
     : (right.make.asset_type.asset_class === "XTZ" && right.salt == '0')
-    ? get_real_value(provider, right)
+    ? await get_real_value(provider, right)
     : undefined
   const parameter = await match_order_to_struct(provider, left, right)
   return args.concat([{

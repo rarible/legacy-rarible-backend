@@ -915,12 +915,12 @@ export const mt_private_code : any =
                                    {  "int": "8"  }
                                  ]
                            },
-                           {  "prim": "SENDER"  },
                            {  "prim": "DUP",
                               "args": [
-                                {  "int": "5"  }
+                                {  "int": "4"  }
                               ]
                            },
+                           {  "prim": "SENDER"  },
                            {  "prim": "PAIR"  },
                            {  "prim": "MEM"  },
                            {  "prim": "DUP",
