@@ -1377,7 +1377,7 @@ let validate _req input =
 
 (* ft-balance-controller *)
 let get_ft_balance ((req, contract), ft_owner) () =
-  let token_id = Option.map Z.of_string (EzAPI.Req.find_param origin_param req) in
+  let token_id = Option.map Z.of_string (EzAPI.Req.find_param token_id_param req) in
   let> r = Db.get_ft_balance ?token_id ~do_error:true ~contract ft_owner in
   match r with
   | Error (`hook_error "contract_not_found") ->
