@@ -7,6 +7,6 @@
   "royalties":"KT1WKRXswxEpTbVg2pGgofzwZCNKjAVcuMgh",
   "transfer_manager": "KT1DyDkW16XBuFzpLkXKraD46SAxQDrha5gm",
   "ft_contracts": {
-    "KT1Rgf9RNW7gLj7JGn98yyVM34S4St9eudMC": { "kind": "lugh", "ledger_id": "10373", "decimals": 6 }
+    "KT1Rgf9RNW7gLj7JGn98yyVM34S4St9eudMC": { "kind": "lugh", "ledger_id": "10373", "decimals": 6, "token_id": "0" }
   }
 }
