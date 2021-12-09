@@ -151,6 +151,7 @@ let upgrade_1_to_2 dbh version =
       balance mpz,
       operators varchar[] not null default '{}',
       metadata jsonb not null default '{}',
+      metadata_uri varchar,
       royalties jsonb not null default '{}',
       creators jsonb[] not null default '{}',
       primary key (contract, owner, token_id))|};
@@ -173,7 +174,8 @@ let upgrade_1_to_2 dbh version =
       contract varchar not null,
       mint jsonb,
       burn jsonb,
-      uri varchar,
+      metadata_key varchar,
+      metadata_value varchar,
       minter jsonb,
       uri_pattern varchar,
       primary key (block, index))|};
@@ -193,7 +195,6 @@ let upgrade_1_to_2 dbh version =
       contract varchar not null,
       token_id mpz,
       amount mpz,
-      metadata jsonb,
       royalties jsonb,
       primary key (block, index, transfer_index))|};
 

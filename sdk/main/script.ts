@@ -1,4 +1,4 @@
-import { transfer, mint, burn, deploy_nft_public, deploy_royalties, set_token_metadata, set_metadata, deploy_exchange, deploy_validator, deploy_fill, deploy_transfer_proxy, send, TransactionArg} from "."
+import { transfer, mint, burn, deploy_nft_public, deploy_royalties, set_token_metadata, set_metadata, deploy_fill, deploy_exchange, deploy_transfer_proxy, deploy_transfer_manager, send, TransactionArg} from "."
 import { in_memory_provider } from '../providers/in_memory/in_memory_provider'
 import yargs from 'yargs'
 import BigNumber from "bignumber.js"
@@ -7,9 +7,9 @@ async function main() {
   const argv = await yargs(process.argv.slice(2)).options({
     edsk: {type: 'string', default: 'edsk4CmgW9r4fwqtsT6x2bB7BdVcERxLPt6poFXGpk1gTKbqR43G5H'},
     endpoint: {type: 'string', default: 'https://hangzhou.tz.functori.com'},
-    exchange: {type: 'string', default: 'KT19dxaDFiN1SPFH5xen65htDemQfsfbJzWo'},
+    exchange: {type: 'string', default: 'KT1DiqMxwkRhtcbAqJeajYcy75VBzxcnsSn8'},
     contract: {type: 'string', default: ''},
-    royalties_contract: {type: 'string', default: 'KT1GCPRRohM4snqj4Mav3iDU1R3hwkuc1wAi'},
+    royalties_contract: {type: 'string', default: 'KT1LDzj3qDGtSLaMCgW8hZ96ZoeiJZnDCYFG'},
     token_id: {type : 'number'},
     royalties: {type: 'string', default: '{}'},
     amount: {type: 'number'},
@@ -20,11 +20,12 @@ async function main() {
     owner: {type: 'string'},
     receiver: {type: 'string'},
     fee: {type: 'number', default: 0},
-    validator: {type: 'string', default: 'KT19QCfMQVdnWLbdcyFMpo4QB9hEB8b4ex4j'},
     operator: {type: 'string', default: ''},
-    fill: {type: 'string', default: 'KT1WnaYEjR6Dd7g3dBs5iQrGqHBrcEBv8c95'},
-    transfer_proxy: {type: 'string', default: 'KT1Gc6sUeBgDH2MpfiWV63DtDvSeT1J9dCyx'},
-    transfer_manager: {type: 'string', default: 'KT1BpwcJn16LTJ2imi7VUXtb5UnJTFDsjYMe'},
+    fill: {type: 'string', default: 'KT1CXaJDtffkDjMB1Aadj4gUzRemMM1tF3KK'},
+    transfer_proxy: {type: 'string', default: 'KT1Qc2Y55SqpQ7WtRAN9q6A82WYEpzYZjdzW'},
+    transfer_manager: {type: 'string', default: 'KT1PpBJBMBWWbMY1J1abSXUKPCCPr5nN6tcx'},
+    fee_receiver: {type: 'string'},
+    protocol_fee: {type: 'number', default: 300},
   }).argv
 
   const token_id_opt = (argv.token_id!=undefined) ? new BigNumber(argv.token_id) : undefined
@@ -47,7 +48,7 @@ async function main() {
   const config = {
     exchange: argv.exchange,
     exchange_proxy: argv.exchange,
-    fees: new BigNumber(0),
+    fees: new BigNumber(argv.protocol_fee),
     nft_public: "",
     mt_public: "",
   }
@@ -59,6 +60,7 @@ async function main() {
   }
   const to = (argv.to) ? argv.to : await provider.tezos.address()
   const owner = (argv.owner) ? argv.owner : await provider.tezos.address()
+  const fee_receiver = (argv.fee_receiver) ? argv.fee_receiver : await provider.tezos.address()
   const asset_class = (amount==undefined) ? "NFT" : "MT"
 
   switch(argv._[0]) {
@@ -111,13 +113,6 @@ async function main() {
       console.log(op_metadata_uri.hash)
       break
 
-    case 'deploy_validator':
-      console.log("deploy validator")
-      const op_deploy_validator = await deploy_validator(provider, owner, argv.exchange, argv.royalties_contract, argv.fill)
-      await op_deploy_validator.confirmation()
-      console.log(op_deploy_validator.contract)
-      break
-
     case 'deploy_fill':
       console.log("deploy fill")
       const op_deploy_fill = await deploy_fill(provider, owner)
@@ -133,22 +128,17 @@ async function main() {
       break
 
     case 'deploy_transfer_proxy':
-      console.log("deploy exchange")
+      console.log("deploy transfer proxy")
       const op_deploy_transfer_proxy = await deploy_transfer_proxy(provider, owner)
       await op_deploy_transfer_proxy.confirmation()
       console.log(op_deploy_transfer_proxy.contract)
       break
 
-    case 'set_validator':
-      console.log("set validator")
-      const arg : TransactionArg = {
-        destination: argv.contract,
-        entrypoint: "setValidator",
-        parameter: { string: argv.validator }
-      }
-      const op_set_validator = await send(provider, arg)
-      await op_set_validator.confirmation()
-      console.log(op_set_validator.hash)
+    case 'deploy_transfer_manager':
+      console.log("deploy transfer manager")
+      const op_deploy_transfer_manager = await deploy_transfer_manager(provider, owner, fee_receiver, new BigNumber(argv.protocol_fee))
+      await op_deploy_transfer_manager.confirmation()
+      console.log(op_deploy_transfer_manager.contract)
       break
 
     case 'update_operators_for_all':

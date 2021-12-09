@@ -78,7 +78,7 @@ export async function fill_order_arg(
     : undefined
   const parameter = await match_order_to_struct(provider, left, right)
   return args.concat([{
-    destination: provider.config.exchange, entrypoint: "matchOrders", parameter, amount }])
+    destination: provider.config.exchange, entrypoint: "match_orders", parameter, amount }])
 }
 
 export async function fill_order(

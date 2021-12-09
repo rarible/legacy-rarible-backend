@@ -60,36 +60,36 @@ let command_result ?(f=(fun l -> String.concat " " @@ List.map String.trim l)) c
   | _ -> failwith (Format.sprintf "Error processing %S" cmd)
 
 let storage_public_nft ?(expiry=31536000000L) admin =
-  Format.sprintf {|{ %S; {}; {}; {}; {}; {}; {}; {}; %Ld; False; {Elt "" 0x} }|} admin expiry
+  Format.sprintf {|{ %S; {}; {}; {}; {}; {}; {}; %Ld; False; {Elt "" 0x} }|} admin expiry
 
 let storage_private_nft ?(expiry=31536000000L) admin =
-  Format.sprintf {|{ %S; {}; {}; {}; {}; {}; {}; {}; {}; %Ld; False; {Elt "" 0x} }|} admin expiry
+  Format.sprintf {|{ %S; {}; {}; {}; {}; {}; {}; %Ld; {}; False; {Elt "" 0x} }|} admin expiry
 
 let storage_public_multi ?(expiry=31536000000L) admin =
-  Format.sprintf {|{ %S; {}; {}; {}; {}; {}; {}; {}; %Ld; False; {Elt "" 0x} }|} admin expiry
+  Format.sprintf {|{ %S; {}; {}; {}; {}; {}; {}; %Ld; False; {Elt "" 0x} }|} admin expiry
 
 let storage_private_multi ?(expiry=31536000000L) admin =
-  Format.sprintf {|{ %S; {}; {}; {}; {}; {}; {}; {}; {}; %Ld; False; {Elt "" 0x} }|} admin expiry
+  Format.sprintf {|{ %S; {}; {}; {}; {}; {}; {}; {}; %Ld; False; {Elt "" 0x} }|} admin expiry
 
 let storage_ubi admin =
   Format.sprintf "Pair %S (Some %S) None False {} {} {} {} {}" admin admin
 
 let storage_royalties ~admin =
-  Format.sprintf "{ %S; None; {}; {} }" admin
+  Format.sprintf {|{ %S; None; {}; {}; {Elt "" 0x} }|} admin
 
-let storage_exchange ~admin ~receiver ~fee =
-  Format.sprintf {|{ %S; %S; %s; None; {}; None; {Elt "" 0x}}|}
-    admin receiver (Z.to_string fee)
+let storage_exchange ~admin ~manager ~royalties ~fill =
+  Format.sprintf {|{ %S; %S; %S; %S; None; False; {}; {Elt "" 0x}}|}
+    admin manager royalties fill
 
-let storage_validator ~admin ~exchange ~royalties ~fill =
-  Format.sprintf {|{ %S; %S; %S; %S; {}; {}; {Elt "" 0x}}|}
-    admin exchange royalties fill
+let storage_fill admin =
+  Format.sprintf {|{ %S; None; {}; {}; {Elt "" 0x}}|} admin
 
-let storage_fill ?validator admin =
-  let validator = match validator with None -> "None" | Some v -> Format.sprintf "Some %S" v in
-  Format.sprintf {|{ %S; %s; {}}|} admin validator
+let storage_transfer_proxy admin =
+  Format.sprintf {|{ %S; None; {}; {Elt "" 0x}}|} admin
 
-let storage_matcher = "Unit"
+let storage_transfer_manager ~admin ~receiver ~protocol_fee =
+  Format.sprintf {|{ %S; %S; %s; None; {}; {}; None; {Elt "" 0x}}|} admin receiver
+    (Z.to_string protocol_fee)
 
 let compile_contract filename =
   Filename.quote_command "completium-cli" [ "generate"; "michelson"; filename ]
@@ -278,17 +278,13 @@ let update_operators_for_all_repr l =
       Format.sprintf "%s %S"
         (if add then "Left" else "Right") operator) l
 
-let set_token_metadata_repr ~id ~metadata =
-  Format.sprintf "{%Ld; {%s}}" id @@ String.concat "; " @@
-  List.map (fun (k, v) -> Format.sprintf "Elt %S 0x%s" k (hex v)) metadata
-
 let set_metadata_repr ~key ~value =
   Format.sprintf "{%S; 0x%s}" key (hex value)
 
 (** entrypoints *)
 
 let match_orders_aux ?endpoint source contract param =
-  call_aux ?endpoint ~entrypoint:"matchOrders" ~param source contract
+  call_aux ?endpoint ~entrypoint:"match_orders" ~param source contract
 
 let mint_tokens_aux ?endpoint ?kind ?royalties ?metadata ~id ~owner source contract =
   let param = mint_tokens_repr ~owner ?kind ?metadata ?royalties id in
@@ -312,7 +308,7 @@ let mint_tokens ~id ~owner ~kind royalties =
 
 let set_royalties_aux ?endpoint ~contract ~id ~royalties source contract_royalties =
   let param = set_royalties_repr ~id ~contract ~royalties in
-  call_aux ?endpoint ~entrypoint:"setRoyalties" ~param source contract_royalties
+  call_aux ?endpoint ~entrypoint:"set_royalties" ~param source contract_royalties
 
 let ubi_set_royalties_aux ?endpoint ~id ~royalties source contract =
   let param = ubi_set_royalties_repr ~id ~royalties in
@@ -375,27 +371,25 @@ let update_operators_for_all l =
       String.sub s 1 (String.length s - 1), add) l in
   call ~entrypoint:"update_operators_for_all" @@ update_operators_for_all_repr l
 
-let set_token_metadata_aux ?endpoint ~id ~metadata source contract =
-  let param = set_token_metadata_repr ~id ~metadata in
-  call_aux ?endpoint ~entrypoint:"setTokenMetadata" ~param source contract
-
-let set_token_metadata ~id ~metadata =
-  let metadata = List.filter_map (fun s ->
-      match String.index_opt s '=' with
-      | None -> None
-      | Some i -> Some (String.sub s 0 i, String.sub s (i+1) (String.length s - i - 1))) metadata in
-  call ~entrypoint:"setTokenMetadata" @@ set_token_metadata_repr ~id:(Int64.of_string id) ~metadata
-
 let set_metadata_aux ?endpoint ~key ~value source contract =
   let param = set_metadata_repr ~key ~value in
-  call_aux ?endpoint ~entrypoint:"setMetadata" ~param source contract
+  call_aux ?endpoint ~entrypoint:"set_metadata" ~param source contract
 
 let set_metadata ~key ~value =
-  call ~entrypoint:"setMetadataUri" @@ set_metadata_repr ~key ~value
+  call ~entrypoint:"set_metadata" @@ set_metadata_repr ~key ~value
 
-let set_validator_aux ?endpoint kt1 source contract =
-  let param = Printf.sprintf "%S" kt1  in
-  call_aux ?endpoint  ~entrypoint:"setValidator" ~param source contract
+let add_exchange_aux ?endpoint ~exchange source contract =
+  let param = Format.sprintf "%S" exchange in
+  call_aux ?endpoint ~entrypoint:"add_exchange" ~param source contract
+
+let add_user_aux ?endpoint ~user source contract =
+  let param = Format.sprintf "%S" user in
+  call_aux ?endpoint ~entrypoint:"add_user" ~param source contract
+
+let set_transfer_proxy_aux ?endpoint ~proxy source contract =
+  let param = Format.sprintf "%S" proxy in
+  call_aux ?endpoint ~entrypoint:"set_transfer_proxy" ~param source contract
+
 
 (** main *)
 
@@ -431,21 +425,19 @@ let main () =
     | [ "compile"; "contract"; filename ] -> Some (compile_contract filename)
     | [ "deploy"; filename; storage ] -> deploy ~filename storage
     | [ "deploy_nft"; admin ] ->
-      deploy ~filename:"contracts/arl/fa2.arl" (storage_public_nft admin)
+      deploy ~filename:"contracts/arl/nft-public.arl" (storage_public_nft admin)
     | [ "deploy_royalties"; admin ] ->
       deploy ~filename:"contracts/arl/royalties.arl" (storage_royalties ~admin)
-    | [ "deploy_exchange"; admin; receiver; fee ] ->
-      deploy ~filename:"contracts/arl/exchangeV2.arl"
-        (storage_exchange ~admin ~receiver ~fee:(Z.of_string fee))
-    | [ "deploy_validator"; admin; exchange; royalties; fill ] ->
-      deploy ~filename:"contracts/arl/validator.arl"
-        (storage_validator ~admin ~exchange ~royalties ~fill)
-    | "deploy_fill" :: admin :: l ->
-      let validator = match l with [ v ] -> Some v | _ -> None in
-      deploy ~filename:"contracts/arl/fill.arl"
-        (storage_fill ?validator admin)
-    | [ "deploy_matcher" ] ->
-      deploy ~filename:"contracts/arl/matcher.arl" storage_matcher
+    | [ "deploy_exchange"; admin; manager; royalties; fill ] ->
+      deploy ~filename:"contracts/arl/exchange.arl"
+        (storage_exchange ~admin ~manager ~royalties ~fill)
+    | [ "deploy_fill"; admin ] ->
+      deploy ~filename:"contracts/arl/fill.arl" (storage_fill admin)
+    | [ "deploy_transfer_proxy"; admin ] ->
+      deploy ~filename:"contracts/arl/transfer_proxy.arl" (storage_transfer_proxy admin)
+    | [ "deploy_transfer_manager"; admin; receiver; fee ] ->
+      deploy ~filename:"contracts/arl/transfer_proxy.arl" @@
+      storage_transfer_manager ~admin ~receiver ~protocol_fee:(Z.of_string fee)
     | [ "storage" ] -> get_storage ()
     | [ "value"; bm_id; key; typ ] -> Some (get_bigmap_value bm_id key typ)
     | [ "call"; entrypoint; s ] -> call ~entrypoint s
@@ -454,7 +446,6 @@ let main () =
     | "transfer" :: l -> transfer l
     | "update_operators" :: l -> update_operators l
     | "update_operators_for_all" :: l -> update_operators_for_all l
-    | "set_token_metadata" :: id :: metadata -> set_token_metadata ~id ~metadata
     | "set_metadata" :: [ key; value ] -> set_metadata ~key ~value
     | "owners" :: bm_id :: l -> owners bm_id l
     | _ -> Arg.usage spec usage; None in

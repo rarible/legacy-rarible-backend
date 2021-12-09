@@ -10,18 +10,17 @@ let api = ref "http://localhost:8080"
 let sdk = ref false
 let endpoint = ref "http://hangzhou.tz.functori.com"
 
-let royalties = "KT1GCPRRohM4snqj4Mav3iDU1R3hwkuc1wAi"
-let validator = "KT19QCfMQVdnWLbdcyFMpo4QB9hEB8b4ex4j"
-let exchange = "KT19dxaDFiN1SPFH5xen65htDemQfsfbJzWo"
-let fill = "KT1WnaYEjR6Dd7g3dBs5iQrGqHBrcEBv8c95"
-let transfer_proxy = "KT1Gc6sUeBgDH2MpfiWV63DtDvSeT1J9dCyx"
+let royalties = "KT1LDzj3qDGtSLaMCgW8hZ96ZoeiJZnDCYFG"
+let exchange = "KT1DiqMxwkRhtcbAqJeajYcy75VBzxcnsSn8"
+let fill = "KT1CXaJDtffkDjMB1Aadj4gUzRemMM1tF3KK"
+let transfer_proxy = "KT1Qc2Y55SqpQ7WtRAN9q6A82WYEpzYZjdzW"
+let transfer_manager = "KT1PpBJBMBWWbMY1J1abSXUKPCCPr5nN6tcx"
 
 let lugh_contract = "KT1StBf222xBLfLTChsute8F9HSt9kVHpqdY"
 
 let config = {
   admin_wallet = "" ;
   exchange ;
-  validator ;
   royalties = "" ;
   contracts = SMap.empty;
   ft_contracts = SMap.empty;
@@ -95,10 +94,6 @@ let ipfs_metadatas_name_len = List.length ipfs_metadatas_name
 let exchange_contracts = [
 ]
 let exchange_contracts_len = List.length exchange_contracts
-
-let validator_contracts = [
-]
-let validator_contracts_len = List.length exchange_contracts
 
 let set_opt_string r = Arg.String (fun s -> r := Some s)
 let set_opt_float r = Arg.Float (fun f -> r := Some f)
@@ -978,17 +973,6 @@ let set_metadata c =
       Printf.eprintf "set_metadata_uri failure (log %s err %s)\n%!" out err;
     Lwt.return_unit
 
-let set_token_metadata c it =
-  if !js then
-    Script_js.set_token_metadata ~endpoint:!endpoint it
-  else
-    let cmd = Script.set_token_metadata_aux ~endpoint:!endpoint ~id:(Z.to_int64 it.it_token_id)
-        ~metadata:it.it_metadata c.col_admin.tz1 it.it_collection in
-    let code, out, err = sys_command cmd in
-    if code <> 0 then
-      Lwt.return @@ Printf.eprintf "set_token_metadata failure (log %s err %s)\n%!" out err
-    else Lwt.return_unit
-
 let deploy_collection c =
   Printf.eprintf "Deploying new collection\n%!" ;
   if !js then
@@ -1039,40 +1023,24 @@ let create_royalties () =
     let>? () = deploy ~filename ~storage ~source alias in
     Lwt.return_ok (alias, admin)
 
-let create_validator ~exchange ~royalties ~fill =
-  Printf.eprintf "Creating new validator\n%!" ;
-  let source = generate_address () in
-  let admin = generate_address () in
-  if !js then
-    let kt1_validator =
-      Script_js.deploy_validator ~endpoint:!endpoint ~exchange ~royalties ~fill ~admin ~source () in
-    Lwt.return_ok (kt1_validator, source)
-  else
-    let alias = generate_alias "validator" in
-    may_import_key source ;
-    let filename = "contracts/arl/validator.arl" in
-    let storage = Script.storage_validator ~admin:admin.tz1 ~exchange ~royalties ~fill in
-    let>? () = deploy ~burn_cap:4.67575 ~filename ~storage ~source alias in
-    Lwt.return_ok (alias, source)
-
-let create_exchange () =
+let create_exchange ~manager ~royalties ~fill =
   Printf.eprintf "Creating new exchange\n%!" ;
   let admin = generate_address () in
   may_import_key admin ;
   let source = generate_address () in
   may_import_key source ;
-  let receiver = generate_address () in
-  may_import_key receiver ;
   if !js then
-    let kt1_exchange = Script_js.deploy_exchange ~endpoint:!endpoint ~admin
-        ~receiver ~fee:(Z.of_int 300) source in
-    Lwt.return_ok (kt1_exchange, admin, receiver)
+    assert false
+    (* let kt1_exchange = Script_js.deploy_exchange ~endpoint:!endpoint ~admin
+     *     ~receiver ~fee:(Z.of_int 300) source in
+     * Lwt.return_ok (kt1_exchange, admin, receiver) *)
   else
-    let filename = "contracts/arl/exchangeV2.arl" in
-    let storage = Script.storage_exchange ~admin:admin.tz1 ~receiver:receiver.tz1 ~fee:(Z.of_int 300) in
+    let filename = "contracts/arl/exchange.arl" in
+    let storage = Script.storage_exchange ~admin:admin.tz1 ~manager
+        ~royalties  ~fill in
     let alias = generate_alias "exchange" in
     let>? () = deploy ~burn_cap:42.1 ~filename ~storage ~source alias in
-    Lwt.return_ok (alias, admin, receiver)
+    Lwt.return_ok (alias, admin)
 
 let create_fill () =
   Printf.eprintf "Creating new fill\n%!" ;
@@ -1090,16 +1058,38 @@ let create_fill () =
     let|>? () = deploy ~filename ~storage ~source alias in
     alias, admin
 
-let set_validator ~validator ~source ~contract =
+let create_transfer_proxy () =
+  Printf.eprintf "Creating new transfer_proxy\n%!" ;
+  let admin = generate_address () in
   if !js then
-    Script_js.set_validator ~endpoint:!endpoint ~source ~contract validator
+    assert false
   else
-    let cmd = Script.set_validator_aux ~endpoint:!endpoint validator source.tz1 contract in
-    let code, out, err = sys_command cmd in
-    if code <> 0 then
-      Lwt.return @@
-      Printf.eprintf "set_validator failure (log %s err %s)\n%!" out err
-    else Lwt.return_unit
+    let alias = generate_alias "transfer_proxy" in
+    may_import_key admin ;
+    let source = generate_address () in
+    may_import_key source ;
+    let filename = "contracts/arl/transfer_proxy.arl" in
+    let storage = Script.storage_transfer_proxy admin.tz1 in
+    let|>? () = deploy ~filename ~storage ~source alias in
+    alias, admin
+
+let create_transfer_manager () =
+  Printf.eprintf "Creating new transfer_manager\n%!" ;
+  let admin = generate_address () in
+  if !js then
+    assert false
+  else
+    let alias = generate_alias "transfer_manager" in
+    may_import_key admin ;
+    let source = generate_address () in
+    may_import_key source ;
+    let receiver = generate_address () in
+    may_import_key receiver ;
+    let filename = "contracts/arl/transfer_manager.arl" in
+    let storage = Script.storage_transfer_manager ~admin:admin.tz1 ~receiver:receiver.tz1
+        ~protocol_fee:(Z.of_int 300) in
+    let|>? () = deploy ~filename ~storage ~source alias in
+    alias, admin
 
 let set_royalties ~contract ~id ~royalties source contract_royalties =
   Printf.eprintf "set_royalties %s %s [%s]\n%!"
@@ -1236,6 +1226,42 @@ let transfer_tokens it amount new_owner =
     else
       let>? hash = get_op_hash out in
       wait_op_included hash
+
+let add_exchange ~admin ~exchange ~manager =
+  if !js then
+    assert false
+  else
+    let cmd =
+      Script.add_exchange_aux ~endpoint:!endpoint ~exchange admin.tz1 manager in
+    let code, out, err = sys_command cmd in
+    if code <> 0 then
+      Lwt.return @@
+      Printf.eprintf "add_exchange failure (log %s err %s)\n%!" out err
+    else Lwt.return_unit
+
+let add_user ~admin ~user ~contract =
+  if !js then
+    assert false
+  else
+    let cmd =
+      Script.add_user_aux ~endpoint:!endpoint ~user admin.tz1 contract in
+    let code, out, err = sys_command cmd in
+    if code <> 0 then
+      Lwt.return @@
+      Printf.eprintf "add_user failure (log %s err %s)\n%!" out err
+    else Lwt.return_unit
+
+let set_transfer_proxy ~admin ~proxy ~manager =
+  if !js then
+    assert false
+  else
+    let cmd =
+      Script.set_transfer_proxy_aux ~endpoint:!endpoint ~proxy admin.tz1 manager in
+    let code, out, err = sys_command cmd in
+    if code <> 0 then
+      Lwt.return @@
+      Printf.eprintf "add_user failure (log %s err %s)\n%!" out err
+    else Lwt.return_unit
 
 let mint_with_random_token_id c =
   Printf.eprintf "mint_with_random_token_id for %s on %s\n%!" c.col_admin.tz1 c.col_kt1 ;
@@ -1413,7 +1439,7 @@ let match_orders ?amount ~source ~contract order_left order_right =
       call
         ?amount
         ~local_forge:false
-        ~entrypoint:"matchOrders"
+        ~entrypoint:"match_orders"
         ~base:(EzAPI.BASE !endpoint)
         ~get_pk:(fun () -> Lwt.return_ok source.edpk)
         ~source:source.tz1
@@ -2182,7 +2208,7 @@ let get_head () =
   EzReq_lwt.get
     (EzAPI.URL "https://api.hangzhou2net.tzkt.io/v1/blocks/count")
 
-let make_config admin_wallet validator exchange royalties contracts ft_contracts
+let make_config admin_wallet exchange royalties contracts ft_contracts
     kafka_broker kafka_username kafka_password =
   let open Crawlori.Config in
   get_head () >>= function
@@ -2202,7 +2228,7 @@ let make_config admin_wallet validator exchange royalties contracts ft_contracts
       register_kinds = None ;
       allow_no_metadata = false ;
       extra = {
-        admin_wallet ; validator ; exchange ; royalties; contracts; ft_contracts;
+        admin_wallet ; exchange ; royalties; contracts; ft_contracts;
       } ;
     } in
     let temp_fn = Filename.temp_file "config" "" in
@@ -2223,10 +2249,10 @@ let make_config admin_wallet validator exchange royalties contracts ft_contracts
       close_out c ;
       Lwt.return (temp_fn, Some kafka_temp_fn)
 
-let start_crawler admin_wallet validator exchange royalties
+let start_crawler admin_wallet exchange royalties
     contracts ft_contracts kafka_broker kafka_username kafka_password =
   make_config
-    admin_wallet validator exchange royalties contracts ft_contracts
+    admin_wallet exchange royalties contracts ft_contracts
     kafka_broker kafka_username kafka_password  >>= fun (config, kafka_config) ->
   let prog = "./_bin/crawler" in
   let args =
@@ -2246,28 +2272,33 @@ let setup_test_env ?(spawn_exchange_infra=false) () =
     let>? r_alias, _r_source = create_royalties () in
     let r_kt1 = find_kt1 r_alias in
     Printf.eprintf "New royalties %s\n%!" r_kt1 ;
-    let>? ex_alias, ex_admin, _ex_receiver = create_exchange () in
-    let ex_kt1 = find_kt1 ex_alias in
-    Printf.eprintf "New exchange %s\n%!" ex_kt1 ;
     let>? fill_alias, fill_admin = create_fill () in
     let fill_kt1 = find_kt1 fill_alias in
     Printf.eprintf "New fill %s\n%!" fill_kt1 ;
-    let>? v_alias, _v_source =
-      create_validator ~exchange:ex_kt1 ~royalties:r_kt1 ~fill:fill_kt1 in
-    let v_kt1 = find_kt1 v_alias in
-    Printf.eprintf "New validator %s\n%!" v_kt1 ;
-    start_crawler "" v_kt1 ex_kt1 r_kt1 SMap.empty SMap.empty "" "" ""
+    let>? transfer_proxy_alias, transfer_proxy_admin = create_transfer_proxy () in
+    let transfer_proxy_kt1 = find_kt1 transfer_proxy_alias in
+    Printf.eprintf "New transfer_proxy %s\n%!" transfer_proxy_kt1 ;
+    let>? transfer_manager_alias, transfer_manager_admin = create_transfer_manager () in
+    let transfer_manager_kt1 = find_kt1 transfer_manager_alias in
+    Printf.eprintf "New transfer_manager %s\n%!" transfer_manager_kt1 ;
+    let>? ex_alias, _ex_admin = create_exchange ~royalties:r_kt1
+        ~fill:fill_kt1 ~manager:transfer_manager_kt1 in
+    let ex_kt1 = find_kt1 ex_alias in
+    Printf.eprintf "New exchange %s\n%!" ex_kt1 ;
+    let> () = add_exchange ~admin:transfer_manager_admin ~manager:transfer_manager_kt1 ~exchange:ex_kt1 in
+    let> () = add_user ~admin:transfer_proxy_admin ~user:transfer_manager_kt1 ~contract:transfer_proxy_kt1 in
+    let> () = set_transfer_proxy ~admin:transfer_manager_admin ~proxy:transfer_proxy_kt1 ~manager:transfer_manager_kt1 in
+    let> () = add_user ~admin:fill_admin ~user:ex_kt1 ~contract:fill_kt1 in
+    start_crawler "" ex_kt1 r_kt1 SMap.empty SMap.empty "" "" ""
     >>= fun (cpid, kafka_config) ->
     api_pid := Some (start_api kafka_config) ;
     crawler_pid := Some cpid ;
-    set_validator ~validator:v_kt1 ~source:ex_admin ~contract:ex_kt1 >>= fun () ->
-    set_validator ~validator:v_kt1 ~source:fill_admin ~contract:fill_kt1 >>= fun () ->
     Printf.eprintf "Waiting 6sec to let crawler catch up...\n%!" ;
     Lwt_unix.sleep 6. >>= fun () ->
     Lwt.return_ok (r_kt1, ex_kt1)
   else
     start_crawler ""
-      validator exchange royalties
+      exchange royalties
       SMap.empty SMap.empty "" "" ""
     >>= fun (cpid, kafka_config) ->
     api_pid := Some (start_api kafka_config) ;
