@@ -1,9 +1,12 @@
 {
   "nodes": [ "https://hangzhounet.smartpy.io" ],
-  "start": 167000,
+  "start": 96750,
   "db_kind": "pg",
   "step_forward": 30,
   "exchange":"KT1ULGjK8FtaJ9QqCgJVN14B6tY76Ykaz6M8",
   "royalties":"KT1WKRXswxEpTbVg2pGgofzwZCNKjAVcuMgh",
-  "transfer_manager": "KT1DyDkW16XBuFzpLkXKraD46SAxQDrha5gm"
+  "transfer_manager": "KT1DyDkW16XBuFzpLkXKraD46SAxQDrha5gm",
+  "ft_contracts": {
+    "KT1Rgf9RNW7gLj7JGn98yyVM34S4St9eudMC": { "kind": "lugh", "ledger_id": "10373" }
+  }
 }
