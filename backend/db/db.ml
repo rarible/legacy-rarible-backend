@@ -1347,8 +1347,8 @@ let insert_mint ~dbh ~op ~contract m =
 let insert_burn ~dbh ~op ~contract m =
   let burn = EzEncoding.construct Json_encoding.(tup2 burn_enc string) (m, op.bo_op.source) in
   let token_id, owner, amount = match m with
-    | MTBurn { amount; token_id } -> token_id, "", amount
-    | NFTBurn token_id -> token_id, "", Z.one in
+    | MTBurn { amount; token_id } -> token_id, op.bo_op.source, amount
+    | NFTBurn token_id -> token_id, op.bo_op.source, Z.one in
   let>? () =
     [%pgsql dbh
         "insert into contract_updates(transaction, index, block, level, tsp, \
