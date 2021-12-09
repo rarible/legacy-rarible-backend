@@ -82,15 +82,15 @@ let get_extra_config ?dbh () =
         "select address, kind, ledger_id, ledger_key, ledger_value, crawled, token_id \
          from ft_contracts"] in
   let>? r = [%pgsql.object dbh
-      "select admin_wallet, exchange_v2_contract, royalties_contract from state"] in
+      "select exchange, royalties, transfer_manager from state"] in
   match r with
   | [ r ] ->
     let contracts = db_contracts contracts in
     let ft_contracts = db_ft_contracts ft_contracts in
     Lwt.return_ok (Some {
-      admin_wallet = r#admin_wallet;
-      exchange = r#exchange_v2_contract;
-      royalties = r#royalties_contract;
+      exchange = r#exchange;
+      royalties = r#royalties;
+      transfer_manager = r#transfer_manager;
       ft_contracts; contracts
     })
   | [] -> Lwt.return_ok None
@@ -102,12 +102,12 @@ let update_extra_config ?dbh e =
   let>? () = match r with
     | [] ->
       [%pgsql dbh
-          "insert into state(exchange_v2_contract, royalties_contract) \
-           values (${e.exchange}, ${e.royalties})"]
+          "insert into state(exchange, royalties, transfer_manager) \
+           values (${e.exchange}, ${e.royalties}, ${e.transfer_manager})"]
     | _ ->
       [%pgsql dbh
-          "update state set exchange_v2_contract = ${e.exchange}, \
-           royalties_contract = ${e.royalties}"] in
+          "update state set exchange = ${e.exchange}, \
+           royalties = ${e.royalties}, transfer_manager = ${e.transfer_manager}"] in
   iter_rp (fun (address, lk) ->
       let id = lk.ft_ledger_id in
       let token_id = lk.ft_token_id in
@@ -1925,28 +1925,34 @@ let insert_transaction ~config ~dbh ~op tr =
         Format.printf "\027[0;35mset royalties %s %ld\027[0m@." (Utils.short op.bo_hash) op.bo_index;
         insert_royalties ~dbh ~op roy
       | _ -> Lwt.return_ok ()
-    else if contract = config.Crawlori.Config.extra.exchange then (* exchange_v2 *)
-      begin match Parameters.parse_exchange entrypoint m with
-        | Ok (Cancel { hash; maker_edpk; maker; make ; take; salt }) ->
+    else if contract = config.Crawlori.Config.extra.exchange then (* exchange *)
+      begin match Parameters.parse_cancel entrypoint m with
+        | Ok { cc_hash; cc_maker_edpk; cc_maker; cc_make ; cc_take; cc_salt } ->
           Format.printf "\027[0;35mcancel order %s %ld %s\027[0m@."
-            (short op.bo_hash) op.bo_index (hash :> string);
-          insert_cancel ~dbh ~op ~maker_edpk ~maker ~make ~take ~salt hash
-        | Ok (DoTransfers
-                {left; left_maker_edpk; left_maker; left_make_asset;
-                 left_take_asset; left_salt;
-                 right; right_maker_edpk; right_maker; right_make_asset;
-                 right_take_asset; right_salt;
-                 fill_make_value; fill_take_value}) ->
+            (short op.bo_hash) op.bo_index (short (cc_hash :> string));
+          insert_cancel ~dbh ~op ~maker_edpk:cc_maker_edpk ~maker:cc_maker
+            ~make:cc_make ~take:cc_take ~salt:cc_salt cc_hash
+        | _ -> Lwt.return_ok ()
+      end
+    else if contract = config.Crawlori.Config.extra.transfer_manager then (* transfer_manager *)
+      begin match Parameters.parse_do_transfers entrypoint m with
+        | Ok {dt_left; dt_left_maker_edpk; dt_left_maker; dt_left_make_asset;
+              dt_left_take_asset; dt_left_salt;
+              dt_right; dt_right_maker_edpk; dt_right_maker; dt_right_make_asset;
+              dt_right_take_asset; dt_right_salt;
+              dt_fill_make_value; dt_fill_take_value} ->
           Format.printf "\027[0;35mdo transfers %s %ld %s %s\027[0m@."
-            (short op.bo_hash) op.bo_index (short (left :> string)) (short (right :> string));
+            (short op.bo_hash) op.bo_index (short (dt_left :> string)) (short (dt_right :> string));
           insert_do_transfers
             ~dbh ~op
-            ~left ~left_maker_edpk ~left_maker ~left_make_asset ~left_take_asset ~left_salt
-            ~right ~right_maker_edpk ~right_maker ~right_make_asset ~right_take_asset ~right_salt
-            ~fill_make_value ~fill_take_value
-        | _ ->
-          (* todo : match order *)
-          Lwt.return_ok ()
+            ~left:dt_left ~left_maker_edpk:dt_left_maker_edpk
+            ~left_maker:dt_left_maker ~left_make_asset:dt_left_make_asset
+            ~left_take_asset:dt_left_take_asset ~left_salt:dt_left_salt
+            ~right:dt_right ~right_maker_edpk:dt_right_maker_edpk
+            ~right_maker:dt_right_maker ~right_make_asset:dt_right_make_asset
+            ~right_take_asset:dt_right_take_asset ~right_salt:dt_right_salt
+            ~fill_make_value:dt_fill_make_value ~fill_take_value:dt_fill_take_value
+        | _ -> Lwt.return_ok ()
       end
     else match
         SMap.find_opt contract config.Crawlori.Config.extra.ft_contracts,

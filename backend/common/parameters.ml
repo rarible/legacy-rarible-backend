@@ -197,67 +197,61 @@ let parse_asset_type (mclass : micheline_value) (mdata : micheline_value) =
     end
   | _ -> unexpected_michelson
 
-let parse_cancel m =
-  match Typed_mich.(parse_value order_type m) with
-  | Ok (`tuple [
+let parse_cancel e m =
+  match e, Typed_mich.(parse_value order_type m) with
+  | EPnamed "cancel", Ok (`tuple [
       maker;
       `tuple [ `tuple [ make_asset_class; make_asset_data ]; `nat m_asset_value ];
       _;
       `tuple [ `tuple [ take_asset_class; take_asset_data ]; `nat t_asset_value ];
-      `nat salt; _; _; _; _ ]) ->
-    let$ maker_edpk = parse_option_key maker in
+      `nat cc_salt; _; _; _; _ ]) ->
+    let$ cc_maker_edpk = parse_option_key maker in
     let$ mat = parse_asset_type make_asset_class make_asset_data in
     let$ tat = parse_asset_type take_asset_class take_asset_data in
-    let make = { asset_type = mat ; asset_value = m_asset_value } in
-    let take = { asset_type = tat ; asset_value = t_asset_value } in
-    let$ hash = Utils.hash_key maker_edpk mat tat salt in
-    let maker = Option.map pk_to_pkh_exn maker_edpk in
-    Ok (Cancel { hash ; maker_edpk; maker ; make ; take ; salt})
+    let cc_make = { asset_type = mat ; asset_value = m_asset_value } in
+    let cc_take = { asset_type = tat ; asset_value = t_asset_value } in
+    let$ cc_hash = Utils.hash_key cc_maker_edpk mat tat cc_salt in
+    let cc_maker = Option.map pk_to_pkh_exn cc_maker_edpk in
+    Ok { cc_hash ; cc_maker_edpk; cc_maker ; cc_make ; cc_take ; cc_salt}
   | _ -> unexpected_michelson
 
-let parse_do_transfers m =
-  match Typed_mich.(parse_value do_transfers_type m) with
-  | Ok (`tuple [
+let parse_do_transfers e m =
+  match e, Typed_mich.(parse_value do_transfers_type m) with
+  | EPnamed "do_transfers", Ok (`tuple [
       _make_asset_type; _take_asset_type;
       _order_data_left; _order_data_right;
-      `tuple [ `nat fill_make_value; `nat fill_take_value ];
+      `tuple [ `nat dt_fill_make_value; `nat dt_fill_take_value ];
       `tuple [
         left_maker;
         `tuple [ `tuple [ left_m_asset_class; left_m_asset_data ]; `nat left_m_asset_value ];
         _left_taker;
         `tuple [ `tuple [ left_t_asset_class; left_t_asset_data ]; `nat left_t_asset_value ];
-        `nat left_salt; _; _; _; _ ];
+        `nat dt_left_salt; _; _; _; _ ];
       `tuple [
         right_maker;
         `tuple [ `tuple [ right_m_asset_class; right_m_asset_data ]; `nat right_m_asset_value ];
         _right_taker;
         `tuple [ `tuple [ right_t_asset_class; right_t_asset_data ]; `nat right_t_asset_value ];
-        `nat right_salt; _; _; _; _ ];
+        `nat dt_right_salt; _; _; _; _ ];
       _fee_side; _royalties ]) ->
-    let$ left_maker_edpk = parse_option_key left_maker in
-    let left_maker = Option.map pk_to_pkh_exn left_maker_edpk in
+    let$ dt_left_maker_edpk = parse_option_key left_maker in
+    let dt_left_maker = Option.map pk_to_pkh_exn dt_left_maker_edpk in
     let$ left_mat = parse_asset_type left_m_asset_class left_m_asset_data in
     let$ left_tat = parse_asset_type left_t_asset_class left_t_asset_data in
-    let$ left = Utils.hash_key left_maker_edpk left_mat left_tat left_salt in
-    let left_make_asset = { asset_type = left_mat ; asset_value = left_m_asset_value } in
-    let left_take_asset = { asset_type = left_tat ; asset_value = left_t_asset_value } in
-    let$ right_maker_edpk = parse_option_key right_maker in
-    let right_maker = Option.map pk_to_pkh_exn right_maker_edpk in
+    let$ dt_left = Utils.hash_key dt_left_maker_edpk left_mat left_tat dt_left_salt in
+    let dt_left_make_asset = { asset_type = left_mat ; asset_value = left_m_asset_value } in
+    let dt_left_take_asset = { asset_type = left_tat ; asset_value = left_t_asset_value } in
+    let$ dt_right_maker_edpk = parse_option_key right_maker in
+    let dt_right_maker = Option.map pk_to_pkh_exn dt_right_maker_edpk in
     let$ right_mat = parse_asset_type right_m_asset_class right_m_asset_data in
     let$ right_tat = parse_asset_type right_t_asset_class right_t_asset_data in
-    let$ right = Utils.hash_key right_maker_edpk right_mat right_tat right_salt in
-    let right_make_asset = { asset_type = right_mat ; asset_value = right_m_asset_value } in
-    let right_take_asset = { asset_type = right_tat ; asset_value = right_t_asset_value } in
-    Ok (DoTransfers
-          {left; left_maker_edpk; left_maker; left_make_asset; left_take_asset; left_salt;
-           right; right_maker_edpk; right_maker; right_make_asset; right_take_asset; right_salt;
-           fill_make_value; fill_take_value})
-  | _ -> unexpected_michelson
-
-let parse_exchange e p =
-  match e, p with
-  | EPnamed "cancel", m -> parse_cancel m
-  | EPnamed "do_transfers", m -> parse_do_transfers m
+    let$ dt_right = Utils.hash_key dt_right_maker_edpk right_mat right_tat dt_right_salt in
+    let dt_right_make_asset = { asset_type = right_mat ; asset_value = right_m_asset_value } in
+    let dt_right_take_asset = { asset_type = right_tat ; asset_value = right_t_asset_value } in
+    Ok {dt_left; dt_left_maker_edpk; dt_left_maker; dt_left_make_asset;
+        dt_left_take_asset; dt_left_salt; dt_right; dt_right_maker_edpk;
+        dt_right_maker; dt_right_make_asset; dt_right_take_asset; dt_right_salt;
+        dt_fill_make_value; dt_fill_take_value}
   | _ -> unexpected_michelson
 
 let parse_ft_fa1_transfer m =
