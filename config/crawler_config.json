@@ -1,8 +1,8 @@
 {
   "nodes":["https://hangzhounet.smartpy.io"],
-  "start":128000,
+  "start":167000,
   "step_forward": 30,
-  "exchange":"KT19dxaDFiN1SPFH5xen65htDemQfsfbJzWo",
-  "validator":"KT19QCfMQVdnWLbdcyFMpo4QB9hEB8b4ex4j",
-  "royalties":"KT1GCPRRohM4snqj4Mav3iDU1R3hwkuc1wAi"
+  "exchange":"KT1ULGjK8FtaJ9QqCgJVN14B6tY76Ykaz6M8",
+  "royalties":"KT1WKRXswxEpTbVg2pGgofzwZCNKjAVcuMgh",
+  "transfer_manager": "KT1DyDkW16XBuFzpLkXKraD46SAxQDrha5gm"
 }

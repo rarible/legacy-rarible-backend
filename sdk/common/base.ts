@@ -70,7 +70,7 @@ export interface TezosProvider {
 
 export interface Config {
   exchange: string;
-  exchange_proxy: string;
+  transfer_proxy: string;
   fees: BigNumber;
   nft_public: string;
   mt_public: string;

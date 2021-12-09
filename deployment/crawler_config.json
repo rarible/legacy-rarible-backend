@@ -1,8 +1,9 @@
 {
   "nodes": [ "https://hangzhounet.smartpy.io" ],
-  "start": 156000,
+  "start": 167000,
   "db_kind": "pg",
   "step_forward": 30,
-  "exchange": "KT1DiqMxwkRhtcbAqJeajYcy75VBzxcnsSn8",
-  "royalties": "KT1LDzj3qDGtSLaMCgW8hZ96ZoeiJZnDCYFG"
+  "exchange":"KT1ULGjK8FtaJ9QqCgJVN14B6tY76Ykaz6M8",
+  "royalties":"KT1WKRXswxEpTbVg2pGgofzwZCNKjAVcuMgh",
+  "transfer_manager": "KT1DyDkW16XBuFzpLkXKraD46SAxQDrha5gm"
 }

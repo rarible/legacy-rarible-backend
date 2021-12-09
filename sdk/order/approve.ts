@@ -10,7 +10,7 @@ export async function approve_fa1_2_arg(
   value: BigNumber,
   infinite: boolean = true
 ) : Promise<TransactionArg | undefined > {
-  const spender = provider.config.exchange_proxy
+  const spender = provider.config.transfer_proxy
   const st : StorageFA1_2 = await provider.tezos.storage(contract)
   let key_exists = false
   let balance = undefined
@@ -50,7 +50,7 @@ export async function approve_fa2_arg(
   owner: string,
   contract: string,
   token_id?: BigNumber) : Promise<TransactionArg | undefined> {
-  const operator = provider.config.exchange_proxy
+  const operator = provider.config.transfer_proxy
   const st : StorageFA2 = await provider.tezos.storage(contract)
   let key_exists = false
   if (token_id!=undefined) {

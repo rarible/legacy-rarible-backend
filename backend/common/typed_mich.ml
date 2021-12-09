@@ -231,13 +231,13 @@ let order_data_type = `tuple [`seq part_type; `seq part_type; `bool ]
 
 let do_transfers_type =
   `tuple [
+    order_type;
+    order_type;
     asset_type_type;
     asset_type_type;
     order_data_type;
     order_data_type;
     `tuple [ `nat; `nat ];
-    order_type;
-    order_type;
     `nat;
     `seq (`tuple [`address; `nat])
   ]

@@ -10,11 +10,11 @@ let api = ref "http://localhost:8080"
 let sdk = ref false
 let endpoint = ref "http://hangzhou.tz.functori.com"
 
-let royalties = "KT1LDzj3qDGtSLaMCgW8hZ96ZoeiJZnDCYFG"
-let exchange = "KT1DiqMxwkRhtcbAqJeajYcy75VBzxcnsSn8"
-let fill = "KT1CXaJDtffkDjMB1Aadj4gUzRemMM1tF3KK"
-let transfer_proxy = "KT1Qc2Y55SqpQ7WtRAN9q6A82WYEpzYZjdzW"
-let transfer_manager = "KT1PpBJBMBWWbMY1J1abSXUKPCCPr5nN6tcx"
+let royalties = "KT1WKRXswxEpTbVg2pGgofzwZCNKjAVcuMgh"
+let exchange = "KT1ULGjK8FtaJ9QqCgJVN14B6tY76Ykaz6M8"
+let fill = "KT1FAndThSQsVqYQVPHGSG5sQPk1XZycNBvL"
+let transfer_proxy = "KT1Qypf9A7DHoAeesu5hj8v6iKwHsJb1RUR2"
+let transfer_manager = "KT1DyDkW16XBuFzpLkXKraD46SAxQDrha5gm"
 
 let lugh_contract = "KT1StBf222xBLfLTChsute8F9HSt9kVHpqdY"
 

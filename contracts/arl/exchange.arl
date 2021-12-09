@@ -444,11 +444,9 @@ entry match_and_transfer(order_left : order, order_right : order, imake_match : 
       | NONE -> empty_royalties
       end;
 
-    var leftOrderMaker  : address = key_address(opt_get(order_left.maker));
-    var rightOrderMaker : address = key_address(opt_get(order_right.maker));
+    transfer transferred to transfer_manager call do_transfers<order * order * rec_asset_type * rec_asset_type * DataV2 * DataV2 * fill_result * fee_side * list<part>>
+    ((order_left, order_right, makeMatch, takeMatch, leftOrderData, rightOrderData, newFill, feeSide, roy))
 
-    transfer transferred to transfer_manager call do_transfers<rec_asset_type * rec_asset_type * DataV2 * DataV2 * fill_result * address * address * fee_side * list<part>>
-    ((makeMatch, takeMatch, leftOrderData, rightOrderData, newFill, leftOrderMaker, rightOrderMaker, feeSide, roy))
   }
 }
 
