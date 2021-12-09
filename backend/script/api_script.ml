@@ -19,9 +19,9 @@ let transfer_manager = "KT1PpBJBMBWWbMY1J1abSXUKPCCPr5nN6tcx"
 let lugh_contract = "KT1StBf222xBLfLTChsute8F9HSt9kVHpqdY"
 
 let config = {
-  admin_wallet = "" ;
   exchange ;
-  royalties = "" ;
+  royalties ;
+  transfer_manager ;
   contracts = SMap.empty;
   ft_contracts = SMap.empty;
 }
@@ -2196,8 +2196,8 @@ let get_head () =
   EzReq_lwt.get
     (EzAPI.URL "https://api.hangzhou2net.tzkt.io/v1/blocks/count")
 
-let make_config admin_wallet exchange royalties contracts ft_contracts
-    kafka_broker kafka_username kafka_password =
+let make_config ~exchange ~royalties ~transfer_manager ~contracts ~ft_contracts
+    ~kafka_broker ~kafka_username ~kafka_password =
   let open Crawlori.Config in
   get_head () >>= function
   | Error (code, str) ->
@@ -2215,9 +2215,7 @@ let make_config admin_wallet exchange royalties contracts ft_contracts
       verbose = 0 ;
       register_kinds = None ;
       allow_no_metadata = false ;
-      extra = {
-        admin_wallet ; exchange ; royalties; contracts; ft_contracts;
-      } ;
+      extra = { exchange; royalties; transfer_manager; contracts; ft_contracts } ;
     } in
     let temp_fn = Filename.temp_file "config" "" in
     let json = EzEncoding.construct (Cconfig.enc Rtypes.config_enc) config in
@@ -2237,11 +2235,11 @@ let make_config admin_wallet exchange royalties contracts ft_contracts
       close_out c ;
       Lwt.return (temp_fn, Some kafka_temp_fn)
 
-let start_crawler admin_wallet exchange royalties
-    contracts ft_contracts kafka_broker kafka_username kafka_password =
+let start_crawler ~exchange ~royalties ~transfer_manager
+    ~contracts ~ft_contracts ~kafka_broker ~kafka_username ~kafka_password =
   make_config
-    admin_wallet exchange royalties contracts ft_contracts
-    kafka_broker kafka_username kafka_password  >>= fun (config, kafka_config) ->
+    ~exchange ~royalties ~transfer_manager ~contracts ~ft_contracts
+    ~kafka_broker ~kafka_username ~kafka_password  >>= fun (config, kafka_config) ->
   let prog = "./_bin/crawler" in
   let args =
     [ prog ; config ] @
@@ -2277,7 +2275,9 @@ let setup_test_env ?(spawn_exchange_infra=false) () =
     let> () = add_user ~admin:transfer_proxy_admin ~user:transfer_manager_kt1 ~contract:transfer_proxy_kt1 in
     let> () = set_transfer_proxy ~admin:transfer_manager_admin ~proxy:transfer_proxy_kt1 ~manager:transfer_manager_kt1 in
     let> () = add_user ~admin:fill_admin ~user:ex_kt1 ~contract:fill_kt1 in
-    start_crawler "" ex_kt1 r_kt1 SMap.empty SMap.empty "" "" ""
+    start_crawler ~exchange:ex_kt1 ~royalties:r_kt1 ~transfer_manager:transfer_manager_kt1
+      ~contracts:SMap.empty ~ft_contracts:SMap.empty
+      ~kafka_broker:"" ~kafka_username:"" ~kafka_password:""
     >>= fun (cpid, kafka_config) ->
     api_pid := Some (start_api kafka_config) ;
     crawler_pid := Some cpid ;
@@ -2285,9 +2285,9 @@ let setup_test_env ?(spawn_exchange_infra=false) () =
     Lwt_unix.sleep 6. >>= fun () ->
     Lwt.return_ok (r_kt1, ex_kt1)
   else
-    start_crawler ""
-      exchange royalties
-      SMap.empty SMap.empty "" "" ""
+    start_crawler ~exchange ~royalties ~transfer_manager
+      ~contracts:SMap.empty ~ft_contracts:SMap.empty
+      ~kafka_broker:"" ~kafka_username:"" ~kafka_password:""
     >>= fun (cpid, kafka_config) ->
     api_pid := Some (start_api kafka_config) ;
     crawler_pid := Some cpid ;

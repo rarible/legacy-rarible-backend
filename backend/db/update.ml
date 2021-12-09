@@ -11,14 +11,9 @@ let upgrade_1_to_2 dbh version =
       "drop table state";
     ] [
     {|create table state(
-      admin_wallet varchar not null default '',
-      last_updated timestamp not null default now(),
-      last_block varchar not null default '',
-      royalties_contract varchar not null default '',
-      exchange_v2_contract varchar not null default '',
-      validator_contract varchar not null default '',
-      fees_receiver jsonb[] not null default '{}',
-      protocol_fee varchar)|};
+      royalties varchar not null default '',
+      exchange varchar not null default '',
+      transfer_manager varchar not null default '')|};
 
     {|create table ft_contracts(
       address varchar primary key,

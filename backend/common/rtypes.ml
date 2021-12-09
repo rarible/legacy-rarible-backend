@@ -844,17 +844,19 @@ type set_royalties = {
   roy_royalties: part list;
 } [@@deriving encoding]
 
-type exchange_param =
-  | Cancel of { hash:Tzfunc.H.t; maker_edpk: string option; maker: string option;
-                make: A.big_integer asset; take: A.big_integer asset; salt : z }
-  | DoTransfers of
-      {left: Tzfunc.H.t; left_maker_edpk : string option; left_maker : string option;
-       left_make_asset: A.big_integer asset ; left_take_asset: A.big_integer asset ;
-       left_salt: z ;
-       right: Tzfunc.H.t ; right_maker_edpk: string option; right_maker: string option;
-       right_make_asset: A.big_integer asset ; right_take_asset: A.big_integer asset ;
-       right_salt: z;
-       fill_make_value: A.big_integer; fill_take_value: A.big_integer}
+type cancel_param = {
+  cc_hash:Tzfunc.H.t; cc_maker_edpk: string option; cc_maker: string option;
+  cc_make: A.big_integer asset; cc_take: A.big_integer asset; cc_salt : z
+}
+
+type do_transfers_param = {
+  dt_left: Tzfunc.H.t; dt_left_maker_edpk : string option;
+  dt_left_maker : string option; dt_left_make_asset: A.big_integer asset ;
+  dt_left_take_asset: A.big_integer asset ; dt_left_salt: z ;
+  dt_right: Tzfunc.H.t ; dt_right_maker_edpk: string option;
+  dt_right_maker: string option; dt_right_make_asset: A.big_integer asset ;
+  dt_right_take_asset: A.big_integer asset ; dt_right_salt: z;
+  dt_fill_make_value: A.big_integer; dt_fill_take_value: A.big_integer }
 
 type micheline_value = [
   | `address of string
@@ -956,9 +958,9 @@ type ft_ledger = {
 } [@@deriving encoding]
 
 type config = {
-  admin_wallet: string; [@dft ""]
   exchange: string; [@dft ""]
   royalties: string; [@dft ""]
+  transfer_manager: string; [@dft ""]
   mutable ft_contracts: ft_ledger SMap.t; [@map] [@dft SMap.empty]
   mutable contracts: nft_ledger SMap.t; [@map] [@dft SMap.empty]
 } [@@deriving encoding]
