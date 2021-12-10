@@ -392,16 +392,14 @@ let get_decimals ?dbh ?(do_error=false) = function
     | [ i ] -> Lwt.return_ok (Some i)
 
 let get_ft_balance ?dbh ?token_id ?(do_error=false) ~contract account =
-  let>? decimals = get_decimals ?dbh (ATFT {contract; token_id}) in
+  let>? decimals = get_decimals ?dbh ~do_error (ATFT {contract; token_id}) in
   let no_token_id = Option.is_none token_id in
   use dbh @@ fun dbh ->
   let>? l = [%pgsql dbh
       "select balance from token_balance_updates where contract = $contract \
        and account = $account and main and ($no_token_id or token_id = $?token_id) order by level desc limit 1"] in
   match l with
-  | [] | _ :: _ :: _ | [ None ] ->
-    if do_error then Lwt.return_error (`hook_error "balance_not_found")
-    else Lwt.return_ok (Z.zero, None)
+  | [] | _ :: _ :: _ | [ None ] -> Lwt.return_ok (Z.zero, None)
   | [ Some b ] -> Lwt.return_ok (b, decimals)
 
 let get_make_balance ?dbh make owner = match make.asset_type with
