@@ -979,22 +979,28 @@ let get_orders_all req () =
   match get_origin_param req with
   | Error err -> return @@ Error err
   | Ok origin ->
-    match get_size_param req with
+    match get_sort_param req with
     | Error err -> return @@ Error err
-    | Ok size ->
-      match get_continuation_last_update_param req with
+    | Ok sort ->
+      match get_status_param req with
       | Error err -> return @@ Error err
-      | Ok continuation ->
-        Db.get_orders_all ?origin ?continuation ?size () >>= function
-        | Error db_err ->
-          let message = Crawlori.Rp.string_of_error db_err in
-          return (Error {code=`UNEXPECTED_API_ERROR; message})
-        | Ok (res, d) ->
-          let res = Balance.dec_orders_pagination ~d res in
-          return_ok res
+      | Ok statuses ->
+        match get_size_param req with
+        | Error err -> return @@ Error err
+        | Ok size ->
+          match get_continuation_last_update_param req with
+          | Error err -> return @@ Error err
+          | Ok continuation ->
+            Db.get_orders_all ?origin ?sort ?statuses ?continuation ?size () >>= function
+            | Error db_err ->
+              let message = Crawlori.Rp.string_of_error db_err in
+              return (Error {code=`UNEXPECTED_API_ERROR; message})
+            | Ok (res, d) ->
+              let res = Balance.dec_orders_pagination ~d res in
+              return_ok res
 [@@get
   {path="/v0.1/orders/all";
-   params=[origin_param;size_param;continuation_param];
+   params=[origin_param;sort_param;status_param;size_param;continuation_param];
    output=orders_pagination_enc A.big_decimal_enc;
    errors=[bad_request_case;unexpected_case];
    name="orders_all";
