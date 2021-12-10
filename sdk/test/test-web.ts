@@ -47,7 +47,8 @@ function parse_asset_type(r : RawAssetType) : AssetType | ExtendedAssetType | un
   } else if (r.asset_class == 'FT' && (r.contract || (r.contract == 'custom' && r.contract_custom))) {
     return {
       asset_class: 'FT',
-      contract: (r.contract=='custom') ? r.contract_custom : r.contract
+      contract: (r.contract=='custom') ? r.contract_custom : r.contract,
+      token_id: (r.token_id<0) ? undefined : new BigNumber(r.token_id)
     }
   } else if ((r.asset_class == 'NFT' || r.asset_class == 'MT') && (r.contract || r.contract=='public' || (r.contract == 'custom' && r.contract_custom))) {
     return {
@@ -252,7 +253,6 @@ export default new Vue({
       if (r2.api_url) { this.api_url = r2.api_url }
       if (r2.node) { this.node = r2.node }
     }
-    this.provider = await provider(this.node, this.api_url, this.wallet)
     let nft_contracts_s = JSON.parse(localStorage.getItem('nft_contracts') || '[]')
     nft_contracts_s.forEach((c : StorageContract) => this.nft_contracts.add(c))
     localStorage.setItem('nft_contracts', JSON.stringify(Array.from(this.nft_contracts)))
@@ -270,19 +270,10 @@ export default new Vue({
     }
   },
 
-  watch: {
-    async node(new_node) {
-      this.provider = await provider(new_node, this.api_url, this.wallet)
-    },
-    async api_url(new_api_url) {
-      this.provider = await provider(this.node, new_api_url, this.wallet)
-    },
-    async wallet(new_wallet) {
-      this.provider = await provider(this.node, this.api_url, new_wallet)
-    }
-  },
-
   methods: {
+    async connect() {
+      this.provider = await provider(this.node, this.api_url, this.wallet)
+    },
     async ftransfer() {
       this.transfer.status = 'info'
       this.transfer.result = ''

@@ -1,5 +1,5 @@
 import { MichelsonData } from "@taquito/michel-codec"
-import { Provider, send, send_batch, TransactionArg, get_public_key, OperationResult, Asset } from "../common/base"
+import { Provider, send, send_batch, TransactionArg, get_public_key, OperationResult, Asset, get_address } from "../common/base"
 import { Part, OrderForm } from "./utils"
 import { invert_order } from "./invert-order"
 import { get_make_fee } from "./get-make-fee"
@@ -57,11 +57,10 @@ export async function fill_order_arg(
 
   const make = await get_make_asset(provider, left, request.amount, pk)
   const arg_approve =
-    (make.asset_type.asset_class != "XTZ" )
-    ? await approve_arg(provider, left.maker, left.make, request.infinite)
+    (make.asset_type.asset_class != "XTZ")
+    ? await approve_arg(provider, await get_address(provider), left.take, request.infinite)
     : undefined
   const args = (arg_approve) ? [ arg_approve ] : []
-
   const right = {
     ...invert_order(left, request.amount, pk),
     data: {
