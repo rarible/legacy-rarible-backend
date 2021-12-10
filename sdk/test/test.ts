@@ -1,11 +1,16 @@
-import { deploy_fa1, mint, make_permit, add_permit, send, sign, StorageFA2, of_hex, storage } from "../main"
+import { deploy_fa1, mint, make_permit, add_permit, send, sign, StorageFA2, of_hex, storage, hex_to_uint8array, b58enc, Provider } from "../main"
 import { in_memory_provider } from '../providers/in_memory/in_memory_provider'
 import BigNumber from "bignumber.js"
+import { MichelsonData, MichelsonType, packDataBytes } from "@taquito/michel-codec"
+import { TezosToolkit } from "@taquito/taquito"
+import { BigMapResponse } from "@taquito/rpc"
+const blake = require('blakejs');
 
 // edsk3UUamwmemNBJgDvS8jXCgKsvjL2NoTwYRFpGSRPut4Hmfs6dG8 Mxs
 // edsk4RqeRTrhdKfJKBTndA9x1RLp4A3wtNL1iMFRXDvfs5ANeZAncZ ibJ
 // edsk368NmXyps5vKts1TrFTTAgReC5VN9NtPmL9Er86XUdHm2yWiaU aMw
 // edskRsg6YnXooVuL1mdBfiJYkH2sAbeVTLUxBGNiqhbAc76QwStLg61QDHoxV6F2ckfmWv7uBFSmQgRhoDVfhmGZ4CRnvKLG7W iA1
+
 async function main() {
 
   try {
@@ -28,11 +33,15 @@ async function main() {
 
   // await mint(provider, "KT1VYBd25dw5GjYqPM8T8My6b4g5c4cd4hwu", {tz1ibJRnL6hHjAfmEzM7QtGyTsS6ZtHdgE2S: 10000n}, 100n, 101n)
 
-    const st : StorageFA2 = await storage(provider, "KT1Rgf9RNW7gLj7JGn98yyVM34S4St9eudMC")
-    let operators = st.operators
-    console.log(operators.toJSON())
-    const r = await operators.get({0: "tz1iA1KggftRjKtAxQs9QbGra2YdsB5MZmgX", 1: "KT1Qypf9A7DHoAeesu5hj8v6iKwHsJb1RUR2" , 2: 0})
-  console.log(r)
+
+  //   const st : StorageFA2 = await storage(provider, "KT1Rgf9RNW7gLj7JGn98yyVM34S4St9eudMC")
+  //   let id = st.operators.toString()
+  //   console.log(id)
+  //   let value : MichelsonData = { prim: "Pair", args: [ { string: "tz1iA1KggftRjKtAxQs9QbGra2YdsB5MZmgX" }, { prim: "Pair", args: [ { string: "KT1Qypf9A7DHoAeesu5hj8v6iKwHsJb1RUR2" }, { int : "0" } ] } ] }
+  //   let type : MichelsonType = { prim: "pair", args: [ { prim: "address" }, { prim: "pair", args: [ { prim: "address" }, { prim: "nat" } ] } ] }
+  //   let r = await get_big_map_value('https://hangzhou.tz.functori.com', id, value, type)
+  //   // const r = await st.operators.get({0: "tz1iA1KggftRjKtAxQs9QbGra2YdsB5MZmgX", 1: {0: "KT1Qypf9A7DHoAeesu5hj8v6iKwHsJb1RUR2" , 1: 0}})
+  // console.log(r)
 
     // transfer(provider, { asset_class: "FA_2", contract: "KT1WUJBk5T53bfNLncG2csWo4y8pFSteBvQL", token_id: BigInt(1) }, "tz1iQ3DU476h5EUULD1e5yfuiYyk1JNR6HbY", BigInt(50)).then(console.log).catch(console.log)
 

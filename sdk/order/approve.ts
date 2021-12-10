@@ -1,7 +1,24 @@
-import { MichelsonData } from "@taquito/michel-codec"
+import { MichelsonData, MichelsonType, packDataBytes } from "@taquito/michel-codec"
 import { Provider, send, StorageFA1_2, StorageFA2,
-         Asset, TransactionArg, OperationResult } from "../common/base"
+         Asset, TransactionArg, OperationResult, hex_to_uint8array, b58enc } from "../common/base"
 import BigNumber from "bignumber.js"
+const blake = require('blakejs')
+
+function key_expr(value: MichelsonData, type: MichelsonType) : string {
+  const b = packDataBytes(value, type).bytes
+  const hash = blake.blake2b(hex_to_uint8array(b), null, 32)
+  return b58enc(hash, new Uint8Array([13, 44, 64, 27]))
+}
+
+async function get_big_map_value(provider: Provider, id: string, value: MichelsonData, type: MichelsonType) : Promise<any | undefined> {
+  try {
+    const rpc = provider.tezos.tk.rpc
+    let expr = key_expr(value, type)
+    return rpc.getBigMapExpr(id, expr)
+  } catch {
+    return undefined
+  }
+}
 
 export async function approve_fa1_2_arg(
   provider: Provider,
@@ -58,13 +75,12 @@ export async function approve_fa2_arg(
       let r = await st.operator.get({ 0 : operator, 1 : token_id, 2: owner })
       key_exists = (r!=undefined)
     } catch {
-      try {
-        // lugh todo doesn't work
-        let r = await st.operators.get({ 0 : owner, 1 : operator, 2: token_id })
-        key_exists = (r!=undefined)
-      } catch {
-        key_exists = false
-      }
+      // lugh
+      let id = st.operators.toString()
+      let value : MichelsonData = { prim: "Pair", args: [ { string: owner }, { prim: "Pair", args: [ { string: operator }, { int : token_id.toString() } ] } ] }
+      let type : MichelsonType = { prim: "pair", args: [ { prim: "address" }, { prim: "pair", args: [ { prim: "address" }, { prim: "nat" } ] } ] }
+      let r = await get_big_map_value(provider, id, value, type)
+      key_exists = (r!=undefined)
     }
     if (!key_exists) {
       let parameter : MichelsonData = [

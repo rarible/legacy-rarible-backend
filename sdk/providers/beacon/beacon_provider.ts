@@ -71,5 +71,6 @@ export async function beacon_provider(wallet: BeaconWallet, tk: TezosToolkit) : 
     storage,
     balance,
     chain_id,
+    tk,
   }
 }

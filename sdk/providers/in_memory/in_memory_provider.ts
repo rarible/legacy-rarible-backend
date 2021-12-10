@@ -57,5 +57,6 @@ export function in_memory_provider(edsk: string, endpoint: string) : TezosProvid
     storage,
     balance,
     chain_id,
+    tk,
   }
 }
