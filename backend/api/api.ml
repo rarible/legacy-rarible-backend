@@ -1382,8 +1382,6 @@ let get_ft_balance ((req, contract), ft_owner) () =
   match r with
   | Error (`hook_error "contract_not_found") ->
     return (Error {code=`TOKEN_NOT_FOUND; message=contract})
-  | Error (`hook_error "balance_not_found") ->
-    return (Error {code=`BALANCE_NOT_FOUND; message=contract ^ " - " ^ ft_owner})
   | Error e ->
     let message = Crawlori.Rp.string_of_error e in
     return (Error {code=`UNEXPECTED_API_ERROR; message})
