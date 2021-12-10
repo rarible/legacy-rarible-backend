@@ -380,9 +380,12 @@ let filter_all_type_to_string l =
 
 let filter_order_all_type_to_string l =
   String.concat ";" @@
-  List.map (fun t ->
-      String.lowercase_ascii @@
-      EzEncoding.construct order_activity_filter_all_type_enc t) l
+  List.map (fun t -> match t with
+      | OALLCANCEL_LIST -> "cancel_l"
+      | OALLCANCEL_BID ->  "cancel_b"
+      | _ ->
+        String.lowercase_ascii @@
+        EzEncoding.construct order_activity_filter_all_type_enc t) l
 
 let filter_user_type_to_pgarray = List.map (fun t ->
     Option.some @@
@@ -397,9 +400,12 @@ let filter_user_type_to_string l =
 
 let filter_order_user_type_to_string l =
   String.concat ";" @@
-  List.map (fun t ->
-      String.lowercase_ascii @@
-      EzEncoding.construct order_activity_filter_user_type_enc t) l
+  List.map (fun t -> match t with
+      | `CANCEL_LIST -> "cancel_l"
+      | `CANCEL_BID ->  "cancel_b"
+      | _ ->
+        String.lowercase_ascii @@
+        EzEncoding.construct order_activity_filter_user_type_enc t) l
 
 let order_bid_status_to_string l =
   String.concat ";" @@

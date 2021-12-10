@@ -341,8 +341,8 @@ let mk_order_activity ~dbh obj =
       let>? act, decs = mk_order_activity_bid ~dbh obj in
       Lwt.return_ok (OrderActivityBid act, decs)
     | "match" -> Lwt.return @@ mk_order_activity_match obj
-    | "cancel_list" -> Lwt.return @@ mk_order_activity_cancel_list obj
-    | "cancel_bid" -> Lwt.return @@ mk_order_activity_cancel_bid obj
+    | "cancel_l" -> Lwt.return @@ mk_order_activity_cancel_list obj
+    | "cancel_b" -> Lwt.return @@ mk_order_activity_cancel_bid obj
     | _ as t -> Lwt.return_error (`hook_error ("unknown order activity type " ^ t)) in
   {
     order_act_id = obj#id ;
@@ -1586,7 +1586,7 @@ let insert_order_activity ~decs dbh activity =
       let level = Some (Int64.to_int32 act.order_activity_cancel_bid_block_number) in
       insert_order_activity
         dbh activity.order_act_id None None hash transaction block
-        level activity.order_act_date "cancel_list"
+        level activity.order_act_date "cancel_l"
     | OrderActivityCancelBid act ->
       let hash = Some act.order_activity_cancel_bid_hash in
       let transaction = Some act.order_activity_cancel_bid_transaction_hash in
@@ -1594,7 +1594,7 @@ let insert_order_activity ~decs dbh activity =
       let level = Some (Int64.to_int32 act.order_activity_cancel_bid_block_number) in
       insert_order_activity
         dbh activity.order_act_id None None hash transaction block
-        level activity.order_act_date "cancel_bid"
+        level activity.order_act_date "cancel_b"
     | OrderActivityMatch act ->
       let left = Some act.order_activity_match_left.order_activity_match_side_hash in
       let right = Some act.order_activity_match_right.order_activity_match_side_hash in
@@ -4220,15 +4220,14 @@ let get_order_activities_by_item ?dbh ?(sort=LATEST_FIRST) ?continuation ?(size=
     ({ order_activities_items = List.map fst activities ; order_activities_continuation }, decs)
 
 let get_order_activities_all ?dbh ?(sort=LATEST_FIRST) ?continuation ?(size=50) types =
+  let types = filter_order_all_type_to_string types in
   Format.eprintf "get_order_activities_all [%s] %s %d@."
-    (String.concat " " @@
-     List.map (EzEncoding.construct order_activity_filter_all_type_enc) types)
+    types
     (match continuation with
      | None -> "None"
      | Some (ts, s) -> (Tzfunc.Proto.A.cal_to_str ts) ^ "_" ^ s)
     size ;
   use dbh @@ fun dbh ->
-  let types = filter_order_all_type_to_string types in
   let size64 = Int64.of_int size in
   let no_continuation, (ts, h) =
     continuation = None,
