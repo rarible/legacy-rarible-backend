@@ -2667,7 +2667,7 @@ let fill_orders ?royalties ?(transfer_proxy=transfer_proxy) ~kind ~privacy () =
   fill_orders_db ?royalties ~transfer_proxy ~kind ~privacy ()
   (* TODO : check order *)
 
-let cancel_order ?royalties ?(exchange=exchange) ~kind ~privacy () =
+let cancel_order_list ?royalties ?(exchange=exchange) ~kind ~privacy () =
   let c = create_collection ?royalties ~kind ~privacy () in
   let>? c = deploy_collection c in
   let>? () = check_collection c in
@@ -2683,11 +2683,38 @@ let cancel_order ?royalties ?(exchange=exchange) ~kind ~privacy () =
       Printf.eprintf "cancel_order error %s" @@ Tzfunc.Rp.string_of_error err ;
       Lwt.return_unit
     | Ok op_hash ->
-      Printf.eprintf "HASH = %s\n%!" op_hash ;
-      Printf.eprintf "Waiting next block...\n%!" ;
-      wait_next_block () >>= fun () ->
-      Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
-      Lwt_unix.sleep 6.
+      wait_op_included op_hash >>= function
+      | Error err ->
+        Printf.eprintf "match_orders error %s" @@ Crp.string_of_error err ;
+        Lwt.return_unit
+      | Ok () -> Lwt.return_unit
+      (* check_orders *)
+  end >>= fun () ->
+  begin match !api_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
+  begin match !crawler_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
+  Lwt.return_ok ()
+
+let cancel_order_bid ?royalties ?(exchange=exchange) ~kind ~privacy () =
+  let c = create_collection ?royalties ~kind ~privacy () in
+  let>? c = deploy_collection c in
+  let>? () = check_collection c in
+  let> () = wait_next_block () in
+  let>? item1 = mint_one_with_token_id_from_api c in
+  wait_next_block () >>= fun () ->
+  let> () = check_item item1 in
+  let source2 = generate_address ~diff:item1.it_owner.tz1 () in
+  let>? order = buy_nft_for_tezos ~salt:1 c.col_kt1 item1 source2 1 in
+  let order = Common.Balance.z_order ~maked:6l order in
+  begin cancel_order ~source:source2 ~contract:exchange order >>= function
+    | Error err ->
+      Printf.eprintf "cancel_order error %s" @@ Tzfunc.Rp.string_of_error err ;
+      Lwt.return_unit
+    | Ok op_hash ->
+      wait_op_included op_hash >>= function
+      | Error err ->
+        Printf.eprintf "match_orders error %s" @@ Crp.string_of_error err ;
+        Lwt.return_unit
+      | Ok () -> Lwt.return_unit
       (* check_orders *)
   end >>= fun () ->
   begin match !api_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
@@ -3002,14 +3029,30 @@ let main () =
            begin match !crawler_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
            Lwt.return_unit))
 
-  | [ "cancel_order" ] ->
+  | [ "cancel_order_list" ] ->
     Lwt_main.run (
       Lwt.catch (fun () ->
           let kind = `nft in
           let privacy = `priv in
           setup_test_env () >>= function
           | Ok (royalties, exchange) ->
-            cancel_order ~royalties ~exchange ~kind ~privacy () >>= fun _ ->
+            cancel_order_list ~royalties ~exchange ~kind ~privacy () >>= fun _ ->
+            Lwt.return @@ clean_test_env ()
+          | Error _err ->Lwt.return @@ clean_test_env ())
+        (fun exn ->
+           Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
+           begin match !api_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
+           begin match !crawler_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
+           Lwt.return_unit))
+
+  | [ "cancel_order_bid" ] ->
+    Lwt_main.run (
+      Lwt.catch (fun () ->
+          let kind = `nft in
+          let privacy = `priv in
+          setup_test_env () >>= function
+          | Ok (royalties, exchange) ->
+            cancel_order_bid ~royalties ~exchange ~kind ~privacy () >>= fun _ ->
             Lwt.return @@ clean_test_env ()
           | Error _err ->Lwt.return @@ clean_test_env ())
         (fun exn ->
