@@ -3172,7 +3172,7 @@ let filter_orders ?origin ?statuses orders =
        | None -> true
        | Some ss ->
          List.exists (fun s -> order.order_elt.order_elt_status = s) ss) &&
-      order.order_elt.order_elt_make_stock > Z.zero &&
+      (* order.order_elt.order_elt_make_stock > Z.zero && *)
       match origin with
       | Some orig ->
         let origin_fees = order.order_data.order_rarible_v2_data_v1_origin_fees in
@@ -3180,7 +3180,7 @@ let filter_orders ?origin ?statuses orders =
       | None -> true)
     orders
 
-let rec get_orders_all_aux ?dbh ?origin ?continuation ~size acc =
+let rec get_orders_all_aux ?dbh ?origin ?(sort=LATEST_FIRST) ?statuses ?continuation ~size acc =
   Format.eprintf "get_orders_all_aux %s %s %Ld %d@."
     (match origin with None -> "None" | Some s -> s)
     (match continuation with
@@ -3195,16 +3195,29 @@ let rec get_orders_all_aux ?dbh ?origin ?continuation ~size acc =
   if len < size  then
     use dbh @@ fun dbh ->
     let>? l =
-      [%pgsql.object dbh
-          "select hash, last_update_at from orders \
-           where \
-           ($no_continuation or \
-           (last_update_at < $ts) or \
-           (last_update_at = $ts and \
-           hash collate \"C\"  < $h)) \
-           order by last_update_at desc, \
-           hash collate \"C\" desc \
-           limit $size"] in
+      match sort with
+      | LATEST_FIRST ->
+        [%pgsql.object dbh
+            "select hash, last_update_at from orders \
+             where \
+             ($no_continuation or \
+             (last_update_at < $ts) or \
+             (last_update_at = $ts and \
+             hash collate \"C\"  < $h)) \
+             order by last_update_at desc, \
+             hash collate \"C\" desc \
+             limit $size"]
+      | EARLIEST_FIRST ->
+        [%pgsql.object dbh
+            "select hash, last_update_at from orders \
+             where \
+             ($no_continuation or \
+             (last_update_at > $ts) or \
+             (last_update_at = $ts and \
+             hash collate \"C\"  < $h)) \
+             order by last_update_at asc, \
+             hash collate \"C\" desc \
+             limit $size"] in
     let continuation = match List.rev l with
       | [] -> None
       | hd :: _ -> Some (hd#last_update_at, hd#hash) in
@@ -3213,8 +3226,8 @@ let rec get_orders_all_aux ?dbh ?origin ?continuation ~size acc =
     | [] -> Lwt.return_ok acc
     | _ ->
       let orders = List.filter_map (fun x -> x) orders in
-      let orders = filter_orders ?origin orders in
-      get_orders_all_aux ~dbh ?origin ?continuation ~size (acc @ orders)
+      let orders = filter_orders ?origin ?statuses orders in
+      get_orders_all_aux ~dbh ?origin ~sort ?statuses ?continuation ~size (acc @ orders)
   else
   if len = size then Lwt.return_ok acc
   else
@@ -3222,7 +3235,7 @@ let rec get_orders_all_aux ?dbh ?origin ?continuation ~size acc =
     List.filter_map (fun x -> x) @@
     List.mapi (fun i order -> if i < Int64.to_int size then Some order else None) acc
 
-let get_orders_all ?dbh ?origin ?continuation ?(size=50) () =
+let get_orders_all ?dbh ?sort ?statuses ?origin ?continuation ?(size=50) () =
   Format.eprintf "get_orders_all %s %s %d@."
     (match origin with None -> "None" | Some s -> s)
     (match continuation with
@@ -3230,7 +3243,7 @@ let get_orders_all ?dbh ?origin ?continuation ?(size=50) () =
      | Some (ts, s) -> (Tzfunc.Proto.A.cal_to_str ts) ^ "_" ^ s)
     size ;
   let size = Int64.of_int size in
-  let>? orders = get_orders_all_aux ?dbh ?origin ?continuation ~size [] in
+  let>? orders = get_orders_all_aux ?dbh ?origin ?sort ?statuses ?continuation ~size [] in
   let len = Int64.of_int @@ List.length orders in
   let orders, decs = List.split orders in
   let orders_pagination_continuation =

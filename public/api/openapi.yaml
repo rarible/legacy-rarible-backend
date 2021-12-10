@@ -699,6 +699,18 @@ paths:
         required: false
         schema:
           $ref: '#/components/schemas/Address'
+      - name: sort
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/schemas/ActivitySort'
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderStatus'
       - name: size
         in: query
         required: false
