@@ -115,6 +115,7 @@ export async function kukai_provider(embed: KukaiEmbed, tk: TezosToolkit) : Prom
     storage,
     balance,
     chain_id,
+    tk,
   }
 
 }

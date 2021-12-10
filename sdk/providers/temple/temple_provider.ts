@@ -28,9 +28,12 @@ export async function temple_provider(wallet: TempleWallet, tk: TezosToolkit) : 
     return { hash: op.opHash, confirmation: async() => { await op.confirmation() } }
   }
   const sign = async(bytes: string, type?: "operation" | "message") => {
-    let prefix = (type=="message") ? tezos_signed_message_prefix() : ''
-    let message = prefix + bytes
-    let payload = pack_string(message)
+    let prefix = ""
+    let payload = bytes
+    if (type=="message") {
+      prefix = tezos_signed_message_prefix()
+      payload = pack_string(prefix + bytes)
+    }
     const signature = await wallet.sign(payload)
     return {signature, prefix}
   }
@@ -62,5 +65,6 @@ export async function temple_provider(wallet: TempleWallet, tk: TezosToolkit) : 
     storage,
     balance,
     chain_id,
+    tk,
   }
 }

@@ -1,10 +1,10 @@
-import { BigMapAbstraction, TransferParams, OriginateParams } from "@taquito/taquito"
-import { MichelsonData } from "@taquito/michel-codec"
+import { BigMapAbstraction, TransferParams, OriginateParams, TezosToolkit } from "@taquito/taquito"
+import { MichelsonData, MichelsonType, packDataBytes } from "@taquito/michel-codec"
 import BigNumber from "bignumber.js"
 import fetch from "node-fetch"
 const {TextEncoder, TextDecoder} = require("text-encoder")
 const bs58check = require("bs58check")
-const blake = require('blakejs');
+const blake = require('blakejs')
 
 export interface StorageFA2 {
   ledger: BigMapAbstraction;
@@ -67,6 +67,7 @@ export interface TezosProvider {
   storage: (contract: string) => Promise<any>;
   balance: () => Promise<BigNumber>;
   chain_id: () => Promise<string>;
+  tk: TezosToolkit
 }
 
 export interface Config {
