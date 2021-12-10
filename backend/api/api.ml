@@ -897,8 +897,8 @@ let get_existing_order hash_key_order =
   Db.get_order hash_key_order
 
 let z_order_form order =
-  let>? maked = Db.get_decimals order.order_form_elt.order_form_elt_make.asset_type in
-  let|>? taked = Db.get_decimals order.order_form_elt.order_form_elt_take.asset_type in
+  let>? maked = Db.get_decimals ~do_error:true order.order_form_elt.order_form_elt_make.asset_type in
+  let|>? taked = Db.get_decimals ~do_error:true order.order_form_elt.order_form_elt_take.asset_type in
   Balance.z_order_form ?maked ?taked order
 
 let upsert_order _req input =
@@ -1386,7 +1386,7 @@ let get_ft_balance ((req, contract), ft_owner) () =
   let token_id = Option.map Z.of_string (EzAPI.Req.find_param token_id_param req) in
   let> r = Db.get_ft_balance ?token_id ~do_error:true ~contract ft_owner in
   match r with
-  | Error (`hook_error "contract_not_found") ->
+  | Error (`hook_error "ft_contract_not_found") ->
     return (Error {code=`TOKEN_NOT_FOUND; message=contract})
   | Error e ->
     let message = Crawlori.Rp.string_of_error e in

@@ -16,14 +16,22 @@ let fill = "KT1FAndThSQsVqYQVPHGSG5sQPk1XZycNBvL"
 let transfer_proxy = "KT1Qypf9A7DHoAeesu5hj8v6iKwHsJb1RUR2"
 let transfer_manager = "KT1DyDkW16XBuFzpLkXKraD46SAxQDrha5gm"
 
-let lugh_contract = "KT1StBf222xBLfLTChsute8F9HSt9kVHpqdY"
+let lugh_contract = "KT1Rgf9RNW7gLj7JGn98yyVM34S4St9eudMC"
 
 let config = {
   exchange ;
   royalties ;
   transfer_manager ;
   contracts = SMap.empty;
-  ft_contracts = SMap.empty;
+  ft_contracts =
+    SMap.singleton
+      lugh_contract
+      { ft_kind = Lugh ;
+        ft_ledger_id = Z.of_int 10373 ;
+        ft_crawled = true ;
+        ft_token_id = Some Z.zero ;
+        ft_decimals = 6l ;
+      }
 }
 
 let api_pid = ref None
@@ -2276,7 +2284,7 @@ let setup_test_env ?(spawn_exchange_infra=false) () =
     let> () = set_transfer_proxy ~admin:transfer_manager_admin ~proxy:transfer_proxy_kt1 ~manager:transfer_manager_kt1 in
     let> () = add_user ~admin:fill_admin ~user:ex_kt1 ~contract:fill_kt1 in
     start_crawler ~exchange:ex_kt1 ~royalties:r_kt1 ~transfer_manager:transfer_manager_kt1
-      ~contracts:SMap.empty ~ft_contracts:SMap.empty
+      ~contracts:SMap.empty ~ft_contracts:config.ft_contracts
       ~kafka_broker:"" ~kafka_username:"" ~kafka_password:""
     >>= fun (cpid, kafka_config) ->
     api_pid := Some (start_api kafka_config) ;
@@ -2286,7 +2294,7 @@ let setup_test_env ?(spawn_exchange_infra=false) () =
     Lwt.return_ok (r_kt1, ex_kt1)
   else
     start_crawler ~exchange ~royalties ~transfer_manager
-      ~contracts:SMap.empty ~ft_contracts:SMap.empty
+      ~contracts:SMap.empty ~ft_contracts:config.ft_contracts
       ~kafka_broker:"" ~kafka_username:"" ~kafka_password:""
     >>= fun (cpid, kafka_config) ->
     api_pid := Some (start_api kafka_config) ;
@@ -2417,12 +2425,20 @@ let sell_nft_for_tezos ?(no_upsert=false) ?(salt=0) collection maker item1 amoun
         Lwt.return_ok @@ Common.Balance.dec_order ~taked:6l order
       | Error _err -> Lwt.fail_with "order_convert"
 
-let sell_nft_for_lugh ?(salt=0) collection maker item1 amount =
-  let lugh = ATNFT { asset_contract = lugh_contract ; asset_token_id = Z.zero } in
+let sell_nft_for_lugh ?(no_upsert=false) ?(salt=0) collection maker item1 amount =
+  let lugh = ATFT { contract = lugh_contract ; token_id = Some Z.zero } in
   let take = { asset_type = lugh ; asset_value = Z.of_int amount } in
   match sell_order_form_from_item ~salt collection maker item1 take with
-  | Error _err -> Lwt.fail_with "order_from"
-  | Ok form -> call_upsert_order ~d:(None, None) form
+  | Error err ->
+    Format.eprintf "sell_nft_for_lugh %s@." @@ Crp.string_of_error err ;
+    Lwt.fail_with "order_from"
+  | Ok form ->
+    if not no_upsert then call_upsert_order ~d:(None, Some 6l) form
+    else
+      match order_from_order_form form with
+      | Ok order ->
+        Lwt.return_ok @@ Common.Balance.dec_order ~taked:6l order
+      | Error _err -> Lwt.fail_with "order_convert"
 
 let buy_nft_for_tezos ?(no_upsert=false) ?(salt=0) collection item1 maker amount =
   let make = { asset_type = ATXTZ ; asset_value = Z.of_int amount } in
@@ -2436,12 +2452,22 @@ let buy_nft_for_tezos ?(no_upsert=false) ?(salt=0) collection item1 maker amount
         Lwt.return_ok @@ Common.Balance.dec_order ~maked:6l order
       | Error _err -> Lwt.fail_with "order_convert"
 
-let buy_nft_for_lugh ?(salt=0) collection item1 maker amount =
-  let lugh = ATNFT { asset_contract = lugh_contract ; asset_token_id = Z.zero } in
+let buy_nft_for_lugh ?(no_upsert=false) ?(salt=0) collection item1 maker amount =
+  let lugh = ATFT { contract = lugh_contract ; token_id = Some Z.zero } in
   let make = { asset_type = lugh ; asset_value = Z.of_int amount } in
   match buy_order_form_from_item ~salt collection item1 maker make with
-  | Error _err -> Lwt.fail_with "order_from"
-  | Ok form -> call_upsert_order ~d:(None, None) form
+  | Error err ->
+    Format.eprintf "buy_nft_for_lugh %s@." @@ Crp.string_of_error err ;
+    Lwt.fail_with "order_from"
+  | Ok form ->
+    if not no_upsert then call_upsert_order ~d:(Some 6l, None) form
+    else
+      match order_from_order_form form with
+      | Ok order ->
+        Lwt.return_ok @@ Common.Balance.dec_order ~maked:6l order
+      | Error err ->
+        Format.eprintf "buy_nft_for_lugh %s@." @@ Crp.string_of_error err ;
+        Lwt.fail_with "order_convert"
 
 let get_source_from_item ((owner, owner_sk), _amount, _token_id, _royalties, _metadata) =
   (owner, owner_sk)
@@ -2485,13 +2511,13 @@ let match_orders_nft ?royalties ?(exchange=exchange) ?(transfer_proxy=transfer_p
           Printf.eprintf "match_orders error %s" @@ Tzfunc.Rp.string_of_error err ;
           Lwt.return_unit
         | Ok op_hash ->
-          Printf.eprintf "HASH = %s\n%!" op_hash ;
-          Printf.eprintf "Waiting next block...\n%!" ;
-          let> () = wait_next_block () in
-          Printf.eprintf "Waiting 6sec for crawler to catch up...\n%!" ;
-          let> () = Lwt_unix.sleep 6. in
-          let> () = check_item {item2 with it_owner = item2.it_owner} in
-          check_item {item1 with it_owner = item2.it_owner} in
+          wait_op_included op_hash >>= function
+          | Error err ->
+            Printf.eprintf "match_orders error %s" @@ Crp.string_of_error err ;
+            Lwt.return_unit
+          | Ok () ->
+            let> () = check_item {item2 with it_owner = item1.it_owner} in
+            check_item {item1 with it_owner = item2.it_owner} in
       Lwt.return_ok ()
 
 let match_orders_tezos_2 ?royalties ?(exchange=exchange) ?(transfer_proxy=transfer_proxy) ~kind ~privacy () =
@@ -2581,41 +2607,47 @@ let match_orders_lugh ?royalties ?(exchange=exchange) ?(transfer_proxy=transfer_
   let>? c = deploy_collection c in
   let>? () = check_collection c in
   let> () = wait_next_block () in
-  let>? item1 = mint_one_with_token_id_from_api c in
-  wait_next_block () >>= fun () ->
+  let source2 = generate_address ~alias:"rarible1" () in
+  let>? item1 = mint_one_with_token_id_from_api ~diff:source2.tz1 c in
   let> () = check_item item1 in
   update_operators
     item1.it_token_id item1.it_owner.tz1 transfer_proxy
     (item1.it_owner.tz1, item1.it_owner.edsk) item1.it_collection >>= function
   | Error err ->
     Lwt.return_ok @@
-    Printf.eprintf "match_orders_tezos error %s" @@
+    Printf.eprintf "match_orders_lugh error %s" @@
     Crp.string_of_error err
   | Ok () ->
-    wait_next_block () >>= fun () ->
-    let>? order1 = sell_nft_for_lugh ~salt:1 c.col_kt1 item1 item1.it_owner 1 in
+    let>? order1 = sell_nft_for_lugh ~salt:1 c.col_kt1 item1 item1.it_owner 42 in
     let order1 = Common.Balance.z_order ~taked:6l order1 in
     (* TODO : check order *)
-    let source2 = generate_address ~alias:"rarible1" () in
-    let>? order2 = buy_nft_for_lugh c.col_kt1 item1 source2 1 in
-    let order2 = Common.Balance.z_order ~maked:6l order2 in
-    (* TODO : check order *)
-    begin
-      match_orders ~amount:1L ~source:source2 ~contract:exchange order2 order1
-      >>= function
-      | Error err ->
-        Printf.eprintf "match_orders error %s" @@ Tzfunc.Rp.string_of_error err ;
-        Lwt.return_unit
-      | Ok op_hash ->
-        wait_op_included op_hash >>= function
+    update_operators
+      Z.zero source2.tz1 transfer_proxy
+      (source2.tz1, source2.edsk) lugh_contract >>= function
+    | Error err ->
+      Lwt.return_ok @@
+      Printf.eprintf "match_orders_lugh error %s" @@
+      Crp.string_of_error err
+    | Ok () ->
+      let>? order2 = buy_nft_for_lugh c.col_kt1 item1 source2 42 in
+      let order2 = Common.Balance.z_order ~maked:6l order2 in
+      (* TODO : check order *)
+      begin
+        match_orders ~source:source2 ~contract:exchange order2 order1
+        >>= function
         | Error err ->
-          Printf.eprintf "match_orders error %s" @@ Crp.string_of_error err ;
+          Printf.eprintf "match_orders error %s" @@ Tzfunc.Rp.string_of_error err ;
           Lwt.return_unit
-        | Ok () ->
-          check_item {item1 with it_owner = source2}
-          (* check_orders *)
-    end >>= fun () ->
-    Lwt.return_ok ()
+        | Ok op_hash ->
+          wait_op_included op_hash >>= function
+          | Error err ->
+            Printf.eprintf "match_orders error %s" @@ Crp.string_of_error err ;
+            Lwt.return_unit
+          | Ok () ->
+            check_item {item1 with it_owner = source2}
+            (* check_orders *)
+      end >>= fun () ->
+      Lwt.return_ok ()
 
 let fill_orders_db ?royalties ~transfer_proxy ~kind ~privacy () =
   let c = create_collection ?royalties ~kind ~privacy () in
@@ -2996,7 +3028,6 @@ let main () =
            begin match !api_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
            begin match !crawler_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
            Lwt.return_unit))
-
   | [ "match_order_lugh_bid" ] ->
     Lwt_main.run (
       Lwt.catch (fun () ->
@@ -3006,7 +3037,9 @@ let main () =
           | Ok (royalties, exchange) ->
             match_orders_lugh ~royalties ~exchange ~kind ~privacy () >>= fun _ ->
             Lwt.return @@ clean_test_env ()
-          | Error _err -> Lwt.return @@ clean_test_env ())
+          | Error err ->
+            Format.eprintf "match_order_lugh_bid %s@." @@ Crp.string_of_error err ;
+            Lwt.return @@ clean_test_env ())
         (fun exn ->
            Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
            begin match !api_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
