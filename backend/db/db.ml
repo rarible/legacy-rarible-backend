@@ -387,7 +387,7 @@ let get_decimals ?dbh ?(do_error=false) = function
          and ($no_token_id or token_id = $?token_id)"] in
     match l with
     | [] | _ :: _ :: _ ->
-      if do_error then Lwt.return_error (`hook_error "contract_not_found")
+      if do_error then Lwt.return_error (`hook_error "ft_contract_not_found")
       else Lwt.return_ok None
     | [ i ] -> Lwt.return_ok (Some i)
 
@@ -1542,9 +1542,9 @@ let db_from_asset ?dbh asset =
   | ATXTZ ->
     Lwt.return_ok (string_of_asset_type asset.asset_type, None, None,
                    asset.asset_value, decimals)
-  | ATFT {contract; _} ->
+  | ATFT {contract; token_id} ->
     Lwt.return_ok
-      (string_of_asset_type asset.asset_type, Some contract, None,
+      (string_of_asset_type asset.asset_type, Some contract, token_id,
        asset.asset_value, decimals)
   | ATNFT fa2 | ATMT fa2 ->
     Lwt.return_ok (string_of_asset_type asset.asset_type, Some fa2.asset_contract,
