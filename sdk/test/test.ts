@@ -1,4 +1,4 @@
-import { deploy_fa1, mint, make_permit, add_permit, send, sign, StorageFA1_2, of_hex } from "../main"
+import { deploy_fa1, mint, make_permit, add_permit, send, sign, StorageFA2, of_hex, storage } from "../main"
 import { in_memory_provider } from '../providers/in_memory/in_memory_provider'
 import BigNumber from "bignumber.js"
 
@@ -11,7 +11,7 @@ async function main() {
   try {
     const config = {
       exchange: "KT1KkUufmRPjK6SBNZVvAYniAY5F9czYmgwu",
-      exchange_proxy: "KT1KkUufmRPjK6SBNZVvAYniAY5F9czYmgwu",
+      transfer_proxy: "KT1KkUufmRPjK6SBNZVvAYniAY5F9czYmgwu",
       fees: new BigNumber(0),
       nft_public: "",
       mt_public: "",
@@ -28,9 +28,11 @@ async function main() {
 
   // await mint(provider, "KT1VYBd25dw5GjYqPM8T8My6b4g5c4cd4hwu", {tz1ibJRnL6hHjAfmEzM7QtGyTsS6ZtHdgE2S: 10000n}, 100n, 101n)
 
-  // const st : StorageFA2 = await storage(provider, "KT1WUJBk5T53bfNLncG2csWo4y8pFSteBvQL")
-  // const r = await st.operator_for_all.get({0: "KT1XgQ52NeNdjo3jLpbsPBRfg8YhWoQ5LB7g", 1: "tz1ibJRnL6hHjAfmEzM7QtGyTsS6ZtHdgE2S"})
-  // console.log(r)
+    const st : StorageFA2 = await storage(provider, "KT1Rgf9RNW7gLj7JGn98yyVM34S4St9eudMC")
+    let operators = st.operators
+    console.log(operators.toJSON())
+    const r = await operators.get({0: "tz1iA1KggftRjKtAxQs9QbGra2YdsB5MZmgX", 1: "KT1Qypf9A7DHoAeesu5hj8v6iKwHsJb1RUR2" , 2: 0})
+  console.log(r)
 
     // transfer(provider, { asset_class: "FA_2", contract: "KT1WUJBk5T53bfNLncG2csWo4y8pFSteBvQL", token_id: BigInt(1) }, "tz1iQ3DU476h5EUULD1e5yfuiYyk1JNR6HbY", BigInt(50)).then(console.log).catch(console.log)
 
@@ -67,11 +69,11 @@ async function main() {
     // console.log(op)
     // await op.confirmation()
 
-    const st : StorageFA1_2 = await provider.tezos.storage('KT1L5WyeKsBMTvseptzcX9Vtbn7Qw4naW98X')
-    const v : any = await st.token_metadata.get('0')
-    console.log(v)
-    console.log(v[Object.keys(v)[1]].get('decimals'))
-    console.log(of_hex(v[Object.keys(v)[1]].get('decimals')))
+    // const st : StorageFA1_2 = await provider.tezos.storage('KT1L5WyeKsBMTvseptzcX9Vtbn7Qw4naW98X')
+    // const v : any = await st.token_metadata.get('0')
+    // console.log(v)
+    // console.log(v[Object.keys(v)[1]].get('decimals'))
+    // console.log(of_hex(v[Object.keys(v)[1]].get('decimals')))
 
   } catch (e) {
     console.error(e)

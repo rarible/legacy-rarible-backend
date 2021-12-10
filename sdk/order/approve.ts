@@ -58,7 +58,13 @@ export async function approve_fa2_arg(
       let r = await st.operator.get({ 0 : operator, 1 : token_id, 2: owner })
       key_exists = (r!=undefined)
     } catch {
-      key_exists = false
+      try {
+        // lugh todo doesn't work
+        let r = await st.operators.get({ 0 : owner, 1 : operator, 2: token_id })
+        key_exists = (r!=undefined)
+      } catch {
+        key_exists = false
+      }
     }
     if (!key_exists) {
       let parameter : MichelsonData = [
@@ -101,8 +107,10 @@ export async function approve_arg(
   asset: Asset,
   infinite?: boolean
 ): Promise<TransactionArg | undefined> {
-  if (asset.asset_type.asset_class == "FT") {
+  if (asset.asset_type.asset_class == "FT" && asset.asset_type.token_id==undefined) {
     return approve_fa1_2_arg(provider, owner, asset.asset_type.contract, asset.value, infinite)
+  } else if (asset.asset_type.asset_class == "FT") {
+    return approve_fa2_arg(provider, owner, asset.asset_type.contract, asset.asset_type.token_id)
   } else if (asset.asset_type.asset_class == "NFT") {
     return approve_fa2_arg(provider, owner, asset.asset_type.contract || provider.config.nft_public)
   } else if (asset.asset_type.asset_class == "MT") {
@@ -133,8 +141,10 @@ export async function approve_token_arg(
   asset: Asset,
   infinite?: boolean
 ): Promise<TransactionArg | undefined> {
-  if (asset.asset_type.asset_class == "FT") {
+  if (asset.asset_type.asset_class == "FT" && asset.asset_type.token_id==undefined) {
     return approve_fa1_2_arg(provider, owner, asset.asset_type.contract, asset.value, infinite)
+  } else if (asset.asset_type.asset_class == "FT") {
+    return approve_fa2_arg(provider, owner, asset.asset_type.contract, asset.asset_type.token_id)
   } else if (asset.asset_type.asset_class == "NFT") {
     return approve_fa2_arg(provider, owner, asset.asset_type.contract || provider.config.nft_public, asset.asset_type.token_id)
   } else if (asset.asset_type.asset_class == "MT") {
