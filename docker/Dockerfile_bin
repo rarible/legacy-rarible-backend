@@ -8,6 +8,7 @@ eval $(opam env) && \
 sudo apt-get install postgresql-13-pgmp && \
 createdb crawlori && sudo -i -u functori -- psql crawlori -c 'create extension if not exists pgmp;' && \
 make deps && \
+opam install httpaf-lwt-unix && \
 POSTGRES_USER=functori make pgmp-extension && \
 make clean && \
 make
