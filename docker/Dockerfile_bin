@@ -10,6 +10,7 @@ createdb crawlori && sudo -i -u functori -- psql crawlori -c 'create extension i
 make deps && \
 opam install httpaf-lwt-unix && \
 echo 'DB=postgres' > Makefile.config && \
+dropdb postgres && \
 POSTGRES_USER=functori make pgmp-extension && \
 make clean && \
 make
