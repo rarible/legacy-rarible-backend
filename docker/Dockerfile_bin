@@ -9,6 +9,7 @@ sudo apt-get install postgresql-13-pgmp && \
 createdb crawlori && sudo -i -u functori -- psql crawlori -c 'create extension if not exists pgmp;' && \
 make deps && \
 opam install httpaf-lwt-unix && \
+echo 'DB=postgres' > Makefile.config && \
 POSTGRES_USER=functori make pgmp-extension && \
 make clean && \
 make
@@ -17,9 +18,9 @@ FROM debian:latest as target
 LABEL Description="rarible container" Vendor="Functori"
 
 RUN apt-get update && apt-get install -y librdkafka-dev libcurl4-gnutls-dev
-RUN addgroup --system functori && adduser --system --group --shell /bin/sh functori && \
-    echo 'functori ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
-USER functori
-WORKDIR /home/functori
-COPY --from=compilation --chown=functori /home/functori/rarible/deployment/crawler_config.json /home/functori/rarible/_bin/* /home/functori/
+RUN addgroup --system postgres && adduser --system --group --shell /bin/sh postgres && \
+    echo 'postgres ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
+USER postgres
+WORKDIR /home/postgres
+COPY --from=compilation --chown=postgres /home/functori/rarible/deployment/crawler_config.json /home/functori/rarible/_bin/* /home/postgres/
 CMD [ "./crawler", "crawler_config.json" ]
