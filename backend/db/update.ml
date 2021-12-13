@@ -5,7 +5,6 @@ let upgrade_1_to_2 dbh version =
       "drop table match_orders";
       "drop table token_updates";
       "drop table contract_updates";
-      "drop table accounts";
       "drop table contracts";
       "drop table tokens";
       "drop table state";
@@ -150,14 +149,6 @@ let upgrade_1_to_2 dbh version =
       royalties jsonb not null default '{}',
       creators jsonb[] not null default '{}',
       primary key (contract, owner, token_id))|};
-
-    {|create table accounts(
-      address varchar primary key,
-      main boolean not null default false,
-      last_block varchar not null,
-      last_level int not null,
-      last timestamp not null,
-      tokens jsonb[] not null default '{}')|};
 
     {|create table contract_updates(
       transaction varchar not null,
