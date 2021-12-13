@@ -132,23 +132,9 @@ let upgrade_1_to_2 dbh version =
     {|create table tokens(
       contract varchar not null,
       token_id varchar not null,
-      block varchar not null,
-      level int not null,
-      tsp timestamp not null,
-      transaction varchar not null,
-      main boolean not null default false,
-      last_block varchar not null,
-      last_level int not null,
-      last timestamp not null,
       owner varchar not null,
       amount zarith not null,
-      supply zarith not null,
       balance zarith,
-      operators varchar[] not null default '{}',
-      metadata jsonb not null default '{}',
-      metadata_uri varchar,
-      royalties jsonb not null default '{}',
-      creators jsonb[] not null default '{}',
       primary key (contract, owner, token_id))|};
 
     {|create table contract_updates(
@@ -292,25 +278,23 @@ let upgrade_1_to_2 dbh version =
       date timestamp not null,
       order_activity_type varchar not null)|};
 
-    {|create table ft_tokens(
+    {|create table token_info(
       contract varchar not null,
-      account varchar not null,
-      balance zarith not null,
-      primary key (contract, account))|};
-
-    {|create table ft_token_updates(
-      transaction varchar not null,
-      index int not null,
+      token_id varchar not null,
       block varchar not null,
       level int not null,
-      main boolean not null default false,
       tsp timestamp not null,
-      transfer_index int not null default 0,
-      source varchar,
-      destination varchar,
-      contract varchar not null,
-      amount zarith not null,
-      primary key (block, index, transfer_index))|};
+      transaction varchar not null,
+      main boolean not null default false,
+      last_block varchar not null,
+      last_level int not null,
+      last timestamp not null,
+      supply zarith not null default 0,
+      metadata jsonb not null default '{}',
+      metadata_uri varchar,
+      royalties jsonb not null default '{}',
+      creators jsonb[] not null default '{}',
+      primary key (contract, token_id))|};
 
   ]
 

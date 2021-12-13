@@ -10,28 +10,6 @@ let parse_address = function
       Tzfunc.Binary.Reader.(contract {s = Tzfunc.Crypto.hex_to_raw h; offset = 0})
   | _ -> unexpected_michelson
 
-let parse_update_operators m =
-  match Typed_mich.parse_value Contract_spec.update_operators_entry m with
-  | Ok (`seq l) ->
-    Ok (Operator_updates (
-        List.filter_map (function
-            | `left (`tuple [ `address op_owner; `address op_operator; `nat op_token_id]) ->
-              Some {op_owner; op_operator; op_token_id; op_add=true}
-            | `right (`tuple [ `address op_owner; `address op_operator; `nat op_token_id]) ->
-              Some {op_owner; op_operator; op_token_id; op_add=false}
-            | _ -> None) l))
-  | _ -> unexpected_michelson
-
-let parse_update_operators_all m =
-  match Typed_mich.parse_value Contract_spec.update_operators_all_entry m with
-  | Ok (`seq l) ->
-    Ok (Operator_updates_all (
-        List.filter_map (function
-            | `left (`address operator) -> Some (operator, true)
-            | `right (`address operator) -> Some (operator, false)
-            | _ -> None) l))
-  | _ -> unexpected_michelson
-
 let parse_transfer m =
   match Typed_mich.parse_value Contract_spec.transfer_entry m with
   | Ok (`seq l) ->
@@ -142,8 +120,6 @@ let parse_set_token_uri_pattern m =
 
 let parse_fa2 e p =
   match e, p with
-  | EPnamed "update_operators", m -> parse_update_operators m
-  | EPnamed "update_operators_for_all", m -> parse_update_operators_all m
   | EPnamed "transfer", m -> parse_transfer m
   | EPnamed "mint", m -> parse_mint m
   | EPnamed "burn", m -> parse_burn m
