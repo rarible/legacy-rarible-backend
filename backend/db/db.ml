@@ -2523,18 +2523,6 @@ let set_main _config dbh {Hooks.m_main; m_hash} =
   let>? c_updates =
     [%pgsql.object dbh
         "update contract_updates set main = $m_main where block = $m_hash returning *"] in
-  let>? () =
-    [%pgsql dbh
-        "update tzip21_metadata set main = $m_main where block = $m_hash"] in
-  let>? () =
-    [%pgsql dbh
-        "update tzip21_formats set main = $m_main where block = $m_hash"] in
-  let>? () =
-    [%pgsql dbh
-        "update tzip21_attributes set main = $m_main where block = $m_hash"] in
-  let>? () =
-    [%pgsql dbh
-        "update tzip21_creators set main = $m_main where block = $m_hash"] in
   let>? cancels =
     [%pgsql.object
       dbh "update order_cancel set main = $m_main where block = $m_hash returning *"] in
@@ -2547,6 +2535,18 @@ let set_main _config dbh {Hooks.m_main; m_hash} =
   let>? () = contract_updates dbh m_main @@ sort c_updates in
   let>? () = token_updates dbh m_main @@ sort t_updates in
   let>? () = token_balance_updates dbh m_main @@ sort tb_updates in
+  let>? () =
+    [%pgsql dbh
+        "update tzip21_metadata set main = $m_main where block = $m_hash"] in
+  let>? () =
+    [%pgsql dbh
+        "update tzip21_formats set main = $m_main where block = $m_hash"] in
+  let>? () =
+    [%pgsql dbh
+        "update tzip21_attributes set main = $m_main where block = $m_hash"] in
+  let>? () =
+    [%pgsql dbh
+        "update tzip21_creators set main = $m_main where block = $m_hash"] in
   let>? () = produce_collection_events m_main collections in
   let>? () = produce_cancel_events dbh m_main @@ sort cancels in
   let>? () = produce_match_events dbh m_main @@ sort matches in
