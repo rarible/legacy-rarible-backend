@@ -805,6 +805,241 @@ export const royalties_code : any =
           ]
        }  ]
      ]
+  },
+  {  "prim": "view",
+     "args": [
+       {  "string": "get_royalties"  },
+       {  "prim": "pair",
+          "args": [
+            {  "prim": "address"  },
+            {  "prim": "nat"  }
+          ]
+       },
+       {  "prim": "list",
+          "args": [
+            {  "prim": "pair",
+               "args": [
+                 {  "prim": "address",
+                    "annots": [
+                      "%partAccount"
+                    ]
+                 },
+                 {  "prim": "nat",
+                    "annots": [
+                      "%partValue"
+                    ]
+                 }
+               ]
+            }
+          ]
+       },
+       [  {  "prim": "UNPAIR"  },
+       {  "prim": "DIP",
+          "args": [
+            {  "int": "1"  },
+            [  {  "prim": "CDR"  },
+            {  "prim": "CDR"  },
+            {  "prim": "CDR"  },
+            {  "prim": "UNPAIR"  },
+            {  "prim": "SWAP"  },
+            {  "prim": "DROP",
+               "args": [
+                 {  "int": "1"  }
+               ]
+            }  ]
+          ]
+       },
+       {  "prim": "UNPAIR"  },
+       {  "prim": "UNIT"  },
+       {  "prim": "DUP",
+          "args": [
+            {  "int": "4"  }
+          ]
+       },
+       {  "prim": "DUP",
+          "args": [
+            {  "int": "4"  }
+          ]
+       },
+       {  "prim": "SOME"  },
+       {  "prim": "DUP",
+          "args": [
+            {  "int": "4"  }
+          ]
+       },
+       {  "prim": "PAIR"  },
+       {  "prim": "MEM"  },
+       {  "prim": "IF",
+          "args": [
+            [  {  "prim": "DUP",
+                  "args": [
+                    {  "int": "4"  }
+                  ]
+            },
+            {  "prim": "DUP",
+               "args": [
+                 {  "int": "4"  }
+               ]
+            },
+            {  "prim": "SOME"  },
+            {  "prim": "DUP",
+               "args": [
+                 {  "int": "4"  }
+               ]
+            },
+            {  "prim": "PAIR"  },
+            {  "prim": "GET"  },
+            {  "prim": "IF_NONE",
+               "args": [
+                 [  {  "prim": "PUSH",
+                       "args": [
+                         {  "prim": "string"  },
+                         {  "string": "royalties"  }
+                       ]
+                 },
+                 {  "prim": "PUSH",
+                    "args": [
+                      {  "prim": "string"  },
+                      {  "string": "AssetNotFound"  }
+                    ]
+                 },
+                 {  "prim": "PAIR"  },
+                 {  "prim": "FAILWITH"  }  ],
+                 [    ]
+               ]
+            }  ],
+            [  {  "prim": "DUP",
+                  "args": [
+                    {  "int": "4"  }
+                  ]
+            },
+            {  "prim": "NONE",
+               "args": [
+                 {  "prim": "nat"  }
+               ]
+            },
+            {  "prim": "DUP",
+               "args": [
+                 {  "int": "4"  }
+               ]
+            },
+            {  "prim": "PAIR"  },
+            {  "prim": "MEM"  },
+            {  "prim": "IF",
+               "args": [
+                 [  {  "prim": "DUP",
+                       "args": [
+                         {  "int": "4"  }
+                       ]
+                 },
+                 {  "prim": "NONE",
+                    "args": [
+                      {  "prim": "nat"  }
+                    ]
+                 },
+                 {  "prim": "DUP",
+                    "args": [
+                      {  "int": "4"  }
+                    ]
+                 },
+                 {  "prim": "PAIR"  },
+                 {  "prim": "GET"  },
+                 {  "prim": "IF_NONE",
+                    "args": [
+                      [  {  "prim": "PUSH",
+                            "args": [
+                              {  "prim": "string"  },
+                              {  "string": "royalties"  }
+                            ]
+                      },
+                      {  "prim": "PUSH",
+                         "args": [
+                           {  "prim": "string"  },
+                           {  "string": "AssetNotFound"  }
+                         ]
+                      },
+                      {  "prim": "PAIR"  },
+                      {  "prim": "FAILWITH"  }  ],
+                      [    ]
+                    ]
+                 }  ],
+                 [  {  "prim": "DUP",
+                       "args": [
+                         {  "int": "2"  }
+                       ]
+                 },
+                 {  "prim": "DUP",
+                    "args": [
+                      {  "int": "4"  }
+                    ]
+                 },
+                 {  "prim": "VIEW",
+                    "args": [
+                      {  "string": "get_royalties"  },
+                      {  "prim": "list",
+                         "args": [
+                           {  "prim": "pair",
+                              "args": [
+                                {  "prim": "address",
+                                   "annots": [
+                                     "%partAccount"
+                                   ]
+                                },
+                                {  "prim": "nat",
+                                   "annots": [
+                                     "%partValue"
+                                   ]
+                                }
+                              ]
+                           }
+                         ]
+                      }
+                    ]
+                 },
+                 {  "prim": "IF_NONE",
+                    "args": [
+                      [  {  "prim": "NIL",
+                            "args": [
+                              {  "prim": "pair",
+                                 "args": [
+                                   {  "prim": "address",
+                                      "annots": [
+                                        "%partAccount"
+                                      ]
+                                   },
+                                   {  "prim": "nat",
+                                      "annots": [
+                                        "%partValue"
+                                      ]
+                                   }
+                                 ]
+                              }
+                            ]
+                      }  ],
+                      [    ]
+                    ]
+                 }  ]
+               ]
+            }  ]
+          ]
+       },
+       {  "prim": "SWAP"  },
+       {  "prim": "DROP",
+          "args": [
+            {  "int": "1"  }
+          ]
+       },
+       {  "prim": "DIP",
+          "args": [
+            {  "int": "1"  },
+            [  {  "prim": "DROP",
+                  "args": [
+                    {  "int": "3"  }
+                  ]
+            }  ]
+          ]
+       }  ]
+     ]
   }  ]
 
 export function royalties_storage(owner: string) : any {

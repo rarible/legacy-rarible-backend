@@ -5975,6 +5975,91 @@ export const nft_public_code : any =
           ]
        }  ]
      ]
+  },
+  {  "prim": "view",
+     "args": [
+       {  "string": "get_royalties"  },
+       {  "prim": "nat"  },
+       {  "prim": "list",
+          "args": [
+            {  "prim": "pair",
+               "args": [
+                 {  "prim": "address",
+                    "annots": [
+                      "%partAccount"
+                    ]
+                 },
+                 {  "prim": "nat",
+                    "annots": [
+                      "%partValue"
+                    ]
+                 }
+               ]
+            }
+          ]
+       },
+       [  {  "prim": "UNPAIR"  },
+       {  "prim": "DIP",
+          "args": [
+            {  "int": "1"  },
+            [  {  "prim": "CDR"  },
+            {  "prim": "UNPAIR"  },
+            {  "prim": "SWAP"  },
+            {  "prim": "DROP",
+               "args": [
+                 {  "int": "1"  }
+               ]
+            }  ]
+          ]
+       },
+       {  "prim": "UNIT"  },
+       {  "prim": "DUP",
+          "args": [
+            {  "int": "3"  }
+          ]
+       },
+       {  "prim": "DUP",
+          "args": [
+            {  "int": "3"  }
+          ]
+       },
+       {  "prim": "GET"  },
+       {  "prim": "IF_NONE",
+          "args": [
+            [  {  "prim": "PUSH",
+                  "args": [
+                    {  "prim": "string"  },
+                    {  "string": "royalties"  }
+                  ]
+            },
+            {  "prim": "PUSH",
+               "args": [
+                 {  "prim": "string"  },
+                 {  "string": "AssetNotFound"  }
+               ]
+            },
+            {  "prim": "PAIR"  },
+            {  "prim": "FAILWITH"  }  ],
+            [    ]
+          ]
+       },
+       {  "prim": "SWAP"  },
+       {  "prim": "DROP",
+          "args": [
+            {  "int": "1"  }
+          ]
+       },
+       {  "prim": "DIP",
+          "args": [
+            {  "int": "1"  },
+            [  {  "prim": "DROP",
+                  "args": [
+                    {  "int": "2"  }
+                  ]
+            }  ]
+          ]
+       }  ]
+     ]
   }  ]
 
 export function nft_public_storage(owner : string) : any {
