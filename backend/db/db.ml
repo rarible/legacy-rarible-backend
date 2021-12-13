@@ -1224,18 +1224,27 @@ let insert_mint_metadata dbh ~contract ~token_id ~block ~level ~tsp ~metadata =
     insert_mint_metadata_formats dbh ~contract ~token_id ~block ~level ~tsp ~metadata in
   let>? () =
     insert_mint_metadata_attributes dbh ~contract ~token_id ~block ~level ~tsp ~metadata in
-  let name = metadata.tzip21_tm_name in
-  let symbol = metadata.tzip21_tm_symbol in
+  let name = match metadata.tzip21_tm_name with
+    | None -> None
+    | Some n -> if Parameters.decode n then Some n else None in
+  let symbol = match metadata.tzip21_tm_symbol with
+    | None -> None
+    | Some n -> if Parameters.decode n then Some n else None in
   let decimals = Option.bind metadata.tzip21_tm_decimals (fun i -> Some (Int32.of_int i))  in
   let artifact_uri = metadata.tzip21_tm_artifact_uri in
   let display_uri = metadata.tzip21_tm_display_uri in
   let thumbnail_uri = metadata.tzip21_tm_thumbnail_uri in
-  let description = metadata.tzip21_tm_description in
+  let description = match metadata.tzip21_tm_description with
+    | None -> None
+    | Some n -> if Parameters.decode n then Some n else None in
   let minter = metadata.tzip21_tm_minter in
   let is_boolean_amount = metadata.tzip21_tm_is_boolean_amount in
-  let tags = match metadata.tzip21_tm_tags with
-    | None -> None
-    | Some t -> Some (List.map Option.some t) in
+   let tags = match metadata.tzip21_tm_tags with
+     | None -> None
+     | Some t -> Some (List.map (fun tag ->
+         if Parameters.decode tag then
+           Option.some tag
+         else None) t) in
   let contributors = match metadata.tzip21_tm_contributors with
     | None -> None
     | Some c -> Some (List.map Option.some c) in

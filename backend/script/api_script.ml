@@ -81,6 +81,7 @@ let royalties_contracts = [
 let royalties_contracts_len = List.length royalties_contracts
 
 let ipfs_metadatas = [
+  (* "ipfs://QmfTFmtHSinLFHfHd7r5Rk3q9HmbNH2VpttJpcGAVQpFZn"; *)
   "ipfs://Qma11k6ahPRXGVV7RgHNuLuwB9PqQB2MVJUtNNXJ7dQeAr";
   "ipfs://QmeaqRBUiw4cJiNKEcW2noc7egLd5GgBqLcHHqUhauJAHN";
   "ipfs://QmUKCfBnpN4CurChDS96wMcQ1akUJXiKtkZtHgHmieZUyL";
@@ -90,6 +91,7 @@ let ipfs_metadatas = [
 ]
 let ipfs_metadatas_len = List.length ipfs_metadatas
 let ipfs_metadatas_name = [
+  (* "ipfs://QmfTFmtHSinLFHfHd7r5Rk3q9HmbNH2VpttJpcGAVQpFZn", "utf8_0"; *)
   "ipfs://Qma11k6ahPRXGVV7RgHNuLuwB9PqQB2MVJUtNNXJ7dQeAr", "hDAO";
   "ipfs://QmeaqRBUiw4cJiNKEcW2noc7egLd5GgBqLcHHqUhauJAHN", "dali tower";
   "ipfs://QmUKCfBnpN4CurChDS96wMcQ1akUJXiKtkZtHgHmieZUyL", "Non Fungible Taco";
