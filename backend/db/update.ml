@@ -45,7 +45,8 @@ let upgrade_1_to_2 dbh version =
       symbol varchar,
       minters varchar[],
       uri_pattern varchar,
-      counter zarith not null default 0)|};
+      counter zarith not null default 0,
+      metadata_id varchar)|};
 
     {|create table tzip21_creators(
       contract varchar not null,
@@ -182,6 +183,7 @@ let upgrade_1_to_2 dbh version =
       token_id varchar,
       amount zarith,
       royalties jsonb,
+      metadata jsonb,
       primary key (block, index, transfer_index))|};
 
     {|create table token_balance_updates(
