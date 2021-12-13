@@ -44,7 +44,7 @@ let db_contracts =
       | Some k, Some v ->
         let ledger_key = EzEncoding.destruct micheline_type_short_enc k in
         let ledger_value = EzEncoding.destruct micheline_type_short_enc v in
-        let v = {nft_type = {ledger_key; ledger_value}; nft_id=r#ledger_id} in
+        let v = {nft_type = {ledger_key; ledger_value}; nft_id=Z.of_string r#ledger_id} in
         SMap.add r#address v acc
       | _ -> acc) SMap.empty
 
@@ -63,8 +63,8 @@ let db_ft_contract r =
   match v with
   | None -> None
   | Some ft_kind -> Some {
-      ft_kind; ft_ledger_id = r#ledger_id; ft_decimals = r#decimals;
-      ft_crawled=r#crawled; ft_token_id = r#token_id}
+      ft_kind; ft_ledger_id = Z.of_string r#ledger_id; ft_decimals = r#decimals;
+      ft_crawled=r#crawled; ft_token_id = Option.map Z.of_string r#token_id}
 
 let db_ft_contracts =
   List.fold_left (fun acc r ->
@@ -109,8 +109,8 @@ let update_extra_config ?dbh e =
           "update state set exchange = ${e.exchange}, \
            royalties = ${e.royalties}, transfer_manager = ${e.transfer_manager}"] in
   iter_rp (fun (address, lk) ->
-      let id = lk.ft_ledger_id in
-      let token_id = lk.ft_token_id in
+      let id = Z.to_string lk.ft_ledger_id in
+      let token_id = Option.map Z.to_string lk.ft_token_id in
       let kind, k, v = match lk.ft_kind with
         | Fa2_single -> "fa2_single", None, None
         | Fa2_multiple -> "fa2_multiple", None, None
@@ -211,12 +211,12 @@ let mk_order_activity_bid ~dbh obj =
   let$ make = mk_asset
       obj#make_asset_type_class
       obj#make_asset_type_contract
-      obj#make_asset_type_token_id
+      (Option.map Z.of_string obj#make_asset_type_token_id)
       make_value in
   let$ take = mk_asset
       obj#take_asset_type_class
       obj#take_asset_type_contract
-      obj#take_asset_type_token_id
+      (Option.map Z.of_string obj#take_asset_type_token_id)
       take_value in
   let|$ price = nft_price make take in
   {
@@ -232,7 +232,7 @@ let mk_left_side obj =
     mk_asset
       obj#oleft_make_asset_type_class
       obj#oleft_make_asset_type_contract
-      obj#oleft_make_asset_type_token_id
+      (Option.map Z.of_string obj#oleft_make_asset_type_token_id)
       obj#oleft_make_asset_value in
   {
     order_activity_match_side_maker = obj#oleft_maker ;
@@ -245,7 +245,7 @@ let mk_right_side obj =
   let|$ asset = mk_asset
       obj#oright_make_asset_type_class
       obj#oright_make_asset_type_contract
-      obj#oright_make_asset_type_token_id
+      (Option.map Z.of_string obj#oright_make_asset_type_token_id)
       obj#oright_make_asset_value in
   {
     order_activity_match_side_maker = obj#oright_maker ;
@@ -266,12 +266,12 @@ let mk_order_activity_match obj =
       order_activity_match_right = right ;
       order_activity_match_price = price ;
       order_activity_match_type =
-        if obj#oleft_salt <> Z.zero then
+        if Z.of_string obj#oleft_salt <> Z.zero then
           begin match left.order_activity_match_side_asset.asset_type with
             | ATNFT _ | ATMT _ -> MTSELL
             | _ -> MTACCEPT_BID
           end
-        else if obj#oright_salt <> Z.zero then
+        else if Z.of_string obj#oright_salt <> Z.zero then
           begin match right.order_activity_match_side_asset.asset_type with
             | ATNFT _ | ATMT _ -> MTSELL
             | _ -> MTACCEPT_BID
@@ -287,12 +287,12 @@ let mk_order_activity_cancel_list obj =
   let$ make = mk_asset
       obj#make_asset_type_class
       obj#make_asset_type_contract
-      obj#make_asset_type_token_id
+      (Option.map Z.of_string obj#make_asset_type_token_id)
       obj#make_asset_value in
   let|$ take = mk_asset
       obj#take_asset_type_class
       obj#take_asset_type_contract
-      obj#take_asset_type_token_id
+      (Option.map Z.of_string obj#take_asset_type_token_id)
       obj#take_asset_value in
   let bid = {
     order_activity_cancel_bid_hash = obj#o_hash;
@@ -311,12 +311,12 @@ let mk_order_activity_cancel_bid obj =
   let$ make = mk_asset
       obj#make_asset_type_class
       obj#make_asset_type_contract
-      obj#make_asset_type_token_id
+      (Option.map Z.of_string obj#make_asset_type_token_id)
       obj#make_asset_value in
   let$ take = mk_asset
       obj#take_asset_type_class
       obj#take_asset_type_contract
-      obj#take_asset_type_token_id
+      (Option.map Z.of_string obj#take_asset_type_token_id)
       obj#take_asset_value in
   let bid = {
     order_activity_cancel_bid_hash = obj#o_hash;
@@ -384,7 +384,7 @@ let get_decimals ?dbh ?(do_error=false) = function
     use dbh @@ fun dbh ->
     let>? l = [%pgsql dbh
         "select decimals from ft_contracts where address = $contract \
-         and ($no_token_id or token_id = $?token_id)"] in
+         and ($no_token_id or token_id = $?{Option.map Z.to_string token_id})"] in
     match l with
     | [] | _ :: _ :: _ ->
       if do_error then Lwt.return_error (`hook_error "ft_contract_not_found")
@@ -397,7 +397,8 @@ let get_ft_balance ?dbh ?token_id ?(do_error=false) ~contract account =
   use dbh @@ fun dbh ->
   let>? l = [%pgsql dbh
       "select balance from token_balance_updates where contract = $contract \
-       and account = $account and main and ($no_token_id or token_id = $?token_id) order by level desc limit 1"] in
+       and account = $account and main and ($no_token_id or token_id = $?{Option.map Z.to_string token_id}) \
+       order by level desc limit 1"] in
   match l with
   | [] | _ :: _ :: _ | [ None ] -> Lwt.return_ok (Z.zero, None)
   | [ Some b ] -> Lwt.return_ok (b, decimals)
@@ -412,7 +413,7 @@ let get_make_balance ?dbh make owner = match make.asset_type with
     let|>? l = [%pgsql.object dbh
         "select amount from tokens where \
          main and \
-         contract = $asset_contract and token_id = $asset_token_id and \
+         contract = $asset_contract and token_id = ${Z.to_string asset_token_id} and \
          owner = $owner"] in
     match l with
     | [ r ] -> r#amount
@@ -458,12 +459,12 @@ let mk_order ?dbh order_obj =
   let>? order_elt_make = Lwt.return @@ mk_asset
       order_obj#make_asset_type_class
       order_obj#make_asset_type_contract
-      order_obj#make_asset_type_token_id
+      (Option.map Z.of_string order_obj#make_asset_type_token_id)
       order_obj#make_asset_value in
   let>? order_elt_take = Lwt.return @@ mk_asset
       order_obj#take_asset_type_class
       order_obj#take_asset_type_contract
-      order_obj#take_asset_type_token_id
+      (Option.map Z.of_string order_obj#take_asset_type_token_id)
       order_obj#take_asset_value in
   let>? price_history = get_order_price_history ?dbh order_obj#hash in
   let>? origin_fees = get_order_origin_fees ?dbh order_obj#hash in
@@ -488,7 +489,7 @@ let mk_order ?dbh order_obj =
     order_elt_end = order_obj#end_date ;
     order_elt_make_stock = make_stock ;
     order_elt_cancelled = cancelled ;
-    order_elt_salt = order_obj#salt ;
+    order_elt_salt = Z.of_string order_obj#salt ;
     order_elt_signature = order_obj#signature ;
     order_elt_created_at = order_obj#created_at ;
     order_elt_last_update_at = last_update_at ;
@@ -540,18 +541,18 @@ let get_nft_item_creators dbh ~contract ~token_id =
   let|>? r =
     [%pgsql.object dbh
         "select account, value FROM tzip21_creators where main and \
-         contract = $contract and token_id = $token_id"] in
+         contract = $contract and token_id = ${Z.to_string token_id}"] in
   filter_creators @@
   List.map (fun r -> { part_account = r#account ; part_value = r#value} ) r
 
 let get_nft_item_owners dbh ~contract ~token_id =
   [%pgsql dbh
       "select owner FROM tokens where main and \
-       amount > 0::mpz and contract = $contract and token_id = $token_id"]
+       amount > 0 and contract = $contract and token_id = ${Z.to_string token_id}"]
 
 let mk_nft_ownership obj =
   let contract = obj#contract in
-  let token_id = obj#token_id in
+  let token_id = Z.of_string obj#token_id in
   let creators = List.filter_map (function
       | None -> None
       | Some json -> Some (EzEncoding.destruct part_enc json)) obj#creators in
@@ -576,8 +577,8 @@ let get_nft_ownership_by_id ?dbh ?(old=false) contract token_id owner =
       "select concat(contract, ':', token_id, ':', owner) as id, \
        contract, token_id, owner, last, tsp, amount, supply, metadata, creators \
        from tokens where \
-       main and contract = $contract and token_id = $token_id and \
-       owner = $owner and (amount > 0::mpz or $old)"] in
+       main and contract = $contract and token_id = ${Z.to_string token_id} and \
+       owner = $owner and (amount > 0 or $old)"] in
   match l with
   | [] -> Lwt.return_error (`hook_error "not found")
   | _ ->
@@ -646,7 +647,7 @@ let get_metadata_formats dbh ~contract ~token_id =
         "select uri, hash, mime_type, file_size, file_name, duration, \
          dimensions_value, dimensions_unit, data_rate_value, data_rate_unit \
          from tzip21_formats where \
-         contract = $contract and token_id = $token_id and main"] in
+         contract = $contract and token_id = ${Z.to_string token_id} and main"] in
   match l with
   | [] -> Lwt.return_ok None
   | _ ->
@@ -664,7 +665,7 @@ let get_metadata_attributes dbh ~contract ~token_id =
   let>? l =
     [%pgsql.object dbh
         "select name, value, type as typ from tzip21_attributes where \
-         contract = $contract and token_id = $token_id and main"] in
+         contract = $contract and token_id = ${Z.to_string token_id} and main"] in
   match l with
   | [] -> Lwt.return_ok None
   | _ ->
@@ -681,7 +682,7 @@ let mk_nft_item_meta dbh ~contract ~token_id =
        description, minter, is_boolean_amount, tags, contributors, \
        publishers, date, block_level, genres, language, rights, right_uri, \
        is_transferable, should_prefer_symbol from tzip21_metadata where \
-       contract = $contract and token_id = $token_id and main"] in
+       contract = $contract and token_id = ${Z.to_string token_id} and main"] in
   match l with
   | [] ->
     Format.eprintf "metadata not found for %s:%s@." contract (Z.to_string token_id) ;
@@ -725,7 +726,7 @@ let mk_nft_item_meta dbh ~contract ~token_id =
 
 let mk_nft_item dbh ?include_meta obj =
   let contract = obj#contract in
-  let token_id = obj#token_id in
+  let token_id = Z.of_string obj#token_id in
   let creators = List.filter_map (function
       | None -> None
       | Some json -> Some (EzEncoding.destruct part_enc json)) obj#creators in
@@ -759,7 +760,7 @@ let get_nft_item_by_id ?dbh ?include_meta contract token_id =
       "select concat(contract, ':', token_id::varchar) as id, contract, token_id, \
        last, amount, supply, metadata, tsp, creators, royalties \
        from tokens where \
-       main and contract = $contract and token_id = $token_id"] in
+       main and contract = $contract and token_id = ${Z.to_string token_id}"] in
   match l with
   | obj :: _ ->
     let>? nft_item = mk_nft_item dbh ?include_meta obj in
@@ -833,7 +834,7 @@ let produce_order_event_item dbh old_owner contract token_id =
     [%pgsql.object dbh
         "select hash from orders \
          where make_asset_type_contract = $contract and \
-         make_asset_type_token_id = $token_id and \
+         make_asset_type_token_id = ${Z.to_string token_id} and \
          maker = $old_owner"] in
   iter_rp (fun r ->
       let>? order = get_order ~dbh r#hash in
@@ -912,7 +913,7 @@ let insert_nft_activity dbh index timestamp nft_activity =
     | NftActivityMint elt -> "mint", None, elt
     | NftActivityBurn elt -> "burn", None, elt
     | NftActivityTransfer {elt; from} -> "transfer", Some from, elt in
-  let token_id = elt.nft_activity_token_id in
+  let token_id = Z.to_string elt.nft_activity_token_id in
   let value = elt.nft_activity_value in
   let level = Int64.to_int32 elt.nft_activity_block_number in
   [%pgsql dbh
@@ -964,7 +965,7 @@ let insert_nft_activity_transfer dbh op kt1 from owner token_id amount =
 let mk_nft_activity_elt obj = {
   nft_activity_owner = obj#owner ;
   nft_activity_contract = obj#contract ;
-  nft_activity_token_id = obj#token_id ;
+  nft_activity_token_id = Z.of_string obj#token_id ;
   nft_activity_value = obj#amount ;
   nft_activity_transaction_hash = obj#transaction ;
   nft_activity_block_hash = obj#block ;
@@ -1111,7 +1112,7 @@ let insert_mint_metadata_creators  dbh ~contract ~token_id ~block ~level ~tsp ~m
           [%pgsql dbh
               "insert into tzip21_creators(contract, token_id, block, level, \
                tsp, account, value) \
-               values($contract, $token_id, $block, $level, $tsp, \
+               values($contract, ${Z.to_string token_id}, $block, $level, $tsp, \
                ${p.part_account}, ${p.part_value}) \
                on conflict do nothing"]
         with _ -> Lwt.return_ok ())
@@ -1124,7 +1125,7 @@ let insert_mint_metadata_creators  dbh ~contract ~token_id ~block ~level ~tsp ~m
           [%pgsql dbh
               "insert into tzip21_creators(contract, token_id, block, level, \
                tsp, account, value) \
-               values($contract, $token_id, $block, $level, $tsp, $part_account, \
+               values($contract, ${Z.to_string token_id}, $block, $level, $tsp, $part_account, \
                $part_value) \
                on conflict do nothing"]
         with _ -> Lwt.return_ok ())
@@ -1139,7 +1140,7 @@ let insert_mint_metadata_creators  dbh ~contract ~token_id ~block ~level ~tsp ~m
           [%pgsql dbh
               "insert into tzip21_creators(contract, token_id, block, level, \
                tsp, account, value) \
-               values($contract, $token_id, $block, $level, $tsp, \
+               values($contract, ${Z.to_string token_id}, $block, $level, $tsp, \
                $part_account, $value) \
                on conflict do nothing"]
         with _ -> Lwt.return_ok ())
@@ -1155,7 +1156,7 @@ let insert_mint_metadata_creators  dbh ~contract ~token_id ~block ~level ~tsp ~m
           [%pgsql dbh
               "insert into tzip21_creators(contract, token_id, block, level, \
                tsp, account, value) \
-               values($contract, $token_id, $block, $level, $tsp, \
+               values($contract, ${Z.to_string token_id}, $block, $level, $tsp, \
                $part_account, $value) \
                on conflict do nothing"]
         with _ -> Lwt.return_ok ())
@@ -1179,7 +1180,7 @@ let insert_mint_metadata_formats dbh ~contract ~token_id ~block ~level ~tsp ~met
           "insert into tzip21_formats(contract, token_id, block, level, \
            tsp, uri, hash, mime_type, file_size, file_name, duration, \
            dimensions_value, dimensions_unit, data_rate_value, data_rate_unit) \
-           values($contract, $token_id, $block, $level, $tsp, ${f.format_uri}, \
+           values($contract, ${Z.to_string token_id}, $block, $level, $tsp, ${f.format_uri}, \
            $?{f.format_hash}, $?{f.format_mime_type}, $?size, \
            $?{f.format_file_name}, $?{f.format_duration}, $?dim_value, \
            $?dim_unit, $?dr_value, $?dr_unit) \
@@ -1193,7 +1194,7 @@ let insert_mint_metadata_formats dbh ~contract ~token_id ~block ~level ~tsp ~met
            data_rate_value = $?dr_value, \
            data_rate_unit = $?dr_unit \
            where tzip21_formats.contract = $contract and \
-           tzip21_formats.token_id = $token_id and \
+           tzip21_formats.token_id = ${Z.to_string token_id} and \
            tzip21_formats.uri = ${f.format_uri}"])
     formats
   | None -> Lwt.return_ok ()
@@ -1206,13 +1207,13 @@ let insert_mint_metadata_attributes dbh ~contract ~token_id ~block ~level ~tsp ~
         [%pgsql dbh
             "insert into tzip21_attributes(contract, token_id, block, level, \
              tsp, name, value, type) \
-             values($contract, $token_id, $block, $level, $tsp, \
+             values($contract, ${Z.to_string token_id}, $block, $level, $tsp, \
              ${a.attribute_name}, $value, $?{a.attribute_type}) \
              on conflict (name, contract, token_id) do update set \
              value = $value, \
              type = $?{a.attribute_type} \
              where tzip21_attributes.contract = $contract and \
-             tzip21_attributes.token_id = $token_id and \
+             tzip21_attributes.token_id = ${Z.to_string token_id} and \
              tzip21_attributes.name = ${a.attribute_name}"])
       attributes
   | None -> Lwt.return_ok ()
@@ -1269,7 +1270,7 @@ let insert_mint_metadata dbh ~contract ~token_id ~block ~level ~tsp ~metadata =
        description, minter, is_boolean_amount, tags, contributors, \
        publishers, date, block_level, genres, language, rights, right_uri, \
        is_transferable, should_prefer_symbol) \
-       values ($contract, $token_id, $block, $level, $tsp, $?name, $?symbol, \
+       values ($contract, ${Z.to_string token_id}, $block, $level, $tsp, $?name, $?symbol, \
        $?decimals, $?artifact_uri, $?display_uri, $?thumbnail_uri, \
        $?description, $?minter, $?is_boolean_amount, $?tags, $?contributors, \
        $?publishers, $?date, $?block_level, $?genres, $?language, $?rights, \
@@ -1285,7 +1286,7 @@ let insert_mint_metadata dbh ~contract ~token_id ~block ~level ~tsp ~metadata =
        is_transferable = $?is_transferable, \
        should_prefer_symbol = $?should_prefer_symbol \
        where tzip21_metadata.contract = $contract and \
-       tzip21_metadata.token_id = $token_id"]
+       tzip21_metadata.token_id = ${Z.to_string token_id}"]
 
 let get_uri_pattern ~dbh contract =
   let>? l =
@@ -1344,7 +1345,7 @@ let insert_mint ~dbh ~op ~contract m =
         "insert into tokens(contract, token_id, block, level, tsp, \
          last_block, last_level, last, owner, \
          amount, transaction, supply, metadata, royalties, metadata_uri) \
-         values($contract, $token_id, $block, $level, $tsp, $block, $level, \
+         values($contract, ${Z.to_string token_id}, $block, $level, $tsp, $block, $level, \
          $tsp, $owner, 0, ${op.bo_hash}, 0, $meta, $royalties, $?uri) \
          on conflict do nothing"] in
   let mint = EzEncoding.construct mint_enc m in
@@ -1377,14 +1378,14 @@ let insert_transfer ~dbh ~op ~contract lt =
               "insert into tokens(contract, token_id, block, level, tsp, \
                last_block, last_level, last, owner, amount, \
                metadata, transaction, supply) \
-               values($contract, $tr_token_id, ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, \
+               values($contract, ${Z.to_string tr_token_id}, ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, \
                ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, \
                $tr_source, 0, '{}', ${op.bo_hash}, 0) on conflict do nothing"] in
           let>? () = [%pgsql dbh
               "insert into tokens(contract, token_id, block, level, tsp, \
                last_block, last_level, last, owner, amount, \
                metadata, transaction, supply) \
-               values($contract, $tr_token_id, ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, \
+               values($contract, ${Z.to_string tr_token_id}, ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, \
                ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, \
                $tr_destination, 0, '{}', ${op.bo_hash}, 0) on conflict do nothing"] in
           let>? () = [%pgsql dbh
@@ -1392,7 +1393,7 @@ let insert_transfer ~dbh ~op ~contract lt =
                source, destination, contract, token_id, amount, transfer_index) \
                values(${op.bo_hash}, ${op.bo_index}, ${op.bo_block}, ${op.bo_level}, \
                ${op.bo_tsp}, $tr_source, $tr_destination, $contract, \
-               $tr_token_id, $tr_amount, $transfer_index) \
+               ${Z.to_string tr_token_id}, $tr_amount, $transfer_index) \
                on conflict do nothing"] in
           let|>? () = insert_nft_activity_transfer
               dbh op contract tr_source tr_destination tr_token_id tr_amount in
@@ -1439,7 +1440,7 @@ let insert_token_balances ~dbh ~op ~contract ?(ft=false) ?token_id balances =
             "insert into token_balance_updates(transaction, index, block, level, \
              tsp, kind, contract, token_id, account, balance) \
              values(${op.bo_hash}, ${op.bo_index}, ${op.bo_block}, ${op.bo_level}, \
-             ${op.bo_tsp}, $kind, $contract, $token_id, $?account, $?balance) on conflict do nothing"] in
+             ${op.bo_tsp}, $kind, $contract, ${Z.to_string token_id}, $?account, $?balance) on conflict do nothing"] in
         match account, ft with
         | None, _ | _, true -> Lwt.return_ok ()
         | Some a, _ ->
@@ -1447,7 +1448,7 @@ let insert_token_balances ~dbh ~op ~contract ?(ft=false) ?token_id balances =
               "insert into tokens(contract, token_id, block, level, tsp, \
                last_block, last_level, last, owner, amount, \
                metadata, transaction, supply) \
-               values($contract, $token_id, ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, \
+               values($contract, ${Z.to_string token_id}, ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, \
                ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, \
                $a, 0, '{}', ${op.bo_hash}, 0) on conflict do nothing"]
           (* todo: get supply from other owner *)
@@ -1460,7 +1461,7 @@ let insert_update_operator ~dbh ~op ~contract lt =
            source, operator, add, contract, token_id) \
            values(${op.bo_hash}, ${op.bo_index}, ${op.bo_block}, ${op.bo_level}, \
            ${op.bo_tsp}, $op_owner, $op_operator, $op_add, \
-           $contract, $op_token_id) on conflict do nothing"]) lt
+           $contract, ${Z.to_string op_token_id}) on conflict do nothing"]) lt
 
 let insert_update_operator_all ~dbh ~op ~contract lt =
   let source = op.bo_op.source in
@@ -1501,7 +1502,7 @@ let reset_nft_item_meta_by_id ?dbh contract token_id =
   use dbh @@ fun dbh ->
   let>? l = [%pgsql dbh
       "select last_block, last_level, last, metadata_uri from tokens where \
-       main and contract = $contract and token_id = $token_id and metadata_uri is not null \
+       main and contract = $contract and token_id = ${Z.to_string token_id} and metadata_uri is not null \
        ORDER BY block desc LIMIT 1"] in
   match l with
   | [] | [ _, _, _, None ] -> Lwt.return_ok ()
@@ -1555,7 +1556,7 @@ let insert_royalties ~dbh ~op roy =
       "insert into token_updates(transaction, index, block, level, tsp, \
        source, token_id, contract, royalties) \
        values(${op.bo_hash}, ${op.bo_index}, ${op.bo_block}, ${op.bo_level}, \
-       ${op.bo_tsp}, $source, $?{roy.roy_token_id}, ${roy.roy_contract}, $royalties) \
+       ${op.bo_tsp}, $source, $?{Option.map Z.to_string roy.roy_token_id}, ${roy.roy_contract}, $royalties) \
        on conflict do nothing"]
 
 let insert_order_activity ?(main=false)
@@ -1733,11 +1734,11 @@ let insert_cancel ~dbh ~op ~maker_edpk ~maker ~make ~take ~salt (hash : Tzfunc.H
            take_asset_value, take_asset_decimals, \
            salt, signature, created_at, last_update_at, hash) \
            values($?maker, $maker_edpk, \
-           $make_class, $?make_contract, $?make_token_id, \
+           $make_class, $?make_contract, $?{Option.map Z.to_string make_token_id}, \
            $make_asset_value, $?make_decimals, \
-           $take_class, $?take_contract, $?take_token_id, \
+           $take_class, $?take_contract, $?{Option.map Z.to_string take_token_id}, \
            $take_asset_value, $?take_decimals, \
-           $salt, $signature, $created_at, $created_at, $hash) \
+           ${Z.to_string salt}, $signature, $created_at, $created_at, $hash) \
            on conflict do nothing"] in
   [%pgsql dbh
       "insert into order_cancel(transaction, index, block, level, tsp, source, cancel) \
@@ -1788,11 +1789,11 @@ let insert_do_transfers ~dbh ~op
              take_asset_value, take_asset_decimals, \
              salt, signature, created_at, last_update_at, hash) \
              values($?left_maker, $left_maker_edpk, \
-             $left_make_class, $?left_make_contract, $?left_make_token_id, \
+             $left_make_class, $?left_make_contract, $?{Option.map Z.to_string left_make_token_id}, \
              $left_make_asset_value, $?left_make_decimals, \
-             $left_take_class, $?left_take_contract, $?left_take_token_id, \
+             $left_take_class, $?left_take_contract, $?{Option.map Z.to_string left_take_token_id}, \
              $left_take_asset_value, $?left_take_decimals, \
-             $left_salt, $signature, $created_at, $created_at, $left) \
+             ${Z.to_string left_salt}, $signature, $created_at, $created_at, $left) \
              on conflict do nothing"] in
       [%pgsql dbh
           "insert into orders(maker, maker_edpk, \
@@ -1802,11 +1803,11 @@ let insert_do_transfers ~dbh ~op
            take_asset_value, take_asset_decimals, \
            salt, signature, created_at, last_update_at, hash) \
            values($?right_maker, $right_maker_edpk, \
-           $right_make_class, $?right_make_contract, $?right_make_token_id, \
+           $right_make_class, $?right_make_contract, $?{Option.map Z.to_string right_make_token_id}, \
            $right_make_asset_value, $?right_make_decimals, \
-           $right_take_class, $?right_take_contract, $?right_take_token_id, \
+           $right_take_class, $?right_take_contract, $?{Option.map Z.to_string right_take_token_id}, \
            $right_take_asset_value, $?right_take_decimals, \
-           $right_salt, $signature, $created_at, $created_at, $right) \
+           ${Z.to_string right_salt}, $signature, $created_at, $created_at, $right) \
            on conflict do nothing"]
     | None, Some (o, _decs) ->
       let left_maker_edpk = match left_maker_edpk with Some s -> s | None -> "None" in
@@ -1832,11 +1833,11 @@ let insert_do_transfers ~dbh ~op
            take_asset_value, take_asset_decimals, \
            salt, signature, created_at, last_update_at, hash) \
            values($?left_maker, $left_maker_edpk, \
-           $left_make_class, $?left_make_contract, $?left_make_token_id, \
+           $left_make_class, $?left_make_contract, $?{Option.map Z.to_string left_make_token_id}, \
            $left_make_asset_value, $?left_make_decimals, \
-           $left_take_class, $?left_take_contract, $?left_take_token_id, \
+           $left_take_class, $?left_take_contract, $?{Option.map Z.to_string left_take_token_id}, \
            $left_take_asset_value, $?left_take_decimals, \
-           $left_salt, $signature, $created_at, $created_at, $left) \
+           ${Z.to_string left_salt}, $signature, $created_at, $created_at, $left) \
            on conflict do nothing"]
     | Some (o, _decs), None ->
       let right_maker_edpk = match right_maker_edpk with Some s -> s | None -> "None" in
@@ -1862,11 +1863,11 @@ let insert_do_transfers ~dbh ~op
            take_asset_value, take_asset_decimals, \
            salt, signature, created_at, last_update_at, hash) \
            values($?right_maker, $right_maker_edpk, \
-           $right_make_class, $?right_make_contract, $?right_make_token_id, \
+           $right_make_class, $?right_make_contract, $?{Option.map Z.to_string right_make_token_id}, \
            $right_make_asset_value, $?right_make_decimals, \
-           $right_take_class, $?right_take_contract, $?right_take_token_id, \
+           $right_take_class, $?right_take_contract, $?{Option.map Z.to_string right_take_token_id}, \
            $right_take_asset_value, $?right_take_decimals, \
-           $right_salt, $signature, $created_at, $created_at, $right) \
+           ${Z.to_string right_salt}, $signature, $created_at, $created_at, $right) \
            on conflict do nothing"] in
   [%pgsql dbh
       "insert into order_match(transaction, index, block, level, tsp, source, \
@@ -2079,7 +2080,7 @@ let insert_origination config dbh op ori =
         "insert into contracts(kind, address, owner, block, level, tsp, \
          last_block, last_level, last, ledger_id, ledger_key, ledger_value, uri_pattern) \
          values($kind, $kt1, $?owner, ${op.bo_block}, ${op.bo_level}, \
-         ${op.bo_tsp}, ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, $ledger_id, \
+         ${op.bo_tsp}, ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, ${Z.to_string ledger_id}, \
          $ledger_key, $ledger_value, $?uri) \
          on conflict do nothing"] in
     let open Crawlori.Config in
@@ -2131,13 +2132,13 @@ let contract_updates_base dbh ~main ~contract ~block ~level ~tsp ~burn
   let>? old_supply, creators =
     let>? l = [%pgsql dbh
         "select supply, creators from tokens where contract = $contract and \
-         token_id = $token_id limit 1"] in
+         token_id = ${Z.to_string token_id} limit 1"] in
     one l in
   let new_supply = Z.(add old_supply (mul factor amount)) in
   let creators = List.filter_map (function
       | None -> None
       | Some json -> Some (EzEncoding.destruct part_enc json)) creators in
-  let creator_values_old = List.map (fun p -> p.part_account, Z.mul (Z.of_int32 p.part_value) old_supply) creators in
+  let creator_values_old = List.map (fun p -> p.part_account, Z.(mul (of_int32 p.part_value) old_supply)) creators in
   let creator_values_new =
     if main && not burn || not main && burn then
       match List.assoc_opt account creator_values_old with
@@ -2158,17 +2159,17 @@ let contract_updates_base dbh ~main ~contract ~block ~level ~tsp ~burn
               part_value = Z.(to_int32 @@ div v new_supply)})) creator_values_new in
   let>? () = [%pgsql dbh
       "update tokens set supply = $new_supply, creators = $creators, \
-       amount = amount + $factor * $amount::mpz, \
+       amount = amount + ${Z.to_string factor}::numeric * ${Z.to_string amount}::numeric, \
        last_block = case when $main then $block else last_block end, \
        last_level = case when $main then $level else last_level end, \
        last = case when $main then $tsp else last end \
-       where token_id = $token_id and contract = $contract and owner = $account"] in
+       where token_id = ${Z.to_string token_id} and contract = $contract and owner = $account"] in
   [%pgsql dbh
       "update tokens set supply = $new_supply, creators = $creators, \
        last_block = case when $main then $block else last_block end, \
        last_level = case when $main then $level else last_level end, \
        last = case when $main then $tsp else last end
-       where token_id = $token_id and contract = $contract and owner <> $account"]
+       where token_id = ${Z.to_string token_id} and contract = $contract and owner <> $account"]
 
 let metadata_enc =
   EzEncoding.ignore_enc @@ Json_encoding.(obj2 (req "name" string) (opt "symbol" string))
@@ -2280,7 +2281,7 @@ let contract_updates dbh main l =
         | [] | _ :: _ :: _ -> 0L, Z.zero
         | [ tokens_number, last_token_id ] ->
           Option.value ~default:0L tokens_number,
-          Option.value ~default:Z.zero last_token_id in
+          Option.fold ~none:Z.zero ~some:Z.of_string last_token_id in
       [%pgsql dbh
           "update contracts set \
            tokens_number = $tokens_number, \
@@ -2296,31 +2297,31 @@ let operator_updates dbh ?token_id ~operator ~add ~contract ~block ~level ~tsp ~
        last_block = case when $main then $block else last_block end, \
        last_level = case when $main then $level else last_level end, \
        last = case when $main then $tsp else last end \
-       where ($no_token_id or token_id = $?token_id) and owner = $source and contract = $contract"]
+       where ($no_token_id or token_id = $?{Option.map Z.to_string token_id}) and owner = $source and contract = $contract"]
 
 let transfer_updates dbh main ~contract ~block ~level ~tsp ~token_id ~source amount destination =
   let amount = if main then amount else Z.neg amount in
   let>? info = [%pgsql dbh
-      "update tokens set amount = amount - $amount::mpz, \
+      "update tokens set amount = amount - ${Z.to_string amount}::numeric, \
        last_block = case when $main then $block else last_block end, \
        last_level = case when $main then $level else last_level end, \
-       last = case when $main then $tsp else last end where token_id = $token_id and \
+       last = case when $main then $tsp else last end where token_id = ${Z.to_string token_id} and \
        owner = $source and contract = $contract \
        returning metadata, supply, transaction, tsp, royalties, creators"] in
   let>? meta, supply, transaction, tsp, royalties, creators =
     one ~err:"source token not found for transfer update" info in
   let>? () =
     [%pgsql dbh
-        "update tokens set amount = amount + $amount::mpz, \
-         metadata = case when amount = 0::mpz then $meta else metadata end, \
+        "update tokens set amount = amount + ${Z.to_string amount}::numeric, \
+         metadata = case when amount = 0 then $meta else metadata end, \
          royalties = $royalties, \
-         supply = case when amount = 0::mpz then $supply else supply end, \
-         transaction = case when amount = 0::mpz then $transaction else transaction end, \
+         supply = case when amount = 0 then ${Z.to_string supply}::numeric else supply end, \
+         transaction = case when amount = 0 then $transaction else transaction end, \
          last_block = case when $main then $block else block end, \
          last_level = case when $main then $level else level end, \
          last = case when $main then $tsp else last end, \
          creators = $creators \
-         where token_id = $token_id and \
+         where token_id = ${Z.to_string token_id} and \
          owner = $destination and contract = $contract"] in
   if main then
     let>? () = produce_nft_item_event dbh contract token_id in
@@ -2333,7 +2334,7 @@ let token_updates dbh main l =
   iter_rp (fun r ->
       let contract, block, level, tsp, source =
         r#contract, r#block, r#level, r#tsp, r#source in
-      match r#destination, r#token_id,
+      match r#destination, Option.map Z.of_string r#token_id,
             r#amount, r#operator, r#add, r#royalties  with
       | Some destination, Some token_id, Some amount, _, _, _ ->
         transfer_updates
@@ -2350,7 +2351,7 @@ let token_updates dbh main l =
                last_level = case when $main then $level else last_level end, \
                last = case when $main then $tsp else last end \
                where contract = $contract and \
-               ($no_token_id or token_id = $?token_id)"]
+               ($no_token_id or token_id = $?{Option.map Z.to_string token_id})"]
         else Lwt.return_ok ()
       | _ -> Lwt.return_error (`hook_error "invalid token_update")) l
 
@@ -2403,7 +2404,7 @@ let token_balance_updates dbh main l =
       List.fold_left (fun acc (account, amount, balance) ->
           match balance with
           | Some b when b <> amount ->
-            TMap.add (r#contract, r#token_id, account) (amount, b) acc
+            TMap.add (r#contract, Z.of_string r#token_id, account) (amount, b) acc
           | _ -> acc) acc l
     ) TMap.empty l in
   iter_rp (fun ((contract, token_id, owner), (amount, balance)) ->
@@ -2411,7 +2412,7 @@ let token_balance_updates dbh main l =
         contract (Z.to_string token_id) owner (Z.to_string amount) (Z.to_string balance);
       [%pgsql dbh
           "update tokens set amount = $balance where contract = $contract \
-           and token_id = $token_id and owner = $owner"]) @@ TMap.bindings m
+           and token_id = ${Z.to_string token_id} and owner = $owner"]) @@ TMap.bindings m
 
 let produce_cancel_events dbh main l =
   iter_rp (fun r ->
@@ -2535,7 +2536,7 @@ let get_nft_items_by_owner ?dbh ?include_meta ?continuation ?(size=50) owner =
       "select concat(contract, ':', token_id) as id, \
        contract, token_id, \
        last, amount, supply, metadata, tsp, creators, royalties from tokens where \
-       main and metadata <> '{}' and owner = $owner and amount > 0::mpz and \
+       main and metadata <> '{}' and owner = $owner and amount > 0 and \
        ($no_continuation or \
        (last = $ts and \
        concat(contract, ':', token_id) collate \"C\" < $id) or \
@@ -2545,7 +2546,7 @@ let get_nft_items_by_owner ?dbh ?include_meta ?continuation ?(size=50) owner =
        limit $size64"] in
   let>? nft_items_total = [%pgsql dbh
       "select count(distinct (contract, token_id)) from tokens where \
-       main and metadata <> '{}' and owner = $owner and amount > 0::mpz"] in
+       main and metadata <> '{}' and owner = $owner and amount > 0"] in
   let>? nft_items_total = match nft_items_total with
     | [ None ] -> Lwt.return_ok 0L
     | [ Some i64 ] -> Lwt.return_ok i64
@@ -2578,7 +2579,7 @@ let get_nft_items_by_creator ?dbh ?include_meta ?continuation ?(size=50) creator
        last, amount, supply, metadata, t.tsp, creators, royalties \
        from tokens as t, unnest(t.creators) as c \
        where c->>'account' = $creator and \
-       t.main and metadata <> '{}' and amount > 0::mpz and \
+       t.main and metadata <> '{}' and amount > 0 and \
        ($no_continuation or \
        (last = $ts and \
        concat(t.contract, ':', t.token_id) collate \"C\" < $id) or \
@@ -2590,7 +2591,7 @@ let get_nft_items_by_creator ?dbh ?include_meta ?continuation ?(size=50) creator
       "select count(distinct (t.token_id, t.contract, t,owner)) from tokens as t, \
        unnest(creators) as c \
        where c->>'account' = $creator and \
-       t.main and metadata <> '{}' and amount > 0::mpz"] in
+       t.main and metadata <> '{}' and amount > 0"] in
   let>? nft_items_total = match nft_items_total with
     | [ None ] -> Lwt.return_ok 0L
     | [ Some i64 ] -> Lwt.return_ok i64
@@ -2622,7 +2623,7 @@ let get_nft_items_by_collection ?dbh ?include_meta ?continuation ?(size=50) cont
        contract, token_id, \
        last, amount, supply, metadata, tsp, creators, royalties \
        from tokens where \
-       main and metadata <> '{}' and contract = $contract and amount > 0::mpz and \
+       main and metadata <> '{}' and contract = $contract and amount > 0 and \
        ($no_continuation or \
        (last = $ts and \
        concat(contract, ':', token_id) collate \"C\" < $id) or \
@@ -2632,7 +2633,7 @@ let get_nft_items_by_collection ?dbh ?include_meta ?continuation ?(size=50) cont
        limit $size64"] in
   let>? nft_items_total = [%pgsql dbh
       "select count(distinct (token_id, owner)) from tokens where \
-       main and metadata <> '{}' and contract = $contract and amount > 0::mpz"] in
+       main and metadata <> '{}' and contract = $contract and amount > 0"] in
   let>? nft_items_total = match nft_items_total with
     | [ None ] -> Lwt.return_ok 0L
     | [ Some i64 ] -> Lwt.return_ok i64
@@ -2693,7 +2694,7 @@ let get_nft_all_items
        last, amount, supply, metadata, tsp, creators, royalties \
        from tokens where \
        main and metadata <> '{}' and \
-       (supply > 0::mpz and amount > 0::mpz or (not $no_show_deleted and $show_deleted_v)) and \
+       (supply > 0 and amount > 0 or (not $no_show_deleted and $show_deleted_v)) and \
        ($no_last_updated_to or (last <= $last_updated_to_v)) and \
        ($no_last_updated_from or (last >= $last_updated_from_v)) and \
        ($no_continuation or \
@@ -2706,7 +2707,7 @@ let get_nft_all_items
   let>? nft_items_total = [%pgsql dbh
       "select count(distinct (owner, contract, token_id)) from tokens where \
        main and metadata <> '{}' and \
-       (supply > 0::mpz and amount > 0::mpz or (not $no_show_deleted and $show_deleted_v)) and \
+       (supply > 0 and amount > 0 or (not $no_show_deleted and $show_deleted_v)) and \
        ($no_last_updated_to or (last <= $last_updated_to_v)) and \
        ($no_last_updated_from or (last >= $last_updated_from_v))"] in
   let>? nft_items_total = match nft_items_total with
@@ -2805,7 +2806,7 @@ let get_nft_activities_by_item ?dbh ?(sort=LATEST_FIRST) ?continuation ?(size=50
       [%pgsql.object dbh
           "select activity_type, transaction, index, block, level, date, contract, \
            token_id, owner, amount, tr_from from nft_activities where \
-           main and contract = $contract and token_id = $token_id and \
+           main and contract = $contract and token_id = ${Z.to_string token_id} and \
            position(activity_type in $types) > 0 and \
            ($no_continuation or \
            (date = $ts and transaction collate \"C\" < $h) or \
@@ -2816,7 +2817,7 @@ let get_nft_activities_by_item ?dbh ?(sort=LATEST_FIRST) ?continuation ?(size=50
       [%pgsql.object dbh
           "select activity_type, transaction, index, block, level, date, contract, \
            token_id, owner, amount, tr_from from nft_activities where \
-           main and contract = $contract and token_id = $token_id and \
+           main and contract = $contract and token_id = ${Z.to_string token_id} and \
            position(activity_type in $types) > 0 and \
            ($no_continuation or \
            (date = $ts and transaction collate \"C\" > $h) or \
@@ -2966,7 +2967,7 @@ let get_nft_ownerships_by_item ?dbh ?continuation ?(size=50) contract token_id =
       "select concat(contract, ':', token_id, ':', owner) as id, \
        contract, token_id, owner, tsp, last, amount, supply, metadata, creators \
        from tokens where \
-       main and contract = $contract and token_id = $token_id and amount > 0::mpz and \
+       main and contract = $contract and token_id = ${Z.to_string token_id} and amount > 0 and \
        ($no_continuation or \
        (last = $ts and concat(contract, ':', token_id, ':', owner) collate \"C\" < $id) or \
        (last < $ts)) \
@@ -2975,8 +2976,8 @@ let get_nft_ownerships_by_item ?dbh ?continuation ?(size=50) contract token_id =
        limit $size64"] in
   let>? nft_ownerships_total = [%pgsql dbh
       "select count(distinct owner) from tokens where \
-       main and contract = $contract and token_id = $token_id \
-       and amount > 0::mpz"] in
+       main and contract = $contract and token_id = ${Z.to_string token_id} \
+       and amount > 0"] in
   let>? nft_ownerships_total = match nft_ownerships_total with
     | [ None ] -> Lwt.return_ok 0L
     | [ Some i64 ] -> Lwt.return_ok i64
@@ -3005,7 +3006,7 @@ let get_nft_all_ownerships ?dbh ?continuation ?(size=50) () =
       "select concat(contract, ':', token_id, ':', owner) as id, \
        contract, token_id, owner, tsp, last, amount, supply, metadata, creators \
        from tokens where \
-       main and amount > 0::mpz and \
+       main and amount > 0 and \
        ($no_continuation or \
        (last = $ts and concat(contract, ':', token_id, ':', owner) collate \"C\" < $id) or \
        (last < $ts)) \
@@ -3014,7 +3015,7 @@ let get_nft_all_ownerships ?dbh ?continuation ?(size=50) () =
        limit $size64"] in
   let>? nft_ownerships_total = [%pgsql dbh
       "select count(distinct owner) from tokens where \
-       main and amount > 0::mpz"] in
+       main and amount > 0"] in
   let>? nft_ownerships_total = match nft_ownerships_total with
     | [ None ] -> Lwt.return_ok 0L
     | [ Some i64 ] -> Lwt.return_ok i64
@@ -3034,7 +3035,7 @@ let generate_nft_token_id ?dbh contract =
   use dbh @@ fun dbh ->
   let>? r = [%pgsql dbh
       "update contracts set counter = case when counter > last_token_id \
-       then counter + 1::mpz else last_token_id + 1::mpz end \
+       then counter + 1 else last_token_id + 1 end \
        where address = $contract returning counter"] in
   match r with
   | [ i ] -> Lwt.return_ok {
@@ -3350,7 +3351,7 @@ let rec get_sell_orders_by_item_aux
       [%pgsql.object dbh
           "select hash, make_asset_value from orders \
            where make_asset_type_contract = $contract and \
-           make_asset_type_token_id = $token_id and \
+           make_asset_type_token_id = ${Z.to_string token_id} and \
            ($no_maker or maker = $maker_v) and \
            ($no_currency or \
            ($currency_tezos and take_asset_type_class = 'XTZ') or \
@@ -3358,12 +3359,12 @@ let rec get_sell_orders_by_item_aux
            take_asset_type_contract = $currency_contract) or \
            ($currency_c and $currency_tid and \
            take_asset_type_contract = $currency_contract and \
-           take_asset_type_token_id = $currency_token_id)) and \
+           take_asset_type_token_id = ${Z.to_string currency_token_id})) and \
            ($no_start_date or created_at >= $start_date_v) and \
            ($no_end_date or created_at <= $end_date_v) and \
            ($no_continuation or \
-           (make_asset_value > $p) or \
-           (make_asset_value = $p and \
+           (make_asset_value > ${Z.to_string p}::numeric) or \
+           (make_asset_value = ${Z.to_string p}::numeric and \
            hash collate \"C\" > $h)) \
            order by make_asset_value asc, \
            hash collate \"C\" asc \
@@ -3697,7 +3698,7 @@ let rec get_bid_orders_by_item_aux
       [%pgsql.object dbh
           "select hash, take_asset_value from orders \
            where take_asset_type_contract = $contract and \
-           take_asset_type_token_id = $token_id and \
+           take_asset_type_token_id = ${Z.to_string token_id} and \
            ($no_maker or maker = $maker_v) and \
            ($no_currency or \
            ($currency_tezos and make_asset_type_class = 'XTZ') or \
@@ -3705,12 +3706,12 @@ let rec get_bid_orders_by_item_aux
            make_asset_type_contract = $currency_contract) or \
            ($currency_c and $currency_tid and \
            make_asset_type_contract = $currency_contract and \
-           make_asset_type_token_id = $currency_token_id)) and \
+           make_asset_type_token_id = ${Z.to_string currency_token_id})) and \
            ($no_start_date or created_at >= $start_date_v) and \
            ($no_end_date or created_at <= $end_date_v) and \
            ($no_continuation or \
-           (take_asset_value < $p) or \
-           (take_asset_value = $p and \
+           (take_asset_value < ${Z.to_string p}::numeric) or \
+           (take_asset_value = ${Z.to_string p}::numeric and \
            hash collate \"C\" < $h)) \
            order by take_asset_value desc, \
            hash collate \"C\" desc \
@@ -3770,12 +3771,12 @@ let get_currencies_by_bid_orders_of_item ?dbh contract token_id =
         "select hash, make_asset_type_class, \
          make_asset_type_contract, make_asset_type_token_id from orders \
          where take_asset_type_contract = $contract and \
-         take_asset_type_token_id = $token_id"] in
+         take_asset_type_token_id = ${Z.to_string token_id}"] in
   let>? assets = map_rp (fun r ->
       Lwt.return @@ mk_asset
         r#make_asset_type_class
         r#make_asset_type_contract
-        r#make_asset_type_token_id
+        (Option.map Z.of_string r#make_asset_type_token_id)
         "0") l in
   let types = List.map (fun a -> a.asset_type) assets in
   let currencies =
@@ -3795,12 +3796,12 @@ let get_currencies_by_sell_orders_of_item ?dbh contract token_id =
         "select hash, take_asset_type_class, \
          take_asset_type_contract, take_asset_type_token_id from orders \
          where make_asset_type_contract = $contract and \
-         make_asset_type_token_id = $token_id"] in
+         make_asset_type_token_id = ${Z.to_string token_id}"] in
   let>? assets = map_rp (fun r ->
       Lwt.return @@ mk_asset
         r#take_asset_type_class
         r#take_asset_type_contract
-        r#take_asset_type_token_id
+        (Option.map Z.of_string r#take_asset_type_token_id)
         "0") l in
   let types = List.map (fun a -> a.asset_type) assets in
   let currencies =
@@ -3866,9 +3867,9 @@ let upsert_order ?dbh order =
        take_asset_value, take_asset_decimals, \
        start_date, end_date, salt, signature, created_at, last_update_at, hash) \
        values($maker, $?taker, $maker_edpk, $?taker_edpk, \
-       $make_class, $?make_contract, $?make_token_id, $make_asset_value, $?make_decimals, \
-       $take_class, $?take_contract, $?take_token_id, $take_asset_value, $?take_decimals, \
-       $?start_date, $?end_date, $salt, $signature, $created_at, $last_update_at, $hash_key) \
+       $make_class, $?make_contract, $?{Option.map Z.to_string make_token_id}, $make_asset_value, $?make_decimals, \
+       $take_class, $?take_contract, $?{Option.map Z.to_string take_token_id}, $take_asset_value, $?take_decimals, \
+       $?start_date, $?end_date, ${Z.to_string salt}, $signature, $created_at, $last_update_at, $hash_key) \
        on conflict (hash) do update set (\
        make_asset_value, take_asset_value, last_update_at, signature) = \
        ($make_asset_value, $take_asset_value, $last_update_at, $signature)"] in
@@ -4097,16 +4098,16 @@ let get_order_activities_by_item ?dbh ?(sort=LATEST_FIRST) ?continuation ?(size=
            left join orders as oleft on oleft.hash = a.match_left \
            left join orders as oright on oright.hash = a.match_right where \
            main and position(order_activity_type in $types) > 0 and \
-           ((o.make_asset_type_contract = $contract and o.make_asset_type_token_id = $token_id) or \
-           (o.take_asset_type_contract = $contract and o.take_asset_type_token_id = $token_id) or \
+           ((o.make_asset_type_contract = $contract and o.make_asset_type_token_id = ${Z.to_string token_id}) or \
+           (o.take_asset_type_contract = $contract and o.take_asset_type_token_id = ${Z.to_string token_id}) or \
            (oleft.make_asset_type_contract = $contract and \
-           oleft.make_asset_type_token_id = $token_id) or \
+           oleft.make_asset_type_token_id = ${Z.to_string token_id}) or \
            (oleft.take_asset_type_contract = $contract and \
-           oleft.take_asset_type_token_id = $token_id) or \
+           oleft.take_asset_type_token_id = ${Z.to_string token_id}) or \
            (oright.make_asset_type_contract = $contract and \
-           oright.make_asset_type_token_id = $token_id) or \
+           oright.make_asset_type_token_id = ${Z.to_string token_id}) or \
            (oright.take_asset_type_contract = $contract and \
-           oright.take_asset_type_token_id = $token_id)) and \
+           oright.take_asset_type_token_id = ${Z.to_string token_id})) and \
            ($no_continuation or \
            (date = $ts and id collate \"C\" < $h) or \
            (date < $ts)) \
@@ -4157,16 +4158,16 @@ let get_order_activities_by_item ?dbh ?(sort=LATEST_FIRST) ?continuation ?(size=
            left join orders as oleft on oleft.hash = a.match_left \
            left join orders as oright on oright.hash = a.match_right where \
            main and position(order_activity_type in $types) > 0 and \
-           ((o.make_asset_type_contract = $contract and o.make_asset_type_token_id = $token_id) or \
-           (o.take_asset_type_contract = $contract and o.take_asset_type_token_id = $token_id) or \
+           ((o.make_asset_type_contract = $contract and o.make_asset_type_token_id = ${Z.to_string token_id}) or \
+           (o.take_asset_type_contract = $contract and o.take_asset_type_token_id = ${Z.to_string token_id}) or \
            (oleft.make_asset_type_contract = $contract and \
-           oleft.make_asset_type_token_id = $token_id) or \
+           oleft.make_asset_type_token_id = ${Z.to_string token_id}) or \
            (oleft.take_asset_type_contract = $contract and \
-           oleft.take_asset_type_token_id = $token_id) or \
+           oleft.take_asset_type_token_id = ${Z.to_string token_id}) or \
            (oright.make_asset_type_contract = $contract and \
-           oright.make_asset_type_token_id = $token_id) or \
+           oright.make_asset_type_token_id = ${Z.to_string token_id}) or \
            (oright.take_asset_type_contract = $contract and \
-           oright.take_asset_type_token_id = $token_id)) and \
+           oright.take_asset_type_token_id = ${Z.to_string token_id})) and \
            ($no_continuation or \
            (date = $ts and id collate \"C\" > $h) or \
            (date > $ts)) \

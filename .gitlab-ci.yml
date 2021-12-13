@@ -17,11 +17,9 @@ check:
   script:
     - if [ ! -d _opam ]; then opam switch create --no-install . ocaml-system; fi
     - eval $(opam env)
-    - sudo apt-get install -y postgresql-13-pgmp npm
-    - createdb crawlori && sudo -i -u functori -- psql crawlori -c 'create extension if not exists pgmp;'
     - make deps
-    - POSTGRES_USER=functori make pgmp-extension
     - make
+    - sudo apt install -y npm
     - sudo npm install -g typescript
     - make ts-deps
     - make ts
