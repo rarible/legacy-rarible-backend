@@ -12,3 +12,4 @@
 /deployment/crawler_config.json
 .idea/
 /test
+/Makefile.config
