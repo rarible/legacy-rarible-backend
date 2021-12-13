@@ -423,20 +423,14 @@ let get_currency_param req =
     begin
       try
         match String.split_on_char ':' str with
-        | "FT" :: contract :: l ->
+        | contract :: l ->
           let token_id = match l with [] -> None | token_id :: _ -> Some (Z.of_string token_id) in
           ignore @@ Base58.decode ~prefix:Prefix.contract_public_key_hash contract ;
           Ok (Some (ATFT {contract; token_id}))
-        | "NFT" :: contract :: token_id :: [] ->
-          ignore @@ Base58.decode ~prefix:Prefix.contract_public_key_hash contract ;
-          Ok (Some (ATNFT { asset_contract = contract ; asset_token_id = Z.of_string token_id }))
-        | "MT" :: contract :: token_id :: [] ->
-          ignore @@ Base58.decode ~prefix:Prefix.contract_public_key_hash contract ;
-          Ok (Some (ATMT { asset_contract = contract ; asset_token_id = Z.of_string token_id }))
         | _ ->
-          mk_invalid_argument currency_param "must be XTZ, FA_1_2:ADDRESS or FA_2:ADDRESS:TOKENID"
+          mk_invalid_argument currency_param "must be XTZ, ADDRESS or ADDRESS:TOKENID"
       with _ ->
-        mk_invalid_argument currency_param "must be XTZ, FA_1_2:ADDRESS or FA_2:ADDRESS:TOKENID"
+        mk_invalid_argument currency_param "must be XTZ, ADDRESS or ADDRESS:TOKENID"
     end
 
 let get_sort_param req =

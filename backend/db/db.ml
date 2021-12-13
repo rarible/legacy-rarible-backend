@@ -3372,16 +3372,16 @@ let rec get_sell_orders_by_item_aux
   let no_maker, maker_v = maker = None, (match maker with None -> "" | Some m -> m) in
   let no_currency = currency = None in
   let currency_tezos = currency = Some ATXTZ in
-  let currency_fa1_2, currency_fa1_2_contract =
-    (match currency with Some (ATFT _) -> true | _ -> false),
-    match currency with Some ATFT {contract;_} -> contract | _ -> ""  in
-  let currency_fa2, (currency_fa2_contract, currency_fa2_token_id) =
-    (match currency with Some (ATNFT _) | Some (ATMT _) -> true | _ -> false),
-    match currency with
-    | Some ATNFT {asset_contract ; asset_token_id }
-    | Some ATMT {asset_contract ; asset_token_id } ->
-      asset_contract, asset_token_id
-    | _ -> "", Z.zero  in
+  let currency_c, currency_contract = match currency with
+    | Some (ATFT { contract ; _ } ) -> true, contract
+    | Some (ATMT { asset_contract ; _ } ) -> true, asset_contract
+    | Some (ATNFT { asset_contract ; _ } ) -> true, asset_contract
+    | _ -> false, "" in
+  let currency_tid, currency_token_id = match currency with
+    | Some (ATFT { token_id ; _ } ) -> true, Option.value ~default:Z.zero token_id
+    | Some (ATMT { asset_token_id ; _ } ) -> true, asset_token_id
+    | Some (ATNFT { asset_token_id ; _ } ) -> true, asset_token_id
+    | _ -> false, Z.zero in
   let no_start_date, start_date_v =
     start_date = None, (match start_date with None -> CalendarLib.Calendar.now () | Some d -> d) in
   let no_end_date, end_date_v =
@@ -3397,13 +3397,11 @@ let rec get_sell_orders_by_item_aux
            ($no_maker or maker = $maker_v) and \
            ($no_currency or \
            ($currency_tezos and take_asset_type_class = 'XTZ') or \
-           ($currency_fa1_2 and \
-           take_asset_type_class = 'FA1_2' and \
-           take_asset_type_contract = $currency_fa1_2_contract) or \
-           ($currency_fa2 and \
-           take_asset_type_class = 'FA_2' and \
-           take_asset_type_contract = $currency_fa2_contract and \
-           take_asset_type_token_id = $currency_fa2_token_id)) and \
+           ($currency_c and not $currency_tid and
+           take_asset_type_contract = $currency_contract) or \
+           ($currency_c and $currency_tid and \
+           take_asset_type_contract = $currency_contract and \
+           take_asset_type_token_id = $currency_token_id)) and \
            ($no_start_date or created_at >= $start_date_v) and \
            ($no_end_date or created_at <= $end_date_v) and \
            ($no_continuation or \
@@ -3721,16 +3719,16 @@ let rec get_bid_orders_by_item_aux
   let no_maker, maker_v = maker = None, (match maker with None -> "" | Some m -> m) in
   let no_currency = currency = None in
   let currency_tezos = currency = Some ATXTZ in
-  let currency_fa1_2, currency_fa1_2_contract =
-    (match currency with Some (ATFT _) -> true | _ -> false),
-    match currency with Some ATFT {contract;_} -> contract | _ -> ""  in
-  let currency_fa2, (currency_fa2_contract, currency_fa2_token_id) =
-    (match currency with Some (ATNFT _) | Some (ATMT _) -> true | _ -> false),
-    match currency with
-    | Some ATNFT {asset_contract ; asset_token_id }
-    | Some ATMT {asset_contract ; asset_token_id } ->
-      asset_contract, asset_token_id
-    | _ -> "", Z.zero  in
+  let currency_c, currency_contract = match currency with
+    | Some (ATFT { contract ; _ } ) -> true, contract
+    | Some (ATMT { asset_contract ; _ } ) -> true, asset_contract
+    | Some (ATNFT { asset_contract ; _ } ) -> true, asset_contract
+    | _ -> false, "" in
+  let currency_tid, currency_token_id = match currency with
+    | Some (ATFT { token_id ; _ } ) -> true, Option.value ~default:Z.zero token_id
+    | Some (ATMT { asset_token_id ; _ } ) -> true, asset_token_id
+    | Some (ATNFT { asset_token_id ; _ } ) -> true, asset_token_id
+    | _ -> false, Z.zero in
   let no_start_date, start_date_v =
     start_date = None, (match start_date with None -> CalendarLib.Calendar.now () | Some d -> d) in
   let no_end_date, end_date_v =
@@ -3745,14 +3743,12 @@ let rec get_bid_orders_by_item_aux
            take_asset_type_token_id = $token_id and \
            ($no_maker or maker = $maker_v) and \
            ($no_currency or \
-           ($currency_tezos and take_asset_type_class = 'XTZ') or \
-           ($currency_fa1_2 and \
-           take_asset_type_class = 'FA1_2' and \
-           take_asset_type_contract = $currency_fa1_2_contract) or \
-           ($currency_fa2 and \
-           take_asset_type_class = 'FA_2' and \
-           take_asset_type_contract = $currency_fa2_contract and \
-           take_asset_type_token_id = $currency_fa2_token_id)) and \
+           ($currency_tezos and make_asset_type_class = 'XTZ') or \
+           ($currency_c and not $currency_tid and
+           make_asset_type_contract = $currency_contract) or \
+           ($currency_c and $currency_tid and \
+           make_asset_type_contract = $currency_contract and \
+           make_asset_type_token_id = $currency_token_id)) and \
            ($no_start_date or created_at >= $start_date_v) and \
            ($no_end_date or created_at <= $end_date_v) and \
            ($no_continuation or \
