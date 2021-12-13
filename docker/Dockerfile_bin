@@ -8,7 +8,7 @@ eval $(opam env) && \
 make deps && \
 opam install httpaf-lwt-unix && \
 echo 'DB=postgres' > Makefile.config && \
-dropdb postgres && \
+dropdb postgres && createdb postgres && \
 make clean && \
 make
 
