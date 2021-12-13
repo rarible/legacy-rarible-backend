@@ -694,6 +694,124 @@ export const fill_code : any =
           ]
        }  ]
      ]
+  },
+  {  "prim": "view",
+     "args": [
+       {  "string": "get"  },
+       {  "prim": "bytes"  },
+       {  "prim": "option",
+          "args": [
+            {  "prim": "nat"  }
+          ]
+       },
+       [  {  "prim": "UNPAIR"  },
+       {  "prim": "DIP",
+          "args": [
+            {  "int": "1"  },
+            [  {  "prim": "CDR"  },
+            {  "prim": "CDR"  },
+            {  "prim": "CDR"  },
+            {  "prim": "UNPAIR"  },
+            {  "prim": "SWAP"  },
+            {  "prim": "DROP",
+               "args": [
+                 {  "int": "1"  }
+               ]
+            }  ]
+          ]
+       },
+       {  "prim": "UNIT"  },
+       {  "prim": "DUP",
+          "args": [
+            {  "int": "3"  }
+          ]
+       },
+       {  "prim": "DUP",
+          "args": [
+            {  "int": "3"  }
+          ]
+       },
+       {  "prim": "GET"  },
+       {  "prim": "IF_NONE",
+          "args": [
+            [  {  "prim": "PUSH",
+                  "args": [
+                    {  "prim": "string"  },
+                    {  "string": "NotFound"  }
+                  ]
+            },
+            {  "prim": "FAILWITH"  }  ],
+            [    ]
+          ]
+       },
+       {  "prim": "SWAP"  },
+       {  "prim": "DROP",
+          "args": [
+            {  "int": "1"  }
+          ]
+       },
+       {  "prim": "DIP",
+          "args": [
+            {  "int": "1"  },
+            [  {  "prim": "DROP",
+                  "args": [
+                    {  "int": "2"  }
+                  ]
+            }  ]
+          ]
+       }  ]
+     ]
+  },
+  {  "prim": "view",
+     "args": [
+       {  "string": "contains"  },
+       {  "prim": "bytes"  },
+       {  "prim": "bool"  },
+       [  {  "prim": "UNPAIR"  },
+       {  "prim": "DIP",
+          "args": [
+            {  "int": "1"  },
+            [  {  "prim": "CDR"  },
+            {  "prim": "CDR"  },
+            {  "prim": "CDR"  },
+            {  "prim": "UNPAIR"  },
+            {  "prim": "SWAP"  },
+            {  "prim": "DROP",
+               "args": [
+                 {  "int": "1"  }
+               ]
+            }  ]
+          ]
+       },
+       {  "prim": "UNIT"  },
+       {  "prim": "DUP",
+          "args": [
+            {  "int": "3"  }
+          ]
+       },
+       {  "prim": "DUP",
+          "args": [
+            {  "int": "3"  }
+          ]
+       },
+       {  "prim": "MEM"  },
+       {  "prim": "SWAP"  },
+       {  "prim": "DROP",
+          "args": [
+            {  "int": "1"  }
+          ]
+       },
+       {  "prim": "DIP",
+          "args": [
+            {  "int": "1"  },
+            [  {  "prim": "DROP",
+                  "args": [
+                    {  "int": "2"  }
+                  ]
+            }  ]
+          ]
+       }  ]
+     ]
   }  ]
 
 export function fill_storage(owner: string) : any {
