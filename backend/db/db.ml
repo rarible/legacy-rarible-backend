@@ -907,11 +907,6 @@ let get_balance ?dbh ~contract ~owner token_id =
   | [ amount ] -> Some amount
   | _ -> None
 
-let insert_account dbh addr ~block ~tsp ~level =
-  [%pgsql dbh
-      "insert into accounts(address, last_block, last_level, last) \
-       values($addr, $block, $level, $tsp) on conflict do nothing"]
-
 let insert_nft_activity dbh index timestamp nft_activity =
   let act_type, act_from, elt =  match nft_activity with
     | NftActivityMint elt -> "mint", None, elt
@@ -1334,7 +1329,6 @@ let insert_mint ~dbh ~op ~contract m =
       m.fa2m_token_id, m.fa2m_owner, m.fa2m_amount,
       m.fa2m_royalties, m.fa2m_metadata in
   let royalties = EzEncoding.construct Json_encoding.(list part_enc) royalties in
-  let>? () = insert_account dbh owner ~block:op.bo_block ~level:op.bo_level ~tsp:op.bo_tsp in
   let>? meta, uri = insert_token_metadata ~dbh ~op ~contract (token_id, meta) in
   let>? () =
     [%pgsql dbh
@@ -1369,7 +1363,6 @@ let insert_burn ~dbh ~op ~contract m =
 
 let insert_transfer ~dbh ~op ~contract lt =
   let|>? _ = fold_rp (fun transfer_index {tr_source; tr_txs} ->
-      let>? () = insert_account dbh tr_source ~block:op.bo_block ~level:op.bo_level ~tsp:op.bo_tsp in
       fold_rp (fun transfer_index {tr_destination; tr_token_id; tr_amount} ->
           let>? () = [%pgsql dbh
               "insert into tokens(contract, token_id, block, level, tsp, \
@@ -1385,8 +1378,6 @@ let insert_transfer ~dbh ~op ~contract lt =
                values($contract, $tr_token_id, ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, \
                ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, \
                $tr_destination, 0, '{}', ${op.bo_hash}, 0) on conflict do nothing"] in
-          let>? () =
-            insert_account dbh tr_destination ~block:op.bo_block ~level:op.bo_level ~tsp:op.bo_tsp in
           let>? () = [%pgsql dbh
               "insert into token_updates(transaction, index, block, level, tsp, \
                source, destination, contract, token_id, amount, transfer_index) \
@@ -1455,23 +1446,21 @@ let insert_token_balances ~dbh ~op ~contract ?(ft=false) ?token_id balances =
 
 let insert_update_operator ~dbh ~op ~contract lt =
   iter_rp (fun {op_owner; op_operator; op_token_id; op_add} ->
-      let>? () = [%pgsql dbh
+      [%pgsql dbh
           "insert into token_updates(transaction, index, block, level, tsp, \
            source, operator, add, contract, token_id) \
            values(${op.bo_hash}, ${op.bo_index}, ${op.bo_block}, ${op.bo_level}, \
            ${op.bo_tsp}, $op_owner, $op_operator, $op_add, \
-           $contract, $op_token_id) on conflict do nothing"] in
-      insert_account dbh op_operator ~block:op.bo_block ~level:op.bo_level ~tsp:op.bo_tsp) lt
+           $contract, $op_token_id) on conflict do nothing"]) lt
 
 let insert_update_operator_all ~dbh ~op ~contract lt =
   let source = op.bo_op.source in
   iter_rp (fun (operator, add) ->
-      let>? () = [%pgsql dbh
+      [%pgsql dbh
           "insert into token_updates(transaction, index, block, level, tsp, \
            source, operator, add, contract) \
            values(${op.bo_hash}, ${op.bo_index}, ${op.bo_block}, ${op.bo_level}, \
-           ${op.bo_tsp}, $source, $operator, $add, $contract) on conflict do nothing"] in
-      insert_account dbh operator ~block:op.bo_block ~level:op.bo_level ~tsp:op.bo_tsp) lt
+           ${op.bo_tsp}, $source, $operator, $add, $contract) on conflict do nothing"]) lt
 
 let insert_metadata ~dbh ~op ~contract ~key ~value =
   [%pgsql dbh
@@ -2158,37 +2147,19 @@ let contract_updates_base dbh ~main ~contract ~block ~level ~tsp ~burn
           Some (EzEncoding.construct part_enc {
               part_account;
               part_value = Z.(to_int32 @@ div v new_supply)})) creator_values_new in
-  let>? l_amount = [%pgsql dbh
+  let>? () = [%pgsql dbh
       "update tokens set supply = $new_supply, creators = $creators, \
        amount = amount + $factor * $amount::mpz, \
        last_block = case when $main then $block else last_block end, \
        last_level = case when $main then $level else last_level end, \
        last = case when $main then $tsp else last end \
-       where token_id = $token_id and contract = $contract and owner = $account \
-       returning amount"] in
-  let>? () = [%pgsql dbh
+       where token_id = $token_id and contract = $contract and owner = $account"] in
+  [%pgsql dbh
       "update tokens set supply = $new_supply, creators = $creators, \
        last_block = case when $main then $block else last_block end, \
        last_level = case when $main then $level else last_level end, \
        last = case when $main then $tsp else last end
-       where token_id = $token_id and contract = $contract and owner <> $account"] in
-  match l_amount with
-  | [ new_amount ] ->
-    (* update account *)
-    let new_token = EzEncoding.construct account_token_enc {
-        at_token_id = token_id;
-        at_contract = contract;
-        at_amount = new_amount } in
-    let old_token = EzEncoding.construct account_token_enc {
-        at_token_id = token_id;
-        at_contract = contract;
-        at_amount = Z.(sub new_amount (mul main_s amount))  } in
-    [%pgsql dbh
-        "update accounts set tokens = array_append(array_remove(tokens, $old_token), $new_token), \
-         last_block = case when $main then $block else last_block end, \
-         last_level = case when $main then $level else last_level end, \
-         last = case when $main then $tsp else last end where address = $account"]
-  | _ -> Lwt.return_ok ()
+       where token_id = $token_id and contract = $contract and owner <> $account"]
 
 let metadata_enc =
   EzEncoding.ignore_enc @@ Json_encoding.(obj2 (req "name" string) (opt "symbol" string))
@@ -2326,11 +2297,11 @@ let transfer_updates dbh main ~contract ~block ~level ~tsp ~token_id ~source amo
        last_level = case when $main then $level else last_level end, \
        last = case when $main then $tsp else last end where token_id = $token_id and \
        owner = $source and contract = $contract \
-       returning amount, metadata, supply, transaction, tsp, royalties, creators"] in
-  let>? new_src_amount, meta, supply, transaction, tsp, royalties, creators =
+       returning metadata, supply, transaction, tsp, royalties, creators"] in
+  let>? meta, supply, transaction, tsp, royalties, creators =
     one ~err:"source token not found for transfer update" info in
-  let>? new_dst_amount =
-    let>? l = [%pgsql dbh
+  let>? () =
+    [%pgsql dbh
         "update tokens set amount = amount + $amount::mpz, \
          metadata = case when amount = 0::mpz then $meta else metadata end, \
          royalties = $royalties, \
@@ -2341,36 +2312,13 @@ let transfer_updates dbh main ~contract ~block ~level ~tsp ~token_id ~source amo
          last = case when $main then $tsp else last end, \
          creators = $creators \
          where token_id = $token_id and \
-         owner = $destination and contract = $contract returning amount"] in
-    one ~err:"destination token not found for transfer update" l in
-  let>? () =
-    if main then
-      let>? () = produce_nft_item_event dbh contract token_id in
-      let>? () = produce_nft_ownership_event dbh contract token_id source in
-      let>? () = produce_nft_ownership_event dbh contract token_id destination in
-      produce_order_event_item dbh source contract token_id
-    else Lwt.return_ok () in
-  let at = { at_token_id = token_id; at_contract = contract;
-             at_amount = new_src_amount } in
-  let new_token_src = EzEncoding.construct account_token_enc at in
-  let old_token_src = EzEncoding.construct account_token_enc {at with at_amount = Z.add new_src_amount amount} in
-  let new_token_dst = EzEncoding.construct account_token_enc {at with at_amount = new_dst_amount} in
-  let old_token_dst = EzEncoding.construct account_token_enc {at with at_amount = Z.sub new_dst_amount amount} in
-  let>? () =
-    [%pgsql dbh
-        "update accounts set \
-         last_block = case when $main then $block else last_block end, \
-         last_level = case when $main then $level else last_level end, \
-         last = case when $main then $tsp else last end, \
-         tokens = array_append(array_remove(tokens, $old_token_src), $new_token_src) \
-         where address = $source"] in
-  [%pgsql dbh
-      "update accounts set \
-       last_block = case when $main then $block else last_block end, \
-       last_level = case when $main then $level else last_level end, \
-       last = case when $main then $tsp else last end, \
-       tokens = array_append(array_remove(tokens, $old_token_dst), $new_token_dst) \
-       where address = $destination"]
+         owner = $destination and contract = $contract"] in
+  if main then
+    let>? () = produce_nft_item_event dbh contract token_id in
+    let>? () = produce_nft_ownership_event dbh contract token_id source in
+    let>? () = produce_nft_ownership_event dbh contract token_id destination in
+    produce_order_event_item dbh source contract token_id
+  else Lwt.return_ok ()
 
 let token_updates dbh main l =
   iter_rp (fun r ->
