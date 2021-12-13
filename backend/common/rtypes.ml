@@ -937,8 +937,9 @@ type ledger_type = {
 } [@@deriving encoding]
 
 type nft_ledger = {
-  nft_type: ledger_type;
-  nft_id: z;
+  nft_ledger_type: ledger_type;
+  nft_ledger_id: z;
+  nft_meta_id: z option;
 } [@@deriving encoding]
 
 type ft_ledger_kind =

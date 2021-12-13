@@ -111,3 +111,5 @@ let ledger_fa1_field = `address, `tuple [`nat; `map (`address, `nat) ]
 let ledger_lugh_field = `tuple [ `address; `nat ], `tuple [`nat; `bool ]
 
 let set_royalties_entry = `tuple [`address; `nat; `map (`address, `nat)]
+
+let token_metadata_field = `nat, `tuple [ `nat; `map (`string, `bytes) ]
