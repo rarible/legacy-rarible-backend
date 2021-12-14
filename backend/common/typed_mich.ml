@@ -80,6 +80,7 @@ let parse_value t m : (micheline_value, _) result =
               | Error e, _ | _, Error e -> Error e
             end
           | m -> Error (`unexpected_michelson_type (k, m))) l
+    | `big_map (_, _), Mint id -> Ok (`nat id)
     | `string, Mstring s -> Ok (`string s)
     | `key, Mstring s -> Ok (`key s)
     | `key_hash, Mstring s -> Ok (`key_hash s)

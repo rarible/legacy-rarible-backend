@@ -2351,20 +2351,25 @@ let royalties_updates ~dbh ~main ~contract ~block ~level ~tsp ?token_id royaltie
          ($no_token_id or token_id = $?{Option.map Z.to_string token_id})"]
   else Lwt.return_ok ()
 
-let token_metadata_updates ~dbh ~main ~contract ~block ~level ~tsp ~token_id meta =
+let token_metadata_updates ~dbh ~main ~contract ~block ~level ~tsp ~token_id ~transaction meta =
   let meta = EzEncoding.destruct Json_encoding.(assoc string) meta in
   let>? meta, uri = insert_token_metadata ~dbh ~block ~level ~tsp ~contract (token_id, meta) in
   [%pgsql dbh
-      "update token_info set metadata = $meta, metadata_uri = $?uri, \
-       last_block = case when $main then $block else last_block end, \
-       last_level = case when $main then $level else last_level end, \
-       last = case when $main then $tsp else last end \
-       where contract = $contract and token_id = ${Z.to_string token_id}"]
+      "insert into token_info(contract, token_id, block, level, tsp, \
+       last_block, last_level, last, transaction, metadata, metadata_uri) \
+       values($contract, ${Z.to_string token_id}, $block, $level, $tsp, \
+       $block, $level, $tsp, $transaction, $meta, $?uri) \
+       on conflict (contract, token_id) do update \
+       set metadata = $meta, metadata_uri = $?uri, \
+       last_block = case when $main then $block else token_info.last_block end, \
+       last_level = case when $main then $level else token_info.last_level end, \
+       last = case when $main then $tsp else token_info.last end \
+       where token_info.contract = $contract and token_info.token_id = ${Z.to_string token_id}"]
 
 let token_updates dbh main l =
   iter_rp (fun r ->
-      let contract, block, level, tsp, source =
-        r#contract, r#block, r#level, r#tsp, r#source in
+      let contract, block, level, tsp, source, transaction =
+        r#contract, r#block, r#level, r#tsp, r#source, r#transaction in
       match r#destination, Option.map Z.of_string r#token_id,
             r#amount, r#operator, r#add, r#royalties, r#metadata  with
       | Some destination, Some token_id, Some amount, _, _, _, _ ->
@@ -2373,7 +2378,7 @@ let token_updates dbh main l =
       | _, token_id, _, _, _, Some royalties, _ ->
         royalties_updates ~dbh ~main ~contract ~block ~level ~tsp ?token_id royalties
       | _, Some token_id, _, _, _, _, Some meta ->
-        token_metadata_updates ~dbh ~main ~contract ~block ~level ~tsp ~token_id meta
+        token_metadata_updates ~dbh ~main ~contract ~block ~level ~tsp ~token_id ~transaction meta
       | _ -> Lwt.return_error (`hook_error "invalid token_update")) l
 
 let token_balance_updates dbh main l =
@@ -4501,3 +4506,11 @@ let get_ft_contract ?dbh contract =
   use dbh @@ fun dbh ->
   let>? l = [%pgsql.object dbh "select * from ft_contracts where address = $contract"] in
   one @@ List.map db_ft_contract l
+
+let get_unknown_metadata_id ?dbh () =
+  use dbh @@ fun dbh ->
+  [%pgsql dbh "select address from contracts where metadata_id is null"]
+
+let set_metadata_id ?dbh ~contract id =
+  use dbh @@ fun dbh ->
+  [%pgsql dbh "update contracts set metadata_id = ${Z.to_string id} where address = $contract"]

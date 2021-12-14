@@ -884,24 +884,24 @@ type do_transfers_param = {
 type micheline_value = [
   | `address of string
   | `assoc of ((micheline_value [@key "key"]) * (micheline_value [@key "value"]) [@object]) list
-  | `bool of bool
+  | `bool of (bool [@wrap "bool"])
   | `bytes of (Proto.hex [@encoding Proto.hex_enc.Proto.Encoding.json])
-  | `chain_id of string
+  | `chain_id of (string [@wrap "chain_id"])
   | `contract
-  | `int of z
-  | `key of string
-  | `key_hash of string
+  | `int of (z [@wrap "int"])
+  | `key of (string [@wrap "key"])
+  | `key_hash of (string [@wrap "key_hash"])
   | `lambda
-  | `left of micheline_value
-  | `mutez of z
-  | `nat of z
+  | `left of (micheline_value [@wrap "left"])
+  | `mutez of (z [@wrap "mutez"])
+  | `nat of (z [@wrap "nat"])
   | `none
   | `operation
-  | `right of micheline_value
+  | `right of (micheline_value [@wrap "right"])
   | `seq of (micheline_value list [@wrap "seq"])
-  | `signature of string
-  | `some of micheline_value
-  | `string of string
+  | `signature of (string [@wrap "signature"])
+  | `some of (micheline_value [@wrap "some"])
+  | `string of (string [@wrap "string"])
   | `timestamp of (Proto.A.timestamp [@encoding Proto.A.timestamp_enc.Proto.Encoding.json])
   | `tuple of (micheline_value list [@wrap "tuple"])
   | `unit

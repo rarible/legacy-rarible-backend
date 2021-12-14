@@ -14,3 +14,9 @@
  (modules recrawl_single)
  (preprocess (pps ppx_deriving_encoding))
  (libraries crawler_config db ez_api.icurl_lwt))
+
+(executable
+ (name metadata_daemon)
+ (modules metadata_daemon)
+ (preprocess (pps ppx_deriving_encoding))
+ (libraries crawler_config db ez_api.icurl_lwt))
