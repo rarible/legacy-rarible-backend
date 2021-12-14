@@ -1035,7 +1035,7 @@ let get_metadata_json meta =
               "ipns/", String.sub url 5 ((String.length meta) - 5)
             else "ipfs/", url
           with _ -> "", url in
-        let uri = Printf.sprintf "https://rarible.mypinata.cloud/%s%s" fs url in
+        let uri = Printf.sprintf "https://rarible.mypinata.coud/%s%s" fs url in
         let|>? json = get_or_timeout ~msg:"get_metadata_json" (EzAPI.URL uri) in
         json, uri
       else Lwt.return_error (0, Some (Printf.sprintf "unknow scheme %s"proto))
@@ -1512,11 +1512,19 @@ let reset_nft_item_meta_by_id ?dbh contract token_id =
   Printf.eprintf "reset_nft_item_meta_by_id %s %s\n%!" contract (Z.to_string token_id) ;
   use dbh @@ fun dbh ->
   let>? l = [%pgsql dbh
-      "select last_block, last_level, last, metadata_uri from token_info where \
-       main and contract = $contract and token_id = ${Z.to_string token_id} and metadata_uri is not null"] in
+      "select last_block, last_level, last, metadata, metadata_uri from token_info where \
+       main and contract = $contract and token_id = ${Z.to_string token_id}"] in
   match l with
-  | [] | [ _, _, _, None ] -> Lwt.return_ok ()
-  | [ block, level, tsp, Some uri ] ->
+  | [] -> Lwt.return_ok ()
+  | [ block, level, tsp, metadata, None ] ->
+    begin
+      Format.eprintf "ok@." ;
+      let l = EzEncoding.destruct Rtypes.token_metadata_enc metadata in
+      let>? _ =
+        insert_token_metadata ~dbh ~block ~level ~tsp ~contract (token_id, l) in
+      Lwt.return_ok ()
+    end
+  | [ block, level, tsp, _, Some uri ] ->
     begin
       try
         get_metadata_json uri >>= function
