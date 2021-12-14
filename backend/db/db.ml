@@ -1046,7 +1046,9 @@ let get_metadata_json meta =
       begin try
           let metadata = EzEncoding.destruct token_metadata_enc json in
           Lwt.return_ok (json, metadata, Some uri)
-        with _ -> Lwt.return_error (-1, None)
+        with exn ->
+          Format.eprintf "%s@." @@ Printexc.to_string exn ;
+          Lwt.return_error (-1, None)
       end
     | Error (c, str) -> Lwt.return_error (c, str)
 

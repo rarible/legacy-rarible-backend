@@ -29,7 +29,30 @@ module A = struct
   let date_schema = Json_schema.(
       create @@
       element @@ String {min_length=0; pattern=None; max_length=None; str_format = Some "date-time"})
-  type date = (Tzfunc.Proto.A.timestamp [@encoding Tzfunc.Proto.A.timestamp_enc.Tzfunc.Proto.Encoding.json])
+
+  let cal_to_str ?(ms=false) date =
+    let s = CalendarLib.Printer.Calendar.sprint "%Y-%m-%dT%H:%M:%S" date in
+    if ms then s ^ ".000Z" else s ^ "Z"
+  let cal_of_str s =
+    try CalendarLib.Printer.Calendar.from_fstring "%Y-%m-%dT%H:%M:%SZ" s
+    with _ ->
+    try CalendarLib.Calendar.from_unixfloat (Float.of_string s)
+    with _ ->
+    try CalendarLib.Printer.Calendar.from_fstring "%Y-%m-%dT%H:%M:%S" s
+    with _ ->
+      if String.length s < 5 then failwith "cannot parse timestamp"
+      else
+        let s = String.sub s 0 (String.length s - 5) in
+        CalendarLib.Printer.Calendar.from_fstring "%Y-%m-%dT%H:%M:%S" s
+
+  type timestamp =
+    CalendarLib.Calendar.t [@encoding Json_encoding.conv cal_to_str cal_of_str Json_encoding.string]
+    [@class_type Ezjs_min.date]
+    [@conv ((fun c -> new%js Ezjs_min.date_fromTimeValue (1000. *. CalendarLib.Calendar.to_unixfloat c)),
+            (fun js -> CalendarLib.Calendar.from_unixfloat (js##getTime /. 1000.)))]
+  [@@deriving encoding]
+
+  type date = (timestamp [@encoding timestamp_enc])
   [@@deriving encoding {schema=date_schema}]
   let date_int64_enc =
     let open Json_encoding in
@@ -980,7 +1003,7 @@ type format_dimensions = {
 
 type tzip21_format = {
   format_uri : string ;
-  format_hash : string option ;
+  format_hash : string option ; [@dft None]
   format_mime_type : string option ;
   format_file_size : int option ;
   format_file_name : string option ;

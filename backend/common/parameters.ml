@@ -126,7 +126,7 @@ let parse_fa2 e p =
   | EPnamed "set_metadata", m -> parse_metadata_uri m
   | EPnamed "add_minter", m -> parse_add_minter m
   | EPnamed "remove_minter", m -> parse_remove_minter m
-  | EPnamed "set_token_uri_pattern", m -> parse_set_token_uri_pattern m
+  | EPnamed "set_token_metadata_uri", m -> parse_set_token_uri_pattern m
   | _ -> unexpected_michelson
 
 let parse_set_royalties m =
