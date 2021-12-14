@@ -12,65 +12,49 @@ export const nft_public_code : any =
                },
                {  "prim": "pair",
                   "args": [
-                    {  "prim": "big_map",
+                    {  "prim": "option",
                        "args": [
-                         {  "prim": "nat"  },
-                         {  "prim": "list",
-                            "args": [
-                              {  "prim": "pair",
-                                 "args": [
-                                   {  "prim": "address",
-                                      "annots": [
-                                        "%partAccount"
-                                      ]
-                                   },
-                                   {  "prim": "nat",
-                                      "annots": [
-                                        "%partValue"
-                                      ]
-                                   }
-                                 ]
-                              }
-                            ]
-                         }
+                         {  "prim": "address"  }
                        ]
                        ,
                        "annots": [
-                         "%royalties"
+                         "%owner_candidate"
                        ]
                     },
                     {  "prim": "pair",
                        "args": [
-                         {  "prim": "big_map",
-                            "args": [
-                              {  "prim": "nat"  },
-                              {  "prim": "address"  }
-                            ]
-                            ,
+                         {  "prim": "bool",
                             "annots": [
-                              "%ledger"
+                              "%paused"
                             ]
                          },
                          {  "prim": "pair",
                             "args": [
                               {  "prim": "big_map",
                                  "args": [
-                                   {  "prim": "pair",
+                                   {  "prim": "nat"  },
+                                   {  "prim": "list",
                                       "args": [
-                                        {  "prim": "address"  },
                                         {  "prim": "pair",
                                            "args": [
-                                             {  "prim": "nat"  },
-                                             {  "prim": "address"  }
+                                             {  "prim": "address",
+                                                "annots": [
+                                                  "%partAccount"
+                                                ]
+                                             },
+                                             {  "prim": "nat",
+                                                "annots": [
+                                                  "%partValue"
+                                                ]
+                                             }
                                            ]
                                         }
                                       ]
-                                   },
-                                   {  "prim": "unit"  }
+                                   }
                                  ]
                                  ,
                                  "annots": [
-                                   "%operator"
+                                   "%royalties"
                                  ]
                               },
                               {  "prim": "pair",
@@ -78,57 +62,77 @@ export const nft_public_code : any =
                                    {  "prim": "big_map",
                                       "args": [
                                         {  "prim": "nat"  },
-                                        {  "prim": "pair",
-                                           "args": [
-                                             {  "prim": "nat",
-                                                "annots": [
-                                                  "%token_id"
-                                                ]
-                                             },
-                                             {  "prim": "map",
-                                                "args": [
-                                                  {  "prim": "string"  },
-                                                  {  "prim": "bytes"  }
-                                                ]
-                                                ,
-                                                "annots": [
-                                                  "%token_info"
-                                                ]
-                                             }
-                                           ]
-                                        }
+                                        {  "prim": "address"  }
                                       ]
                                       ,
                                       "annots": [
-                                        "%token_metadata"
+                                        "%ledger"
                                       ]
                                    },
                                    {  "prim": "pair",
                                       "args": [
                                         {  "prim": "big_map",
                                            "args": [
-                                             {  "prim": "address"  },
                                              {  "prim": "pair",
                                                 "args": [
-                                                  {  "prim": "nat",
-                                                     "annots": [
-                                                       "%counter"
-                                                     ]
-                                                  },
+                                                  {  "prim": "address"  },
                                                   {  "prim": "pair",
                                                      "args": [
-                                                       {  "prim": "option",
-                                                          "args": [
-                                                            {  "prim": "nat"  }
-                                                          ]
-                                                          ,
+                                                       {  "prim": "nat"  },
+                                                       {  "prim": "address"  }
+                                                     ]
+                                                  }
+                                                ]
+                                             },
+                                             {  "prim": "unit"  }
+                                           ]
+                                           ,
+                                           "annots": [
+                                             "%operator"
+                                           ]
+                                        },
+                                        {  "prim": "pair",
+                                           "args": [
+                                             {  "prim": "big_map",
+                                                "args": [
+                                                  {  "prim": "nat"  },
+                                                  {  "prim": "pair",
+                                                     "args": [
+                                                       {  "prim": "nat",
                                                           "annots": [
-                                                            "%user_expiry"
+                                                            "%token_id"
                                                           ]
                                                        },
                                                        {  "prim": "map",
                                                           "args": [
-                                                            {  "prim": "bytes"  },
+                                                            {  "prim": "string"  },
+                                                            {  "prim": "bytes"  }
+                                                          ]
+                                                          ,
+                                                          "annots": [
+                                                            "%token_info"
+                                                          ]
+                                                       }
+                                                     ]
+                                                  }
+                                                ]
+                                                ,
+                                                "annots": [
+                                                  "%token_metadata"
+                                                ]
+                                             },
+                                             {  "prim": "pair",
+                                                "args": [
+                                                  {  "prim": "big_map",
+                                                     "args": [
+                                                       {  "prim": "address"  },
+                                                       {  "prim": "pair",
+                                                          "args": [
+                                                            {  "prim": "nat",
+                                                               "annots": [
+                                                                 "%counter"
+                                                               ]
+                                                            },
                                                             {  "prim": "pair",
                                                                "args": [
                                                                  {  "prim": "option",
@@ -139,72 +143,89 @@ export const nft_public_code : any =
                                                                     ,
                                                                     "annots": [
 
-                                                                    "%expiry"
+                                                                    "%user_expiry"
                                                                     ]
                                                                  },
-                                                                 {  "prim": "timestamp",
+                                                                 {  "prim": "map",
+                                                                    "args": [
+
+                                                                    {  "prim": "bytes"  },
+                                                                    {
+                                                                    "prim": "pair",
+                                                                    "args": [
+
+                                                                    {
+                                                                    "prim": "option",
+                                                                    "args": [
+
+                                                                    {  "prim": "nat"  }
+                                                                    ]
+                                                                    ,
+                                                                    "annots": [
+
+                                                                    "%expiry"
+                                                                    ]
+                                                                    },
+                                                                    {
+                                                                    "prim": "timestamp",
                                                                     "annots": [
 
                                                                     "%created_at"
+                                                                    ]
+                                                                    }
+                                                                    ]
+                                                                    }
+                                                                    ]
+                                                                    ,
+                                                                    "annots": [
+
+                                                                    "%user_permits"
                                                                     ]
                                                                  }
                                                                ]
                                                             }
                                                           ]
-                                                          ,
-                                                          "annots": [
-                                                            "%user_permits"
-                                                          ]
                                                        }
                                                      ]
-                                                  }
-                                                ]
-                                             }
-                                           ]
-                                           ,
-                                           "annots": [
-                                             "%permits"
-                                           ]
-                                        },
-                                        {  "prim": "pair",
-                                           "args": [
-                                             {  "prim": "big_map",
-                                                "args": [
-                                                  {  "prim": "pair",
-                                                     "args": [
-                                                       {  "prim": "address"  },
-                                                       {  "prim": "address"  }
-                                                     ]
-                                                  },
-                                                  {  "prim": "unit"  }
-                                                ]
-                                                ,
-                                                "annots": [
-                                                  "%operator_for_all"
-                                                ]
-                                             },
-                                             {  "prim": "pair",
-                                                "args": [
-                                                  {  "prim": "nat",
+                                                     ,
                                                      "annots": [
-                                                       "%default_expiry"
+                                                       "%permits"
                                                      ]
                                                   },
                                                   {  "prim": "pair",
                                                      "args": [
-                                                       {  "prim": "bool",
-                                                          "annots": [
-                                                            "%paused"
-                                                          ]
-                                                       },
                                                        {  "prim": "big_map",
                                                           "args": [
-                                                            {  "prim": "string"  },
-                                                            {  "prim": "bytes"  }
+                                                            {  "prim": "pair",
+                                                               "args": [
+                                                                 {  "prim": "address"  },
+                                                                 {  "prim": "address"  }
+                                                               ]
+                                                            },
+                                                            {  "prim": "unit"  }
                                                           ]
                                                           ,
                                                           "annots": [
-                                                            "%metadata"
+                                                            "%operator_for_all"
+                                                          ]
+                                                       },
+                                                       {  "prim": "pair",
+                                                          "args": [
+                                                            {  "prim": "nat",
+                                                               "annots": [
+                                                                 "%default_expiry"
+                                                               ]
+                                                            },
+                                                            {  "prim": "big_map",
+                                                               "args": [
+                                                                 {  "prim": "string"  },
+                                                                 {  "prim": "bytes"  }
+                                                               ]
+                                                               ,
+                                                               "annots": [
+                                                                 "%metadata"
+                                                               ]
+                                                            }
                                                           ]
                                                        }
                                                      ]
@@ -298,6 +319,60 @@ export const nft_public_code : any =
                                 "%balance_of"
                               ]
                            },
+                           {  "prim": "address",
+                              "annots": [
+                                "%declare_ownership"
+                              ]
+                           }
+                         ]
+                      },
+                      {  "prim": "or",
+                         "args": [
+                           {  "prim": "unit",
+                              "annots": [
+                                "%claim_ownership"
+                              ]
+                           },
+                           {  "prim": "unit",
+                              "annots": [
+                                "%pause"
+                              ]
+                           }
+                         ]
+                      }
+                    ]
+                 },
+                 {  "prim": "or",
+                    "args": [
+                      {  "prim": "or",
+                         "args": [
+                           {  "prim": "unit",
+                              "annots": [
+                                "%unpause"
+                              ]
+                           },
+                           {  "prim": "pair",
+                              "args": [
+                                {  "prim": "string",
+                                   "annots": [
+                                     "%ikey"
+                                   ]
+                                },
+                                {  "prim": "bytes",
+                                   "annots": [
+                                     "%idata"
+                                   ]
+                                }
+                              ]
+                              ,
+                              "annots": [
+                                "%set_metadata"
+                              ]
+                           }
+                         ]
+                      },
+                      {  "prim": "or",
+                         "args": [
                            {  "prim": "list",
                               "args": [
                                 {  "prim": "or",
@@ -355,11 +430,7 @@ export const nft_public_code : any =
                               "annots": [
                                 "%update_operators"
                               ]
-                           }
-                         ]
-                      },
-                      {  "prim": "or",
-                         "args": [
+                           },
                            {  "prim": "list",
                               "args": [
                                 {  "prim": "or",
@@ -373,41 +444,48 @@ export const nft_public_code : any =
                               "annots": [
                                 "%update_operators_for_all"
                               ]
-                           },
-                           {  "prim": "nat",
-                              "annots": [
-                                "%burn"
-                              ]
                            }
                          ]
                       }
                     ]
-                 },
+                 }
+               ]
+            },
+            {  "prim": "or",
+               "args": [
                  {  "prim": "or",
                     "args": [
                       {  "prim": "or",
                          "args": [
+                           {  "prim": "nat",
+                              "annots": [
+                                "%set_default_expiry"
+                              ]
+                           },
                            {  "prim": "pair",
                               "args": [
-                                {  "prim": "string",
+                                {  "prim": "option",
+                                   "args": [
+                                     {  "prim": "nat"  }
+                                   ]
+                                   ,
                                    "annots": [
-                                     "%ikey"
+                                     "%v"
                                    ]
                                 },
-                                {  "prim": "bytes",
+                                {  "prim": "option",
+                                   "args": [
+                                     {  "prim": "bytes"  }
+                                   ]
+                                   ,
                                    "annots": [
-                                     "%idata"
+                                     "%p"
                                    ]
                                 }
                               ]
                               ,
                               "annots": [
-                                "%set_metadata"
-                              ]
-                           },
-                           {  "prim": "bool",
-                              "annots": [
-                                "%set_pause"
+                                "%set_expiry"
                               ]
                            }
                          ]
@@ -441,93 +519,6 @@ export const nft_public_code : any =
                                 "%permit"
                               ]
                            },
-                           {  "prim": "nat",
-                              "annots": [
-                                "%set_default_expiry"
-                              ]
-                           }
-                         ]
-                      }
-                    ]
-                 }
-               ]
-            },
-            {  "prim": "or",
-               "args": [
-                 {  "prim": "or",
-                    "args": [
-                      {  "prim": "or",
-                         "args": [
-                           {  "prim": "pair",
-                              "args": [
-                                {  "prim": "option",
-                                   "args": [
-                                     {  "prim": "nat"  }
-                                   ]
-                                   ,
-                                   "annots": [
-                                     "%v"
-                                   ]
-                                },
-                                {  "prim": "option",
-                                   "args": [
-                                     {  "prim": "bytes"  }
-                                   ]
-                                   ,
-                                   "annots": [
-                                     "%p"
-                                   ]
-                                }
-                              ]
-                              ,
-                              "annots": [
-                                "%set_expiry"
-                              ]
-                           },
-                           {  "prim": "list",
-                              "args": [
-                                {  "prim": "pair",
-                                   "args": [
-                                     {  "prim": "address"  },
-                                     {  "prim": "list",
-                                        "args": [
-                                          {  "prim": "pair",
-                                             "args": [
-                                               {  "prim": "address",
-                                                  "annots": [
-                                                    "%to"
-                                                  ]
-                                               },
-                                               {  "prim": "pair",
-                                                  "args": [
-                                                    {  "prim": "nat",
-                                                       "annots": [
-                                                         "%token_id"
-                                                       ]
-                                                    },
-                                                    {  "prim": "nat",
-                                                       "annots": [
-                                                         "%amount"
-                                                       ]
-                                                    }
-                                                  ]
-                                               }
-                                             ]
-                                          }
-                                        ]
-                                     }
-                                   ]
-                                }
-                              ]
-                              ,
-                              "annots": [
-                                "%transfer"
-                              ]
-                           }
-                         ]
-                      },
-                      {  "prim": "or",
-                         "args": [
                            {  "prim": "list",
                               "args": [
                                 {  "prim": "pair",
@@ -581,72 +572,120 @@ export const nft_public_code : any =
                               "annots": [
                                 "%transfer_gasless"
                               ]
-                           },
-                           {  "prim": "address",
-                              "annots": [
-                                "%transfer_ownership"
-                              ]
                            }
                          ]
                       }
                     ]
                  },
-                 {  "prim": "pair",
+                 {  "prim": "or",
                     "args": [
-                      {  "prim": "nat",
-                         "annots": [
-                           "%itokenid"
-                         ]
-                      },
-                      {  "prim": "pair",
+                      {  "prim": "or",
                          "args": [
-                           {  "prim": "address",
-                              "annots": [
-                                "%iowner"
-                              ]
-                           },
-                           {  "prim": "pair",
+                           {  "prim": "list",
                               "args": [
-                                {  "prim": "map",
+                                {  "prim": "pair",
                                    "args": [
-                                     {  "prim": "string"  },
-                                     {  "prim": "bytes"  }
-                                   ]
-                                   ,
-                                   "annots": [
-                                     "%itokenMetadata"
-                                   ]
-                                },
-                                {  "prim": "list",
-                                   "args": [
-                                     {  "prim": "pair",
+                                     {  "prim": "address"  },
+                                     {  "prim": "list",
                                         "args": [
-                                          {  "prim": "address",
-                                             "annots": [
-                                               "%partAccount"
-                                             ]
-                                          },
-                                          {  "prim": "nat",
-                                             "annots": [
-                                               "%partValue"
+                                          {  "prim": "pair",
+                                             "args": [
+                                               {  "prim": "address",
+                                                  "annots": [
+                                                    "%to"
+                                                  ]
+                                               },
+                                               {  "prim": "pair",
+                                                  "args": [
+                                                    {  "prim": "nat",
+                                                       "annots": [
+                                                         "%token_id"
+                                                       ]
+                                                    },
+                                                    {  "prim": "nat",
+                                                       "annots": [
+                                                         "%amount"
+                                                       ]
+                                                    }
+                                                  ]
+                                               }
                                              ]
                                           }
                                         ]
                                      }
                                    ]
-                                   ,
+                                }
+                              ]
+                              ,
+                              "annots": [
+                                "%transfer"
+                              ]
+                           },
+                           {  "prim": "pair",
+                              "args": [
+                                {  "prim": "nat",
                                    "annots": [
-                                     "%iroyalties"
+                                     "%itokenid"
+                                   ]
+                                },
+                                {  "prim": "pair",
+                                   "args": [
+                                     {  "prim": "address",
+                                        "annots": [
+                                          "%iowner"
+                                        ]
+                                     },
+                                     {  "prim": "pair",
+                                        "args": [
+                                          {  "prim": "map",
+                                             "args": [
+                                               {  "prim": "string"  },
+                                               {  "prim": "bytes"  }
+                                             ]
+                                             ,
+                                             "annots": [
+                                               "%itokenMetadata"
+                                             ]
+                                          },
+                                          {  "prim": "list",
+                                             "args": [
+                                               {  "prim": "pair",
+                                                  "args": [
+                                                    {  "prim": "address",
+                                                       "annots": [
+                                                         "%partAccount"
+                                                       ]
+                                                    },
+                                                    {  "prim": "nat",
+                                                       "annots": [
+                                                         "%partValue"
+                                                       ]
+                                                    }
+                                                  ]
+                                               }
+                                             ]
+                                             ,
+                                             "annots": [
+                                               "%iroyalties"
+                                             ]
+                                          }
+                                        ]
+                                     }
                                    ]
                                 }
                               ]
+                              ,
+                              "annots": [
+                                "%mint"
+                              ]
                            }
                          ]
+                      },
+                      {  "prim": "nat",
+                         "annots": [
+                           "%burn"
+                         ]
                       }
-                    ]
-                    ,
-                    "annots": [
-                      "%mint"
                     ]
                  }
                ]
@@ -993,162 +1032,6 @@ export const nft_public_code : any =
             {  "prim": "DROP",
                "args": [
                  {  "int": "4"  }
-               ]
-            }  ]
-          ]
-       },
-       {  "prim": "LAMBDA",
-          "args": [
-            {  "prim": "pair",
-               "args": [
-                 {  "prim": "string"  },
-                 {  "prim": "list",
-                    "args": [
-                      {  "prim": "pair",
-                         "args": [
-                           {  "prim": "address"  },
-                           {  "prim": "list",
-                              "args": [
-                                {  "prim": "pair",
-                                   "args": [
-                                     {  "prim": "address",
-                                        "annots": [
-                                          "%to"
-                                        ]
-                                     },
-                                     {  "prim": "pair",
-                                        "args": [
-                                          {  "prim": "nat",
-                                             "annots": [
-                                               "%token_id"
-                                             ]
-                                          },
-                                          {  "prim": "nat",
-                                             "annots": [
-                                               "%amount"
-                                             ]
-                                          }
-                                        ]
-                                     }
-                                   ]
-                                }
-                              ]
-                           }
-                         ]
-                      }
-                    ]
-                 }
-               ]
-            },
-            {  "prim": "option",
-               "args": [
-                 {  "prim": "address"  }
-               ]
-            },
-            [  {  "prim": "UNPAIR",
-                  "args": [
-                    {  "int": "2"  }
-                  ]
-            },
-            {  "prim": "PUSH",
-               "args": [
-                 {  "prim": "unit"  },
-                 {  "prim": "Unit"  }
-               ]
-            },
-            {  "prim": "DUP",
-               "args": [
-                 {  "int": "3"  }
-               ]
-            },
-            {  "prim": "IF_CONS",
-               "args": [
-                 [  {  "prim": "DUP"  },
-                 {  "prim": "CAR"  },
-                 {  "prim": "DUP",
-                    "args": [
-                      {  "int": "3"  }
-                    ]
-                 },
-                 {  "prim": "ITER",
-                    "args": [
-                      [  {  "prim": "DUP"  },
-                      {  "prim": "CAR"  },
-                      {  "prim": "DUP",
-                         "args": [
-                           {  "int": "3"  }
-                         ]
-                      },
-                      {  "prim": "COMPARE"  },
-                      {  "prim": "EQ"  },
-                      {  "prim": "NOT"  },
-                      {  "prim": "IF",
-                         "args": [
-                           [  {  "prim": "PUSH",
-                                 "args": [
-                                   {  "prim": "string"  },
-                                   {  "string": "FA2_NOT_OPERATOR"  }
-                                 ]
-                           },
-                           {  "prim": "FAILWITH"  }  ],
-                           [    ]
-                         ]
-                      },
-                      {  "prim": "DROP",
-                         "args": [
-                           {  "int": "1"  }
-                         ]
-                      }  ]
-                    ]
-                 },
-                 {  "prim": "DUP"  },
-                 {  "prim": "SOME"  },
-                 {  "prim": "DIP",
-                    "args": [
-                      {  "int": "1"  },
-                      [  {  "prim": "DIG",
-                            "args": [
-                              {  "int": "3"  }
-                            ]
-                      },
-                      {  "prim": "DROP",
-                         "args": [
-                           {  "int": "1"  }
-                         ]
-                      }  ]
-                    ]
-                 },
-                 {  "prim": "DUG",
-                    "args": [
-                      {  "int": "3"  }
-                    ]
-                 },
-                 {  "prim": "DROP",
-                    "args": [
-                      {  "int": "3"  }
-                    ]
-                 }  ],
-                 [  {  "prim": "NONE",
-                       "args": [
-                         {  "prim": "address"  }
-                       ]
-                 },
-                 {  "prim": "SWAP"  },
-                 {  "prim": "DROP",
-                    "args": [
-                      {  "int": "1"  }
-                    ]
-                 }  ]
-               ]
-            },
-            {  "prim": "DUG",
-               "args": [
-                 {  "int": "2"  }
-               ]
-            },
-            {  "prim": "DROP",
-               "args": [
-                 {  "int": "2"  }
                ]
             }  ]
           ]
@@ -1920,6 +1803,162 @@ export const nft_public_code : any =
             }  ]
           ]
        },
+       {  "prim": "LAMBDA",
+          "args": [
+            {  "prim": "pair",
+               "args": [
+                 {  "prim": "string"  },
+                 {  "prim": "list",
+                    "args": [
+                      {  "prim": "pair",
+                         "args": [
+                           {  "prim": "address"  },
+                           {  "prim": "list",
+                              "args": [
+                                {  "prim": "pair",
+                                   "args": [
+                                     {  "prim": "address",
+                                        "annots": [
+                                          "%to"
+                                        ]
+                                     },
+                                     {  "prim": "pair",
+                                        "args": [
+                                          {  "prim": "nat",
+                                             "annots": [
+                                               "%token_id"
+                                             ]
+                                          },
+                                          {  "prim": "nat",
+                                             "annots": [
+                                               "%amount"
+                                             ]
+                                          }
+                                        ]
+                                     }
+                                   ]
+                                }
+                              ]
+                           }
+                         ]
+                      }
+                    ]
+                 }
+               ]
+            },
+            {  "prim": "option",
+               "args": [
+                 {  "prim": "address"  }
+               ]
+            },
+            [  {  "prim": "UNPAIR",
+                  "args": [
+                    {  "int": "2"  }
+                  ]
+            },
+            {  "prim": "PUSH",
+               "args": [
+                 {  "prim": "unit"  },
+                 {  "prim": "Unit"  }
+               ]
+            },
+            {  "prim": "DUP",
+               "args": [
+                 {  "int": "3"  }
+               ]
+            },
+            {  "prim": "IF_CONS",
+               "args": [
+                 [  {  "prim": "DUP"  },
+                 {  "prim": "CAR"  },
+                 {  "prim": "DUP",
+                    "args": [
+                      {  "int": "3"  }
+                    ]
+                 },
+                 {  "prim": "ITER",
+                    "args": [
+                      [  {  "prim": "DUP"  },
+                      {  "prim": "CAR"  },
+                      {  "prim": "DUP",
+                         "args": [
+                           {  "int": "3"  }
+                         ]
+                      },
+                      {  "prim": "COMPARE"  },
+                      {  "prim": "EQ"  },
+                      {  "prim": "NOT"  },
+                      {  "prim": "IF",
+                         "args": [
+                           [  {  "prim": "PUSH",
+                                 "args": [
+                                   {  "prim": "string"  },
+                                   {  "string": "FA2_NOT_OPERATOR"  }
+                                 ]
+                           },
+                           {  "prim": "FAILWITH"  }  ],
+                           [    ]
+                         ]
+                      },
+                      {  "prim": "DROP",
+                         "args": [
+                           {  "int": "1"  }
+                         ]
+                      }  ]
+                    ]
+                 },
+                 {  "prim": "DUP"  },
+                 {  "prim": "SOME"  },
+                 {  "prim": "DIP",
+                    "args": [
+                      {  "int": "1"  },
+                      [  {  "prim": "DIG",
+                            "args": [
+                              {  "int": "3"  }
+                            ]
+                      },
+                      {  "prim": "DROP",
+                         "args": [
+                           {  "int": "1"  }
+                         ]
+                      }  ]
+                    ]
+                 },
+                 {  "prim": "DUG",
+                    "args": [
+                      {  "int": "3"  }
+                    ]
+                 },
+                 {  "prim": "DROP",
+                    "args": [
+                      {  "int": "3"  }
+                    ]
+                 }  ],
+                 [  {  "prim": "NONE",
+                       "args": [
+                         {  "prim": "address"  }
+                       ]
+                 },
+                 {  "prim": "SWAP"  },
+                 {  "prim": "DROP",
+                    "args": [
+                      {  "int": "1"  }
+                    ]
+                 }  ]
+               ]
+            },
+            {  "prim": "DUG",
+               "args": [
+                 {  "int": "2"  }
+               ]
+            },
+            {  "prim": "DROP",
+               "args": [
+                 {  "int": "2"  }
+               ]
+            }  ]
+          ]
+       },
        {  "prim": "NIL",
           "args": [
             {  "prim": "operation"  }
@@ -1936,7 +1975,7 @@ export const nft_public_code : any =
             {  "int": "1"  },
             [  {  "prim": "UNPAIR",
                   "args": [
-                    {  "int": "10"  }
+                    {  "int": "11"  }
                   ]
             }  ]
           ]
@@ -1952,7 +1991,7 @@ export const nft_public_code : any =
                                     [  {  "prim": "UNPAIR"  },
                                     {  "prim": "DUP",
                                        "args": [
-                                         {  "int": "13"  }
+                                         {  "int": "14"  }
                                        ]
                                     },
                                     {  "prim": "DUP",
@@ -1972,7 +2011,7 @@ export const nft_public_code : any =
                                          {  "prim": "CAR"  },
                                          {  "prim": "DUP",
                                             "args": [
-                                              {  "int": "10"  }
+                                              {  "int": "12"  }
                                             ]
                                          },
                                          {  "prim": "DUP",
@@ -2005,7 +2044,7 @@ export const nft_public_code : any =
                                          {  "prim": "EQ"  },
                                          {  "prim": "DUP",
                                             "args": [
-                                              {  "int": "10"  }
+                                              {  "int": "12"  }
                                             ]
                                          },
                                          {  "prim": "DUP",
@@ -2053,7 +2092,7 @@ export const nft_public_code : any =
                                          {  "int": "1"  },
                                          [  {  "prim": "DIG",
                                                "args": [
-                                                 {  "int": "12"  }
+                                                 {  "int": "13"  }
                                                ]
                                          },
                                          {  "prim": "DROP",
@@ -2063,6 +2102,426 @@ export const nft_public_code : any =
                                          }  ]
                                        ]
                                     },
+                                    {  "prim": "DUG",
+                                       "args": [
+                                         {  "int": "13"  }
+                                       ]
+                                    },
+                                    {  "prim": "DROP",
+                                       "args": [
+                                         {  "int": "2"  }
+                                       ]
+                                    },
+                                    {  "prim": "PAIR",
+                                       "args": [
+                                         {  "int": "11"  }
+                                       ]
+                                    },
+                                    {  "prim": "DIG",
+                                       "args": [
+                                         {  "int": "1"  }
+                                       ]
+                                    },
+                                    {  "prim": "PAIR"  }  ],
+                                    [  {  "prim": "DUP",
+                                          "args": [
+                                            {  "int": "2"  }
+                                          ]
+                                    },
+                                    {  "prim": "SENDER"  },
+                                    {  "prim": "COMPARE"  },
+                                    {  "prim": "EQ"  },
+                                    {  "prim": "NOT"  },
+                                    {  "prim": "IF",
+                                       "args": [
+                                         [  {  "prim": "PUSH",
+                                               "args": [
+                                                 {  "prim": "string"  },
+                                                 {  "string": "InvalidCaller"  }
+                                               ]
+                                         },
+                                         {  "prim": "FAILWITH"  }  ],
+                                         [    ]
+                                       ]
+                                    },
+                                    {  "prim": "DUP"  },
+                                    {  "prim": "SOME"  },
+                                    {  "prim": "DIP",
+                                       "args": [
+                                         {  "int": "1"  },
+                                         [  {  "prim": "DIG",
+                                               "args": [
+                                                 {  "int": "2"  }
+                                               ]
+                                         },
+                                         {  "prim": "DROP",
+                                            "args": [
+                                              {  "int": "1"  }
+                                            ]
+                                         }  ]
+                                       ]
+                                    },
+                                    {  "prim": "DUG",
+                                       "args": [
+                                         {  "int": "2"  }
+                                       ]
+                                    },
+                                    {  "prim": "DROP",
+                                       "args": [
+                                         {  "int": "1"  }
+                                       ]
+                                    },
+                                    {  "prim": "PAIR",
+                                       "args": [
+                                         {  "int": "11"  }
+                                       ]
+                                    },
+                                    {  "prim": "DIG",
+                                       "args": [
+                                         {  "int": "1"  }
+                                       ]
+                                    },
+                                    {  "prim": "PAIR"  }  ]
+                                  ]
+                            }  ],
+                            [  {  "prim": "IF_LEFT",
+                                  "args": [
+                                    [  {  "prim": "DROP",
+                                          "args": [
+                                            {  "int": "1"  }
+                                          ]
+                                    },
+                                    {  "prim": "DUP",
+                                       "args": [
+                                         {  "int": "2"  }
+                                       ]
+                                    },
+                                    {  "prim": "IF_NONE",
+                                       "args": [
+                                         [  {  "prim": "PUSH",
+                                               "args": [
+                                                 {  "prim": "string"  },
+                                                 {  "string": "NotFound"  }
+                                               ]
+                                         },
+                                         {  "prim": "FAILWITH"  }  ],
+                                         [    ]
+                                       ]
+                                    },
+                                    {  "prim": "SENDER"  },
+                                    {  "prim": "COMPARE"  },
+                                    {  "prim": "EQ"  },
+                                    {  "prim": "NOT"  },
+                                    {  "prim": "IF",
+                                       "args": [
+                                         [  {  "prim": "PUSH",
+                                               "args": [
+                                                 {  "prim": "string"  },
+                                                 {  "string": "InvalidCaller"  }
+                                               ]
+                                         },
+                                         {  "prim": "FAILWITH"  }  ],
+                                         [    ]
+                                       ]
+                                    },
+                                    {  "prim": "DUP",
+                                       "args": [
+                                         {  "int": "2"  }
+                                       ]
+                                    },
+                                    {  "prim": "IF_NONE",
+                                       "args": [
+                                         [  {  "prim": "PUSH",
+                                               "args": [
+                                                 {  "prim": "string"  },
+                                                 {  "string": "NotFound"  }
+                                               ]
+                                         },
+                                         {  "prim": "FAILWITH"  }  ],
+                                         [    ]
+                                       ]
+                                    },
+                                    {  "prim": "SWAP"  },
+                                    {  "prim": "DROP",
+                                       "args": [
+                                         {  "int": "1"  }
+                                       ]
+                                    },
+                                    {  "prim": "NONE",
+                                       "args": [
+                                         {  "prim": "address"  }
+                                       ]
+                                    },
+                                    {  "prim": "DIP",
+                                       "args": [
+                                         {  "int": "1"  },
+                                         [  {  "prim": "DIG",
+                                               "args": [
+                                                 {  "int": "1"  }
+                                               ]
+                                         },
+                                         {  "prim": "DROP",
+                                            "args": [
+                                              {  "int": "1"  }
+                                            ]
+                                         }  ]
+                                       ]
+                                    },
+                                    {  "prim": "DUG",
+                                       "args": [
+                                         {  "int": "1"  }
+                                       ]
+                                    },
+                                    {  "prim": "PAIR",
+                                       "args": [
+                                         {  "int": "11"  }
+                                       ]
+                                    },
+                                    {  "prim": "DIG",
+                                       "args": [
+                                         {  "int": "1"  }
+                                       ]
+                                    },
+                                    {  "prim": "PAIR"  }  ],
+                                    [  {  "prim": "DROP",
+                                          "args": [
+                                            {  "int": "1"  }
+                                          ]
+                                    },
+                                    {  "prim": "DUP"  },
+                                    {  "prim": "SENDER"  },
+                                    {  "prim": "COMPARE"  },
+                                    {  "prim": "EQ"  },
+                                    {  "prim": "NOT"  },
+                                    {  "prim": "IF",
+                                       "args": [
+                                         [  {  "prim": "PUSH",
+                                               "args": [
+                                                 {  "prim": "string"  },
+                                                 {  "string": "InvalidCaller"  }
+                                               ]
+                                         },
+                                         {  "prim": "FAILWITH"  }  ],
+                                         [    ]
+                                       ]
+                                    },
+                                    {  "prim": "DUP",
+                                       "args": [
+                                         {  "int": "3"  }
+                                       ]
+                                    },
+                                    {  "prim": "IF",
+                                       "args": [
+                                         [  {  "prim": "PUSH",
+                                               "args": [
+                                                 {  "prim": "string"  },
+                                                 {  "string": "CONTRACT_PAUSED"  }
+                                               ]
+                                         },
+                                         {  "prim": "FAILWITH"  }  ],
+                                         [    ]
+                                       ]
+                                    },
+                                    {  "prim": "PUSH",
+                                       "args": [
+                                         {  "prim": "bool"  },
+                                         {  "prim": "True"  }
+                                       ]
+                                    },
+                                    {  "prim": "DIP",
+                                       "args": [
+                                         {  "int": "1"  },
+                                         [  {  "prim": "DIG",
+                                               "args": [
+                                                 {  "int": "2"  }
+                                               ]
+                                         },
+                                         {  "prim": "DROP",
+                                            "args": [
+                                              {  "int": "1"  }
+                                            ]
+                                         }  ]
+                                       ]
+                                    },
+                                    {  "prim": "DUG",
+                                       "args": [
+                                         {  "int": "2"  }
+                                       ]
+                                    },
+                                    {  "prim": "PAIR",
+                                       "args": [
+                                         {  "int": "11"  }
+                                       ]
+                                    },
+                                    {  "prim": "DIG",
+                                       "args": [
+                                         {  "int": "1"  }
+                                       ]
+                                    },
+                                    {  "prim": "PAIR"  }  ]
+                                  ]
+                            }  ]
+                          ]
+                    }  ],
+                    [  {  "prim": "IF_LEFT",
+                          "args": [
+                            [  {  "prim": "IF_LEFT",
+                                  "args": [
+                                    [  {  "prim": "DROP",
+                                          "args": [
+                                            {  "int": "1"  }
+                                          ]
+                                    },
+                                    {  "prim": "DUP"  },
+                                    {  "prim": "SENDER"  },
+                                    {  "prim": "COMPARE"  },
+                                    {  "prim": "EQ"  },
+                                    {  "prim": "NOT"  },
+                                    {  "prim": "IF",
+                                       "args": [
+                                         [  {  "prim": "PUSH",
+                                               "args": [
+                                                 {  "prim": "string"  },
+                                                 {  "string": "InvalidCaller"  }
+                                               ]
+                                         },
+                                         {  "prim": "FAILWITH"  }  ],
+                                         [    ]
+                                       ]
+                                    },
+                                    {  "prim": "DUP",
+                                       "args": [
+                                         {  "int": "3"  }
+                                       ]
+                                    },
+                                    {  "prim": "NOT"  },
+                                    {  "prim": "IF",
+                                       "args": [
+                                         [  {  "prim": "PUSH",
+                                               "args": [
+                                                 {  "prim": "string"  },
+                                                 {  "string": "CONTRACT_NOT_PAUSED"  }
+                                               ]
+                                         },
+                                         {  "prim": "FAILWITH"  }  ],
+                                         [    ]
+                                       ]
+                                    },
+                                    {  "prim": "PUSH",
+                                       "args": [
+                                         {  "prim": "bool"  },
+                                         {  "prim": "False"  }
+                                       ]
+                                    },
+                                    {  "prim": "DIP",
+                                       "args": [
+                                         {  "int": "1"  },
+                                         [  {  "prim": "DIG",
+                                               "args": [
+                                                 {  "int": "2"  }
+                                               ]
+                                         },
+                                         {  "prim": "DROP",
+                                            "args": [
+                                              {  "int": "1"  }
+                                            ]
+                                         }  ]
+                                       ]
+                                    },
+                                    {  "prim": "DUG",
+                                       "args": [
+                                         {  "int": "2"  }
+                                       ]
+                                    },
+                                    {  "prim": "PAIR",
+                                       "args": [
+                                         {  "int": "11"  }
+                                       ]
+                                    },
+                                    {  "prim": "DIG",
+                                       "args": [
+                                         {  "int": "1"  }
+                                       ]
+                                    },
+                                    {  "prim": "PAIR"  }  ],
+                                    [  {  "prim": "UNPAIR"  },
+                                    {  "prim": "SWAP"  },
+                                    {  "prim": "DUP",
+                                       "args": [
+                                         {  "int": "3"  }
+                                       ]
+                                    },
+                                    {  "prim": "SENDER"  },
+                                    {  "prim": "COMPARE"  },
+                                    {  "prim": "EQ"  },
+                                    {  "prim": "NOT"  },
+                                    {  "prim": "IF",
+                                       "args": [
+                                         [  {  "prim": "PUSH",
+                                               "args": [
+                                                 {  "prim": "string"  },
+                                                 {  "string": "InvalidCaller"  }
+                                               ]
+                                         },
+                                         {  "prim": "FAILWITH"  }  ],
+                                         [    ]
+                                       ]
+                                    },
+                                    {  "prim": "DUP",
+                                       "args": [
+                                         {  "int": "20"  }
+                                       ]
+                                    },
+                                    {  "prim": "DUP",
+                                       "args": [
+                                         {  "int": "6"  }
+                                       ]
+                                    },
+                                    {  "prim": "PUSH",
+                                       "args": [
+                                         {  "prim": "string"  },
+                                         {  "string": "CONTRACT_PAUSED"  }
+                                       ]
+                                    },
+                                    {  "prim": "PAIR"  },
+                                    {  "prim": "EXEC"  },
+                                    {  "prim": "NOT"  },
+                                    {  "prim": "IF",
+                                       "args": [
+                                         [  {  "prim": "PUSH",
+                                               "args": [
+                                                 {  "prim": "string"  },
+                                                 {  "string": "r3"  }
+                                               ]
+                                         },
+                                         {  "prim": "PUSH",
+                                            "args": [
+                                              {  "prim": "string"  },
+                                              {  "string": "InvalidCondition"  }
+                                            ]
+                                         },
+                                         {  "prim": "PAIR"  },
+                                         {  "prim": "FAILWITH"  }  ],
+                                         [    ]
+                                       ]
+                                    },
+                                    {  "prim": "DIG",
+                                       "args": [
+                                         {  "int": "12"  }
+                                       ]
+                                    },
+                                    {  "prim": "DUP",
+                                       "args": [
+                                         {  "int": "2"  }
+                                       ]
+                                    },
+                                    {  "prim": "SOME"  },
+                                    {  "prim": "DUP",
+                                       "args": [
+                                         {  "int": "4"  }
+                                       ]
+                                    },
+                                    {  "prim": "UPDATE"  },
                                     {  "prim": "DUG",
                                        "args": [
                                          {  "int": "12"  }
@@ -2075,7 +2534,7 @@ export const nft_public_code : any =
                                     },
                                     {  "prim": "PAIR",
                                        "args": [
-                                         {  "int": "10"  }
+                                         {  "int": "11"  }
                                        ]
                                     },
                                     {  "prim": "DIG",
@@ -2083,15 +2542,19 @@ export const nft_public_code : any =
                                          {  "int": "1"  }
                                        ]
                                     },
-                                    {  "prim": "PAIR"  }  ],
+                                    {  "prim": "PAIR"  }  ]
+                                  ]
+                            }  ],
+                            [  {  "prim": "IF_LEFT",
+                                  "args": [
                                     [  {  "prim": "DUP",
                                           "args": [
-                                            {  "int": "18"  }
+                                            {  "int": "19"  }
                                           ]
                                     },
                                     {  "prim": "DUP",
                                        "args": [
-                                         {  "int": "11"  }
+                                         {  "int": "5"  }
                                        ]
                                     },
                                     {  "prim": "PUSH",
@@ -2143,7 +2606,7 @@ export const nft_public_code : any =
                                                    [  {  "prim": "PUSH",
                                                          "args": [
                                                            {  "prim": "string"  },
-                                                           {  "string": "CALLER NOT OWNER"  }
+                                                           {  "string": "CALLER_NOT_OWNER"  }
                                                          ]
                                                    },
                                                    {  "prim": "FAILWITH"  }  ],
@@ -2152,7 +2615,7 @@ export const nft_public_code : any =
                                               },
                                               {  "prim": "DUP",
                                                  "args": [
-                                                   {  "int": "7"  }
+                                                   {  "int": "9"  }
                                                  ]
                                               },
                                               {  "prim": "DUP",
@@ -2196,7 +2659,7 @@ export const nft_public_code : any =
                                                    {  "prim": "FAILWITH"  }  ],
                                                    [  {  "prim": "DUP",
                                                          "args": [
-                                                           {  "int": "7"  }
+                                                           {  "int": "9"  }
                                                          ]
                                                    },
                                                    {  "prim": "PUSH",
@@ -2234,7 +2697,7 @@ export const nft_public_code : any =
                                                         {  "int": "1"  },
                                                         [  {  "prim": "DIG",
                                                               "args": [
-                                                                {  "int": "6"  }
+                                                                {  "int": "8"  }
                                                               ]
                                                         },
                                                         {  "prim": "DROP",
@@ -2246,7 +2709,7 @@ export const nft_public_code : any =
                                                    },
                                                    {  "prim": "DUG",
                                                       "args": [
-                                                        {  "int": "6"  }
+                                                        {  "int": "8"  }
                                                       ]
                                                    }  ]
                                                  ]
@@ -2271,7 +2734,7 @@ export const nft_public_code : any =
                                                    [  {  "prim": "PUSH",
                                                          "args": [
                                                            {  "prim": "string"  },
-                                                           {  "string": "CALLER NOT OWNER"  }
+                                                           {  "string": "CALLER_NOT_OWNER"  }
                                                          ]
                                                    },
                                                    {  "prim": "FAILWITH"  }  ],
@@ -2280,7 +2743,7 @@ export const nft_public_code : any =
                                               },
                                               {  "prim": "DUP",
                                                  "args": [
-                                                   {  "int": "7"  }
+                                                   {  "int": "9"  }
                                                  ]
                                               },
                                               {  "prim": "NONE",
@@ -2316,7 +2779,7 @@ export const nft_public_code : any =
                                                    {  "int": "1"  },
                                                    [  {  "prim": "DIG",
                                                          "args": [
-                                                           {  "int": "6"  }
+                                                           {  "int": "8"  }
                                                          ]
                                                    },
                                                    {  "prim": "DROP",
@@ -2328,7 +2791,7 @@ export const nft_public_code : any =
                                               },
                                               {  "prim": "DUG",
                                                  "args": [
-                                                   {  "int": "6"  }
+                                                   {  "int": "8"  }
                                                  ]
                                               },
                                               {  "prim": "DROP",
@@ -2352,7 +2815,7 @@ export const nft_public_code : any =
                                     },
                                     {  "prim": "PAIR",
                                        "args": [
-                                         {  "int": "10"  }
+                                         {  "int": "11"  }
                                        ]
                                     },
                                     {  "prim": "DIG",
@@ -2360,19 +2823,15 @@ export const nft_public_code : any =
                                          {  "int": "1"  }
                                        ]
                                     },
-                                    {  "prim": "PAIR"  }  ]
-                                  ]
-                            }  ],
-                            [  {  "prim": "IF_LEFT",
-                                  "args": [
+                                    {  "prim": "PAIR"  }  ],
                                     [  {  "prim": "DUP",
                                           "args": [
-                                            {  "int": "18"  }
+                                            {  "int": "19"  }
                                           ]
                                     },
                                     {  "prim": "DUP",
                                        "args": [
-                                         {  "int": "11"  }
+                                         {  "int": "5"  }
                                        ]
                                     },
                                     {  "prim": "PUSH",
@@ -2411,7 +2870,7 @@ export const nft_public_code : any =
                                             "args": [
                                               [  {  "prim": "DUP",
                                                     "args": [
-                                                      {  "int": "10"  }
+                                                      {  "int": "12"  }
                                                     ]
                                               },
                                               {  "prim": "SENDER"  },
@@ -2440,7 +2899,7 @@ export const nft_public_code : any =
                                                    {  "prim": "FAILWITH"  }  ],
                                                    [  {  "prim": "DUP",
                                                          "args": [
-                                                           {  "int": "10"  }
+                                                           {  "int": "12"  }
                                                          ]
                                                    },
                                                    {  "prim": "PUSH",
@@ -2463,7 +2922,7 @@ export const nft_public_code : any =
                                                         {  "int": "1"  },
                                                         [  {  "prim": "DIG",
                                                               "args": [
-                                                                {  "int": "9"  }
+                                                                {  "int": "11"  }
                                                               ]
                                                         },
                                                         {  "prim": "DROP",
@@ -2475,7 +2934,7 @@ export const nft_public_code : any =
                                                    },
                                                    {  "prim": "DUG",
                                                       "args": [
-                                                        {  "int": "9"  }
+                                                        {  "int": "11"  }
                                                       ]
                                                    }  ]
                                                  ]
@@ -2487,7 +2946,7 @@ export const nft_public_code : any =
                                               }  ],
                                               [  {  "prim": "DUP",
                                                     "args": [
-                                                      {  "int": "10"  }
+                                                      {  "int": "12"  }
                                                     ]
                                               },
                                               {  "prim": "NONE",
@@ -2508,7 +2967,7 @@ export const nft_public_code : any =
                                                    {  "int": "1"  },
                                                    [  {  "prim": "DIG",
                                                          "args": [
-                                                           {  "int": "9"  }
+                                                           {  "int": "11"  }
                                                          ]
                                                    },
                                                    {  "prim": "DROP",
@@ -2520,7 +2979,7 @@ export const nft_public_code : any =
                                               },
                                               {  "prim": "DUG",
                                                  "args": [
-                                                   {  "int": "9"  }
+                                                   {  "int": "11"  }
                                                  ]
                                               },
                                               {  "prim": "DROP",
@@ -2544,199 +3003,7 @@ export const nft_public_code : any =
                                     },
                                     {  "prim": "PAIR",
                                        "args": [
-                                         {  "int": "10"  }
-                                       ]
-                                    },
-                                    {  "prim": "DIG",
-                                       "args": [
-                                         {  "int": "1"  }
-                                       ]
-                                    },
-                                    {  "prim": "PAIR"  }  ],
-                                    [  {  "prim": "DUP",
-                                          "args": [
-                                            {  "int": "18"  }
-                                          ]
-                                    },
-                                    {  "prim": "DUP",
-                                       "args": [
                                          {  "int": "11"  }
-                                       ]
-                                    },
-                                    {  "prim": "PUSH",
-                                       "args": [
-                                         {  "prim": "string"  },
-                                         {  "string": "CONTRACT_PAUSED"  }
-                                       ]
-                                    },
-                                    {  "prim": "PAIR"  },
-                                    {  "prim": "EXEC"  },
-                                    {  "prim": "NOT"  },
-                                    {  "prim": "IF",
-                                       "args": [
-                                         [  {  "prim": "PUSH",
-                                               "args": [
-                                                 {  "prim": "string"  },
-                                                 {  "string": "r2"  }
-                                               ]
-                                         },
-                                         {  "prim": "PUSH",
-                                            "args": [
-                                              {  "prim": "string"  },
-                                              {  "string": "InvalidCondition"  }
-                                            ]
-                                         },
-                                         {  "prim": "PAIR"  },
-                                         {  "prim": "FAILWITH"  }  ],
-                                         [    ]
-                                       ]
-                                    },
-                                    {  "prim": "SENDER"  },
-                                    {  "prim": "DUP",
-                                       "args": [
-                                         {  "int": "5"  }
-                                       ]
-                                    },
-                                    {  "prim": "DUP",
-                                       "args": [
-                                         {  "int": "3"  }
-                                       ]
-                                    },
-                                    {  "prim": "GET"  },
-                                    {  "prim": "IF_NONE",
-                                       "args": [
-                                         [  {  "prim": "PUSH",
-                                               "args": [
-                                                 {  "prim": "string"  },
-                                                 {  "string": "ledger"  }
-                                               ]
-                                         },
-                                         {  "prim": "PUSH",
-                                            "args": [
-                                              {  "prim": "string"  },
-                                              {  "string": "AssetNotFound"  }
-                                            ]
-                                         },
-                                         {  "prim": "PAIR"  },
-                                         {  "prim": "FAILWITH"  }  ],
-                                         [    ]
-                                       ]
-                                    },
-                                    {  "prim": "COMPARE"  },
-                                    {  "prim": "EQ"  },
-                                    {  "prim": "DUP",
-                                       "args": [
-                                         {  "int": "5"  }
-                                       ]
-                                    },
-                                    {  "prim": "DUP",
-                                       "args": [
-                                         {  "int": "3"  }
-                                       ]
-                                    },
-                                    {  "prim": "MEM"  },
-                                    {  "prim": "AND"  },
-                                    {  "prim": "IF",
-                                       "args": [
-                                         [  {  "prim": "DUP",
-                                               "args": [
-                                                 {  "int": "4"  }
-                                               ]
-                                         },
-                                         {  "prim": "NONE",
-                                            "args": [
-                                              {  "prim": "address"  }
-                                            ]
-                                         },
-                                         {  "prim": "DUP",
-                                            "args": [
-                                              {  "int": "3"  }
-                                            ]
-                                         },
-                                         {  "prim": "UPDATE"  },
-                                         {  "prim": "DIP",
-                                            "args": [
-                                              {  "int": "1"  },
-                                              [  {  "prim": "DIG",
-                                                    "args": [
-                                                      {  "int": "3"  }
-                                                    ]
-                                              },
-                                              {  "prim": "DROP",
-                                                 "args": [
-                                                   {  "int": "1"  }
-                                                 ]
-                                              }  ]
-                                            ]
-                                         },
-                                         {  "prim": "DUG",
-                                            "args": [
-                                              {  "int": "3"  }
-                                            ]
-                                         },
-                                         {  "prim": "DUP",
-                                            "args": [
-                                              {  "int": "6"  }
-                                            ]
-                                         },
-                                         {  "prim": "NONE",
-                                            "args": [
-                                              {  "prim": "pair",
-                                                 "args": [
-                                                   {  "prim": "nat"  },
-                                                   {  "prim": "map",
-                                                      "args": [
-                                                        {  "prim": "string"  },
-                                                        {  "prim": "bytes"  }
-                                                      ]
-                                                   }
-                                                 ]
-                                              }
-                                            ]
-                                         },
-                                         {  "prim": "DUP",
-                                            "args": [
-                                              {  "int": "3"  }
-                                            ]
-                                         },
-                                         {  "prim": "UPDATE"  },
-                                         {  "prim": "DIP",
-                                            "args": [
-                                              {  "int": "1"  },
-                                              [  {  "prim": "DIG",
-                                                    "args": [
-                                                      {  "int": "5"  }
-                                                    ]
-                                              },
-                                              {  "prim": "DROP",
-                                                 "args": [
-                                                   {  "int": "1"  }
-                                                 ]
-                                              }  ]
-                                            ]
-                                         },
-                                         {  "prim": "DUG",
-                                            "args": [
-                                              {  "int": "5"  }
-                                            ]
-                                         }  ],
-                                         [  {  "prim": "PUSH",
-                                               "args": [
-                                                 {  "prim": "string"  },
-                                                 {  "string": "CALLER NOT OWNER"  }
-                                               ]
-                                         },
-                                         {  "prim": "FAILWITH"  }  ]
-                                       ]
-                                    },
-                                    {  "prim": "DROP",
-                                       "args": [
-                                         {  "int": "1"  }
-                                       ]
-                                    },
-                                    {  "prim": "PAIR",
-                                       "args": [
-                                         {  "int": "10"  }
                                        ]
                                     },
                                     {  "prim": "DIG",
@@ -2748,17 +3015,19 @@ export const nft_public_code : any =
                                   ]
                             }  ]
                           ]
-                    }  ],
+                    }  ]
+                  ]
+            }  ],
+            [  {  "prim": "IF_LEFT",
+                  "args": [
                     [  {  "prim": "IF_LEFT",
                           "args": [
                             [  {  "prim": "IF_LEFT",
                                   "args": [
-                                    [  {  "prim": "UNPAIR"  },
-                                    {  "prim": "SWAP"  },
-                                    {  "prim": "DUP",
-                                       "args": [
-                                         {  "int": "3"  }
-                                       ]
+                                    [  {  "prim": "DUP",
+                                          "args": [
+                                            {  "int": "2"  }
+                                          ]
                                     },
                                     {  "prim": "SENDER"  },
                                     {  "prim": "COMPARE"  },
@@ -2783,871 +3052,7 @@ export const nft_public_code : any =
                                     },
                                     {  "prim": "DUP",
                                        "args": [
-                                         {  "int": "12"  }
-                                       ]
-                                    },
-                                    {  "prim": "PUSH",
-                                       "args": [
-                                         {  "prim": "string"  },
-                                         {  "string": "CONTRACT_PAUSED"  }
-                                       ]
-                                    },
-                                    {  "prim": "PAIR"  },
-                                    {  "prim": "EXEC"  },
-                                    {  "prim": "NOT"  },
-                                    {  "prim": "IF",
-                                       "args": [
-                                         [  {  "prim": "PUSH",
-                                               "args": [
-                                                 {  "prim": "string"  },
-                                                 {  "string": "r3"  }
-                                               ]
-                                         },
-                                         {  "prim": "PUSH",
-                                            "args": [
-                                              {  "prim": "string"  },
-                                              {  "string": "InvalidCondition"  }
-                                            ]
-                                         },
-                                         {  "prim": "PAIR"  },
-                                         {  "prim": "FAILWITH"  }  ],
-                                         [    ]
-                                       ]
-                                    },
-                                    {  "prim": "DIG",
-                                       "args": [
-                                         {  "int": "11"  }
-                                       ]
-                                    },
-                                    {  "prim": "DUP",
-                                       "args": [
-                                         {  "int": "2"  }
-                                       ]
-                                    },
-                                    {  "prim": "SOME"  },
-                                    {  "prim": "DUP",
-                                       "args": [
-                                         {  "int": "4"  }
-                                       ]
-                                    },
-                                    {  "prim": "UPDATE"  },
-                                    {  "prim": "DUG",
-                                       "args": [
-                                         {  "int": "11"  }
-                                       ]
-                                    },
-                                    {  "prim": "DROP",
-                                       "args": [
-                                         {  "int": "2"  }
-                                       ]
-                                    },
-                                    {  "prim": "PAIR",
-                                       "args": [
-                                         {  "int": "10"  }
-                                       ]
-                                    },
-                                    {  "prim": "DIG",
-                                       "args": [
-                                         {  "int": "1"  }
-                                       ]
-                                    },
-                                    {  "prim": "PAIR"  }  ],
-                                    [  {  "prim": "DUP",
-                                          "args": [
-                                            {  "int": "2"  }
-                                          ]
-                                    },
-                                    {  "prim": "SENDER"  },
-                                    {  "prim": "COMPARE"  },
-                                    {  "prim": "EQ"  },
-                                    {  "prim": "NOT"  },
-                                    {  "prim": "IF",
-                                       "args": [
-                                         [  {  "prim": "PUSH",
-                                               "args": [
-                                                 {  "prim": "string"  },
-                                                 {  "string": "InvalidCaller"  }
-                                               ]
-                                         },
-                                         {  "prim": "FAILWITH"  }  ],
-                                         [    ]
-                                       ]
-                                    },
-                                    {  "prim": "DUP"  },
-                                    {  "prim": "DIP",
-                                       "args": [
-                                         {  "int": "1"  },
-                                         [  {  "prim": "DIG",
-                                               "args": [
-                                                 {  "int": "9"  }
-                                               ]
-                                         },
-                                         {  "prim": "DROP",
-                                            "args": [
-                                              {  "int": "1"  }
-                                            ]
-                                         }  ]
-                                       ]
-                                    },
-                                    {  "prim": "DUG",
-                                       "args": [
-                                         {  "int": "9"  }
-                                       ]
-                                    },
-                                    {  "prim": "DROP",
-                                       "args": [
-                                         {  "int": "1"  }
-                                       ]
-                                    },
-                                    {  "prim": "PAIR",
-                                       "args": [
-                                         {  "int": "10"  }
-                                       ]
-                                    },
-                                    {  "prim": "DIG",
-                                       "args": [
-                                         {  "int": "1"  }
-                                       ]
-                                    },
-                                    {  "prim": "PAIR"  }  ]
-                                  ]
-                            }  ],
-                            [  {  "prim": "IF_LEFT",
-                                  "args": [
-                                    [  {  "prim": "UNPAIR"  },
-                                    {  "prim": "SWAP"  },
-                                    {  "prim": "UNPAIR"  },
-                                    {  "prim": "SWAP"  },
-                                    {  "prim": "DUP",
-                                       "args": [
-                                         {  "int": "20"  }
-                                       ]
-                                    },
-                                    {  "prim": "DUP",
-                                       "args": [
-                                         {  "int": "13"  }
-                                       ]
-                                    },
-                                    {  "prim": "PUSH",
-                                       "args": [
-                                         {  "prim": "string"  },
-                                         {  "string": "CONTRACT_PAUSED"  }
-                                       ]
-                                    },
-                                    {  "prim": "PAIR"  },
-                                    {  "prim": "EXEC"  },
-                                    {  "prim": "NOT"  },
-                                    {  "prim": "IF",
-                                       "args": [
-                                         [  {  "prim": "PUSH",
-                                               "args": [
-                                                 {  "prim": "string"  },
-                                                 {  "string": "r5"  }
-                                               ]
-                                         },
-                                         {  "prim": "PUSH",
-                                            "args": [
-                                              {  "prim": "string"  },
-                                              {  "string": "InvalidCondition"  }
-                                            ]
-                                         },
-                                         {  "prim": "PAIR"  },
-                                         {  "prim": "FAILWITH"  }  ],
-                                         [    ]
-                                       ]
-                                    },
-                                    {  "prim": "DUP",
-                                       "args": [
-                                         {  "int": "3"  }
-                                       ]
-                                    },
-                                    {  "prim": "HASH_KEY"  },
-                                    {  "prim": "IMPLICIT_ACCOUNT"  },
-                                    {  "prim": "ADDRESS"  },
-                                    {  "prim": "EMPTY_MAP",
-                                       "args": [
-                                         {  "prim": "bytes"  },
-                                         {  "prim": "pair",
-                                            "args": [
-                                              {  "prim": "option",
-                                                 "args": [
-                                                   {  "prim": "nat"  }
-                                                 ]
-                                                 ,
-                                                 "annots": [
-                                                   "%expiry"
-                                                 ]
-                                              },
-                                              {  "prim": "timestamp",
-                                                 "annots": [
-                                                   "%created_at"
-                                                 ]
-                                              }
-                                            ]
-                                         }
-                                       ]
-                                    },
-                                    {  "prim": "DUP",
-                                       "args": [
-                                         {  "int": "11"  }
-                                       ]
-                                    },
-                                    {  "prim": "DUP",
-                                       "args": [
-                                         {  "int": "3"  }
-                                       ]
-                                    },
-                                    {  "prim": "MEM"  },
-                                    {  "prim": "IF",
-                                       "args": [
-                                         [  {  "prim": "DUP",
-                                               "args": [
-                                                 {  "int": "11"  }
-                                               ]
-                                         },
-                                         {  "prim": "DUP",
-                                            "args": [
-                                              {  "int": "3"  }
-                                            ]
-                                         },
-                                         {  "prim": "GET"  },
-                                         {  "prim": "IF_NONE",
-                                            "args": [
-                                              [  {  "prim": "PUSH",
-                                                    "args": [
-                                                      {  "prim": "string"  },
-                                                      {  "string": "permits"  }
-                                                    ]
-                                              },
-                                              {  "prim": "PUSH",
-                                                 "args": [
-                                                   {  "prim": "string"  },
-                                                   {  "string": "AssetNotFound"  }
-                                                 ]
-                                              },
-                                              {  "prim": "PAIR"  },
-                                              {  "prim": "FAILWITH"  }  ],
-                                              [    ]
-                                            ]
-                                         },
-                                         {  "prim": "CDR"  },
-                                         {  "prim": "CDR"  },
-                                         {  "prim": "DUP",
-                                            "args": [
-                                              {  "int": "12"  }
-                                            ]
-                                         },
-                                         {  "prim": "DUP",
-                                            "args": [
-                                              {  "int": "4"  }
-                                            ]
-                                         },
-                                         {  "prim": "GET"  },
-                                         {  "prim": "IF_NONE",
-                                            "args": [
-                                              [  {  "prim": "PUSH",
-                                                    "args": [
-                                                      {  "prim": "string"  },
-                                                      {  "string": "permits"  }
-                                                    ]
-                                              },
-                                              {  "prim": "PUSH",
-                                                 "args": [
-                                                   {  "prim": "string"  },
-                                                   {  "string": "AssetNotFound"  }
-                                                 ]
-                                              },
-                                              {  "prim": "PAIR"  },
-                                              {  "prim": "FAILWITH"  }  ],
-                                              [    ]
-                                            ]
-                                         },
-                                         {  "prim": "CAR"  },
-                                         {  "prim": "PAIR"  }  ],
-                                         [  {  "prim": "DUP"  },
-                                         {  "prim": "PUSH",
-                                            "args": [
-                                              {  "prim": "nat"  },
-                                              {  "int": "0"  }
-                                            ]
-                                         },
-                                         {  "prim": "PAIR"  }  ]
-                                       ]
-                                    },
-                                    {  "prim": "DUP"  },
-                                    {  "prim": "CAR"  },
-                                    {  "prim": "DUP",
-                                       "args": [
-                                         {  "int": "2"  }
-                                       ]
-                                    },
-                                    {  "prim": "CDR"  },
-                                    {  "prim": "DUP",
-                                       "args": [
-                                         {  "int": "6"  }
-                                       ]
-                                    },
-                                    {  "prim": "DUP",
-                                       "args": [
-                                         {  "int": "3"  }
-                                       ]
-                                    },
-                                    {  "prim": "PAIR"  },
-                                    {  "prim": "CHAIN_ID"  },
-                                    {  "prim": "SELF_ADDRESS"  },
-                                    {  "prim": "PAIR"  },
-                                    {  "prim": "PAIR"  },
-                                    {  "prim": "PACK"  },
-                                    {  "prim": "DUP"  },
-                                    {  "prim": "DUP",
-                                       "args": [
-                                         {  "int": "9"  }
-                                       ]
-                                    },
-                                    {  "prim": "DUP",
-                                       "args": [
-                                         {  "int": "11"  }
-                                       ]
-                                    },
-                                    {  "prim": "CHECK_SIGNATURE"  },
-                                    {  "prim": "NOT"  },
-                                    {  "prim": "IF",
-                                       "args": [
-                                         [  {  "prim": "DUP"  },
-                                         {  "prim": "PUSH",
-                                            "args": [
-                                              {  "prim": "string"  },
-                                              {  "string": "MISSIGNED"  }
-                                            ]
-                                         },
-                                         {  "prim": "PAIR"  },
-                                         {  "prim": "FAILWITH"  }  ],
-                                         [    ]
-                                       ]
-                                    },
-                                    {  "prim": "DUP",
-                                       "args": [
-                                         {  "int": "23"  }
-                                       ]
-                                    },
-                                    {  "prim": "DUP",
-                                       "args": [
-                                         {  "int": "7"  }
-                                       ]
-                                    },
-                                    {  "prim": "DUP",
-                                       "args": [
-                                         {  "int": "19"  }
-                                       ]
-                                    },
-                                    {  "prim": "PAIR"  },
-                                    {  "prim": "DUP",
-                                       "args": [
-                                         {  "int": "17"  }
-                                       ]
-                                    },
-                                    {  "prim": "PAIR"  },
-                                    {  "prim": "EXEC"  },
-                                    {  "prim": "DUP",
-                                       "args": [
-                                         {  "int": "16"  }
-                                       ]
-                                    },
-                                    {  "prim": "DUP",
-                                       "args": [
-                                         {  "int": "8"  }
-                                       ]
-                                    },
-                                    {  "prim": "MEM"  },
-                                    {  "prim": "IF",
-                                       "args": [
-                                         [  {  "prim": "DUP",
-                                               "args": [
-                                                 {  "int": "16"  }
-                                               ]
-                                         },
-                                         {  "prim": "DUP",
-                                            "args": [
-                                              {  "int": "8"  }
-                                            ]
-                                         },
-                                         {  "prim": "GET"  },
-                                         {  "prim": "IF_NONE",
-                                            "args": [
-                                              [  {  "prim": "PUSH",
-                                                    "args": [
-                                                      {  "prim": "string"  },
-                                                      {  "string": "permits"  }
-                                                    ]
-                                              },
-                                              {  "prim": "PUSH",
-                                                 "args": [
-                                                   {  "prim": "string"  },
-                                                   {  "string": "AssetNotFound"  }
-                                                 ]
-                                              },
-                                              {  "prim": "PAIR"  },
-                                              {  "prim": "FAILWITH"  }  ],
-                                              [    ]
-                                            ]
-                                         },
-                                         {  "prim": "DUP",
-                                            "args": [
-                                              {  "int": "17"  }
-                                            ]
-                                         },
-                                         {  "prim": "DUP",
-                                            "args": [
-                                              {  "int": "18"  }
-                                            ]
-                                         },
-                                         {  "prim": "DUP",
-                                            "args": [
-                                              {  "int": "10"  }
-                                            ]
-                                         },
-                                         {  "prim": "GET"  },
-                                         {  "prim": "IF_NONE",
-                                            "args": [
-                                              [  {  "prim": "PUSH",
-                                                    "args": [
-                                                      {  "prim": "string"  },
-                                                      {  "string": "permits"  }
-                                                    ]
-                                              },
-                                              {  "prim": "PUSH",
-                                                 "args": [
-                                                   {  "prim": "string"  },
-                                                   {  "string": "AssetNotFound"  }
-                                                 ]
-                                              },
-                                              {  "prim": "PAIR"  },
-                                              {  "prim": "FAILWITH"  }  ],
-                                              [    ]
-                                            ]
-                                         },
-                                         {  "prim": "UNPAIR"  },
-                                         {  "prim": "DROP",
-                                            "args": [
-                                              {  "int": "1"  }
-                                            ]
-                                         },
-                                         {  "prim": "PUSH",
-                                            "args": [
-                                              {  "prim": "nat"  },
-                                              {  "int": "1"  }
-                                            ]
-                                         },
-                                         {  "prim": "DUP",
-                                            "args": [
-                                              {  "int": "4"  }
-                                            ]
-                                         },
-                                         {  "prim": "CAR"  },
-                                         {  "prim": "ADD"  },
-                                         {  "prim": "SWAP"  },
-                                         {  "prim": "UNPAIR"  },
-                                         {  "prim": "SWAP"  },
-                                         {  "prim": "DROP",
-                                            "args": [
-                                              {  "int": "1"  }
-                                            ]
-                                         },
-                                         {  "prim": "DUP",
-                                            "args": [
-                                              {  "int": "7"  }
-                                            ]
-                                         },
-                                         {  "prim": "NOW"  },
-                                         {  "prim": "DUP",
-                                            "args": [
-                                              {  "int": "7"  }
-                                            ]
-                                         },
-                                         {  "prim": "SOME"  },
-                                         {  "prim": "PAIR"  },
-                                         {  "prim": "SOME"  },
-                                         {  "prim": "DUP",
-                                            "args": [
-                                              {  "int": "14"  }
-                                            ]
-                                         },
-                                         {  "prim": "UPDATE"  },
-                                         {  "prim": "SWAP"  },
-                                         {  "prim": "PAIR"  },
-                                         {  "prim": "SWAP"  },
-                                         {  "prim": "PAIR"  },
-                                         {  "prim": "SOME"  },
-                                         {  "prim": "DUP",
-                                            "args": [
-                                              {  "int": "10"  }
-                                            ]
-                                         },
-                                         {  "prim": "UPDATE"  },
-                                         {  "prim": "DIP",
-                                            "args": [
-                                              {  "int": "1"  },
-                                              [  {  "prim": "DIG",
-                                                    "args": [
-                                                      {  "int": "16"  }
-                                                    ]
-                                              },
-                                              {  "prim": "DROP",
-                                                 "args": [
-                                                   {  "int": "1"  }
-                                                 ]
-                                              }  ]
-                                            ]
-                                         },
-                                         {  "prim": "DUG",
-                                            "args": [
-                                              {  "int": "16"  }
-                                            ]
-                                         },
-                                         {  "prim": "DROP",
-                                            "args": [
-                                              {  "int": "1"  }
-                                            ]
-                                         }  ],
-                                         [  {  "prim": "DUP",
-                                               "args": [
-                                                 {  "int": "16"  }
-                                               ]
-                                         },
-                                         {  "prim": "DUP",
-                                            "args": [
-                                              {  "int": "8"  }
-                                            ]
-                                         },
-                                         {  "prim": "MEM"  },
-                                         {  "prim": "IF",
-                                            "args": [
-                                              [  {  "prim": "PUSH",
-                                                    "args": [
-                                                      {  "prim": "string"  },
-                                                      {  "string": "permits"  }
-                                                    ]
-                                              },
-                                              {  "prim": "PUSH",
-                                                 "args": [
-                                                   {  "prim": "string"  },
-                                                   {  "string": "KeyExists"  }
-                                                 ]
-                                              },
-                                              {  "prim": "PAIR"  },
-                                              {  "prim": "FAILWITH"  }  ],
-                                              [  {  "prim": "DUP",
-                                                    "args": [
-                                                      {  "int": "16"  }
-                                                    ]
-                                              },
-                                              {  "prim": "DUP",
-                                                 "args": [
-                                                   {  "int": "4"  }
-                                                 ]
-                                              },
-                                              {  "prim": "NOW"  },
-                                              {  "prim": "DUP",
-                                                 "args": [
-                                                   {  "int": "4"  }
-                                                 ]
-                                              },
-                                              {  "prim": "SOME"  },
-                                              {  "prim": "PAIR"  },
-                                              {  "prim": "SOME"  },
-                                              {  "prim": "DUP",
-                                                 "args": [
-                                                   {  "int": "11"  }
-                                                 ]
-                                              },
-                                              {  "prim": "UPDATE"  },
-                                              {  "prim": "NONE",
-                                                 "args": [
-                                                   {  "prim": "nat"  }
-                                                 ]
-                                              },
-                                              {  "prim": "PAIR"  },
-                                              {  "prim": "PUSH",
-                                                 "args": [
-                                                   {  "prim": "nat"  },
-                                                   {  "int": "1"  }
-                                                 ]
-                                              },
-                                              {  "prim": "PUSH",
-                                                 "args": [
-                                                   {  "prim": "nat"  },
-                                                   {  "int": "0"  }
-                                                 ]
-                                              },
-                                              {  "prim": "ADD"  },
-                                              {  "prim": "PAIR"  },
-                                              {  "prim": "SOME"  },
-                                              {  "prim": "DUP",
-                                                 "args": [
-                                                   {  "int": "9"  }
-                                                 ]
-                                              },
-                                              {  "prim": "UPDATE"  },
-                                              {  "prim": "DIP",
-                                                 "args": [
-                                                   {  "int": "1"  },
-                                                   [  {  "prim": "DIG",
-                                                         "args": [
-                                                           {  "int": "15"  }
-                                                         ]
-                                                   },
-                                                   {  "prim": "DROP",
-                                                      "args": [
-                                                        {  "int": "1"  }
-                                                      ]
-                                                   }  ]
-                                                 ]
-                                              },
-                                              {  "prim": "DUG",
-                                                 "args": [
-                                                   {  "int": "15"  }
-                                                 ]
-                                              }  ]
-                                            ]
-                                         }  ]
-                                       ]
-                                    },
-                                    {  "prim": "DUP",
-                                       "args": [
-                                         {  "int": "16"  }
-                                       ]
-                                    },
-                                    {  "prim": "DUP",
-                                       "args": [
-                                         {  "int": "8"  }
-                                       ]
-                                    },
-                                    {  "prim": "GET"  },
-                                    {  "prim": "IF_NONE",
-                                       "args": [
-                                         [  {  "prim": "PUSH",
-                                               "args": [
-                                                 {  "prim": "string"  },
-                                                 {  "string": "permits"  }
-                                               ]
-                                         },
-                                         {  "prim": "PUSH",
-                                            "args": [
-                                              {  "prim": "string"  },
-                                              {  "string": "AssetNotFound"  }
-                                            ]
-                                         },
-                                         {  "prim": "PAIR"  },
-                                         {  "prim": "FAILWITH"  }  ],
-                                         [    ]
-                                       ]
-                                    },
-                                    {  "prim": "CDR"  },
-                                    {  "prim": "CDR"  },
-                                    {  "prim": "ITER",
-                                       "args": [
-                                         [  {  "prim": "UNPAIR"  },
-                                         {  "prim": "DUP",
-                                            "args": [
-                                              {  "int": "24"  }
-                                            ]
-                                         },
-                                         {  "prim": "DUP",
-                                            "args": [
-                                              {  "int": "4"  }
-                                            ]
-                                         },
-                                         {  "prim": "DUP",
-                                            "args": [
-                                              {  "int": "4"  }
-                                            ]
-                                         },
-                                         {  "prim": "PAIR"  },
-                                         {  "prim": "EXEC"  },
-                                         {  "prim": "IF",
-                                            "args": [
-                                              [  {  "prim": "DUP",
-                                                    "args": [
-                                                      {  "int": "18"  }
-                                                    ]
-                                              },
-                                              {  "prim": "DUP",
-                                                 "args": [
-                                                   {  "int": "19"  }
-                                                 ]
-                                              },
-                                              {  "prim": "DUP",
-                                                 "args": [
-                                                   {  "int": "11"  }
-                                                 ]
-                                              },
-                                              {  "prim": "GET"  },
-                                              {  "prim": "IF_NONE",
-                                                 "args": [
-                                                   [  {  "prim": "PUSH",
-                                                         "args": [
-                                                           {  "prim": "string"  },
-                                                           {  "string": "permits"  }
-                                                         ]
-                                                   },
-                                                   {  "prim": "PUSH",
-                                                      "args": [
-                                                        {  "prim": "string"  },
-                                                        {  "string": "AssetNotFound"  }
-                                                      ]
-                                                   },
-                                                   {  "prim": "PAIR"  },
-                                                   {  "prim": "FAILWITH"  }  ],
-                                                   [    ]
-                                                 ]
-                                              },
-                                              {  "prim": "UNPAIR"  },
-                                              {  "prim": "SWAP"  },
-                                              {  "prim": "UNPAIR"  },
-                                              {  "prim": "SWAP"  },
-                                              {  "prim": "DROP",
-                                                 "args": [
-                                                   {  "int": "1"  }
-                                                 ]
-                                              },
-                                              {  "prim": "DUP",
-                                                 "args": [
-                                                   {  "int": "21"  }
-                                                 ]
-                                              },
-                                              {  "prim": "DUP",
-                                                 "args": [
-                                                   {  "int": "13"  }
-                                                 ]
-                                              },
-                                              {  "prim": "GET"  },
-                                              {  "prim": "IF_NONE",
-                                                 "args": [
-                                                   [  {  "prim": "PUSH",
-                                                         "args": [
-                                                           {  "prim": "string"  },
-                                                           {  "string": "permits"  }
-                                                         ]
-                                                   },
-                                                   {  "prim": "PUSH",
-                                                      "args": [
-                                                        {  "prim": "string"  },
-                                                        {  "string": "AssetNotFound"  }
-                                                      ]
-                                                   },
-                                                   {  "prim": "PAIR"  },
-                                                   {  "prim": "FAILWITH"  }  ],
-                                                   [    ]
-                                                 ]
-                                              },
-                                              {  "prim": "CDR"  },
-                                              {  "prim": "CDR"  },
-                                              {  "prim": "NONE",
-                                                 "args": [
-                                                   {  "prim": "pair",
-                                                      "args": [
-                                                        {  "prim": "option",
-                                                           "args": [
-                                                             {  "prim": "nat"  }
-                                                           ]
-                                                        },
-                                                        {  "prim": "timestamp"  }
-                                                      ]
-                                                   }
-                                                 ]
-                                              },
-                                              {  "prim": "DUP",
-                                                 "args": [
-                                                   {  "int": "6"  }
-                                                 ]
-                                              },
-                                              {  "prim": "UPDATE"  },
-                                              {  "prim": "SWAP"  },
-                                              {  "prim": "PAIR"  },
-                                              {  "prim": "SWAP"  },
-                                              {  "prim": "PAIR"  },
-                                              {  "prim": "SOME"  },
-                                              {  "prim": "DUP",
-                                                 "args": [
-                                                   {  "int": "11"  }
-                                                 ]
-                                              },
-                                              {  "prim": "UPDATE"  },
-                                              {  "prim": "DIP",
-                                                 "args": [
-                                                   {  "int": "1"  },
-                                                   [  {  "prim": "DIG",
-                                                         "args": [
-                                                           {  "int": "17"  }
-                                                         ]
-                                                   },
-                                                   {  "prim": "DROP",
-                                                      "args": [
-                                                        {  "int": "1"  }
-                                                      ]
-                                                   }  ]
-                                                 ]
-                                              },
-                                              {  "prim": "DUG",
-                                                 "args": [
-                                                   {  "int": "17"  }
-                                                 ]
-                                              }  ],
-                                              [    ]
-                                            ]
-                                         },
-                                         {  "prim": "DROP",
-                                            "args": [
-                                              {  "int": "2"  }
-                                            ]
-                                         }  ]
-                                       ]
-                                    },
-                                    {  "prim": "DROP",
-                                       "args": [
-                                         {  "int": "10"  }
-                                       ]
-                                    },
-                                    {  "prim": "PAIR",
-                                       "args": [
-                                         {  "int": "10"  }
-                                       ]
-                                    },
-                                    {  "prim": "DIG",
-                                       "args": [
-                                         {  "int": "1"  }
-                                       ]
-                                    },
-                                    {  "prim": "PAIR"  }  ],
-                                    [  {  "prim": "DUP",
-                                          "args": [
-                                            {  "int": "2"  }
-                                          ]
-                                    },
-                                    {  "prim": "SENDER"  },
-                                    {  "prim": "COMPARE"  },
-                                    {  "prim": "EQ"  },
-                                    {  "prim": "NOT"  },
-                                    {  "prim": "IF",
-                                       "args": [
-                                         [  {  "prim": "PUSH",
-                                               "args": [
-                                                 {  "prim": "string"  },
-                                                 {  "string": "InvalidCaller"  }
-                                               ]
-                                         },
-                                         {  "prim": "FAILWITH"  }  ],
-                                         [    ]
-                                       ]
-                                    },
-                                    {  "prim": "DUP",
-                                       "args": [
-                                         {  "int": "18"  }
-                                       ]
-                                    },
-                                    {  "prim": "DUP",
-                                       "args": [
-                                         {  "int": "11"  }
+                                         {  "int": "5"  }
                                        ]
                                     },
                                     {  "prim": "PUSH",
@@ -3684,7 +3089,7 @@ export const nft_public_code : any =
                                          {  "int": "1"  },
                                          [  {  "prim": "DIG",
                                                "args": [
-                                                 {  "int": "8"  }
+                                                 {  "int": "10"  }
                                                ]
                                          },
                                          {  "prim": "DROP",
@@ -3696,7 +3101,7 @@ export const nft_public_code : any =
                                     },
                                     {  "prim": "DUG",
                                        "args": [
-                                         {  "int": "8"  }
+                                         {  "int": "10"  }
                                        ]
                                     },
                                     {  "prim": "DROP",
@@ -3706,7 +3111,7 @@ export const nft_public_code : any =
                                     },
                                     {  "prim": "PAIR",
                                        "args": [
-                                         {  "int": "10"  }
+                                         {  "int": "11"  }
                                        ]
                                     },
                                     {  "prim": "DIG",
@@ -3714,29 +3119,17 @@ export const nft_public_code : any =
                                          {  "int": "1"  }
                                        ]
                                     },
-                                    {  "prim": "PAIR"  }  ]
-                                  ]
-                            }  ]
-                          ]
-                    }  ]
-                  ]
-            }  ],
-            [  {  "prim": "IF_LEFT",
-                  "args": [
-                    [  {  "prim": "IF_LEFT",
-                          "args": [
-                            [  {  "prim": "IF_LEFT",
-                                  "args": [
+                                    {  "prim": "PAIR"  }  ],
                                     [  {  "prim": "UNPAIR"  },
                                     {  "prim": "SWAP"  },
                                     {  "prim": "DUP",
                                        "args": [
-                                         {  "int": "19"  }
+                                         {  "int": "20"  }
                                        ]
                                     },
                                     {  "prim": "DUP",
                                        "args": [
-                                         {  "int": "12"  }
+                                         {  "int": "6"  }
                                        ]
                                     },
                                     {  "prim": "PUSH",
@@ -3777,7 +3170,7 @@ export const nft_public_code : any =
                                          [    ],
                                          [  {  "prim": "DUP",
                                                "args": [
-                                                 {  "int": "11"  }
+                                                 {  "int": "13"  }
                                                ]
                                          },
                                          {  "prim": "DUP",
@@ -3808,7 +3201,7 @@ export const nft_public_code : any =
                                     },
                                     {  "prim": "DUP",
                                        "args": [
-                                         {  "int": "8"  }
+                                         {  "int": "10"  }
                                        ]
                                     },
                                     {  "prim": "SENDER"  },
@@ -3820,12 +3213,12 @@ export const nft_public_code : any =
                                             "args": [
                                               [  {  "prim": "DUP",
                                                     "args": [
-                                                      {  "int": "8"  }
+                                                      {  "int": "10"  }
                                                     ]
                                               },
                                               {  "prim": "DUP",
                                                  "args": [
-                                                   {  "int": "9"  }
+                                                   {  "int": "11"  }
                                                  ]
                                               },
                                               {  "prim": "SENDER"  },
@@ -3873,7 +3266,7 @@ export const nft_public_code : any =
                                                    {  "int": "1"  },
                                                    [  {  "prim": "DIG",
                                                          "args": [
-                                                           {  "int": "7"  }
+                                                           {  "int": "9"  }
                                                          ]
                                                    },
                                                    {  "prim": "DROP",
@@ -3885,12 +3278,12 @@ export const nft_public_code : any =
                                               },
                                               {  "prim": "DUG",
                                                  "args": [
-                                                   {  "int": "7"  }
+                                                   {  "int": "9"  }
                                                  ]
                                               }  ],
                                               [  {  "prim": "DUP",
                                                     "args": [
-                                                      {  "int": "9"  }
+                                                      {  "int": "11"  }
                                                     ]
                                               },
                                               {  "prim": "SENDER"  },
@@ -3984,12 +3377,12 @@ export const nft_public_code : any =
                                                              },
                                                              {  "prim": "DUP",
                                                                 "args": [
-                                                                  {  "int": "11"  }
+                                                                  {  "int": "13"  }
                                                                 ]
                                                              },
                                                              {  "prim": "DUP",
                                                                 "args": [
-                                                                  {  "int": "12"  }
+                                                                  {  "int": "14"  }
                                                                 ]
                                                              },
                                                              {  "prim": "SENDER"  },
@@ -4026,7 +3419,7 @@ export const nft_public_code : any =
                                                              },
                                                              {  "prim": "DUP",
                                                                 "args": [
-                                                                  {  "int": "14"  }
+                                                                  {  "int": "16"  }
                                                                 ]
                                                              },
                                                              {  "prim": "SENDER"  },
@@ -4090,7 +3483,7 @@ export const nft_public_code : any =
                                                                   [  {
                                                                   "prim": "DIG",
                                                                   "args": [
-                                                                    {  "int": "10"  }
+                                                                    {  "int": "12"  }
                                                                   ]
                                                                   },
                                                                   {
@@ -4103,7 +3496,7 @@ export const nft_public_code : any =
                                                              },
                                                              {  "prim": "DUG",
                                                                 "args": [
-                                                                  {  "int": "10"  }
+                                                                  {  "int": "12"  }
                                                                 ]
                                                              }  ],
                                                              [    ]
@@ -4121,7 +3514,7 @@ export const nft_public_code : any =
                                                       "args": [
                                                         [  {  "prim": "DUP",
                                                               "args": [
-                                                                {  "int": "10"  }
+                                                                {  "int": "12"  }
                                                               ]
                                                         },
                                                         {  "prim": "SENDER"  },
@@ -4169,12 +3562,12 @@ export const nft_public_code : any =
                                                         },
                                                         {  "prim": "DUP",
                                                            "args": [
-                                                             {  "int": "11"  }
+                                                             {  "int": "13"  }
                                                            ]
                                                         },
                                                         {  "prim": "DUP",
                                                            "args": [
-                                                             {  "int": "12"  }
+                                                             {  "int": "14"  }
                                                            ]
                                                         },
                                                         {  "prim": "SENDER"  },
@@ -4210,7 +3603,7 @@ export const nft_public_code : any =
                                                         },
                                                         {  "prim": "DUP",
                                                            "args": [
-                                                             {  "int": "14"  }
+                                                             {  "int": "16"  }
                                                            ]
                                                         },
                                                         {  "prim": "SENDER"  },
@@ -4274,7 +3667,7 @@ export const nft_public_code : any =
                                                              [  {  "prim": "DIG",
                                                                    "args": [
 
-                                                                   {  "int": "10"  }
+                                                                   {  "int": "12"  }
                                                                    ]
                                                              },
                                                              {  "prim": "DROP",
@@ -4286,7 +3679,7 @@ export const nft_public_code : any =
                                                         },
                                                         {  "prim": "DUG",
                                                            "args": [
-                                                             {  "int": "10"  }
+                                                             {  "int": "12"  }
                                                            ]
                                                         },
                                                         {  "prim": "DROP",
@@ -4340,7 +3733,7 @@ export const nft_public_code : any =
                                     },
                                     {  "prim": "PAIR",
                                        "args": [
-                                         {  "int": "10"  }
+                                         {  "int": "11"  }
                                        ]
                                     },
                                     {  "prim": "DIG",
@@ -4348,15 +3741,23 @@ export const nft_public_code : any =
                                          {  "int": "1"  }
                                        ]
                                     },
-                                    {  "prim": "PAIR"  }  ],
-                                    [  {  "prim": "DUP",
-                                          "args": [
-                                            {  "int": "18"  }
-                                          ]
+                                    {  "prim": "PAIR"  }  ]
+                                  ]
+                            }  ],
+                            [  {  "prim": "IF_LEFT",
+                                  "args": [
+                                    [  {  "prim": "UNPAIR"  },
+                                    {  "prim": "SWAP"  },
+                                    {  "prim": "UNPAIR"  },
+                                    {  "prim": "SWAP"  },
+                                    {  "prim": "DUP",
+                                       "args": [
+                                         {  "int": "21"  }
+                                       ]
                                     },
                                     {  "prim": "DUP",
                                        "args": [
-                                         {  "int": "11"  }
+                                         {  "int": "7"  }
                                        ]
                                     },
                                     {  "prim": "PUSH",
@@ -4373,7 +3774,7 @@ export const nft_public_code : any =
                                          [  {  "prim": "PUSH",
                                                "args": [
                                                  {  "prim": "string"  },
-                                                 {  "string": "r8"  }
+                                                 {  "string": "r5"  }
                                                ]
                                          },
                                          {  "prim": "PUSH",
@@ -4389,12 +3790,176 @@ export const nft_public_code : any =
                                     },
                                     {  "prim": "DUP",
                                        "args": [
-                                         {  "int": "17"  }
+                                         {  "int": "3"  }
+                                       ]
+                                    },
+                                    {  "prim": "HASH_KEY"  },
+                                    {  "prim": "IMPLICIT_ACCOUNT"  },
+                                    {  "prim": "ADDRESS"  },
+                                    {  "prim": "EMPTY_MAP",
+                                       "args": [
+                                         {  "prim": "bytes"  },
+                                         {  "prim": "pair",
+                                            "args": [
+                                              {  "prim": "option",
+                                                 "args": [
+                                                   {  "prim": "nat"  }
+                                                 ]
+                                                 ,
+                                                 "annots": [
+                                                   "%expiry"
+                                                 ]
+                                              },
+                                              {  "prim": "timestamp",
+                                                 "annots": [
+                                                   "%created_at"
+                                                 ]
+                                              }
+                                            ]
+                                         }
                                        ]
                                     },
                                     {  "prim": "DUP",
                                        "args": [
+                                         {  "int": "13"  }
+                                       ]
+                                    },
+                                    {  "prim": "DUP",
+                                       "args": [
+                                         {  "int": "3"  }
+                                       ]
+                                    },
+                                    {  "prim": "MEM"  },
+                                    {  "prim": "IF",
+                                       "args": [
+                                         [  {  "prim": "DUP",
+                                               "args": [
+                                                 {  "int": "13"  }
+                                               ]
+                                         },
+                                         {  "prim": "DUP",
+                                            "args": [
+                                              {  "int": "3"  }
+                                            ]
+                                         },
+                                         {  "prim": "GET"  },
+                                         {  "prim": "IF_NONE",
+                                            "args": [
+                                              [  {  "prim": "PUSH",
+                                                    "args": [
+                                                      {  "prim": "string"  },
+                                                      {  "string": "permits"  }
+                                                    ]
+                                              },
+                                              {  "prim": "PUSH",
+                                                 "args": [
+                                                   {  "prim": "string"  },
+                                                   {  "string": "AssetNotFound"  }
+                                                 ]
+                                              },
+                                              {  "prim": "PAIR"  },
+                                              {  "prim": "FAILWITH"  }  ],
+                                              [    ]
+                                            ]
+                                         },
+                                         {  "prim": "CDR"  },
+                                         {  "prim": "CDR"  },
+                                         {  "prim": "DUP",
+                                            "args": [
+                                              {  "int": "14"  }
+                                            ]
+                                         },
+                                         {  "prim": "DUP",
+                                            "args": [
+                                              {  "int": "4"  }
+                                            ]
+                                         },
+                                         {  "prim": "GET"  },
+                                         {  "prim": "IF_NONE",
+                                            "args": [
+                                              [  {  "prim": "PUSH",
+                                                    "args": [
+                                                      {  "prim": "string"  },
+                                                      {  "string": "permits"  }
+                                                    ]
+                                              },
+                                              {  "prim": "PUSH",
+                                                 "args": [
+                                                   {  "prim": "string"  },
+                                                   {  "string": "AssetNotFound"  }
+                                                 ]
+                                              },
+                                              {  "prim": "PAIR"  },
+                                              {  "prim": "FAILWITH"  }  ],
+                                              [    ]
+                                            ]
+                                         },
+                                         {  "prim": "CAR"  },
+                                         {  "prim": "PAIR"  }  ],
+                                         [  {  "prim": "DUP"  },
+                                         {  "prim": "PUSH",
+                                            "args": [
+                                              {  "prim": "nat"  },
+                                              {  "int": "0"  }
+                                            ]
+                                         },
+                                         {  "prim": "PAIR"  }  ]
+                                       ]
+                                    },
+                                    {  "prim": "DUP"  },
+                                    {  "prim": "CAR"  },
+                                    {  "prim": "DUP",
+                                       "args": [
                                          {  "int": "2"  }
+                                       ]
+                                    },
+                                    {  "prim": "CDR"  },
+                                    {  "prim": "DUP",
+                                       "args": [
+                                         {  "int": "6"  }
+                                       ]
+                                    },
+                                    {  "prim": "DUP",
+                                       "args": [
+                                         {  "int": "3"  }
+                                       ]
+                                    },
+                                    {  "prim": "PAIR"  },
+                                    {  "prim": "CHAIN_ID"  },
+                                    {  "prim": "SELF_ADDRESS"  },
+                                    {  "prim": "PAIR"  },
+                                    {  "prim": "PAIR"  },
+                                    {  "prim": "PACK"  },
+                                    {  "prim": "DUP"  },
+                                    {  "prim": "DUP",
+                                       "args": [
+                                         {  "int": "9"  }
+                                       ]
+                                    },
+                                    {  "prim": "DUP",
+                                       "args": [
+                                         {  "int": "11"  }
+                                       ]
+                                    },
+                                    {  "prim": "CHECK_SIGNATURE"  },
+                                    {  "prim": "NOT"  },
+                                    {  "prim": "IF",
+                                       "args": [
+                                         [  {  "prim": "DUP"  },
+                                         {  "prim": "PUSH",
+                                            "args": [
+                                              {  "prim": "string"  },
+                                              {  "string": "MISSIGNED"  }
+                                            ]
+                                         },
+                                         {  "prim": "PAIR"  },
+                                         {  "prim": "FAILWITH"  }  ],
+                                         [    ]
+                                       ]
+                                    },
+                                    {  "prim": "DUP",
+                                       "args": [
+                                         {  "int": "25"  }
                                        ]
                                     },
                                     {  "prim": "DUP",
@@ -4402,524 +3967,256 @@ export const nft_public_code : any =
                                          {  "int": "7"  }
                                        ]
                                     },
-                                    {  "prim": "PAIR"  },
                                     {  "prim": "DUP",
                                        "args": [
-                                         {  "int": "10"  }
+                                         {  "int": "21"  }
                                        ]
                                     },
                                     {  "prim": "PAIR"  },
                                     {  "prim": "DUP",
                                        "args": [
-                                         {  "int": "6"  }
+                                         {  "int": "19"  }
                                        ]
                                     },
                                     {  "prim": "PAIR"  },
                                     {  "prim": "EXEC"  },
-                                    {  "prim": "NOT"  },
+                                    {  "prim": "DUP",
+                                       "args": [
+                                         {  "int": "18"  }
+                                       ]
+                                    },
+                                    {  "prim": "DUP",
+                                       "args": [
+                                         {  "int": "8"  }
+                                       ]
+                                    },
+                                    {  "prim": "MEM"  },
                                     {  "prim": "IF",
                                        "args": [
                                          [  {  "prim": "DUP",
                                                "args": [
-                                                 {  "int": "16"  }
+                                                 {  "int": "18"  }
                                                ]
                                          },
                                          {  "prim": "DUP",
                                             "args": [
-                                              {  "int": "2"  }
+                                              {  "int": "8"  }
+                                            ]
+                                         },
+                                         {  "prim": "GET"  },
+                                         {  "prim": "IF_NONE",
+                                            "args": [
+                                              [  {  "prim": "PUSH",
+                                                    "args": [
+                                                      {  "prim": "string"  },
+                                                      {  "string": "permits"  }
+                                                    ]
+                                              },
+                                              {  "prim": "PUSH",
+                                                 "args": [
+                                                   {  "prim": "string"  },
+                                                   {  "string": "AssetNotFound"  }
+                                                 ]
+                                              },
+                                              {  "prim": "PAIR"  },
+                                              {  "prim": "FAILWITH"  }  ],
+                                              [    ]
+                                            ]
+                                         },
+                                         {  "prim": "DUP",
+                                            "args": [
+                                              {  "int": "19"  }
+                                            ]
+                                         },
+                                         {  "prim": "DUP",
+                                            "args": [
+                                              {  "int": "20"  }
+                                            ]
+                                         },
+                                         {  "prim": "DUP",
+                                            "args": [
+                                              {  "int": "10"  }
+                                            ]
+                                         },
+                                         {  "prim": "GET"  },
+                                         {  "prim": "IF_NONE",
+                                            "args": [
+                                              [  {  "prim": "PUSH",
+                                                    "args": [
+                                                      {  "prim": "string"  },
+                                                      {  "string": "permits"  }
+                                                    ]
+                                              },
+                                              {  "prim": "PUSH",
+                                                 "args": [
+                                                   {  "prim": "string"  },
+                                                   {  "string": "AssetNotFound"  }
+                                                 ]
+                                              },
+                                              {  "prim": "PAIR"  },
+                                              {  "prim": "FAILWITH"  }  ],
+                                              [    ]
+                                            ]
+                                         },
+                                         {  "prim": "UNPAIR"  },
+                                         {  "prim": "DROP",
+                                            "args": [
+                                              {  "int": "1"  }
                                             ]
                                          },
                                          {  "prim": "PUSH",
                                             "args": [
-                                              {  "prim": "string"  },
-                                              {  "string": "FA2_NOT_OPERATOR"  }
+                                              {  "prim": "nat"  },
+                                              {  "int": "1"  }
                                             ]
                                          },
-                                         {  "prim": "PAIR"  },
-                                         {  "prim": "EXEC"  },
-                                         {  "prim": "IF_NONE",
+                                         {  "prim": "DUP",
                                             "args": [
-                                              [    ],
-                                              [  {  "prim": "DUP",
+                                              {  "int": "4"  }
+                                            ]
+                                         },
+                                         {  "prim": "CAR"  },
+                                         {  "prim": "ADD"  },
+                                         {  "prim": "SWAP"  },
+                                         {  "prim": "UNPAIR"  },
+                                         {  "prim": "SWAP"  },
+                                         {  "prim": "DROP",
+                                            "args": [
+                                              {  "int": "1"  }
+                                            ]
+                                         },
+                                         {  "prim": "DUP",
+                                            "args": [
+                                              {  "int": "7"  }
+                                            ]
+                                         },
+                                         {  "prim": "NOW"  },
+                                         {  "prim": "DUP",
+                                            "args": [
+                                              {  "int": "7"  }
+                                            ]
+                                         },
+                                         {  "prim": "SOME"  },
+                                         {  "prim": "PAIR"  },
+                                         {  "prim": "SOME"  },
+                                         {  "prim": "DUP",
+                                            "args": [
+                                              {  "int": "14"  }
+                                            ]
+                                         },
+                                         {  "prim": "UPDATE"  },
+                                         {  "prim": "SWAP"  },
+                                         {  "prim": "PAIR"  },
+                                         {  "prim": "SWAP"  },
+                                         {  "prim": "PAIR"  },
+                                         {  "prim": "SOME"  },
+                                         {  "prim": "DUP",
+                                            "args": [
+                                              {  "int": "10"  }
+                                            ]
+                                         },
+                                         {  "prim": "UPDATE"  },
+                                         {  "prim": "DIP",
+                                            "args": [
+                                              {  "int": "1"  },
+                                              [  {  "prim": "DIG",
                                                     "args": [
-                                                      {  "int": "2"  }
+                                                      {  "int": "18"  }
                                                     ]
-                                              },
-                                              {  "prim": "PACK"  },
-                                              {  "prim": "BLAKE2B"  },
-                                              {  "prim": "DUP",
-                                                 "args": [
-                                                   {  "int": "9"  }
-                                                 ]
-                                              },
-                                              {  "prim": "DUP",
-                                                 "args": [
-                                                   {  "int": "3"  }
-                                                 ]
-                                              },
-                                              {  "prim": "MEM"  },
-                                              {  "prim": "NOT"  },
-                                              {  "prim": "IF",
-                                                 "args": [
-                                                   [  {  "prim": "PUSH",
-                                                         "args": [
-                                                           {  "prim": "string"  },
-                                                           {  "string": "NO_ENTRY_FOR_USER"  }
-                                                         ]
-                                                   },
-                                                   {  "prim": "FAILWITH"  }  ],
-                                                   [  {  "prim": "DUP",
-                                                         "args": [
-                                                           {  "int": "9"  }
-                                                         ]
-                                                   },
-                                                   {  "prim": "DUP",
-                                                      "args": [
-                                                        {  "int": "3"  }
-                                                      ]
-                                                   },
-                                                   {  "prim": "GET"  },
-                                                   {  "prim": "IF_NONE",
-                                                      "args": [
-                                                        [  {  "prim": "PUSH",
-                                                              "args": [
-                                                                {  "prim": "string"  },
-                                                                {  "string": "permits"  }
-                                                              ]
-                                                        },
-                                                        {  "prim": "PUSH",
-                                                           "args": [
-                                                             {  "prim": "string"  },
-                                                             {  "string": "AssetNotFound"  }
-                                                           ]
-                                                        },
-                                                        {  "prim": "PAIR"  },
-                                                        {  "prim": "FAILWITH"  }  ],
-                                                        [    ]
-                                                      ]
-                                                   },
-                                                   {  "prim": "CDR"  },
-                                                   {  "prim": "CDR"  },
-                                                   {  "prim": "DUP",
-                                                      "args": [
-                                                        {  "int": "2"  }
-                                                      ]
-                                                   },
-                                                   {  "prim": "MEM"  },
-                                                   {  "prim": "NOT"  },
-                                                   {  "prim": "IF",
-                                                      "args": [
-                                                        [  {  "prim": "PUSH",
-                                                              "args": [
-                                                                {  "prim": "string"  },
-                                                                {  "string": "FA2_NOT_OPERATOR"  }
-                                                              ]
-                                                        },
-                                                        {  "prim": "FAILWITH"  }  ],
-                                                        [  {  "prim": "DUP",
-                                                              "args": [
-                                                                {  "int": "9"  }
-                                                              ]
-                                                        },
-                                                        {  "prim": "DUP",
-                                                           "args": [
-                                                             {  "int": "3"  }
-                                                           ]
-                                                        },
-                                                        {  "prim": "GET"  },
-                                                        {  "prim": "IF_NONE",
-                                                           "args": [
-                                                             [  {  "prim": "PUSH",
-                                                                   "args": [
-
-                                                                   {  "prim": "string"  },
-                                                                   {  "string": "permits"  }
-                                                                   ]
-                                                             },
-                                                             {  "prim": "PUSH",
-                                                                "args": [
-                                                                  {  "prim": "string"  },
-                                                                  {  "string": "AssetNotFound"  }
-                                                                ]
-                                                             },
-                                                             {  "prim": "PAIR"  },
-                                                             {  "prim": "FAILWITH"  }  ],
-                                                             [    ]
-                                                           ]
-                                                        },
-                                                        {  "prim": "CDR"  },
-                                                        {  "prim": "CDR"  },
-                                                        {  "prim": "DUP",
-                                                           "args": [
-                                                             {  "int": "2"  }
-                                                           ]
-                                                        },
-                                                        {  "prim": "GET"  },
-                                                        {  "prim": "IF_NONE",
-                                                           "args": [
-                                                             [  {  "prim": "PUSH",
-                                                                   "args": [
-
-                                                                   {  "prim": "string"  },
-                                                                   {  "string": "NotFound"  }
-                                                                   ]
-                                                             },
-                                                             {  "prim": "FAILWITH"  }  ],
-                                                             [    ]
-                                                           ]
-                                                        },
-                                                        {  "prim": "DUP",
-                                                           "args": [
-                                                             {  "int": "17"  }
-                                                           ]
-                                                        },
-                                                        {  "prim": "DUP",
-                                                           "args": [
-                                                             {  "int": "19"  }
-                                                           ]
-                                                        },
-                                                        {  "prim": "DUP",
-                                                           "args": [
-                                                             {  "int": "4"  }
-                                                           ]
-                                                        },
-                                                        {  "prim": "PAIR"  },
-                                                        {  "prim": "DUP",
-                                                           "args": [
-                                                             {  "int": "5"  }
-                                                           ]
-                                                        },
-                                                        {  "prim": "PAIR"  },
-                                                        {  "prim": "DUP",
-                                                           "args": [
-                                                             {  "int": "14"  }
-                                                           ]
-                                                        },
-                                                        {  "prim": "PAIR"  },
-                                                        {  "prim": "DUP",
-                                                           "args": [
-                                                             {  "int": "12"  }
-                                                           ]
-                                                        },
-                                                        {  "prim": "PAIR"  },
-                                                        {  "prim": "EXEC"  },
-                                                        {  "prim": "DUP",
-                                                           "args": [
-                                                             {  "int": "17"  }
-                                                           ]
-                                                        },
-                                                        {  "prim": "DUP",
-                                                           "args": [
-                                                             {  "int": "2"  }
-                                                           ]
-                                                        },
-                                                        {  "prim": "DUP",
-                                                           "args": [
-                                                             {  "int": "4"  }
-                                                           ]
-                                                        },
-                                                        {  "prim": "PAIR"  },
-                                                        {  "prim": "EXEC"  },
-                                                        {  "prim": "IF",
-                                                           "args": [
-                                                             [  {  "prim": "PUSH",
-                                                                   "args": [
-
-                                                                   {  "prim": "string"  },
-                                                                   {  "string": "EXPIRED_PERMIT"  }
-                                                                   ]
-                                                             },
-                                                             {  "prim": "FAILWITH"  }  ],
-                                                             [  {  "prim": "DUP",
-                                                                   "args": [
-
-                                                                   {  "int": "11"  }
-                                                                   ]
-                                                             },
-                                                             {  "prim": "DUP",
-                                                                "args": [
-                                                                  {  "int": "12"  }
-                                                                ]
-                                                             },
-                                                             {  "prim": "DUP",
-                                                                "args": [
-                                                                  {  "int": "6"  }
-                                                                ]
-                                                             },
-                                                             {  "prim": "GET"  },
-                                                             {  "prim": "IF_NONE",
-                                                                "args": [
-                                                                  [  {
-                                                                  "prim": "PUSH",
-                                                                  "args": [
-                                                                    {  "prim": "string"  },
-                                                                    {  "string": "permits"  }
-                                                                  ]
-                                                                  },
-                                                                  {
-                                                                  "prim": "PUSH",
-                                                                  "args": [
-                                                                    {  "prim": "string"  },
-                                                                    {  "string": "AssetNotFound"  }
-                                                                  ]
-                                                                  },
-                                                                  {  "prim": "PAIR"  },
-                                                                  {  "prim": "FAILWITH"  }  ],
-                                                                  [    ]
-                                                                ]
-                                                             },
-                                                             {  "prim": "UNPAIR"  },
-                                                             {  "prim": "SWAP"  },
-                                                             {  "prim": "UNPAIR"  },
-                                                             {  "prim": "SWAP"  },
-                                                             {  "prim": "DROP",
-                                                                "args": [
-                                                                  {  "int": "1"  }
-                                                                ]
-                                                             },
-                                                             {  "prim": "DUP",
-                                                                "args": [
-                                                                  {  "int": "14"  }
-                                                                ]
-                                                             },
-                                                             {  "prim": "DUP",
-                                                                "args": [
-                                                                  {  "int": "8"  }
-                                                                ]
-                                                             },
-                                                             {  "prim": "GET"  },
-                                                             {  "prim": "IF_NONE",
-                                                                "args": [
-                                                                  [  {
-                                                                  "prim": "PUSH",
-                                                                  "args": [
-                                                                    {  "prim": "string"  },
-                                                                    {  "string": "permits"  }
-                                                                  ]
-                                                                  },
-                                                                  {
-                                                                  "prim": "PUSH",
-                                                                  "args": [
-                                                                    {  "prim": "string"  },
-                                                                    {  "string": "AssetNotFound"  }
-                                                                  ]
-                                                                  },
-                                                                  {  "prim": "PAIR"  },
-                                                                  {  "prim": "FAILWITH"  }  ],
-                                                                  [    ]
-                                                                ]
-                                                             },
-                                                             {  "prim": "CDR"  },
-                                                             {  "prim": "CDR"  },
-                                                             {  "prim": "NONE",
-                                                                "args": [
-                                                                  {
-                                                                  "prim": "pair",
-                                                                  "args": [
-                                                                    {
-                                                                    "prim": "option",
-                                                                    "args": [
-
-                                                                    {  "prim": "nat"  }
-                                                                    ]
-                                                                    },
-                                                                    {  "prim": "timestamp"  }
-                                                                  ]
-                                                                  }
-                                                                ]
-                                                             },
-                                                             {  "prim": "DUP",
-                                                                "args": [
-                                                                  {  "int": "8"  }
-                                                                ]
-                                                             },
-                                                             {  "prim": "UPDATE"  },
-                                                             {  "prim": "SWAP"  },
-                                                             {  "prim": "PAIR"  },
-                                                             {  "prim": "SWAP"  },
-                                                             {  "prim": "PAIR"  },
-                                                             {  "prim": "SOME"  },
-                                                             {  "prim": "DUP",
-                                                                "args": [
-                                                                  {  "int": "6"  }
-                                                                ]
-                                                             },
-                                                             {  "prim": "UPDATE"  },
-                                                             {  "prim": "DIP",
-                                                                "args": [
-                                                                  {  "int": "1"  },
-                                                                  [  {
-                                                                  "prim": "DIG",
-                                                                  "args": [
-                                                                    {  "int": "10"  }
-                                                                  ]
-                                                                  },
-                                                                  {
-                                                                  "prim": "DROP",
-                                                                  "args": [
-                                                                    {  "int": "1"  }
-                                                                  ]
-                                                                  }  ]
-                                                                ]
-                                                             },
-                                                             {  "prim": "DUG",
-                                                                "args": [
-                                                                  {  "int": "10"  }
-                                                                ]
-                                                             }  ]
-                                                           ]
-                                                        },
-                                                        {  "prim": "DROP",
-                                                           "args": [
-                                                             {  "int": "2"  }
-                                                           ]
-                                                        }  ]
-                                                      ]
-                                                   }  ]
-                                                 ]
                                               },
                                               {  "prim": "DROP",
                                                  "args": [
-                                                   {  "int": "2"  }
+                                                   {  "int": "1"  }
                                                  ]
                                               }  ]
                                             ]
-                                         }  ],
-                                         [    ]
-                                       ]
-                                    },
-                                    {  "prim": "DUP"  },
-                                    {  "prim": "ITER",
-                                       "args": [
-                                         [  {  "prim": "DUP"  },
-                                         {  "prim": "CAR"  },
-                                         {  "prim": "DUP",
+                                         },
+                                         {  "prim": "DUG",
                                             "args": [
-                                              {  "int": "2"  }
+                                              {  "int": "18"  }
                                             ]
                                          },
-                                         {  "prim": "CDR"  },
-                                         {  "prim": "DUP"  },
-                                         {  "prim": "ITER",
+                                         {  "prim": "DROP",
+                                            "args": [
+                                              {  "int": "1"  }
+                                            ]
+                                         }  ],
+                                         [  {  "prim": "DUP",
+                                               "args": [
+                                                 {  "int": "18"  }
+                                               ]
+                                         },
+                                         {  "prim": "DUP",
+                                            "args": [
+                                              {  "int": "8"  }
+                                            ]
+                                         },
+                                         {  "prim": "MEM"  },
+                                         {  "prim": "IF",
                                             "args": [
                                               [  {  "prim": "PUSH",
                                                     "args": [
-                                                      {  "prim": "nat"  },
-                                                      {  "int": "1"  }
+                                                      {  "prim": "string"  },
+                                                      {  "string": "permits"  }
+                                                    ]
+                                              },
+                                              {  "prim": "PUSH",
+                                                 "args": [
+                                                   {  "prim": "string"  },
+                                                   {  "string": "KeyExists"  }
+                                                 ]
+                                              },
+                                              {  "prim": "PAIR"  },
+                                              {  "prim": "FAILWITH"  }  ],
+                                              [  {  "prim": "DUP",
+                                                    "args": [
+                                                      {  "int": "18"  }
                                                     ]
                                               },
                                               {  "prim": "DUP",
                                                  "args": [
-                                                   {  "int": "2"  }
+                                                   {  "int": "4"  }
                                                  ]
                                               },
-                                              {  "prim": "CDR"  },
-                                              {  "prim": "CDR"  },
-                                              {  "prim": "COMPARE"  },
-                                              {  "prim": "EQ"  },
-                                              {  "prim": "NOT"  },
-                                              {  "prim": "IF",
-                                                 "args": [
-                                                   [  {  "prim": "PUSH",
-                                                         "args": [
-                                                           {  "prim": "string"  },
-                                                           {  "string": "INVALID_AMOUNT"  }
-                                                         ]
-                                                   },
-                                                   {  "prim": "FAILWITH"  }  ],
-                                                   [    ]
-                                                 ]
-                                              },
-                                              {  "prim": "DUP"  },
-                                              {  "prim": "CDR"  },
-                                              {  "prim": "CAR"  },
+                                              {  "prim": "NOW"  },
                                               {  "prim": "DUP",
                                                  "args": [
-                                                   {  "int": "9"  }
+                                                   {  "int": "4"  }
                                                  ]
                                               },
-                                              {  "prim": "DUP",
-                                                 "args": [
-                                                   {  "int": "2"  }
-                                                 ]
-                                              },
-                                              {  "prim": "MEM"  },
-                                              {  "prim": "IF",
-                                                 "args": [
-                                                   [  {  "prim": "DUP",
-                                                         "args": [
-                                                           {  "int": "4"  }
-                                                         ]
-                                                   },
-                                                   {  "prim": "DUP",
-                                                      "args": [
-                                                        {  "int": "10"  }
-                                                      ]
-                                                   },
-                                                   {  "prim": "DUP",
-                                                      "args": [
-                                                        {  "int": "3"  }
-                                                      ]
-                                                   },
-                                                   {  "prim": "GET"  },
-                                                   {  "prim": "IF_NONE",
-                                                      "args": [
-                                                        [  {  "prim": "PUSH",
-                                                              "args": [
-                                                                {  "prim": "string"  },
-                                                                {  "string": "ledger"  }
-                                                              ]
-                                                        },
-                                                        {  "prim": "PUSH",
-                                                           "args": [
-                                                             {  "prim": "string"  },
-                                                             {  "string": "AssetNotFound"  }
-                                                           ]
-                                                        },
-                                                        {  "prim": "PAIR"  },
-                                                        {  "prim": "FAILWITH"  }  ],
-                                                        [    ]
-                                                      ]
-                                                   },
-                                                   {  "prim": "COMPARE"  },
-                                                   {  "prim": "EQ"  },
-                                                   {  "prim": "NOT"  },
-                                                   {  "prim": "IF",
-                                                      "args": [
-                                                        [  {  "prim": "PUSH",
-                                                              "args": [
-                                                                {  "prim": "string"  },
-                                                                {  "string": "FA2_INSUFFICIENT_BALANCE"  }
-                                                              ]
-                                                        },
-                                                        {  "prim": "FAILWITH"  }  ],
-                                                        [    ]
-                                                      ]
-                                                   }  ],
-                                                   [  {  "prim": "PUSH",
-                                                         "args": [
-                                                           {  "prim": "string"  },
-                                                           {  "string": "FA2_TOKEN_UNDEFINED"  }
-                                                         ]
-                                                   },
-                                                   {  "prim": "FAILWITH"  }  ]
-                                                 ]
-                                              },
-                                              {  "prim": "DUP",
-                                                 "args": [
-                                                   {  "int": "9"  }
-                                                 ]
-                                              },
-                                              {  "prim": "DUP",
-                                                 "args": [
-                                                   {  "int": "3"  }
-                                                 ]
-                                              },
-                                              {  "prim": "CAR"  },
+                                              {  "prim": "SOME"  },
+                                              {  "prim": "PAIR"  },
                                               {  "prim": "SOME"  },
                                               {  "prim": "DUP",
                                                  "args": [
-                                                   {  "int": "3"  }
+                                                   {  "int": "11"  }
+                                                 ]
+                                              },
+                                              {  "prim": "UPDATE"  },
+                                              {  "prim": "NONE",
+                                                 "args": [
+                                                   {  "prim": "nat"  }
+                                                 ]
+                                              },
+                                              {  "prim": "PAIR"  },
+                                              {  "prim": "PUSH",
+                                                 "args": [
+                                                   {  "prim": "nat"  },
+                                                   {  "int": "1"  }
+                                                 ]
+                                              },
+                                              {  "prim": "PUSH",
+                                                 "args": [
+                                                   {  "prim": "nat"  },
+                                                   {  "int": "0"  }
+                                                 ]
+                                              },
+                                              {  "prim": "ADD"  },
+                                              {  "prim": "PAIR"  },
+                                              {  "prim": "SOME"  },
+                                              {  "prim": "DUP",
+                                                 "args": [
+                                                   {  "int": "9"  }
                                                  ]
                                               },
                                               {  "prim": "UPDATE"  },
@@ -4928,7 +4225,7 @@ export const nft_public_code : any =
                                                    {  "int": "1"  },
                                                    [  {  "prim": "DIG",
                                                          "args": [
-                                                           {  "int": "8"  }
+                                                           {  "int": "17"  }
                                                          ]
                                                    },
                                                    {  "prim": "DROP",
@@ -4940,31 +4237,212 @@ export const nft_public_code : any =
                                               },
                                               {  "prim": "DUG",
                                                  "args": [
-                                                   {  "int": "8"  }
-                                                 ]
-                                              },
-                                              {  "prim": "DROP",
-                                                 "args": [
-                                                   {  "int": "2"  }
+                                                   {  "int": "17"  }
                                                  ]
                                               }  ]
+                                            ]
+                                         }  ]
+                                       ]
+                                    },
+                                    {  "prim": "DUP",
+                                       "args": [
+                                         {  "int": "18"  }
+                                       ]
+                                    },
+                                    {  "prim": "DUP",
+                                       "args": [
+                                         {  "int": "8"  }
+                                       ]
+                                    },
+                                    {  "prim": "GET"  },
+                                    {  "prim": "IF_NONE",
+                                       "args": [
+                                         [  {  "prim": "PUSH",
+                                               "args": [
+                                                 {  "prim": "string"  },
+                                                 {  "string": "permits"  }
+                                               ]
+                                         },
+                                         {  "prim": "PUSH",
+                                            "args": [
+                                              {  "prim": "string"  },
+                                              {  "string": "AssetNotFound"  }
+                                            ]
+                                         },
+                                         {  "prim": "PAIR"  },
+                                         {  "prim": "FAILWITH"  }  ],
+                                         [    ]
+                                       ]
+                                    },
+                                    {  "prim": "CDR"  },
+                                    {  "prim": "CDR"  },
+                                    {  "prim": "ITER",
+                                       "args": [
+                                         [  {  "prim": "UNPAIR"  },
+                                         {  "prim": "DUP",
+                                            "args": [
+                                              {  "int": "26"  }
+                                            ]
+                                         },
+                                         {  "prim": "DUP",
+                                            "args": [
+                                              {  "int": "4"  }
+                                            ]
+                                         },
+                                         {  "prim": "DUP",
+                                            "args": [
+                                              {  "int": "4"  }
+                                            ]
+                                         },
+                                         {  "prim": "PAIR"  },
+                                         {  "prim": "EXEC"  },
+                                         {  "prim": "IF",
+                                            "args": [
+                                              [  {  "prim": "DUP",
+                                                    "args": [
+                                                      {  "int": "20"  }
+                                                    ]
+                                              },
+                                              {  "prim": "DUP",
+                                                 "args": [
+                                                   {  "int": "21"  }
+                                                 ]
+                                              },
+                                              {  "prim": "DUP",
+                                                 "args": [
+                                                   {  "int": "11"  }
+                                                 ]
+                                              },
+                                              {  "prim": "GET"  },
+                                              {  "prim": "IF_NONE",
+                                                 "args": [
+                                                   [  {  "prim": "PUSH",
+                                                         "args": [
+                                                           {  "prim": "string"  },
+                                                           {  "string": "permits"  }
+                                                         ]
+                                                   },
+                                                   {  "prim": "PUSH",
+                                                      "args": [
+                                                        {  "prim": "string"  },
+                                                        {  "string": "AssetNotFound"  }
+                                                      ]
+                                                   },
+                                                   {  "prim": "PAIR"  },
+                                                   {  "prim": "FAILWITH"  }  ],
+                                                   [    ]
+                                                 ]
+                                              },
+                                              {  "prim": "UNPAIR"  },
+                                              {  "prim": "SWAP"  },
+                                              {  "prim": "UNPAIR"  },
+                                              {  "prim": "SWAP"  },
+                                              {  "prim": "DROP",
+                                                 "args": [
+                                                   {  "int": "1"  }
+                                                 ]
+                                              },
+                                              {  "prim": "DUP",
+                                                 "args": [
+                                                   {  "int": "23"  }
+                                                 ]
+                                              },
+                                              {  "prim": "DUP",
+                                                 "args": [
+                                                   {  "int": "13"  }
+                                                 ]
+                                              },
+                                              {  "prim": "GET"  },
+                                              {  "prim": "IF_NONE",
+                                                 "args": [
+                                                   [  {  "prim": "PUSH",
+                                                         "args": [
+                                                           {  "prim": "string"  },
+                                                           {  "string": "permits"  }
+                                                         ]
+                                                   },
+                                                   {  "prim": "PUSH",
+                                                      "args": [
+                                                        {  "prim": "string"  },
+                                                        {  "string": "AssetNotFound"  }
+                                                      ]
+                                                   },
+                                                   {  "prim": "PAIR"  },
+                                                   {  "prim": "FAILWITH"  }  ],
+                                                   [    ]
+                                                 ]
+                                              },
+                                              {  "prim": "CDR"  },
+                                              {  "prim": "CDR"  },
+                                              {  "prim": "NONE",
+                                                 "args": [
+                                                   {  "prim": "pair",
+                                                      "args": [
+                                                        {  "prim": "option",
+                                                           "args": [
+                                                             {  "prim": "nat"  }
+                                                           ]
+                                                        },
+                                                        {  "prim": "timestamp"  }
+                                                      ]
+                                                   }
+                                                 ]
+                                              },
+                                              {  "prim": "DUP",
+                                                 "args": [
+                                                   {  "int": "6"  }
+                                                 ]
+                                              },
+                                              {  "prim": "UPDATE"  },
+                                              {  "prim": "SWAP"  },
+                                              {  "prim": "PAIR"  },
+                                              {  "prim": "SWAP"  },
+                                              {  "prim": "PAIR"  },
+                                              {  "prim": "SOME"  },
+                                              {  "prim": "DUP",
+                                                 "args": [
+                                                   {  "int": "11"  }
+                                                 ]
+                                              },
+                                              {  "prim": "UPDATE"  },
+                                              {  "prim": "DIP",
+                                                 "args": [
+                                                   {  "int": "1"  },
+                                                   [  {  "prim": "DIG",
+                                                         "args": [
+                                                           {  "int": "19"  }
+                                                         ]
+                                                   },
+                                                   {  "prim": "DROP",
+                                                      "args": [
+                                                        {  "int": "1"  }
+                                                      ]
+                                                   }  ]
+                                                 ]
+                                              },
+                                              {  "prim": "DUG",
+                                                 "args": [
+                                                   {  "int": "19"  }
+                                                 ]
+                                              }  ],
+                                              [    ]
                                             ]
                                          },
                                          {  "prim": "DROP",
                                             "args": [
-                                              {  "int": "3"  }
+                                              {  "int": "2"  }
                                             ]
                                          }  ]
                                        ]
                                     },
                                     {  "prim": "DROP",
                                        "args": [
-                                         {  "int": "1"  }
+                                         {  "int": "10"  }
                                        ]
                                     },
                                     {  "prim": "PAIR",
                                        "args": [
-                                         {  "int": "10"  }
+                                         {  "int": "11"  }
                                        ]
                                     },
                                     {  "prim": "DIG",
@@ -4972,11 +4450,7 @@ export const nft_public_code : any =
                                          {  "int": "1"  }
                                        ]
                                     },
-                                    {  "prim": "PAIR"  }  ]
-                                  ]
-                            }  ],
-                            [  {  "prim": "IF_LEFT",
-                                  "args": [
+                                    {  "prim": "PAIR"  }  ],
                                     [  {  "prim": "DUP"  },
                                     {  "prim": "ITER",
                                        "args": [
@@ -5000,7 +4474,7 @@ export const nft_public_code : any =
                                          {  "prim": "ADDRESS"  },
                                          {  "prim": "DUP",
                                             "args": [
-                                              {  "int": "11"  }
+                                              {  "int": "13"  }
                                             ]
                                          },
                                          {  "prim": "DUP",
@@ -5013,7 +4487,7 @@ export const nft_public_code : any =
                                             "args": [
                                               [  {  "prim": "DUP",
                                                     "args": [
-                                                      {  "int": "11"  }
+                                                      {  "int": "13"  }
                                                     ]
                                               },
                                               {  "prim": "DUP",
@@ -5096,7 +4570,7 @@ export const nft_public_code : any =
                                          },
                                          {  "prim": "DUP",
                                             "args": [
-                                              {  "int": "13"  }
+                                              {  "int": "15"  }
                                             ]
                                          },
                                          {  "prim": "DUP",
@@ -5109,12 +4583,12 @@ export const nft_public_code : any =
                                             "args": [
                                               [  {  "prim": "DUP",
                                                     "args": [
-                                                      {  "int": "13"  }
+                                                      {  "int": "15"  }
                                                     ]
                                               },
                                               {  "prim": "DUP",
                                                  "args": [
-                                                   {  "int": "14"  }
+                                                   {  "int": "16"  }
                                                  ]
                                               },
                                               {  "prim": "DUP",
@@ -5173,7 +4647,7 @@ export const nft_public_code : any =
                                                    {  "int": "1"  },
                                                    [  {  "prim": "DIG",
                                                          "args": [
-                                                           {  "int": "12"  }
+                                                           {  "int": "14"  }
                                                          ]
                                                    },
                                                    {  "prim": "DROP",
@@ -5185,12 +4659,12 @@ export const nft_public_code : any =
                                               },
                                               {  "prim": "DUG",
                                                  "args": [
-                                                   {  "int": "12"  }
+                                                   {  "int": "14"  }
                                                  ]
                                               }  ],
                                               [  {  "prim": "DUP",
                                                     "args": [
-                                                      {  "int": "13"  }
+                                                      {  "int": "15"  }
                                                     ]
                                               },
                                               {  "prim": "DUP",
@@ -5217,7 +4691,7 @@ export const nft_public_code : any =
                                                    {  "prim": "FAILWITH"  }  ],
                                                    [  {  "prim": "DUP",
                                                          "args": [
-                                                           {  "int": "13"  }
+                                                           {  "int": "15"  }
                                                          ]
                                                    },
                                                    {  "prim": "EMPTY_MAP",
@@ -5274,7 +4748,7 @@ export const nft_public_code : any =
                                                         {  "int": "1"  },
                                                         [  {  "prim": "DIG",
                                                               "args": [
-                                                                {  "int": "12"  }
+                                                                {  "int": "14"  }
                                                               ]
                                                         },
                                                         {  "prim": "DROP",
@@ -5286,7 +4760,7 @@ export const nft_public_code : any =
                                                    },
                                                    {  "prim": "DUG",
                                                       "args": [
-                                                        {  "int": "12"  }
+                                                        {  "int": "14"  }
                                                       ]
                                                    }  ]
                                                  ]
@@ -5338,7 +4812,7 @@ export const nft_public_code : any =
                                                    {  "prim": "PUSH",
                                                       "args": [
                                                         {  "prim": "string"  },
-                                                        {  "string": "SIGNER_IS_NOT_FROM"  }
+                                                        {  "string": "SIGNER_NOT_FROM"  }
                                                       ]
                                                    },
                                                    {  "prim": "PAIR"  },
@@ -5360,7 +4834,7 @@ export const nft_public_code : any =
                                                    {  "prim": "CAR"  },
                                                    {  "prim": "DUP",
                                                       "args": [
-                                                        {  "int": "16"  }
+                                                        {  "int": "18"  }
                                                       ]
                                                    },
                                                    {  "prim": "DUP",
@@ -5378,7 +4852,7 @@ export const nft_public_code : any =
                                                         },
                                                         {  "prim": "DUP",
                                                            "args": [
-                                                             {  "int": "17"  }
+                                                             {  "int": "19"  }
                                                            ]
                                                         },
                                                         {  "prim": "DUP",
@@ -5452,13 +4926,13 @@ export const nft_public_code : any =
                                                         [  {  "prim": "PUSH",
                                                               "args": [
                                                                 {  "prim": "string"  },
-                                                                {  "string": "INVALID_AMOUNT"  }
+                                                                {  "string": "FA2_INVALID_AMOUNT"  }
                                                               ]
                                                         },
                                                         {  "prim": "FAILWITH"  }  ],
                                                         [  {  "prim": "DUP",
                                                               "args": [
-                                                                {  "int": "16"  }
+                                                                {  "int": "18"  }
                                                               ]
                                                         },
                                                         {  "prim": "DUP",
@@ -5479,7 +4953,7 @@ export const nft_public_code : any =
                                                              [  {  "prim": "DIG",
                                                                    "args": [
 
-                                                                   {  "int": "15"  }
+                                                                   {  "int": "17"  }
                                                                    ]
                                                              },
                                                              {  "prim": "DROP",
@@ -5491,7 +4965,7 @@ export const nft_public_code : any =
                                                         },
                                                         {  "prim": "DUG",
                                                            "args": [
-                                                             {  "int": "15"  }
+                                                             {  "int": "17"  }
                                                            ]
                                                         }  ]
                                                       ]
@@ -5524,65 +4998,7 @@ export const nft_public_code : any =
                                     },
                                     {  "prim": "PAIR",
                                        "args": [
-                                         {  "int": "10"  }
-                                       ]
-                                    },
-                                    {  "prim": "DIG",
-                                       "args": [
-                                         {  "int": "1"  }
-                                       ]
-                                    },
-                                    {  "prim": "PAIR"  }  ],
-                                    [  {  "prim": "DUP",
-                                          "args": [
-                                            {  "int": "2"  }
-                                          ]
-                                    },
-                                    {  "prim": "SENDER"  },
-                                    {  "prim": "COMPARE"  },
-                                    {  "prim": "EQ"  },
-                                    {  "prim": "NOT"  },
-                                    {  "prim": "IF",
-                                       "args": [
-                                         [  {  "prim": "PUSH",
-                                               "args": [
-                                                 {  "prim": "string"  },
-                                                 {  "string": "InvalidCaller"  }
-                                               ]
-                                         },
-                                         {  "prim": "FAILWITH"  }  ],
-                                         [    ]
-                                       ]
-                                    },
-                                    {  "prim": "DUP"  },
-                                    {  "prim": "DIP",
-                                       "args": [
-                                         {  "int": "1"  },
-                                         [  {  "prim": "DIG",
-                                               "args": [
-                                                 {  "int": "1"  }
-                                               ]
-                                         },
-                                         {  "prim": "DROP",
-                                            "args": [
-                                              {  "int": "1"  }
-                                            ]
-                                         }  ]
-                                       ]
-                                    },
-                                    {  "prim": "DUG",
-                                       "args": [
-                                         {  "int": "1"  }
-                                       ]
-                                    },
-                                    {  "prim": "DROP",
-                                       "args": [
-                                         {  "int": "1"  }
-                                       ]
-                                    },
-                                    {  "prim": "PAIR",
-                                       "args": [
-                                         {  "int": "10"  }
+                                         {  "int": "11"  }
                                        ]
                                     },
                                     {  "prim": "DIG",
@@ -5595,371 +5011,1195 @@ export const nft_public_code : any =
                             }  ]
                           ]
                     }  ],
-                    [  {  "prim": "UNPAIR"  },
-                    {  "prim": "SWAP"  },
-                    {  "prim": "UNPAIR"  },
-                    {  "prim": "SWAP"  },
-                    {  "prim": "UNPAIR"  },
-                    {  "prim": "SWAP"  },
-                    {  "prim": "DUP",
-                       "args": [
-                         {  "int": "21"  }
-                       ]
-                    },
-                    {  "prim": "DUP",
-                       "args": [
-                         {  "int": "14"  }
-                       ]
-                    },
-                    {  "prim": "PUSH",
-                       "args": [
-                         {  "prim": "string"  },
-                         {  "string": "CONTRACT_PAUSED"  }
-                       ]
-                    },
-                    {  "prim": "PAIR"  },
-                    {  "prim": "EXEC"  },
-                    {  "prim": "NOT"  },
-                    {  "prim": "IF",
-                       "args": [
-                         [  {  "prim": "PUSH",
+                    [  {  "prim": "IF_LEFT",
+                          "args": [
+                            [  {  "prim": "IF_LEFT",
+                                  "args": [
+                                    [  {  "prim": "DUP",
+                                          "args": [
+                                            {  "int": "19"  }
+                                          ]
+                                    },
+                                    {  "prim": "DUP",
+                                       "args": [
+                                         {  "int": "5"  }
+                                       ]
+                                    },
+                                    {  "prim": "PUSH",
+                                       "args": [
+                                         {  "prim": "string"  },
+                                         {  "string": "CONTRACT_PAUSED"  }
+                                       ]
+                                    },
+                                    {  "prim": "PAIR"  },
+                                    {  "prim": "EXEC"  },
+                                    {  "prim": "NOT"  },
+                                    {  "prim": "IF",
+                                       "args": [
+                                         [  {  "prim": "PUSH",
+                                               "args": [
+                                                 {  "prim": "string"  },
+                                                 {  "string": "r8"  }
+                                               ]
+                                         },
+                                         {  "prim": "PUSH",
+                                            "args": [
+                                              {  "prim": "string"  },
+                                              {  "string": "InvalidCondition"  }
+                                            ]
+                                         },
+                                         {  "prim": "PAIR"  },
+                                         {  "prim": "FAILWITH"  }  ],
+                                         [    ]
+                                       ]
+                                    },
+                                    {  "prim": "DUP",
+                                       "args": [
+                                         {  "int": "18"  }
+                                       ]
+                                    },
+                                    {  "prim": "DUP",
+                                       "args": [
+                                         {  "int": "2"  }
+                                       ]
+                                    },
+                                    {  "prim": "DUP",
+                                       "args": [
+                                         {  "int": "9"  }
+                                       ]
+                                    },
+                                    {  "prim": "PAIR"  },
+                                    {  "prim": "DUP",
+                                       "args": [
+                                         {  "int": "12"  }
+                                       ]
+                                    },
+                                    {  "prim": "PAIR"  },
+                                    {  "prim": "DUP",
+                                       "args": [
+                                         {  "int": "8"  }
+                                       ]
+                                    },
+                                    {  "prim": "PAIR"  },
+                                    {  "prim": "EXEC"  },
+                                    {  "prim": "NOT"  },
+                                    {  "prim": "IF",
+                                       "args": [
+                                         [  {  "prim": "DUP",
+                                               "args": [
+                                                 {  "int": "14"  }
+                                               ]
+                                         },
+                                         {  "prim": "DUP",
+                                            "args": [
+                                              {  "int": "2"  }
+                                            ]
+                                         },
+                                         {  "prim": "PUSH",
+                                            "args": [
+                                              {  "prim": "string"  },
+                                              {  "string": "FA2_NOT_OPERATOR"  }
+                                            ]
+                                         },
+                                         {  "prim": "PAIR"  },
+                                         {  "prim": "EXEC"  },
+                                         {  "prim": "IF_NONE",
+                                            "args": [
+                                              [    ],
+                                              [  {  "prim": "DUP",
+                                                    "args": [
+                                                      {  "int": "2"  }
+                                                    ]
+                                              },
+                                              {  "prim": "PACK"  },
+                                              {  "prim": "BLAKE2B"  },
+                                              {  "prim": "DUP",
+                                                 "args": [
+                                                   {  "int": "11"  }
+                                                 ]
+                                              },
+                                              {  "prim": "DUP",
+                                                 "args": [
+                                                   {  "int": "3"  }
+                                                 ]
+                                              },
+                                              {  "prim": "MEM"  },
+                                              {  "prim": "NOT"  },
+                                              {  "prim": "IF",
+                                                 "args": [
+                                                   [  {  "prim": "PUSH",
+                                                         "args": [
+                                                           {  "prim": "string"  },
+                                                           {  "string": "NO_ENTRY_FOR_USER"  }
+                                                         ]
+                                                   },
+                                                   {  "prim": "FAILWITH"  }  ],
+                                                   [  {  "prim": "DUP",
+                                                         "args": [
+                                                           {  "int": "11"  }
+                                                         ]
+                                                   },
+                                                   {  "prim": "DUP",
+                                                      "args": [
+                                                        {  "int": "3"  }
+                                                      ]
+                                                   },
+                                                   {  "prim": "GET"  },
+                                                   {  "prim": "IF_NONE",
+                                                      "args": [
+                                                        [  {  "prim": "PUSH",
+                                                              "args": [
+                                                                {  "prim": "string"  },
+                                                                {  "string": "permits"  }
+                                                              ]
+                                                        },
+                                                        {  "prim": "PUSH",
+                                                           "args": [
+                                                             {  "prim": "string"  },
+                                                             {  "string": "AssetNotFound"  }
+                                                           ]
+                                                        },
+                                                        {  "prim": "PAIR"  },
+                                                        {  "prim": "FAILWITH"  }  ],
+                                                        [    ]
+                                                      ]
+                                                   },
+                                                   {  "prim": "CDR"  },
+                                                   {  "prim": "CDR"  },
+                                                   {  "prim": "DUP",
+                                                      "args": [
+                                                        {  "int": "2"  }
+                                                      ]
+                                                   },
+                                                   {  "prim": "MEM"  },
+                                                   {  "prim": "NOT"  },
+                                                   {  "prim": "IF",
+                                                      "args": [
+                                                        [  {  "prim": "PUSH",
+                                                              "args": [
+                                                                {  "prim": "string"  },
+                                                                {  "string": "FA2_NOT_OPERATOR"  }
+                                                              ]
+                                                        },
+                                                        {  "prim": "FAILWITH"  }  ],
+                                                        [  {  "prim": "DUP",
+                                                              "args": [
+                                                                {  "int": "11"  }
+                                                              ]
+                                                        },
+                                                        {  "prim": "DUP",
+                                                           "args": [
+                                                             {  "int": "3"  }
+                                                           ]
+                                                        },
+                                                        {  "prim": "GET"  },
+                                                        {  "prim": "IF_NONE",
+                                                           "args": [
+                                                             [  {  "prim": "PUSH",
+                                                                   "args": [
+
+                                                                   {  "prim": "string"  },
+                                                                   {  "string": "permits"  }
+                                                                   ]
+                                                             },
+                                                             {  "prim": "PUSH",
+                                                                "args": [
+                                                                  {  "prim": "string"  },
+                                                                  {  "string": "AssetNotFound"  }
+                                                                ]
+                                                             },
+                                                             {  "prim": "PAIR"  },
+                                                             {  "prim": "FAILWITH"  }  ],
+                                                             [    ]
+                                                           ]
+                                                        },
+                                                        {  "prim": "CDR"  },
+                                                        {  "prim": "CDR"  },
+                                                        {  "prim": "DUP",
+                                                           "args": [
+                                                             {  "int": "2"  }
+                                                           ]
+                                                        },
+                                                        {  "prim": "GET"  },
+                                                        {  "prim": "IF_NONE",
+                                                           "args": [
+                                                             [  {  "prim": "PUSH",
+                                                                   "args": [
+
+                                                                   {  "prim": "string"  },
+                                                                   {  "string": "NotFound"  }
+                                                                   ]
+                                                             },
+                                                             {  "prim": "FAILWITH"  }  ],
+                                                             [    ]
+                                                           ]
+                                                        },
+                                                        {  "prim": "DUP",
+                                                           "args": [
+                                                             {  "int": "19"  }
+                                                           ]
+                                                        },
+                                                        {  "prim": "DUP",
+                                                           "args": [
+                                                             {  "int": "21"  }
+                                                           ]
+                                                        },
+                                                        {  "prim": "DUP",
+                                                           "args": [
+                                                             {  "int": "4"  }
+                                                           ]
+                                                        },
+                                                        {  "prim": "PAIR"  },
+                                                        {  "prim": "DUP",
+                                                           "args": [
+                                                             {  "int": "5"  }
+                                                           ]
+                                                        },
+                                                        {  "prim": "PAIR"  },
+                                                        {  "prim": "DUP",
+                                                           "args": [
+                                                             {  "int": "16"  }
+                                                           ]
+                                                        },
+                                                        {  "prim": "PAIR"  },
+                                                        {  "prim": "DUP",
+                                                           "args": [
+                                                             {  "int": "14"  }
+                                                           ]
+                                                        },
+                                                        {  "prim": "PAIR"  },
+                                                        {  "prim": "EXEC"  },
+                                                        {  "prim": "DUP",
+                                                           "args": [
+                                                             {  "int": "19"  }
+                                                           ]
+                                                        },
+                                                        {  "prim": "DUP",
+                                                           "args": [
+                                                             {  "int": "2"  }
+                                                           ]
+                                                        },
+                                                        {  "prim": "DUP",
+                                                           "args": [
+                                                             {  "int": "4"  }
+                                                           ]
+                                                        },
+                                                        {  "prim": "PAIR"  },
+                                                        {  "prim": "EXEC"  },
+                                                        {  "prim": "IF",
+                                                           "args": [
+                                                             [  {  "prim": "PUSH",
+                                                                   "args": [
+
+                                                                   {  "prim": "string"  },
+                                                                   {  "string": "PERMIT_EXPIRED"  }
+                                                                   ]
+                                                             },
+                                                             {  "prim": "FAILWITH"  }  ],
+                                                             [  {  "prim": "DUP",
+                                                                   "args": [
+
+                                                                   {  "int": "13"  }
+                                                                   ]
+                                                             },
+                                                             {  "prim": "DUP",
+                                                                "args": [
+                                                                  {  "int": "14"  }
+                                                                ]
+                                                             },
+                                                             {  "prim": "DUP",
+                                                                "args": [
+                                                                  {  "int": "6"  }
+                                                                ]
+                                                             },
+                                                             {  "prim": "GET"  },
+                                                             {  "prim": "IF_NONE",
+                                                                "args": [
+                                                                  [  {
+                                                                  "prim": "PUSH",
+                                                                  "args": [
+                                                                    {  "prim": "string"  },
+                                                                    {  "string": "permits"  }
+                                                                  ]
+                                                                  },
+                                                                  {
+                                                                  "prim": "PUSH",
+                                                                  "args": [
+                                                                    {  "prim": "string"  },
+                                                                    {  "string": "AssetNotFound"  }
+                                                                  ]
+                                                                  },
+                                                                  {  "prim": "PAIR"  },
+                                                                  {  "prim": "FAILWITH"  }  ],
+                                                                  [    ]
+                                                                ]
+                                                             },
+                                                             {  "prim": "UNPAIR"  },
+                                                             {  "prim": "SWAP"  },
+                                                             {  "prim": "UNPAIR"  },
+                                                             {  "prim": "SWAP"  },
+                                                             {  "prim": "DROP",
+                                                                "args": [
+                                                                  {  "int": "1"  }
+                                                                ]
+                                                             },
+                                                             {  "prim": "DUP",
+                                                                "args": [
+                                                                  {  "int": "16"  }
+                                                                ]
+                                                             },
+                                                             {  "prim": "DUP",
+                                                                "args": [
+                                                                  {  "int": "8"  }
+                                                                ]
+                                                             },
+                                                             {  "prim": "GET"  },
+                                                             {  "prim": "IF_NONE",
+                                                                "args": [
+                                                                  [  {
+                                                                  "prim": "PUSH",
+                                                                  "args": [
+                                                                    {  "prim": "string"  },
+                                                                    {  "string": "permits"  }
+                                                                  ]
+                                                                  },
+                                                                  {
+                                                                  "prim": "PUSH",
+                                                                  "args": [
+                                                                    {  "prim": "string"  },
+                                                                    {  "string": "AssetNotFound"  }
+                                                                  ]
+                                                                  },
+                                                                  {  "prim": "PAIR"  },
+                                                                  {  "prim": "FAILWITH"  }  ],
+                                                                  [    ]
+                                                                ]
+                                                             },
+                                                             {  "prim": "CDR"  },
+                                                             {  "prim": "CDR"  },
+                                                             {  "prim": "NONE",
+                                                                "args": [
+                                                                  {
+                                                                  "prim": "pair",
+                                                                  "args": [
+                                                                    {
+                                                                    "prim": "option",
+                                                                    "args": [
+
+                                                                    {  "prim": "nat"  }
+                                                                    ]
+                                                                    },
+                                                                    {  "prim": "timestamp"  }
+                                                                  ]
+                                                                  }
+                                                                ]
+                                                             },
+                                                             {  "prim": "DUP",
+                                                                "args": [
+                                                                  {  "int": "8"  }
+                                                                ]
+                                                             },
+                                                             {  "prim": "UPDATE"  },
+                                                             {  "prim": "SWAP"  },
+                                                             {  "prim": "PAIR"  },
+                                                             {  "prim": "SWAP"  },
+                                                             {  "prim": "PAIR"  },
+                                                             {  "prim": "SOME"  },
+                                                             {  "prim": "DUP",
+                                                                "args": [
+                                                                  {  "int": "6"  }
+                                                                ]
+                                                             },
+                                                             {  "prim": "UPDATE"  },
+                                                             {  "prim": "DIP",
+                                                                "args": [
+                                                                  {  "int": "1"  },
+                                                                  [  {
+                                                                  "prim": "DIG",
+                                                                  "args": [
+                                                                    {  "int": "12"  }
+                                                                  ]
+                                                                  },
+                                                                  {
+                                                                  "prim": "DROP",
+                                                                  "args": [
+                                                                    {  "int": "1"  }
+                                                                  ]
+                                                                  }  ]
+                                                                ]
+                                                             },
+                                                             {  "prim": "DUG",
+                                                                "args": [
+                                                                  {  "int": "12"  }
+                                                                ]
+                                                             }  ]
+                                                           ]
+                                                        },
+                                                        {  "prim": "DROP",
+                                                           "args": [
+                                                             {  "int": "2"  }
+                                                           ]
+                                                        }  ]
+                                                      ]
+                                                   }  ]
+                                                 ]
+                                              },
+                                              {  "prim": "DROP",
+                                                 "args": [
+                                                   {  "int": "2"  }
+                                                 ]
+                                              }  ]
+                                            ]
+                                         }  ],
+                                         [    ]
+                                       ]
+                                    },
+                                    {  "prim": "DUP"  },
+                                    {  "prim": "ITER",
+                                       "args": [
+                                         [  {  "prim": "DUP"  },
+                                         {  "prim": "CAR"  },
+                                         {  "prim": "DUP",
+                                            "args": [
+                                              {  "int": "2"  }
+                                            ]
+                                         },
+                                         {  "prim": "CDR"  },
+                                         {  "prim": "DUP"  },
+                                         {  "prim": "ITER",
+                                            "args": [
+                                              [  {  "prim": "PUSH",
+                                                    "args": [
+                                                      {  "prim": "nat"  },
+                                                      {  "int": "1"  }
+                                                    ]
+                                              },
+                                              {  "prim": "DUP",
+                                                 "args": [
+                                                   {  "int": "2"  }
+                                                 ]
+                                              },
+                                              {  "prim": "CDR"  },
+                                              {  "prim": "CDR"  },
+                                              {  "prim": "COMPARE"  },
+                                              {  "prim": "EQ"  },
+                                              {  "prim": "NOT"  },
+                                              {  "prim": "IF",
+                                                 "args": [
+                                                   [  {  "prim": "PUSH",
+                                                         "args": [
+                                                           {  "prim": "string"  },
+                                                           {  "string": "FA2_INVALID_AMOUNT"  }
+                                                         ]
+                                                   },
+                                                   {  "prim": "FAILWITH"  }  ],
+                                                   [    ]
+                                                 ]
+                                              },
+                                              {  "prim": "DUP"  },
+                                              {  "prim": "CDR"  },
+                                              {  "prim": "CAR"  },
+                                              {  "prim": "DUP",
+                                                 "args": [
+                                                   {  "int": "11"  }
+                                                 ]
+                                              },
+                                              {  "prim": "DUP",
+                                                 "args": [
+                                                   {  "int": "2"  }
+                                                 ]
+                                              },
+                                              {  "prim": "MEM"  },
+                                              {  "prim": "IF",
+                                                 "args": [
+                                                   [  {  "prim": "DUP",
+                                                         "args": [
+                                                           {  "int": "4"  }
+                                                         ]
+                                                   },
+                                                   {  "prim": "DUP",
+                                                      "args": [
+                                                        {  "int": "12"  }
+                                                      ]
+                                                   },
+                                                   {  "prim": "DUP",
+                                                      "args": [
+                                                        {  "int": "3"  }
+                                                      ]
+                                                   },
+                                                   {  "prim": "GET"  },
+                                                   {  "prim": "IF_NONE",
+                                                      "args": [
+                                                        [  {  "prim": "PUSH",
+                                                              "args": [
+                                                                {  "prim": "string"  },
+                                                                {  "string": "ledger"  }
+                                                              ]
+                                                        },
+                                                        {  "prim": "PUSH",
+                                                           "args": [
+                                                             {  "prim": "string"  },
+                                                             {  "string": "AssetNotFound"  }
+                                                           ]
+                                                        },
+                                                        {  "prim": "PAIR"  },
+                                                        {  "prim": "FAILWITH"  }  ],
+                                                        [    ]
+                                                      ]
+                                                   },
+                                                   {  "prim": "COMPARE"  },
+                                                   {  "prim": "EQ"  },
+                                                   {  "prim": "NOT"  },
+                                                   {  "prim": "IF",
+                                                      "args": [
+                                                        [  {  "prim": "PUSH",
+                                                              "args": [
+                                                                {  "prim": "string"  },
+                                                                {  "string": "FA2_INSUFFICIENT_BALANCE"  }
+                                                              ]
+                                                        },
+                                                        {  "prim": "FAILWITH"  }  ],
+                                                        [    ]
+                                                      ]
+                                                   }  ],
+                                                   [  {  "prim": "PUSH",
+                                                         "args": [
+                                                           {  "prim": "string"  },
+                                                           {  "string": "FA2_TOKEN_UNDEFINED"  }
+                                                         ]
+                                                   },
+                                                   {  "prim": "FAILWITH"  }  ]
+                                                 ]
+                                              },
+                                              {  "prim": "DUP",
+                                                 "args": [
+                                                   {  "int": "11"  }
+                                                 ]
+                                              },
+                                              {  "prim": "DUP",
+                                                 "args": [
+                                                   {  "int": "3"  }
+                                                 ]
+                                              },
+                                              {  "prim": "CAR"  },
+                                              {  "prim": "SOME"  },
+                                              {  "prim": "DUP",
+                                                 "args": [
+                                                   {  "int": "3"  }
+                                                 ]
+                                              },
+                                              {  "prim": "UPDATE"  },
+                                              {  "prim": "DIP",
+                                                 "args": [
+                                                   {  "int": "1"  },
+                                                   [  {  "prim": "DIG",
+                                                         "args": [
+                                                           {  "int": "10"  }
+                                                         ]
+                                                   },
+                                                   {  "prim": "DROP",
+                                                      "args": [
+                                                        {  "int": "1"  }
+                                                      ]
+                                                   }  ]
+                                                 ]
+                                              },
+                                              {  "prim": "DUG",
+                                                 "args": [
+                                                   {  "int": "10"  }
+                                                 ]
+                                              },
+                                              {  "prim": "DROP",
+                                                 "args": [
+                                                   {  "int": "2"  }
+                                                 ]
+                                              }  ]
+                                            ]
+                                         },
+                                         {  "prim": "DROP",
+                                            "args": [
+                                              {  "int": "3"  }
+                                            ]
+                                         }  ]
+                                       ]
+                                    },
+                                    {  "prim": "DROP",
+                                       "args": [
+                                         {  "int": "1"  }
+                                       ]
+                                    },
+                                    {  "prim": "PAIR",
+                                       "args": [
+                                         {  "int": "11"  }
+                                       ]
+                                    },
+                                    {  "prim": "DIG",
+                                       "args": [
+                                         {  "int": "1"  }
+                                       ]
+                                    },
+                                    {  "prim": "PAIR"  }  ],
+                                    [  {  "prim": "UNPAIR"  },
+                                    {  "prim": "SWAP"  },
+                                    {  "prim": "UNPAIR"  },
+                                    {  "prim": "SWAP"  },
+                                    {  "prim": "UNPAIR"  },
+                                    {  "prim": "SWAP"  },
+                                    {  "prim": "DUP",
+                                       "args": [
+                                         {  "int": "22"  }
+                                       ]
+                                    },
+                                    {  "prim": "DUP",
+                                       "args": [
+                                         {  "int": "8"  }
+                                       ]
+                                    },
+                                    {  "prim": "PUSH",
+                                       "args": [
+                                         {  "prim": "string"  },
+                                         {  "string": "CONTRACT_PAUSED"  }
+                                       ]
+                                    },
+                                    {  "prim": "PAIR"  },
+                                    {  "prim": "EXEC"  },
+                                    {  "prim": "NOT"  },
+                                    {  "prim": "IF",
+                                       "args": [
+                                         [  {  "prim": "PUSH",
+                                               "args": [
+                                                 {  "prim": "string"  },
+                                                 {  "string": "r10"  }
+                                               ]
+                                         },
+                                         {  "prim": "PUSH",
+                                            "args": [
+                                              {  "prim": "string"  },
+                                              {  "string": "InvalidCondition"  }
+                                            ]
+                                         },
+                                         {  "prim": "PAIR"  },
+                                         {  "prim": "FAILWITH"  }  ],
+                                         [    ]
+                                       ]
+                                    },
+                                    {  "prim": "DUP",
+                                       "args": [
+                                         {  "int": "11"  }
+                                       ]
+                                    },
+                                    {  "prim": "DUP",
+                                       "args": [
+                                         {  "int": "5"  }
+                                       ]
+                                    },
+                                    {  "prim": "MEM"  },
+                                    {  "prim": "IF",
+                                       "args": [
+                                         [  {  "prim": "DUP",
+                                               "args": [
+                                                 {  "int": "11"  }
+                                               ]
+                                         },
+                                         {  "prim": "DUP",
+                                            "args": [
+                                              {  "int": "12"  }
+                                            ]
+                                         },
+                                         {  "prim": "DUP",
+                                            "args": [
+                                              {  "int": "6"  }
+                                            ]
+                                         },
+                                         {  "prim": "GET"  },
+                                         {  "prim": "IF_NONE",
+                                            "args": [
+                                              [  {  "prim": "PUSH",
+                                                    "args": [
+                                                      {  "prim": "string"  },
+                                                      {  "string": "token_metadata"  }
+                                                    ]
+                                              },
+                                              {  "prim": "PUSH",
+                                                 "args": [
+                                                   {  "prim": "string"  },
+                                                   {  "string": "AssetNotFound"  }
+                                                 ]
+                                              },
+                                              {  "prim": "PAIR"  },
+                                              {  "prim": "FAILWITH"  }  ],
+                                              [    ]
+                                            ]
+                                         },
+                                         {  "prim": "UNPAIR"  },
+                                         {  "prim": "DROP",
+                                            "args": [
+                                              {  "int": "1"  }
+                                            ]
+                                         },
+                                         {  "prim": "DUP",
+                                            "args": [
+                                              {  "int": "6"  }
+                                            ]
+                                         },
+                                         {  "prim": "SWAP"  },
+                                         {  "prim": "DROP",
+                                            "args": [
+                                              {  "int": "1"  }
+                                            ]
+                                         },
+                                         {  "prim": "DUP",
+                                            "args": [
+                                              {  "int": "4"  }
+                                            ]
+                                         },
+                                         {  "prim": "SWAP"  },
+                                         {  "prim": "PAIR"  },
+                                         {  "prim": "SOME"  },
+                                         {  "prim": "DUP",
+                                            "args": [
+                                              {  "int": "6"  }
+                                            ]
+                                         },
+                                         {  "prim": "UPDATE"  },
+                                         {  "prim": "DIP",
+                                            "args": [
+                                              {  "int": "1"  },
+                                              [  {  "prim": "DIG",
+                                                    "args": [
+                                                      {  "int": "10"  }
+                                                    ]
+                                              },
+                                              {  "prim": "DROP",
+                                                 "args": [
+                                                   {  "int": "1"  }
+                                                 ]
+                                              }  ]
+                                            ]
+                                         },
+                                         {  "prim": "DUG",
+                                            "args": [
+                                              {  "int": "10"  }
+                                            ]
+                                         }  ],
+                                         [  {  "prim": "DUP",
+                                               "args": [
+                                                 {  "int": "11"  }
+                                               ]
+                                         },
+                                         {  "prim": "DUP",
+                                            "args": [
+                                              {  "int": "5"  }
+                                            ]
+                                         },
+                                         {  "prim": "MEM"  },
+                                         {  "prim": "IF",
+                                            "args": [
+                                              [  {  "prim": "PUSH",
+                                                    "args": [
+                                                      {  "prim": "string"  },
+                                                      {  "string": "token_metadata"  }
+                                                    ]
+                                              },
+                                              {  "prim": "PUSH",
+                                                 "args": [
+                                                   {  "prim": "string"  },
+                                                   {  "string": "KeyExists"  }
+                                                 ]
+                                              },
+                                              {  "prim": "PAIR"  },
+                                              {  "prim": "FAILWITH"  }  ],
+                                              [  {  "prim": "DUP",
+                                                    "args": [
+                                                      {  "int": "11"  }
+                                                    ]
+                                              },
+                                              {  "prim": "DUP",
+                                                 "args": [
+                                                   {  "int": "3"  }
+                                                 ]
+                                              },
+                                              {  "prim": "DUP",
+                                                 "args": [
+                                                   {  "int": "6"  }
+                                                 ]
+                                              },
+                                              {  "prim": "PAIR"  },
+                                              {  "prim": "SOME"  },
+                                              {  "prim": "DUP",
+                                                 "args": [
+                                                   {  "int": "6"  }
+                                                 ]
+                                              },
+                                              {  "prim": "UPDATE"  },
+                                              {  "prim": "DIP",
+                                                 "args": [
+                                                   {  "int": "1"  },
+                                                   [  {  "prim": "DIG",
+                                                         "args": [
+                                                           {  "int": "10"  }
+                                                         ]
+                                                   },
+                                                   {  "prim": "DROP",
+                                                      "args": [
+                                                        {  "int": "1"  }
+                                                      ]
+                                                   }  ]
+                                                 ]
+                                              },
+                                              {  "prim": "DUG",
+                                                 "args": [
+                                                   {  "int": "10"  }
+                                                 ]
+                                              }  ]
+                                            ]
+                                         }  ]
+                                       ]
+                                    },
+                                    {  "prim": "DUP",
+                                       "args": [
+                                         {  "int": "8"  }
+                                       ]
+                                    },
+                                    {  "prim": "DUP",
+                                       "args": [
+                                         {  "int": "5"  }
+                                       ]
+                                    },
+                                    {  "prim": "MEM"  },
+                                    {  "prim": "IF",
+                                       "args": [
+                                         [  {  "prim": "PUSH",
+                                               "args": [
+                                                 {  "prim": "string"  },
+                                                 {  "string": "royalties"  }
+                                               ]
+                                         },
+                                         {  "prim": "PUSH",
+                                            "args": [
+                                              {  "prim": "string"  },
+                                              {  "string": "KeyExists"  }
+                                            ]
+                                         },
+                                         {  "prim": "PAIR"  },
+                                         {  "prim": "FAILWITH"  }  ],
+                                         [  {  "prim": "DUP",
+                                               "args": [
+                                                 {  "int": "8"  }
+                                               ]
+                                         },
+                                         {  "prim": "DUP",
+                                            "args": [
+                                              {  "int": "2"  }
+                                            ]
+                                         },
+                                         {  "prim": "SOME"  },
+                                         {  "prim": "DUP",
+                                            "args": [
+                                              {  "int": "6"  }
+                                            ]
+                                         },
+                                         {  "prim": "UPDATE"  },
+                                         {  "prim": "DIP",
+                                            "args": [
+                                              {  "int": "1"  },
+                                              [  {  "prim": "DIG",
+                                                    "args": [
+                                                      {  "int": "7"  }
+                                                    ]
+                                              },
+                                              {  "prim": "DROP",
+                                                 "args": [
+                                                   {  "int": "1"  }
+                                                 ]
+                                              }  ]
+                                            ]
+                                         },
+                                         {  "prim": "DUG",
+                                            "args": [
+                                              {  "int": "7"  }
+                                            ]
+                                         }  ]
+                                       ]
+                                    },
+                                    {  "prim": "DUP",
+                                       "args": [
+                                         {  "int": "9"  }
+                                       ]
+                                    },
+                                    {  "prim": "DUP",
+                                       "args": [
+                                         {  "int": "5"  }
+                                       ]
+                                    },
+                                    {  "prim": "MEM"  },
+                                    {  "prim": "IF",
+                                       "args": [
+                                         [  {  "prim": "PUSH",
+                                               "args": [
+                                                 {  "prim": "string"  },
+                                                 {  "string": "ledger"  }
+                                               ]
+                                         },
+                                         {  "prim": "PUSH",
+                                            "args": [
+                                              {  "prim": "string"  },
+                                              {  "string": "KeyExists"  }
+                                            ]
+                                         },
+                                         {  "prim": "PAIR"  },
+                                         {  "prim": "FAILWITH"  }  ],
+                                         [  {  "prim": "DUP",
+                                               "args": [
+                                                 {  "int": "9"  }
+                                               ]
+                                         },
+                                         {  "prim": "DUP",
+                                            "args": [
+                                              {  "int": "4"  }
+                                            ]
+                                         },
+                                         {  "prim": "SOME"  },
+                                         {  "prim": "DUP",
+                                            "args": [
+                                              {  "int": "6"  }
+                                            ]
+                                         },
+                                         {  "prim": "UPDATE"  },
+                                         {  "prim": "DIP",
+                                            "args": [
+                                              {  "int": "1"  },
+                                              [  {  "prim": "DIG",
+                                                    "args": [
+                                                      {  "int": "8"  }
+                                                    ]
+                                              },
+                                              {  "prim": "DROP",
+                                                 "args": [
+                                                   {  "int": "1"  }
+                                                 ]
+                                              }  ]
+                                            ]
+                                         },
+                                         {  "prim": "DUG",
+                                            "args": [
+                                              {  "int": "8"  }
+                                            ]
+                                         }  ]
+                                       ]
+                                    },
+                                    {  "prim": "DROP",
+                                       "args": [
+                                         {  "int": "4"  }
+                                       ]
+                                    },
+                                    {  "prim": "PAIR",
+                                       "args": [
+                                         {  "int": "11"  }
+                                       ]
+                                    },
+                                    {  "prim": "DIG",
+                                       "args": [
+                                         {  "int": "1"  }
+                                       ]
+                                    },
+                                    {  "prim": "PAIR"  }  ]
+                                  ]
+                            }  ],
+                            [  {  "prim": "DUP",
+                                  "args": [
+                                    {  "int": "19"  }
+                                  ]
+                            },
+                            {  "prim": "DUP",
+                               "args": [
+                                 {  "int": "5"  }
+                               ]
+                            },
+                            {  "prim": "PUSH",
                                "args": [
                                  {  "prim": "string"  },
-                                 {  "string": "r10"  }
+                                 {  "string": "CONTRACT_PAUSED"  }
                                ]
-                         },
-                         {  "prim": "PUSH",
-                            "args": [
-                              {  "prim": "string"  },
-                              {  "string": "InvalidCondition"  }
-                            ]
-                         },
-                         {  "prim": "PAIR"  },
-                         {  "prim": "FAILWITH"  }  ],
-                         [    ]
-                       ]
-                    },
-                    {  "prim": "DUP",
-                       "args": [
-                         {  "int": "9"  }
-                       ]
-                    },
-                    {  "prim": "DUP",
-                       "args": [
-                         {  "int": "5"  }
-                       ]
-                    },
-                    {  "prim": "MEM"  },
-                    {  "prim": "IF",
-                       "args": [
-                         [  {  "prim": "DUP",
+                            },
+                            {  "prim": "PAIR"  },
+                            {  "prim": "EXEC"  },
+                            {  "prim": "NOT"  },
+                            {  "prim": "IF",
                                "args": [
-                                 {  "int": "9"  }
-                               ]
-                         },
-                         {  "prim": "DUP",
-                            "args": [
-                              {  "int": "10"  }
-                            ]
-                         },
-                         {  "prim": "DUP",
-                            "args": [
-                              {  "int": "6"  }
-                            ]
-                         },
-                         {  "prim": "GET"  },
-                         {  "prim": "IF_NONE",
-                            "args": [
-                              [  {  "prim": "PUSH",
+                                 [  {  "prim": "PUSH",
+                                       "args": [
+                                         {  "prim": "string"  },
+                                         {  "string": "r2"  }
+                                       ]
+                                 },
+                                 {  "prim": "PUSH",
                                     "args": [
                                       {  "prim": "string"  },
-                                      {  "string": "token_metadata"  }
+                                      {  "string": "InvalidCondition"  }
                                     ]
-                              },
-                              {  "prim": "PUSH",
-                                 "args": [
-                                   {  "prim": "string"  },
-                                   {  "string": "AssetNotFound"  }
-                                 ]
-                              },
-                              {  "prim": "PAIR"  },
-                              {  "prim": "FAILWITH"  }  ],
-                              [    ]
-                            ]
-                         },
-                         {  "prim": "UNPAIR"  },
-                         {  "prim": "DROP",
-                            "args": [
-                              {  "int": "1"  }
-                            ]
-                         },
-                         {  "prim": "DUP",
-                            "args": [
-                              {  "int": "6"  }
-                            ]
-                         },
-                         {  "prim": "SWAP"  },
-                         {  "prim": "DROP",
-                            "args": [
-                              {  "int": "1"  }
-                            ]
-                         },
-                         {  "prim": "DUP",
-                            "args": [
-                              {  "int": "4"  }
-                            ]
-                         },
-                         {  "prim": "SWAP"  },
-                         {  "prim": "PAIR"  },
-                         {  "prim": "SOME"  },
-                         {  "prim": "DUP",
-                            "args": [
-                              {  "int": "6"  }
-                            ]
-                         },
-                         {  "prim": "UPDATE"  },
-                         {  "prim": "DIP",
-                            "args": [
-                              {  "int": "1"  },
-                              [  {  "prim": "DIG",
-                                    "args": [
-                                      {  "int": "8"  }
-                                    ]
-                              },
-                              {  "prim": "DROP",
-                                 "args": [
-                                   {  "int": "1"  }
-                                 ]
-                              }  ]
-                            ]
-                         },
-                         {  "prim": "DUG",
-                            "args": [
-                              {  "int": "8"  }
-                            ]
-                         }  ],
-                         [  {  "prim": "DUP",
-                               "args": [
-                                 {  "int": "9"  }
+                                 },
+                                 {  "prim": "PAIR"  },
+                                 {  "prim": "FAILWITH"  }  ],
+                                 [    ]
                                ]
-                         },
-                         {  "prim": "DUP",
-                            "args": [
-                              {  "int": "5"  }
-                            ]
-                         },
-                         {  "prim": "MEM"  },
-                         {  "prim": "IF",
-                            "args": [
-                              [  {  "prim": "PUSH",
-                                    "args": [
-                                      {  "prim": "string"  },
-                                      {  "string": "token_metadata"  }
-                                    ]
-                              },
-                              {  "prim": "PUSH",
-                                 "args": [
-                                   {  "prim": "string"  },
-                                   {  "string": "KeyExists"  }
-                                 ]
-                              },
-                              {  "prim": "PAIR"  },
-                              {  "prim": "FAILWITH"  }  ],
-                              [  {  "prim": "DUP",
-                                    "args": [
-                                      {  "int": "9"  }
-                                    ]
-                              },
-                              {  "prim": "DUP",
-                                 "args": [
-                                   {  "int": "3"  }
-                                 ]
-                              },
-                              {  "prim": "DUP",
-                                 "args": [
-                                   {  "int": "6"  }
-                                 ]
-                              },
-                              {  "prim": "PAIR"  },
-                              {  "prim": "SOME"  },
-                              {  "prim": "DUP",
-                                 "args": [
-                                   {  "int": "6"  }
-                                 ]
-                              },
-                              {  "prim": "UPDATE"  },
-                              {  "prim": "DIP",
-                                 "args": [
-                                   {  "int": "1"  },
-                                   [  {  "prim": "DIG",
-                                         "args": [
-                                           {  "int": "8"  }
-                                         ]
-                                   },
-                                   {  "prim": "DROP",
-                                      "args": [
-                                        {  "int": "1"  }
-                                      ]
-                                   }  ]
-                                 ]
-                              },
-                              {  "prim": "DUG",
-                                 "args": [
-                                   {  "int": "8"  }
-                                 ]
-                              }  ]
-                            ]
-                         }  ]
-                       ]
-                    },
-                    {  "prim": "DUP",
-                       "args": [
-                         {  "int": "6"  }
-                       ]
-                    },
-                    {  "prim": "DUP",
-                       "args": [
-                         {  "int": "5"  }
-                       ]
-                    },
-                    {  "prim": "MEM"  },
-                    {  "prim": "IF",
-                       "args": [
-                         [  {  "prim": "PUSH",
-                               "args": [
-                                 {  "prim": "string"  },
-                                 {  "string": "royalties"  }
-                               ]
-                         },
-                         {  "prim": "PUSH",
-                            "args": [
-                              {  "prim": "string"  },
-                              {  "string": "KeyExists"  }
-                            ]
-                         },
-                         {  "prim": "PAIR"  },
-                         {  "prim": "FAILWITH"  }  ],
-                         [  {  "prim": "DUP",
-                               "args": [
-                                 {  "int": "6"  }
-                               ]
-                         },
-                         {  "prim": "DUP",
-                            "args": [
-                              {  "int": "2"  }
-                            ]
-                         },
-                         {  "prim": "SOME"  },
-                         {  "prim": "DUP",
-                            "args": [
-                              {  "int": "6"  }
-                            ]
-                         },
-                         {  "prim": "UPDATE"  },
-                         {  "prim": "DIP",
-                            "args": [
-                              {  "int": "1"  },
-                              [  {  "prim": "DIG",
-                                    "args": [
-                                      {  "int": "5"  }
-                                    ]
-                              },
-                              {  "prim": "DROP",
-                                 "args": [
-                                   {  "int": "1"  }
-                                 ]
-                              }  ]
-                            ]
-                         },
-                         {  "prim": "DUG",
-                            "args": [
-                              {  "int": "5"  }
-                            ]
-                         }  ]
-                       ]
-                    },
-                    {  "prim": "DUP",
-                       "args": [
-                         {  "int": "7"  }
-                       ]
-                    },
-                    {  "prim": "DUP",
-                       "args": [
-                         {  "int": "5"  }
-                       ]
-                    },
-                    {  "prim": "MEM"  },
-                    {  "prim": "IF",
-                       "args": [
-                         [  {  "prim": "PUSH",
-                               "args": [
-                                 {  "prim": "string"  },
-                                 {  "string": "ledger"  }
-                               ]
-                         },
-                         {  "prim": "PUSH",
-                            "args": [
-                              {  "prim": "string"  },
-                              {  "string": "KeyExists"  }
-                            ]
-                         },
-                         {  "prim": "PAIR"  },
-                         {  "prim": "FAILWITH"  }  ],
-                         [  {  "prim": "DUP",
+                            },
+                            {  "prim": "SENDER"  },
+                            {  "prim": "DUP",
                                "args": [
                                  {  "int": "7"  }
                                ]
-                         },
-                         {  "prim": "DUP",
-                            "args": [
-                              {  "int": "4"  }
-                            ]
-                         },
-                         {  "prim": "SOME"  },
-                         {  "prim": "DUP",
-                            "args": [
-                              {  "int": "6"  }
-                            ]
-                         },
-                         {  "prim": "UPDATE"  },
-                         {  "prim": "DIP",
-                            "args": [
-                              {  "int": "1"  },
-                              [  {  "prim": "DIG",
+                            },
+                            {  "prim": "DUP",
+                               "args": [
+                                 {  "int": "3"  }
+                               ]
+                            },
+                            {  "prim": "GET"  },
+                            {  "prim": "IF_NONE",
+                               "args": [
+                                 [  {  "prim": "PUSH",
+                                       "args": [
+                                         {  "prim": "string"  },
+                                         {  "string": "ledger"  }
+                                       ]
+                                 },
+                                 {  "prim": "PUSH",
                                     "args": [
-                                      {  "int": "6"  }
+                                      {  "prim": "string"  },
+                                      {  "string": "AssetNotFound"  }
                                     ]
-                              },
-                              {  "prim": "DROP",
-                                 "args": [
-                                   {  "int": "1"  }
-                                 ]
-                              }  ]
-                            ]
-                         },
-                         {  "prim": "DUG",
-                            "args": [
-                              {  "int": "6"  }
-                            ]
-                         }  ]
-                       ]
-                    },
-                    {  "prim": "DROP",
-                       "args": [
-                         {  "int": "4"  }
-                       ]
-                    },
-                    {  "prim": "PAIR",
-                       "args": [
-                         {  "int": "10"  }
-                       ]
-                    },
-                    {  "prim": "DIG",
-                       "args": [
-                         {  "int": "1"  }
-                       ]
-                    },
-                    {  "prim": "PAIR"  }  ]
+                                 },
+                                 {  "prim": "PAIR"  },
+                                 {  "prim": "FAILWITH"  }  ],
+                                 [    ]
+                               ]
+                            },
+                            {  "prim": "COMPARE"  },
+                            {  "prim": "EQ"  },
+                            {  "prim": "DUP",
+                               "args": [
+                                 {  "int": "7"  }
+                               ]
+                            },
+                            {  "prim": "DUP",
+                               "args": [
+                                 {  "int": "3"  }
+                               ]
+                            },
+                            {  "prim": "MEM"  },
+                            {  "prim": "AND"  },
+                            {  "prim": "IF",
+                               "args": [
+                                 [  {  "prim": "DUP",
+                                       "args": [
+                                         {  "int": "6"  }
+                                       ]
+                                 },
+                                 {  "prim": "NONE",
+                                    "args": [
+                                      {  "prim": "address"  }
+                                    ]
+                                 },
+                                 {  "prim": "DUP",
+                                    "args": [
+                                      {  "int": "3"  }
+                                    ]
+                                 },
+                                 {  "prim": "UPDATE"  },
+                                 {  "prim": "DIP",
+                                    "args": [
+                                      {  "int": "1"  },
+                                      [  {  "prim": "DIG",
+                                            "args": [
+                                              {  "int": "5"  }
+                                            ]
+                                      },
+                                      {  "prim": "DROP",
+                                         "args": [
+                                           {  "int": "1"  }
+                                         ]
+                                      }  ]
+                                    ]
+                                 },
+                                 {  "prim": "DUG",
+                                    "args": [
+                                      {  "int": "5"  }
+                                    ]
+                                 },
+                                 {  "prim": "DUP",
+                                    "args": [
+                                      {  "int": "8"  }
+                                    ]
+                                 },
+                                 {  "prim": "NONE",
+                                    "args": [
+                                      {  "prim": "pair",
+                                         "args": [
+                                           {  "prim": "nat"  },
+                                           {  "prim": "map",
+                                              "args": [
+                                                {  "prim": "string"  },
+                                                {  "prim": "bytes"  }
+                                              ]
+                                           }
+                                         ]
+                                      }
+                                    ]
+                                 },
+                                 {  "prim": "DUP",
+                                    "args": [
+                                      {  "int": "3"  }
+                                    ]
+                                 },
+                                 {  "prim": "UPDATE"  },
+                                 {  "prim": "DIP",
+                                    "args": [
+                                      {  "int": "1"  },
+                                      [  {  "prim": "DIG",
+                                            "args": [
+                                              {  "int": "7"  }
+                                            ]
+                                      },
+                                      {  "prim": "DROP",
+                                         "args": [
+                                           {  "int": "1"  }
+                                         ]
+                                      }  ]
+                                    ]
+                                 },
+                                 {  "prim": "DUG",
+                                    "args": [
+                                      {  "int": "7"  }
+                                    ]
+                                 }  ],
+                                 [  {  "prim": "PUSH",
+                                       "args": [
+                                         {  "prim": "string"  },
+                                         {  "string": "CALLER_NOT_OWNER"  }
+                                       ]
+                                 },
+                                 {  "prim": "FAILWITH"  }  ]
+                               ]
+                            },
+                            {  "prim": "DROP",
+                               "args": [
+                                 {  "int": "1"  }
+                               ]
+                            },
+                            {  "prim": "PAIR",
+                               "args": [
+                                 {  "int": "11"  }
+                               ]
+                            },
+                            {  "prim": "DIG",
+                               "args": [
+                                 {  "int": "1"  }
+                               ]
+                            },
+                            {  "prim": "PAIR"  }  ]
+                          ]
+                    }  ]
                   ]
             }  ]
           ]
@@ -6003,6 +6243,8 @@ export const nft_public_code : any =
           "args": [
             {  "int": "1"  },
             [  {  "prim": "CDR"  },
+            {  "prim": "CDR"  },
+            {  "prim": "CDR"  },
             {  "prim": "UNPAIR"  },
             {  "prim": "SWAP"  },
             {  "prim": "DROP",
@@ -6023,24 +6265,57 @@ export const nft_public_code : any =
             {  "int": "3"  }
           ]
        },
-       {  "prim": "GET"  },
-       {  "prim": "IF_NONE",
+       {  "prim": "MEM"  },
+       {  "prim": "IF",
           "args": [
-            [  {  "prim": "PUSH",
+            [  {  "prim": "DUP",
                   "args": [
-                    {  "prim": "string"  },
-                    {  "string": "royalties"  }
+                    {  "int": "3"  }
                   ]
             },
-            {  "prim": "PUSH",
+            {  "prim": "DUP",
                "args": [
-                 {  "prim": "string"  },
-                 {  "string": "AssetNotFound"  }
+                 {  "int": "3"  }
                ]
             },
-            {  "prim": "PAIR"  },
-            {  "prim": "FAILWITH"  }  ],
-            [    ]
+            {  "prim": "GET"  },
+            {  "prim": "IF_NONE",
+               "args": [
+                 [  {  "prim": "PUSH",
+                       "args": [
+                         {  "prim": "string"  },
+                         {  "string": "royalties"  }
+                       ]
+                 },
+                 {  "prim": "PUSH",
+                    "args": [
+                      {  "prim": "string"  },
+                      {  "string": "AssetNotFound"  }
+                    ]
+                 },
+                 {  "prim": "PAIR"  },
+                 {  "prim": "FAILWITH"  }  ],
+                 [    ]
+               ]
+            }  ],
+            [  {  "prim": "NIL",
+                  "args": [
+                    {  "prim": "pair",
+                       "args": [
+                         {  "prim": "address",
+                            "annots": [
+                              "%partAccount"
+                            ]
+                         },
+                         {  "prim": "nat",
+                            "annots": [
+                              "%partValue"
+                            ]
+                         }
+                       ]
+                    }
+                  ]
+            }  ]
           ]
        },
        {  "prim": "SWAP"  },
@@ -6068,10 +6343,10 @@ export function nft_public_storage(owner : string) : any {
               {  "string": owner  },
               {  "prim": "Pair",
                  "args": [
-                   [    ],
+                   {  "prim": "None"  },
                    {  "prim": "Pair",
                       "args": [
-                        [    ],
+                        {  "prim": "False"  },
                         {  "prim": "Pair",
                            "args": [
                              [    ],
@@ -6086,16 +6361,21 @@ export function nft_public_storage(owner : string) : any {
                                             [    ],
                                             {  "prim": "Pair",
                                                "args": [
-                                                 {  "int": "31556952"  },
+                                                 [    ],
                                                  {  "prim": "Pair",
                                                     "args": [
-                                                      {  "prim": "False"  },
-                                                      [  {  "prim": "Elt",
-                                                            "args": [
-                                                              {  "string": ""  },
-                                                              {  "bytes": ""  }
-                                                            ]
-                                                      }  ]
+                                                      [    ],
+                                                      {  "prim": "Pair",
+                                                         "args": [
+                                                           {  "int": "31556952"  },
+                                                           [  {  "prim": "Elt",
+                                                                 "args": [
+                                                                   {  "string": ""  },
+                                                                   {  "bytes": ""  }
+                                                                 ]
+                                                           }  ]
+                                                         ]
+                                                      }
                                                     ]
                                                  }
                                                ]
