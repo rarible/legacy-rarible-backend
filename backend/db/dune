@@ -23,3 +23,9 @@ let no_update = true")))
  (preprocessor_deps (env_var "PGDATABASE") .rarible_witness)
  (preprocess (pps pgocaml_ppx))
  (libraries db_env_rarible crawlori.pg common lwt kafka kafka_lwt))
+
+
+(executable
+ (name extract_metadata_id)
+ (modules extract_metadata_id)
+ (libraries db ez_api.icurl_lwt))
