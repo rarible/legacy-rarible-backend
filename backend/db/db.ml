@@ -581,7 +581,7 @@ let get_nft_ownership_by_id ?dbh ?(old=false) contract token_id owner =
        where main and i.contract = $contract and i.token_id = ${Z.to_string token_id} and \
        owner = $owner and (amount > 0 or $old)"] in
   match l with
-  | [] -> Lwt.return_error (`hook_error "not found")
+  | [] -> Lwt.return_error (`hook_error "ownership not found")
   | _ ->
     let>? obj = one l in
     let nft_ownership = mk_nft_ownership obj in
@@ -766,7 +766,7 @@ let get_nft_item_by_id ?dbh ?include_meta contract token_id =
   | obj :: _ ->
     let>? nft_item = mk_nft_item dbh ?include_meta obj in
     Lwt.return_ok nft_item
-  | [] -> Lwt.return_error (`hook_error "not found")
+  | [] -> Lwt.return_error (`hook_error "item not found")
 
 let mk_nft_collection_name_symbol r =
   match r#name with
@@ -816,7 +816,7 @@ let get_nft_collection_by_id ?dbh collection =
        or (ledger_key = '[ \"address\", \"nat\"]' and ledger_value = '\"nat\"') \
        or (ledger_key = '[\"nat\", \"address\"]' and ledger_value = '\"nat\"'))"] in
   match l with
-  | [] -> Lwt.return_error (`hook_error "not found")
+  | [] -> Lwt.return_error (`hook_error "collection not found")
   | obj :: _ ->
     Lwt.return @@ mk_nft_collection obj
 
@@ -871,8 +871,12 @@ let produce_nft_collection_event c =
   Lwt.return_ok ()
 
 let produce_update_collection_event dbh contract =
-  let>? c = get_nft_collection_by_id ~dbh contract in
-  produce_nft_collection_event c
+  let> c = get_nft_collection_by_id ~dbh contract in
+  match c with
+  | Ok c -> produce_nft_collection_event c
+  | Error e ->
+    Printf.eprintf "couldn't produce collection event %S\n%!" @@ Crp.string_of_error e ;
+    Lwt.return_ok ()
 
 let produce_nft_ownership_update_event os =
   if os.nft_ownership_value = Z.zero then
