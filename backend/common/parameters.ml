@@ -100,7 +100,10 @@ let parse_burn m =
 
 let parse_metadata_uri m =
   match Typed_mich.parse_value (`tuple [`string; `bytes]) m with
-  | Ok (`tuple [ `string k; `bytes h ]) -> Ok (Metadata (k, (Tzfunc.Crypto.hex_to_raw h :> string)))
+  | Ok (`tuple [ `string k; `bytes h ]) ->
+    let s = (Tzfunc.Crypto.hex_to_raw h :> string) in
+    if decode s then Ok (Metadata (k, s))
+    else unexpected_michelson
   | _ -> unexpected_michelson
 
 let parse_add_minter m =
