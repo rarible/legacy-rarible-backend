@@ -432,16 +432,14 @@ let get_order_updates ?dbh obj make maker take data =
   let hash = obj#hash in
   use dbh @@ fun dbh ->
   let>? cancel = [%pgsql.object dbh
-      "select * from order_cancel \
-       where main and (cancel = $hash) order by tsp"] in
+      "select * from order_cancel where (cancel = $hash) order by tsp"] in
   match cancel with
   | [ cancel ] ->
     Lwt.return_ok (Z.zero, Z.zero, true, cancel#tsp, Z.zero)
   | _ ->
     let>? matches = [%pgsql.object dbh
         "select * from order_match \
-         where main and \
-         (hash_left = $hash or hash_right = $hash) order by tsp"] in
+         where (hash_left = $hash or hash_right = $hash) order by tsp"] in
     let fill = get_fill hash matches in
     let|>? make_balance = get_make_balance ~dbh make maker in
     let cancelled = false in
