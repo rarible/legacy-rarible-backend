@@ -729,8 +729,6 @@ let mk_nft_item dbh ?include_meta obj =
   let creators = List.filter_map (function
       | None -> None
       | Some json -> Some (EzEncoding.destruct part_enc json)) obj#creators in
-  get_nft_item_owners dbh ~contract ~token_id >>=? fun owners ->
-  (* get_nft_item_royalties  >>=? fun royalties -> *)
   let>? meta = match include_meta with
     | Some true -> mk_nft_item_meta dbh ~contract ~token_id
     | _ -> Lwt.return_ok None in
@@ -741,7 +739,7 @@ let mk_nft_item dbh ?include_meta obj =
     nft_item_creators = creators ;
     nft_item_supply = obj#supply ;
     nft_item_lazy_supply = Z.zero ;
-    nft_item_owners = owners ;
+    nft_item_owners = List.filter_map (fun x -> x) @@ Option.value ~default:[] obj#owners ;
     nft_item_royalties = EzEncoding.destruct Json_encoding.(list part_enc) obj#royalties ;
     nft_item_date = obj#last ;
     nft_item_minted_at = obj#tsp ;
@@ -756,10 +754,12 @@ let get_nft_item_by_id ?dbh ?include_meta contract token_id =
     (match include_meta with None -> "None" | Some s -> string_of_bool s) ;
   use dbh @@ fun dbh ->
   let>? l = [%pgsql.object dbh
-      "select concat(contract, ':', token_id::varchar) as id, contract, token_id, \
-       last, supply, metadata, tsp, creators, royalties \
-       from token_info where \
-       main and contract = $contract and token_id = ${Z.to_string token_id}"] in
+      "select concat(i.contract, ':', i.token_id::varchar) as id, i.contract, i.token_id, \
+       last, supply, metadata, tsp, creators, royalties, array_agg(owner) as owners \
+       from tokens t \
+       inner join token_info i on i.contract = t.contract and i.token_id = t.token_id \
+       where main and i.contract = $contract and i.token_id = ${Z.to_string token_id} \
+       group by (i.contract, i.token_id)"] in
   match l with
   | obj :: _ ->
     let>? nft_item = mk_nft_item dbh ?include_meta obj in
@@ -2558,7 +2558,8 @@ let get_nft_items_by_owner ?dbh ?include_meta ?continuation ?(size=50) owner =
   let>? l = [%pgsql.object dbh
       "select concat(i.contract, ':', i.token_id) as id, \
        i.contract, i.token_id, \
-       last, amount, supply, metadata, tsp, creators, royalties from tokens t \
+       last, supply, metadata, tsp, creators, royalties, \
+       array_agg(owner) as owners from tokens t \
        inner join token_info i on i.contract = t.contract and i.token_id = t.token_id \
        where \
        main and metadata <> '{}' and owner = $owner and amount > 0 and \
@@ -2566,6 +2567,7 @@ let get_nft_items_by_owner ?dbh ?include_meta ?continuation ?(size=50) owner =
        (last = $ts and \
        concat(i.contract, ':', i.token_id) collate \"C\" < $id) or \
        (last < $ts)) \
+       group by (i.contract, i.token_id) \
        order by last desc, \
        concat(i.contract, ':', i.token_id) collate \"C\" desc \
        limit $size64"] in
@@ -2600,22 +2602,24 @@ let get_nft_items_by_creator ?dbh ?include_meta ?continuation ?(size=50) creator
     continuation = None,
     (match continuation with None -> CalendarLib.Calendar.now (), "" | Some (ts, h) -> (ts, h)) in
   let>? l = [%pgsql.object dbh
-      "select concat(t.contract, ':', t.token_id) as id, \
-       t.contract, t.token_id, \
-       last, amount, supply, metadata, i.tsp, creators, royalties \
+      "select concat(i.contract, ':', i.token_id) as id, \
+       i.contract, i.token_id, \
+       last, supply, metadata, i.tsp, creators, royalties, \
+       array_agg(owner) as owners \
        from tokens as t, token_info i, unnest(i.creators) as c \
        where c->>'account' = $creator and \
        t.contract = i.contract and t.token_id = i.token_id and \
        i.main and metadata <> '{}' and amount > 0 and \
        ($no_continuation or \
        (last = $ts and \
-       concat(t.contract, ':', t.token_id) collate \"C\" < $id) or \
+       concat(i.contract, ':', i.token_id) collate \"C\" < $id) or \
        (last < $ts)) \
+       group by (i.contract, i.token_id) \
        order by last desc, \
-       concat(t.contract, ':', t.token_id) collate \"C\" desc \
+       concat(i.contract, ':', i.token_id) collate \"C\" desc \
        limit $size64"] in
   let>? nft_items_total = [%pgsql dbh
-      "select count(distinct (t.token_id, t.contract, t,owner)) from tokens as t, \
+      "select count(distinct (t.token_id, t.contract, t.owner)) from tokens as t, \
        token_info i, unnest(creators) as c \
        where c->>'account' = $creator and i.contract = t.contract and i.token_id = t.token_id and \
        i.main and metadata <> '{}' and amount > 0"] in
@@ -2648,13 +2652,15 @@ let get_nft_items_by_collection ?dbh ?include_meta ?continuation ?(size=50) cont
   let>? l = [%pgsql.object dbh
       "select concat(i.contract, ':', i.token_id) as id, \
        i.contract, i.token_id, \
-       last, supply, metadata, tsp, creators, royalties \
-       from token_info i where \
-       main and metadata <> '{}' and i.contract = $contract and \
+       last, supply, metadata, tsp, creators, royalties, \
+       array_agg(owner) as owners \
+       from tokens t inner join token_info i on i.contract = t.contract and i.token_id = t.token_id where \
+       main and metadata <> '{}' and i.contract = $contract and amount > 0 and \
        ($no_continuation or \
        (last = $ts and \
        concat(i.contract, ':', i.token_id) collate \"C\" < $id) or \
        (last < $ts)) \
+       group by (i.contract, i.token_id) \
        order by last desc, \
        concat(i.contract, ':', i.token_id) collate \"C\" desc \
        limit $size64"] in
@@ -2716,9 +2722,9 @@ let get_nft_all_items
     show_deleted = None,
     (match show_deleted with None -> false | Some b -> b) in
   let>? l = [%pgsql.object dbh
-      "select concat(i.contract, ':', i.token_id) as id, \
+      "select concat(i.contract, ':', i.token_id) id, \
        i.contract, i.token_id, \
-       last, amount, supply, metadata, tsp, creators, royalties \
+       last, supply, metadata, tsp, creators, royalties, array_agg(owner) as owners \
        from tokens t inner join token_info i on i.contract = t.contract and i.token_id = t.token_id \
        where main and metadata <> '{}' and \
        (amount > 0 or (not $no_show_deleted and $show_deleted_v)) and \
@@ -2728,6 +2734,7 @@ let get_nft_all_items
        (last = $ts and \
        concat(i.contract, ':', i.token_id) collate \"C\" < $id) or \
        (last < $ts)) \
+       group by (i.contract, i.token_id) \
        order by last desc, \
        concat(i.contract, ':', i.token_id) collate \"C\" \
        desc limit $size64"] in
