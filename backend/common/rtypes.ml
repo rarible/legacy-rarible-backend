@@ -1002,15 +1002,15 @@ type format_dimensions = {
 } [@@deriving encoding]
 
 type tzip21_format = {
-  format_uri : string ;
-  format_hash : string option ; [@dft None]
+  format_uri : string ; [@dft "no_format_uri"]
+  format_hash : string option ;
   format_mime_type : string option ;
   format_file_size : int option ;
   format_file_name : string option ;
   format_duration : string option ;
   format_dimensions : format_dimensions option ;
   format_data_rate : format_dimensions option ;
-} [@@deriving encoding {camel}]
+} [@@deriving encoding {camel ; option="option"}]
 
 type tzip21_formats = tzip21_format list [@@deriving encoding]
 
@@ -1029,9 +1029,9 @@ let type_or_display_type_enc =
        (opt "display_type" string))
 
 type tzip21_attribute = {
-  attribute_name : string ; [@encoding name_or_trait_type_enc] [@merge]
+  attribute_name : string ; [@encoding name_or_trait_type_enc] [@merge] [@dft "no_attribute_name"]
   attribute_type : string option ; [@encoding type_or_display_type_enc] [@merge]
-  attribute_value : Json_repr.ezjsonm ;
+  attribute_value : Json_repr.ezjsonm ; [@dft `O []]
 } [@@deriving encoding]
 
 type tzip21_attributes = tzip21_attribute list [@@deriving encoding]
@@ -1048,7 +1048,7 @@ type tzip21_token_metadata = {
   tzip21_tm_symbol : string option ;
   tzip21_tm_decimals : int option ;
   tzip21_tm_artifact_uri : string option ;
-  tzip21_tm_display_uri : string option ; [@dft None]
+  tzip21_tm_display_uri : string option ;
   tzip21_tm_thumbnail_uri : string option ;
   tzip21_tm_description : string option ;
   tzip21_tm_minter : string option ;
@@ -1067,7 +1067,7 @@ type tzip21_token_metadata = {
   tzip21_tm_right_uri : string option ;
   tzip21_tm_is_transferable : bool option ;
   tzip21_tm_should_prefer_symbol : bool option ;
-} [@@deriving encoding {camel}]
+} [@@deriving encoding {camel; option="option"}]
 
 type currency_order_type =
   | COTSELL
