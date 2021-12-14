@@ -2074,12 +2074,12 @@ let filter_contracts op ori =
   | _ -> None
 
 let insert_origination config dbh op ori =
-  match filter_contracts op ori with
-  | None ->
+  match filter_contracts op ori, op.bo_meta with
+  | None, _ | _, None ->
     Lwt.return_ok ()
-  | Some k ->
+  | Some k, Some meta ->
     let kt1 = Tzfunc.Crypto.op_to_KT1 op.bo_hash in
-    let kind, owner, ledger_id, meta_id, ledger_key, ledger_value, contract_value, uri = match k with
+    let kind, owner, ledger_id, meta_id, ledger_key, ledger_value, nft, uri = match k with
       | `rarible (id, k, v, meta, owner) ->
         "rarible", Some owner, id, meta,
         EzEncoding.construct micheline_type_short_enc k,
@@ -2099,8 +2099,8 @@ let insert_origination config dbh op ori =
         {nft_ledger_id=id; nft_ledger_type={ledger_key=k; ledger_value=v}; nft_meta_id=meta},
         None in
     Format.printf "\027[0;93morigination %s (%s, %s)\027[0m@."
-      (Utils.short kt1) kind (EzEncoding.construct nft_ledger_enc contract_value);
-    let|>? () = [%pgsql dbh
+      (Utils.short kt1) kind (EzEncoding.construct nft_ledger_enc nft);
+    let>? () = [%pgsql dbh
         "insert into contracts(kind, address, owner, block, level, tsp, \
          last_block, last_level, last, ledger_id, ledger_key, ledger_value, \
          uri_pattern, metadata_id) \
@@ -2109,10 +2109,21 @@ let insert_origination config dbh op ori =
          $ledger_key, $ledger_value, $?uri, $?{Option.map Z.to_string meta_id}) \
          on conflict do nothing"] in
     let open Crawlori.Config in
-    config.extra.contracts <- SMap.add kt1 contract_value config.extra.contracts;
-    match config.accounts with
-    | None -> config.accounts <- Some (SSet.singleton kt1);
-    | Some accs -> config.accounts <- Some (SSet.add kt1 accs)
+    config.extra.contracts <- SMap.add kt1 nft config.extra.contracts;
+    let () = match config.accounts with
+      | None -> config.accounts <- Some (SSet.singleton kt1)
+      | Some accs -> config.accounts <- Some (SSet.add kt1 accs) in
+    let balances = Storage_diff.get_big_map_updates ~id:nft.nft_ledger_id
+        nft.nft_ledger_type.ledger_key nft.nft_ledger_type.ledger_value
+        meta.op_lazy_storage_diff in
+    let>? () = insert_token_balances ~dbh ~op ~contract:kt1 balances in
+    let meta_k, meta_v = Contract_spec.token_metadata_field in
+    match nft.nft_meta_id with
+    | None -> Lwt.return_ok ()
+    | Some id ->
+      let metadata = Storage_diff.get_big_map_updates ~id meta_k meta_v
+          meta.op_lazy_storage_diff in
+      insert_metadatas ~dbh ~op ~contract:kt1 metadata
 
 let insert_operation config dbh op =
   let open Hooks in
