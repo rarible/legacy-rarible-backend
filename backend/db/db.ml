@@ -2722,7 +2722,7 @@ let get_nft_all_items
        last, amount, supply, metadata, tsp, creators, royalties \
        from tokens t inner join token_info i on i.contract = t.contract and i.token_id = t.token_id \
        where main and metadata <> '{}' and \
-       (supply > 0 and amount > 0 or (not $no_show_deleted and $show_deleted_v)) and \
+       (amount > 0 or (not $no_show_deleted and $show_deleted_v)) and \
        ($no_last_updated_to or (last <= $last_updated_to_v)) and \
        ($no_last_updated_from or (last >= $last_updated_from_v)) and \
        ($no_continuation or \
@@ -2736,7 +2736,7 @@ let get_nft_all_items
       "select count(distinct (owner, i.contract, i.token_id)) from tokens t \
        inner join token_info i on i.contract = t.contract and i.token_id = t.token_id \
        where main and metadata <> '{}' and \
-       (supply > 0 and amount > 0 or (not $no_show_deleted and $show_deleted_v)) and \
+       (amount > 0 or (not $no_show_deleted and $show_deleted_v)) and \
        ($no_last_updated_to or (last <= $last_updated_to_v)) and \
        ($no_last_updated_from or (last >= $last_updated_from_v))"] in
   let>? nft_items_total = match nft_items_total with
