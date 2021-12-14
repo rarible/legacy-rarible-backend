@@ -1001,11 +1001,19 @@ type format_dimensions = {
   format_dim_unit : string ;
 } [@@deriving encoding]
 
+let int_or_string_enc = Json_encoding.(union [
+    case int (fun i -> Some i ) (fun i -> i) ;
+    case string
+      (fun i -> Some (string_of_int i))
+      (fun s ->
+         match int_of_string_opt s with None -> failwith ("can't cast to int " ^ s) | Some i -> i) ;
+  ])
+
 type tzip21_format = {
   format_uri : string ; [@dft "no_format_uri"]
   format_hash : string option ;
   format_mime_type : string option ;
-  format_file_size : int option ;
+  format_file_size : int option ;  [@encoding int_or_string_enc]
   format_file_name : string option ;
   format_duration : string option ;
   format_dimensions : format_dimensions option ;
