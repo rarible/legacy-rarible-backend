@@ -2141,7 +2141,7 @@ let check_collection co =
   begin
     if c.nft_collection_id = kt1 &&
        c.nft_collection_owner = Some owner then
-      Printf.eprintf "[Ok] API: get_nft_collection_by_id %s\n%!" alias
+      Printf.eprintf "[OK] API: get_nft_collection_by_id %s\n%!" alias
     else
       Printf.eprintf "[KO] API: get_nft_collection_by_id %s (no matching collection)\n%!" alias
   end ;
