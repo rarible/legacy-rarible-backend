@@ -1013,7 +1013,7 @@ type tzip21_format = {
   format_uri : string ; [@dft "no_format_uri"]
   format_hash : string option ;
   format_mime_type : string option ;
-  format_file_size : int option ;  [@encoding int_or_string_enc]
+  format_file_size : (int [@encoding int_or_string_enc]) option ;
   format_file_name : string option ;
   format_duration : string option ;
   format_dimensions : format_dimensions option ;
