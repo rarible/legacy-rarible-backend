@@ -1513,8 +1513,7 @@ let reset_nft_item_meta_by_id ?dbh contract token_id =
   use dbh @@ fun dbh ->
   let>? l = [%pgsql dbh
       "select last_block, last_level, last, metadata_uri from token_info where \
-       main and contract = $contract and token_id = ${Z.to_string token_id} and metadata_uri is not null \
-       ORDER BY block desc LIMIT 1"] in
+       main and contract = $contract and token_id = ${Z.to_string token_id} and metadata_uri is not null"] in
   match l with
   | [] | [ _, _, _, None ] -> Lwt.return_ok ()
   | [ block, level, tsp, Some uri ] ->
@@ -2356,9 +2355,9 @@ let token_metadata_updates ~dbh ~main ~contract ~block ~level ~tsp ~token_id ~tr
   let>? meta, uri = insert_token_metadata ~dbh ~block ~level ~tsp ~contract (token_id, meta) in
   [%pgsql dbh
       "insert into token_info(contract, token_id, block, level, tsp, \
-       last_block, last_level, last, transaction, metadata, metadata_uri) \
+       last_block, last_level, last, transaction, metadata, metadata_uri, main) \
        values($contract, ${Z.to_string token_id}, $block, $level, $tsp, \
-       $block, $level, $tsp, $transaction, $meta, $?uri) \
+       $block, $level, $tsp, $transaction, $meta, $?uri, true) \
        on conflict (contract, token_id) do update \
        set metadata = $meta, metadata_uri = $?uri, \
        last_block = case when $main then $block else token_info.last_block end, \
@@ -4514,3 +4513,37 @@ let get_unknown_metadata_id ?dbh () =
 let set_metadata_id ?dbh ~contract id =
   use dbh @@ fun dbh ->
   [%pgsql dbh "update contracts set metadata_id = ${Z.to_string id} where address = $contract"]
+
+let update_unknown_metadata ?dbh () =
+  use dbh @@ fun dbh ->
+  let>? l = [%pgsql.object dbh
+      "select contract, token_id, block, level, tsp, metadata_uri \
+       from token_info where \
+       main and metadata is null and metadata_uri is not null"] in
+  iter_rp (fun r ->
+      match r#metadata_uri with
+      | None -> Lwt.return_ok ()
+      | Some uri ->
+        let> re = get_metadata_json uri in
+        match re with
+        | Ok (_json, metadata, _uri) ->
+          let block, level, tsp, contract, token_id =
+            r#block, r#level, r#tsp, r#contract, Z.of_string r#token_id in
+          let>? () =
+            insert_mint_metadata dbh ~contract ~token_id ~block ~level ~tsp ~metadata in
+          let>? () =
+            [%pgsql dbh
+                "update tzip21_metadata set main = true where block = $block"] in
+          let>? () =
+            [%pgsql dbh
+                "update tzip21_formats set main = true where block = $block"] in
+          let>? () =
+            [%pgsql dbh
+                "update tzip21_attributes set main = true where block = $block"] in
+          [%pgsql dbh
+              "update tzip21_creators set main = true where block = $block"]
+        | Error (code, str) ->
+          Lwt.return_error
+            (`hook_error
+               (Printf.sprintf "fetch metadata error %d:%s" code @@
+                Option.value ~default:"None" str))) l
