@@ -235,7 +235,7 @@ export default new Vue({
       status: 'info',
       result: '',
       get_result: '',
-      fields: [ 'make_class', 'make_contract', 'make_token_id', 'make_value', 'take_class', 'take_contract', 'take_token_id', 'take_value' ],
+      fields: [ 'hash', 'make_class', 'make_contract', 'make_token_id', 'make_value', 'take_class', 'take_contract', 'take_token_id', 'take_value' ],
       payouts: '',
       origin_fees: ''
     },

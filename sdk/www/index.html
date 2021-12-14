@@ -324,6 +324,9 @@
 
           <b-tab title="Fill" @click="get_orders()">
             <b-table selectable :fields="fill.fields" :items="fill.orders" select-mode="single" class="mt-4" @row-selected="onselected" ref="orders_table">
+              <template #cell(hash)="data">
+                {{ data.item.hash.substring(0,10) }}
+              </template>
               <template #cell(make_class)="data">
                 {{ data.item.make.asset_type.asset_class }}
               </template>

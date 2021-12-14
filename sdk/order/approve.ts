@@ -14,7 +14,7 @@ async function get_big_map_value(provider: Provider, id: string, value: Michelso
   try {
     const rpc = provider.tezos.tk.rpc
     let expr = key_expr(value, type)
-    return rpc.getBigMapExpr(id, expr)
+    return await rpc.getBigMapExpr(id, expr)
   } catch {
     return undefined
   }
