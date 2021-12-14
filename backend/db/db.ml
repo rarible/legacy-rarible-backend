@@ -2648,9 +2648,9 @@ let get_nft_items_by_collection ?dbh ?include_meta ?continuation ?(size=50) cont
   let>? l = [%pgsql.object dbh
       "select concat(i.contract, ':', i.token_id) as id, \
        i.contract, i.token_id, \
-       last, amount, supply, metadata, tsp, creators, royalties \
-       from tokens t inner join token_info i on i.contract = t.contract and i.token_id = t.token_id where \
-       main and metadata <> '{}' and i.contract = $contract and amount > 0 and \
+       last, supply, metadata, tsp, creators, royalties \
+       from token_info i where \
+       main and metadata <> '{}' and i.contract = $contract and \
        ($no_continuation or \
        (last = $ts and \
        concat(i.contract, ':', i.token_id) collate \"C\" < $id) or \
@@ -2659,9 +2659,8 @@ let get_nft_items_by_collection ?dbh ?include_meta ?continuation ?(size=50) cont
        concat(i.contract, ':', i.token_id) collate \"C\" desc \
        limit $size64"] in
   let>? nft_items_total = [%pgsql dbh
-      "select count(distinct (i.token_id, owner)) from tokens t \
-       inner join token_info i on i.contract = t.contract and i.token_id = t.token_id \
-       where main and metadata <> '{}' and i.contract = $contract and amount > 0"] in
+      "select count(distinct (i.token_id)) from token_info i \
+       where main and metadata <> '{}' and i.contract = $contract"] in
   let>? nft_items_total = match nft_items_total with
     | [ None ] -> Lwt.return_ok 0L
     | [ Some i64 ] -> Lwt.return_ok i64
