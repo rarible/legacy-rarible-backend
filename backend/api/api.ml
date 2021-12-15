@@ -514,7 +514,7 @@ let get_nft_ownership_by_id (_, ownership_id) () =
   | Error err -> return @@ Error err
   | Ok (contract, token_id, owner) ->
     Db.get_nft_ownership_by_id contract token_id owner >>= function
-    | Error (`hook_error "not found") ->
+    | Error (`hook_error "ownership not found") ->
       return (Error {code=`OWNERSHIP_NOT_FOUND; message=ownership_id})
     | Error db_err ->
       let message = Crawlori.Rp.string_of_error db_err in
@@ -614,7 +614,7 @@ let get_nft_item_by_id (req, item_id) () =
     | Error err -> return @@ Error err
     | Ok include_meta ->
       Db.get_nft_item_by_id ?include_meta contract token_id >>= function
-      | Error (`hook_error "not found") ->
+      | Error (`hook_error "item not found") ->
         return (Error {code=`ITEM_NOT_FOUND; message=item_id})
       | Error db_err ->
         let message = Crawlori.Rp.string_of_error db_err in
@@ -768,7 +768,7 @@ let get_nft_collection_by_id (_req, collection) () =
   | Error err -> return @@ Error err
   | Ok collection ->
     Db.get_nft_collection_by_id collection >>= function
-    | Error (`hook_error "not found") ->
+    | Error (`hook_error "collection not found") ->
       return (Error {code=`COLLECTION_NOT_FOUND; message=collection})
     | Error db_err ->
       let message = Crawlori.Rp.string_of_error db_err in
