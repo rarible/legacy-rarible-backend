@@ -1,4 +1,4 @@
-import { Provider, OperationResult } from "../common/base"
+import { Provider, OperationResult, to_hex } from "../common/base"
 
 export const mt_private_code : any =
   [  {  "prim": "storage",
@@ -7647,7 +7647,8 @@ export const mt_private_code : any =
      ]
   }  ]
 
-export function mt_private_storage(owner : string) : any {
+export function mt_private_storage(owner : string, metadata_uri?: string) : any {
+  const bytes = (metadata_uri) ? to_hex(metadata_uri) : ""
   return {  "prim": "Pair",
             "args": [
               {  "string": owner  },
@@ -7685,7 +7686,7 @@ export function mt_private_storage(owner : string) : any {
                                                                 "prim": "Elt",
                                                                 "args": [
                                                                   {  "string": ""  },
-                                                                  {  "bytes": ""  }
+                                                                  {  "bytes": bytes  }
                                                                 ]
                                                                 }  ]
                                                               ]
@@ -7715,7 +7716,8 @@ export function mt_private_storage(owner : string) : any {
 export async function deploy_mt_private(
   provider : Provider,
   owner: string,
+  metadata_uri?: string
 ) : Promise<OperationResult> {
-  const init = mt_private_storage(owner)
+  const init = mt_private_storage(owner, metadata_uri)
   return provider.tezos.originate({init, code: mt_private_code})
 }
