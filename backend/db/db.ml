@@ -1053,7 +1053,7 @@ let get_metadata_json meta =
               "ipns/", String.sub url 5 ((String.length meta) - 5)
             else "ipfs/", url
           with _ -> "", url in
-        let uri = Printf.sprintf "https://rarible.mypinata.coud/%s%s" fs url in
+        let uri = Printf.sprintf "https://rarible.mypinata.cloud/%s%s" fs url in
         let|>? json = get_or_timeout ~msg:"get_metadata_json" (EzAPI.URL uri) in
         json, uri
       else Lwt.return_error (0, Some (Printf.sprintf "unknow scheme %s"proto))
