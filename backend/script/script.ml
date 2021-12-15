@@ -60,16 +60,16 @@ let command_result ?(f=(fun l -> String.concat " " @@ List.map String.trim l)) c
   | _ -> failwith (Format.sprintf "Error processing %S" cmd)
 
 let storage_public_nft ?(expiry=31536000000L) admin =
-  Format.sprintf {|{ %S; {}; {}; {}; {}; {}; {}; %Ld; False; {Elt "" 0x} }|} admin expiry
+  Format.sprintf {|{ %S; None; False; {}; {}; {}; {}; {}; {}; %Ld; {Elt "" 0x} }|} admin expiry
 
 let storage_private_nft ?(expiry=31536000000L) admin =
-  Format.sprintf {|{ %S; {}; {}; {}; {}; {}; {}; %Ld; {}; False; {Elt "" 0x} }|} admin expiry
+  Format.sprintf {|{ %S; None; False; {}; {}; {}; {}; {}; {}; {}; %Ld; {Elt "" 0x} }|} admin expiry
 
 let storage_public_multi ?(expiry=31536000000L) admin =
-  Format.sprintf {|{ %S; {}; {}; {}; {}; {}; {}; %Ld; False; {Elt "" 0x} }|} admin expiry
+  Format.sprintf {|{ %S; None; False; {}; {}; {}; {}; {}; {}; %Ld; {Elt "" 0x} }|} admin expiry
 
 let storage_private_multi ?(expiry=31536000000L) admin =
-  Format.sprintf {|{ %S; {}; {}; {}; {}; {}; {}; {}; %Ld; False; {Elt "" 0x} }|} admin expiry
+  Format.sprintf {|{ %S; None; False; {}; {}; {}; {}; {}; {}; {}; %Ld; {Elt "" 0x} }|} admin expiry
 
 let storage_ubi admin =
   Format.sprintf "Pair %S (Some %S) None False {} {} {} {} {}" admin admin
