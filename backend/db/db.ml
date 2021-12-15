@@ -229,13 +229,13 @@ let mk_order_activity_bid ~dbh obj =
     order_activity_bid_price = price ;
   }, (obj#make_asset_decimals, obj#take_asset_decimals)
 
-let mk_left_side obj =
+let mk_left_side obj value =
   let|$ asset =
     mk_asset
       obj#oleft_make_asset_type_class
       obj#oleft_make_asset_type_contract
       (Option.map Z.of_string obj#oleft_make_asset_type_token_id)
-      obj#oleft_make_asset_value in
+      value in
   {
     order_activity_match_side_maker = obj#oleft_maker ;
     order_activity_match_side_hash = obj#oleft_hash ;
@@ -243,12 +243,12 @@ let mk_left_side obj =
     order_activity_match_side_type = mk_side_type asset ;
   }, obj#oleft_make_asset_decimals
 
-let mk_right_side obj =
+let mk_right_side obj value =
   let|$ asset = mk_asset
       obj#oright_make_asset_type_class
       obj#oright_make_asset_type_contract
       (Option.map Z.of_string obj#oright_make_asset_type_token_id)
-      obj#oright_make_asset_value in
+      value in
   {
     order_activity_match_side_maker = obj#oright_maker ;
     order_activity_match_side_hash = obj#oright_hash ;
@@ -256,10 +256,26 @@ let mk_right_side obj =
     order_activity_match_side_type = mk_side_type asset ;
   }, obj#oright_make_asset_decimals
 
-let mk_order_activity_match obj =
-  let$ left, left_decimals = mk_left_side obj in
-  let$ right, right_decimals = mk_right_side obj in
-  let|$ price = nft_price
+let mk_order_activity_match ~dbh obj =
+  let|> r =
+    [%pgsql.object dbh
+        "select fill_make_value, fill_take_value \
+         from order_match where transaction = $?{obj#transaction}"] in
+  let left_value, right_value = match r with
+    | Ok [ r ] ->
+      if r#fill_make_value = obj#oleft_make_asset_value ||
+         r#fill_take_value = obj#oright_make_asset_value then
+        r#fill_make_value, r#fill_take_value
+      else
+      if r#fill_make_value = obj#oright_make_asset_value || r#fill_take_value = obj#oleft_make_asset_value then
+        r#fill_take_value, r#fill_make_value
+      else obj#oleft_make_asset_value, obj#oright_make_asset_value
+    | _ -> obj#oleft_make_asset_value, obj#oright_make_asset_value
+  in
+  let$ left, left_decimals = mk_left_side obj left_value in
+  let$ right, right_decimals = mk_right_side obj right_value in
+  let|$ price =
+    nft_price
       left.order_activity_match_side_asset
       right.order_activity_match_side_asset in
   OrderActivityMatch
@@ -342,7 +358,9 @@ let mk_order_activity ~dbh obj =
     | "bid" ->
       let>? act, decs = mk_order_activity_bid ~dbh obj in
       Lwt.return_ok (OrderActivityBid act, decs)
-    | "match" -> Lwt.return @@ mk_order_activity_match obj
+    | "match" ->
+      let>? act, decs = mk_order_activity_match ~dbh obj in
+      Lwt.return_ok (act, decs)
     | "cancel_l" -> Lwt.return @@ mk_order_activity_cancel_list obj
     | "cancel_b" -> Lwt.return @@ mk_order_activity_cancel_bid obj
     | _ as t -> Lwt.return_error (`hook_error ("unknown order activity type " ^ t)) in
