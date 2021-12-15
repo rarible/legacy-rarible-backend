@@ -17,6 +17,8 @@ copy: build openapi
 	@cp -f _build/default/backend/script/api_script.exe _bin/tester
 	@cp -f _build/default/backend/crawler/recrawl_single.exe _bin/recrawl
 	@cp -f _build/default/backend/db/update.exe _bin/update_db
+	@cp -f _build/default/backend/db/extract_metadata_id.exe _bin/extract_metadata_id
+	@cp -f _build/default/backend/crawler/metadata_daemon.exe _bin/metadata_daemon
 
 clean:
 	@dune clean
