@@ -2901,7 +2901,8 @@ let get_nft_activities_by_user ?dbh ?(sort=LATEST_FIRST) ?continuation ?(size=50
           "select activity_type, transaction, index, block, level, date, contract, \
            token_id, owner, amount, tr_from from nft_activities where \
            main and \
-           (position(owner in $users) > 0 or position(tr_from in $users) > 0) and \
+           (position(owner in $users) > 0 or \
+           (tr_from is not null and position(tr_from in $users) > 0)) and \
            position(activity_type in $types) > 0 and \
            ($no_continuation or \
            (date = $ts and transaction collate \"C\" < $h) or \
@@ -2914,7 +2915,8 @@ let get_nft_activities_by_user ?dbh ?(sort=LATEST_FIRST) ?continuation ?(size=50
           "select activity_type, transaction, index, block, level, date, contract, \
            token_id, owner, amount, tr_from from nft_activities where \
            main and \
-           (position(owner in $users) > 0 or position(tr_from in $users) > 0) and \
+           (position(owner in $users) > 0 or \
+           (tr_from is not null and position(tr_from in $users) > 0)) and \
            position(activity_type in $types) > 0 and \
            ($no_continuation or \
            (date = $ts and transaction collate \"C\" > $h) or \
