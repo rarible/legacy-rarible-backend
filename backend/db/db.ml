@@ -773,7 +773,8 @@ let get_nft_item_by_id ?dbh ?include_meta contract token_id =
   use dbh @@ fun dbh ->
   let>? l = [%pgsql.object dbh
       "select concat(i.contract, ':', i.token_id::varchar) as id, i.contract, i.token_id, \
-       last, supply, metadata, tsp, creators, royalties, array_agg(owner) as owners \
+       last, supply, metadata, tsp, creators, royalties, \
+       array_agg(case when amount <> 0 then owner end) as owners \
        from tokens t \
        inner join token_info i on i.contract = t.contract and i.token_id = t.token_id \
        where main and i.contract = $contract and i.token_id = ${Z.to_string token_id} \
@@ -2585,7 +2586,7 @@ let get_nft_items_by_owner ?dbh ?include_meta ?continuation ?(size=50) owner =
       "select concat(i.contract, ':', i.token_id) as id, \
        i.contract, i.token_id, \
        last, supply, metadata, tsp, creators, royalties, \
-       array_agg(owner) as owners from tokens t \
+       array_agg(case when amount <> 0 then owner end) as owners from tokens t \
        inner join token_info i on i.contract = t.contract and i.token_id = t.token_id \
        where \
        main and metadata <> '{}' and owner = $owner and amount > 0 and \
@@ -2631,7 +2632,7 @@ let get_nft_items_by_creator ?dbh ?include_meta ?continuation ?(size=50) creator
       "select concat(i.contract, ':', i.token_id) as id, \
        i.contract, i.token_id, \
        last, supply, metadata, i.tsp, creators, royalties, \
-       array_agg(owner) as owners \
+       array_agg(case when amount <> 0 then owner end) as owners \
        from tokens as t, token_info i, unnest(i.creators) as c \
        where c->>'account' = $creator and \
        t.contract = i.contract and t.token_id = i.token_id and \
@@ -2679,7 +2680,7 @@ let get_nft_items_by_collection ?dbh ?include_meta ?continuation ?(size=50) cont
       "select concat(i.contract, ':', i.token_id) as id, \
        i.contract, i.token_id, \
        last, supply, metadata, tsp, creators, royalties, \
-       array_agg(owner) as owners \
+       array_agg(case when amount <> 0 then owner end) as owners \
        from tokens t inner join token_info i on i.contract = t.contract and i.token_id = t.token_id where \
        main and metadata <> '{}' and i.contract = $contract and amount > 0 and \
        ($no_continuation or \
@@ -2750,7 +2751,8 @@ let get_nft_all_items
   let>? l = [%pgsql.object dbh
       "select concat(i.contract, ':', i.token_id) id, \
        i.contract, i.token_id, \
-       last, supply, metadata, tsp, creators, royalties, array_agg(owner) as owners \
+       last, supply, metadata, tsp, creators, royalties, \
+       array_agg(case when amount <> 0 then owner end) as owners \
        from tokens t inner join token_info i on i.contract = t.contract and i.token_id = t.token_id \
        where main and metadata <> '{}' and \
        (amount > 0 or (not $no_show_deleted and $show_deleted_v)) and \
