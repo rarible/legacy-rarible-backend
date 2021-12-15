@@ -2426,9 +2426,10 @@ let token_balance_updates dbh main l =
       let>? l = fold_rp (fun acc (account, balance, other) ->
           let>? l = match account with
             | Some account ->
+              let amount = Option.value ~default:Z.zero balance in
               let>? l = [%pgsql dbh
                   "insert into tokens(contract, token_id, owner, amount, balance) \
-                   values(${r#contract}, ${r#token_id}, $account, 0, $?balance) \
+                   values(${r#contract}, ${r#token_id}, $account, $amount, $?balance) \
                    on conflict (contract, token_id, owner) \
                    do update set balance = $?balance where tokens.contract = ${r#contract} \
                    and tokens.token_id = ${r#token_id} and tokens.owner = $account \
