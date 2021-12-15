@@ -835,6 +835,16 @@ let search_nft_all_collections req () =
 
 (* order-controller *)
 
+let verify ~pk58 ~sig58 ~bytes =
+  let open Tzfunc.Crypto in
+  Result.bind (Pk.b58dec pk58) @@ fun pk ->
+  Result.bind (Signature.b58dec sig58) @@ fun signature ->
+  match Curve.from_b58 pk58, Curve.from_b58 sig58 with
+  | Ok `ed25519, Ok `ed25519 -> Ed25519.verify_bytes ~pk ~signature ~bytes
+  | Ok `secp256k1, Ok `secp256k1 -> Secp256k1.verify_bytes ~pk ~signature ~bytes
+  | Error e, _ | _, Error e -> Error e
+  | _ -> Error `unmatched_curve
+
 let validate_signature order =
   let order_elt = order.order_elt in
   let data_type, payouts, origin_fees =
@@ -849,7 +859,7 @@ let validate_signature order =
       data_type payouts origin_fees in
   let edsig = order_elt.order_elt_signature in
   let edpk = order_elt.order_elt_maker_edpk in
-  match Tzfunc.Crypto.Ed25519.verify ~edpk ~edsig ~bytes:msg with
+  match verify ~pk58:edpk ~sig58:edsig ~bytes:msg with
   | Ok true -> Ok ()
   | _ -> Error {code=`INCORRECT_SIGNATURE; message=order_elt.order_elt_hash}
 
@@ -1334,16 +1344,6 @@ let get_order_activities req input =
    output=order_activities_enc A.big_decimal_enc;
    errors=[bad_request_case;unexpected_case];
    section=order_activities_section}]
-
-let verify ~pk58 ~sig58 ~bytes =
-  let open Tzfunc.Crypto in
-  Result.bind (Pk.b58dec pk58) @@ fun pk ->
-  Result.bind (Signature.b58dec sig58) @@ fun signature ->
-  match Curve.from_b58 pk58, Curve.from_b58 sig58 with
-  | Ok `ed25519, Ok `ed25519 -> Ed25519.verify_bytes ~pk ~signature ~bytes
-  | Ok `secp256k1, Ok `secp256k1 -> Secp256k1.verify_bytes ~pk ~signature ~bytes
-  | Error e, _ | _, Error e -> Error e
-  | _ -> Error `unmatched_curve
 
 
 
