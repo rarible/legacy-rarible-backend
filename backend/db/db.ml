@@ -4554,11 +4554,19 @@ let set_metadata_id ?dbh ~contract id =
 let update_unknown_metadata ?dbh () =
   use dbh @@ fun dbh ->
   let>? l = [%pgsql.object dbh
-      "select contract, token_id, block, level, tsp, metadata_uri \
-       from token_info where \
-       main and metadata is null and metadata_uri is not null"] in
+      "select i.contract, i.token_id, i.block, i.level, i.tsp, metadata, metadata_uri \
+       from token_info i left join tzip21_metadata t on i.token_id = t.token_id and i.contract = t.contract where \
+       i.main and t.contract is null"] in
   iter_rp (fun r ->
-      match r#metadata_uri with
+      let metadata_uri = match r#metadata_uri with
+        | None ->
+          let l = EzEncoding.destruct Json_encoding.(assoc string) r#metadata in
+          begin match List.assoc_opt "" l with
+            | None -> None
+            | Some uri -> Some uri
+          end
+        | Some uri -> Some uri in
+      match metadata_uri with
       | None -> Lwt.return_ok ()
       | Some uri ->
         let> re = get_metadata_json uri in
