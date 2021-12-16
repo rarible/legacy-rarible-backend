@@ -1,4 +1,4 @@
-import { Provider, transfer, mint, burn, deploy_nft_private, deploy_mt_private, upsert_order, bid, sell, Part, AssetType, OrderForm, SellRequest, BidRequest, ExtendedAssetType, XTZAssetType, FTAssetType, TokenAssetType, approve_token, fill_order, get_public_key, order_of_json, salt, pk_to_pkh, get_address, OperationResult, sign, TezosProvider } from "../main"
+import { Provider, transfer, mint, burn, deploy_nft_private, deploy_mt_private, upsert_order, bid, sell, Part, AssetType, OrderForm, SellRequest, BidRequest, ExtendedAssetType, XTZAssetType, FTAssetType, TokenAssetType, approve_token, fill_order, get_public_key, order_of_json, salt, pk_to_pkh, get_address, DeployResult, sign, TezosProvider } from "../main"
 import { beacon_provider } from '../providers/beacon/beacon_provider'
 import { temple_provider } from '../providers/temple/temple_provider'
 import { kukai_provider } from '../providers/kukai/kukai_provider'
@@ -337,23 +337,19 @@ export default new Vue({
         this.deploy.result = "no owner given"
       } else {
         let metadata = (this.deploy.metadata=='') ? undefined : JSON.parse(this.deploy.metadata)
-        let op : OperationResult | undefined ;
+        let op : DeployResult | undefined ;
         if (this.deploy.kind == 'NFT') op = await deploy_nft_private(this.provider, this.deploy.owner, metadata)
         else if (this.deploy.kind == 'MT') op = await deploy_mt_private(this.provider, this.deploy.owner, metadata)
         if (!op) {
           this.deploy.status = 'danger'
           this.deploy.result = "kind not understood"
         } else {
-          this.deploy.result = `operation ${op.hash} injected`
+          this.deploy.result = `operation ${op.hash} injected -> new contract: ${op.contract}`
           await op.confirmation()
           this.deploy.status = 'success'
-          if (op.contract) {
-            this.deploy.result = `operation ${op.hash} confirmed -> new contract: ${op.contract}`
-            this.nft_contracts.add({contract: op.contract, owner: this.deploy.owner })
-            localStorage.setItem('nft_contracts', JSON.stringify(Array.from(this.nft_contracts)))
-          } else {
-            this.deploy.result = `operation ${op.hash} confirmed`
-          }
+          this.deploy.result = `operation ${op.hash} confirmed -> new contract: ${op.contract}`
+          this.nft_contracts.add({contract: op.contract, owner: this.deploy.owner })
+          localStorage.setItem('nft_contracts', JSON.stringify(Array.from(this.nft_contracts)))
         }
       }
     },

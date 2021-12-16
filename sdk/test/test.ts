@@ -1,4 +1,4 @@
-import { deploy_fa1, mint, make_permit, add_permit, send, sign, StorageFA2, of_hex, storage, hex_to_uint8array, b58enc, Provider } from "../main"
+import { deploy_fa1, mint, make_permit, add_permit, send, sign, StorageFA2, of_hex, storage, hex_to_uint8array, b58enc, Provider, op_to_kt1 } from "../main"
 import { in_memory_provider } from '../providers/in_memory/in_memory_provider'
 import BigNumber from "bignumber.js"
 import { MichelsonData, MichelsonType, packDataBytes } from "@taquito/michel-codec"
@@ -32,7 +32,7 @@ async function main() {
     }
 
   // await mint(provider, "KT1VYBd25dw5GjYqPM8T8My6b4g5c4cd4hwu", {tz1ibJRnL6hHjAfmEzM7QtGyTsS6ZtHdgE2S: 10000n}, 100n, 101n)
-
+    console.log(op_to_kt1('ooraPaZtEMbQAM885Mhpc2jPRVJCxGchu5ZPJ9ZS2eK5p4VcJxP'))
 
   //   const st : StorageFA2 = await storage(provider, "KT1Rgf9RNW7gLj7JGn98yyVM34S4St9eudMC")
   //   let id = st.operators.toString()

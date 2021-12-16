@@ -1,4 +1,4 @@
-import { Provider, OperationResult } from "../common/base"
+import { Provider, DeployResult } from "../common/base"
 
 export const fill_code : any =
   [  {  "prim": "storage",
@@ -846,7 +846,7 @@ export function fill_storage(owner: string) : any {
 export async function deploy_fill(
   provider : Provider,
   owner: string,
-) : Promise<OperationResult> {
+) : Promise<DeployResult> {
   const init = fill_storage(owner)
   return provider.tezos.originate({init, code: fill_code})
 }
