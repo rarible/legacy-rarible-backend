@@ -507,6 +507,28 @@ let rarible_attributes_of_tzip21_attributes = function
     Option.some @@
     List.filter_map tzip21_attribute_to_rarible_attribute attr
 
+let find_video_asset m =
+  begin
+    match Filename.extension @@
+      Option.value ~default:"" m.tzip21_tm_artifact_uri with
+    | ".mp4" -> m.tzip21_tm_artifact_uri
+    | _ ->
+      begin
+        match
+          Filename.extension @@
+          Option.value ~default:"" m.tzip21_tm_display_uri with
+        | ".mp4" -> m.tzip21_tm_display_uri
+        | _ ->
+          begin
+            match
+              Filename.extension @@
+              Option.value ~default:"" m.tzip21_tm_thumbnail_uri with
+            | ".mp4" -> m.tzip21_tm_thumbnail_uri
+            | _ -> None
+          end
+      end
+  end
+
 let rarible_meta_of_tzip21_meta meta =
   match meta with
   | None -> None
@@ -532,16 +554,12 @@ let rarible_meta_of_tzip21_meta meta =
       nft_item_meta_animation =
         match m.tzip21_tm_artifact_uri, m.tzip21_tm_formats with
         | None, _ -> None
-        | Some uri, None ->
-          begin match Filename.extension uri with
-            | ".mp4" -> Some uri
-            | _ -> None
-          end
+        | Some _, None -> find_video_asset m
         | Some uri, Some formats ->
           if List.exists (fun f -> match f.format_mime_type with
               | None -> false
               | Some mt -> f.format_uri = uri && is_video_format mt)
               formats then
             Some uri
-          else None
+          else find_video_asset m
     }
