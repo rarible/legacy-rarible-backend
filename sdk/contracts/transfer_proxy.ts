@@ -1,4 +1,4 @@
-import { Provider, OperationResult } from "../common/base"
+import { Provider, DeployResult } from "../common/base"
 
 export const transfer_proxy_code : any =
   [  {  "prim": "storage",
@@ -643,7 +643,7 @@ export function transfer_proxy_storage(owner: string) : any {
 export async function deploy_transfer_proxy(
   provider : Provider,
   owner: string,
-) : Promise<OperationResult> {
+) : Promise<DeployResult> {
   const init = transfer_proxy_storage(owner)
   return provider.tezos.originate({init, code: transfer_proxy_code})
 }

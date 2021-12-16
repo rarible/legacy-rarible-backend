@@ -1,5 +1,5 @@
 import { MichelsonData } from "@taquito/michel-codec"
-import { Provider, send, TransactionArg, get_address, OperationResult, to_hex } from "../common/base"
+import { Provider, send, TransactionArg, get_address, OperationResult, MintResult, to_hex } from "../common/base"
 import BigNumber from "bignumber.js"
 import fetch from "node-fetch"
 
@@ -78,11 +78,10 @@ export async function mint_nft(
   token_id?: BigNumber,
   metadata?: { [key: string]: string },
   owner?: string,
-) : Promise<OperationResult> {
+) : Promise<MintResult> {
   const [ next_id, arg ] = await mint_nft_arg(provider, contract, royalties, token_id, metadata, owner)
   let op = await send(provider, arg)
-  op.token_id = next_id
-  return op
+  return {...op, token_id : next_id }
 }
 
 export async function mint_mt_arg(
@@ -109,11 +108,10 @@ export async function mint_mt(
   token_id?: BigNumber,
   metadata?: { [key: string]: string },
   owner?: string,
-) : Promise<OperationResult> {
+) : Promise<MintResult> {
   const [ next_id, arg ] = await mint_mt_arg(provider, contract, royalties, supply, token_id, metadata, owner)
   let op = await send(provider, arg)
-  op.token_id = next_id
-  return op
+  return {...op, token_id : next_id }
 }
 
 export async function mint_arg(
@@ -137,7 +135,7 @@ export async function mint(
   token_id?: BigNumber,
   metadata?: { [key: string]: string },
   owner?: string,
-) : Promise<OperationResult> {
+) : Promise<MintResult> {
   if (supply!=undefined) { return mint_mt(provider, contract, royalties, supply, token_id, metadata, owner) }
   else { return mint_nft(provider, contract, royalties, token_id, metadata, owner) }
 }

@@ -1,4 +1,4 @@
-import { Provider, OperationResult } from "../common/base"
+import { Provider, DeployResult } from "../common/base"
 import { make_metadata } from "./contract-metadata"
 
 export const nft_public_code : any =
@@ -6396,7 +6396,7 @@ export async function deploy_nft_public(
   owner: string,
   metadata?: { [key:string]: string },
   metadata_uri?: string
-) : Promise<OperationResult> {
+) : Promise<DeployResult> {
   const init = nft_public_storage(owner, metadata, metadata_uri)
   return provider.tezos.originate({init, code: nft_public_code})
 }

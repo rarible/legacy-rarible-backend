@@ -52,14 +52,15 @@ export interface Asset {
 export interface OperationResult {
   hash: string;
   confirmation: () => Promise<void>;
-  token_id?: BigNumber;
-  contract?: string;
 }
+
+export type MintResult = OperationResult & { token_id: BigNumber }
+export type DeployResult = OperationResult & { contract: string }
 
 export interface TezosProvider {
   kind: 'in_memory' | "temple" | "beacon" | "kukai";
   transfer: (arg: TransferParams) => Promise<OperationResult>;
-  originate: (arg: OriginateParams) => Promise<OperationResult>;
+  originate: (arg: OriginateParams) => Promise<DeployResult>;
   batch: (args: TransferParams[]) => Promise<OperationResult>;
   sign: (bytes: string, type?: "operation" | "message") => Promise<{signature: string, prefix: string}>;
   address: () => Promise<string>;
@@ -260,6 +261,8 @@ export const edsig_prefix =  new Uint8Array([9, 245, 205, 134, 18])
 export const spsig1_prefix =  new Uint8Array([13, 115, 101, 19, 63])
 export const p2sig_prefix =  new Uint8Array([54, 240, 44, 52])
 export const sig_prefix =  new Uint8Array([4, 130, 43])
+export const op_prefix =  new Uint8Array([5, 116])
+export const kt1_prefix =  new Uint8Array([2, 90, 121])
 
 export function b58enc(payload: Uint8Array, prefix: Uint8Array) : string {
   const n = new Uint8Array(prefix.length + payload.length);
@@ -293,4 +296,11 @@ export function pk_to_pkh(pk: string) : string {
   const pk_bytes = b58dec(pk, pk_prefix)
   const hash = blake.blake2b(pk_bytes, null, 20)
   return b58enc(hash, pkh_prefix)
+}
+
+export function op_to_kt1(hash: string) : string {
+  const op = b58dec(hash, op_prefix)
+  const data = new Uint8Array([...op, 0, 0, 0, 0])
+  const hash_kt1 = blake.blake2b(data, null, 20)
+  return b58enc(hash_kt1, kt1_prefix)
 }

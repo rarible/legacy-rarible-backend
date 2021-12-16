@@ -1,4 +1,4 @@
-import { Provider, OperationResult } from "../common/base"
+import { Provider, DeployResult } from "../common/base"
 import { make_metadata } from "./contract-metadata"
 
 export const mt_private_code : any =
@@ -7711,7 +7711,7 @@ export async function deploy_mt_private(
   owner: string,
   metadata?: { [key:string]: string },
   metadata_uri?: string
-) : Promise<OperationResult> {
+) : Promise<DeployResult> {
   const init = mt_private_storage(owner, metadata, metadata_uri)
   return provider.tezos.originate({init, code: mt_private_code})
 }

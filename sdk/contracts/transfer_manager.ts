@@ -1,4 +1,4 @@
-import { Provider, OperationResult } from "../common/base"
+import { Provider, DeployResult } from "../common/base"
 import BigNumber from "bignumber.js"
 
 export const transfer_manager_code : any =
@@ -16486,7 +16486,7 @@ export async function deploy_transfer_manager(
   provider: Provider,
   owner: string,
   default_fee_receiver: string,
-  protocol_fee: BigNumber) : Promise<OperationResult> {
+  protocol_fee: BigNumber) : Promise<DeployResult> {
   const init = transfer_manager_storage(owner, default_fee_receiver, protocol_fee)
   return provider.tezos.originate({init, code: transfer_manager_code})
 }

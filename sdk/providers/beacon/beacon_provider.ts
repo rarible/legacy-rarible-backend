@@ -1,7 +1,7 @@
 import { BeaconWallet } from '@taquito/beacon-wallet'
 import { SigningType } from "@airgap/beacon-sdk"
 import { TezosToolkit, TransferParams, OriginateParams, OpKind } from "@taquito/taquito"
-import { TezosProvider, b58enc, hex_to_uint8array, edpk_prefix, tezos_signed_message_prefix, pack_string } from "../../common/base"
+import { TezosProvider, b58enc, hex_to_uint8array, edpk_prefix, tezos_signed_message_prefix, pack_string, op_to_kt1 } from "../../common/base"
 
 export async function beacon_provider(wallet: BeaconWallet, tk: TezosToolkit) : Promise<TezosProvider> {
   tk.setWalletProvider(wallet)
@@ -13,13 +13,8 @@ export async function beacon_provider(wallet: BeaconWallet, tk: TezosToolkit) : 
     const op = await tk.wallet.originate(arg).send()
     return {
       hash: op.opHash,
-      confirmation: async function() {
-        await op.confirmation()
-        const op2 = await op.originationOperation()
-        const contract = (op2!.metadata.operation_result.originated_contracts || [])[0]
-        this.contract = contract
-      },
-      contract: undefined as string | undefined
+      contract: op_to_kt1(op.opHash),
+      confirmation: async() => { await op.confirmation() }
     }
   }
   const batch = async(args: TransferParams[]) => {

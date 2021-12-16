@@ -1,4 +1,4 @@
-import { Provider, OperationResult, to_hex } from "../common/base"
+import { Provider, DeployResult, to_hex } from "../common/base"
 import BigNumber from "bignumber.js"
 
 export const fa1_code : any =
@@ -309,7 +309,7 @@ export async function deploy_fa1(
   name?: string,
   symbol?: string,
   uri?: string,
-) : Promise<OperationResult> {
+) : Promise<DeployResult> {
   const init = fa1_storage(owner, supply, decimals, name, symbol, uri)
   return provider.tezos.originate({init, code: fa1_code})
 }
