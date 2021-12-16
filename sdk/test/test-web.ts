@@ -102,6 +102,8 @@ export default new Vue({
     wallet: 'beacon' as 'temple' | 'beacon' | 'kukai',
     provider: {} as Provider,
     path: "home",
+    connected: false,
+    address: '',
     transfer : {
       asset_type: {
         asset_class: 'NFT',
@@ -139,6 +141,7 @@ export default new Vue({
     deploy: {
       owner: '',
       kind: 'NFT',
+      metadata: '',
       result: '',
       status: 'info',
     },
@@ -273,6 +276,8 @@ export default new Vue({
   methods: {
     async connect() {
       this.provider = await provider(this.node, this.api_url, this.wallet)
+      this.connected = true
+      this.address = await this.provider.tezos.address()
     },
     async ftransfer() {
       this.transfer.status = 'info'
@@ -331,9 +336,10 @@ export default new Vue({
         this.deploy.status = 'danger'
         this.deploy.result = "no owner given"
       } else {
+        let metadata = (this.deploy.metadata=='') ? undefined : JSON.parse(this.deploy.metadata)
         let op : OperationResult | undefined ;
-        if (this.deploy.kind == 'NFT') op = await deploy_nft_private(this.provider, this.deploy.owner)
-        else if (this.deploy.kind == 'MT') op = await deploy_mt_private(this.provider, this.deploy.owner)
+        if (this.deploy.kind == 'NFT') op = await deploy_nft_private(this.provider, this.deploy.owner, metadata)
+        else if (this.deploy.kind == 'MT') op = await deploy_mt_private(this.provider, this.deploy.owner, metadata)
         if (!op) {
           this.deploy.status = 'danger'
           this.deploy.result = "kind not understood"

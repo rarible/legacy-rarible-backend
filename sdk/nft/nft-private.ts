@@ -1,4 +1,5 @@
-import { Provider, OperationResult, to_hex } from "../common/base"
+import { Provider, OperationResult } from "../common/base"
+import { make_metadata } from "./contract-metadata"
 
 export const nft_private_code : any =
   [  {  "prim": "storage",
@@ -6846,8 +6847,7 @@ export const nft_private_code : any =
      ]
   }  ]
 
-export function nft_private_storage(owner: string, metadata_uri?: string) : any {
-  const bytes = (metadata_uri) ? to_hex(metadata_uri) : ""
+export function nft_private_storage(owner: string, metadata?: { [key : string] : string }, metadata_uri?: string ) : any {
   return {  "prim": "Pair",
             "args": [
               {  "string": owner  },
@@ -6881,13 +6881,7 @@ export function nft_private_storage(owner: string, metadata_uri?: string) : any 
                                                            {  "prim": "Pair",
                                                               "args": [
                                                                 {  "int": "31556952"  },
-                                                                [  {
-                                                                "prim": "Elt",
-                                                                "args": [
-                                                                  {  "string": ""  },
-                                                                  {  "bytes": bytes  }
-                                                                ]
-                                                                }  ]
+                                                                make_metadata(metadata_uri, metadata)
                                                               ]
                                                            }
                                                          ]
@@ -6915,8 +6909,9 @@ export function nft_private_storage(owner: string, metadata_uri?: string) : any 
 export async function deploy_nft_private(
   provider : Provider,
   owner: string,
+  metadata?: { [key:string]: string },
   metadata_uri?: string
 ) : Promise<OperationResult> {
-  const init = nft_private_storage(owner, metadata_uri)
+  const init = nft_private_storage(owner, metadata, metadata_uri)
   return provider.tezos.originate({init, code: nft_private_code})
 }
