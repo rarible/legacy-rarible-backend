@@ -1061,6 +1061,12 @@ let get_or_timeout ?msg url =
   let timeout = Lwt_unix.sleep 30. >>= fun () -> Lwt.return_error (-1, Some "timeout") in
   Lwt.pick [ timeout ; EzReq_lwt.get ?msg url ]
 
+let get_metadata_uri s =
+  let proto = try String.sub s 0 6 with _ -> "" in
+  if proto = "https:" || proto = "http:/" then Some s
+  else if proto = "ipfs:/" then Some s
+  else None
+
 let get_metadata_json ?(quiet=false) meta =
   if not quiet then Format.eprintf "get_metadata_json %s@." meta ;
   let msg = if not quiet then Some "get_metadata_json" else None in
@@ -1379,15 +1385,32 @@ let insert_token_metadata ~dbh ~block ~level ~tsp ~contract (token_id, l) =
     | Some metadata -> insert_mint_metadata dbh ~contract ~token_id ~block ~level ~tsp ~metadata in
   Lwt.return_ok (json, uri)
 
-let insert_metadata_update ~dbh ~op ~contract ~token_id l =
+let insert_metadata_update ~dbh ~op ~contract ~token_id ?(forward=false) l =
   let token_meta = EzEncoding.construct Json_encoding.(assoc string) l in
-  [%pgsql dbh
-      "insert into token_updates(transaction, index, block, level, tsp, \
-       source, contract, token_id, metadata) \
-       values(${op.bo_hash}, ${op.bo_index}, ${op.bo_block}, ${op.bo_level}, \
-       ${op.bo_tsp}, ${op.bo_op.source}, $contract, \
-       ${Z.to_string token_id}, $token_meta) \
-       on conflict do nothing"]
+  if not forward then
+    [%pgsql dbh
+        "insert into token_updates(transaction, index, block, level, tsp, \
+         source, contract, token_id, metadata) \
+         values(${op.bo_hash}, ${op.bo_index}, ${op.bo_block}, ${op.bo_level}, \
+         ${op.bo_tsp}, ${op.bo_op.source}, $contract, \
+         ${Z.to_string token_id}, $token_meta) \
+         on conflict do nothing"]
+  else
+    let block, level, tsp, transaction = op.bo_block, op.bo_level, op.bo_tsp, op.bo_hash in
+    let uri = match List.assoc_opt "" l with
+      | None -> None
+      | Some s -> get_metadata_uri s in
+    [%pgsql dbh
+        "insert into token_info(contract, token_id, block, level, tsp, \
+         last_block, last_level, last, transaction, metadata, metadata_uri, main) \
+         values($contract, ${Z.to_string token_id}, $block, $level, $tsp, \
+         $block, $level, $tsp, $transaction, $token_meta, $?uri, true) \
+         on conflict (contract, token_id) do update \
+         set metadata = $token_meta, metadata_uri = $?uri, \
+         last_block = $block, \
+         last_level = $level, last = $tsp \
+         where token_info.contract = $contract and \
+         token_info.token_id = ${Z.to_string token_id}"]
 
 let insert_mint ~dbh ~op ~contract m =
   let block = op.bo_block in
@@ -1425,7 +1448,7 @@ let insert_mint ~dbh ~op ~contract m =
          on conflict do nothing"] in
   insert_nft_activity_mint dbh op contract token_id owner amount
 
-let insert_metadatas ~dbh ~op ~contract l =
+let insert_metadatas ~dbh ~op ~contract ?(forward=false) l =
   iter_rp (function
       | `nat token_id, Some (`tuple [`nat _; `assoc l]) ->
         let meta = List.filter_map (function
@@ -1434,7 +1457,7 @@ let insert_metadatas ~dbh ~op ~contract l =
               if Parameters.decode s then Some (k, s)
               else None
             | _ -> None) l in
-        insert_metadata_update ~dbh ~op ~contract ~token_id meta
+        insert_metadata_update ~dbh ~op ~contract ~token_id ~forward meta
       | _ -> Lwt.return_ok ()) l
 
 let insert_burn ~dbh ~op ~contract m =
@@ -1473,18 +1496,18 @@ let insert_transfer ~dbh ~op ~contract lt =
         ) transfer_index tr_txs) 0l lt in
   ()
 
-let insert_token_balances ~dbh ~op ~contract ?(ft=false) ?token_id balances =
+let insert_token_balances ~dbh ~op ~contract ?(ft=false) ?token_id ?(forward=false) balances =
   iter_rp (fun (k, v) ->
       let kind, token_id, account, balance = match k, v, ft with
         | `nat id, Some (`address a), false ->
-          "nft", id, Some a, None
+          "nft", id, Some a, Some Z.one
         | `nat id, None, false -> "nft", id, None, None
         | `tuple [`nat id; `address a], Some (`nat bal), false
         | `tuple [`address a; `nat id], Some (`nat bal), false ->
           "mt", id, Some a, Some bal
         | `tuple [`nat id; `address a], None, false
         | `tuple [`address a; `nat id], None, false ->
-          "mt", id, Some a, None
+          "mt", id, Some a, Some Z.zero
         | `tuple [`nat id; `address a], Some (`nat bal), true
         | `tuple [`address a; `nat id], Some (`nat bal), true ->
           begin match token_id with
@@ -1495,12 +1518,12 @@ let insert_token_balances ~dbh ~op ~contract ?(ft=false) ?token_id balances =
         | `tuple [`address a; `nat id], None, true ->
           begin match token_id with
             | Some tid when id <> tid -> "", Z.minus_one, None, None
-            | _ -> "ft_multi", id, Some a, None
+            | _ -> "ft_multi", id, Some a, Some Z.zero
           end
         | `address a, Some (`nat bal), true ->
           "ft", Z.minus_one, Some a, Some bal
         | `address a, None, true ->
-          "ft", Z.minus_one, Some a, None
+          "ft", Z.minus_one, Some a, Some Z.zero
         | `tuple [`address a; `nat id], Some (`tuple (`nat bal :: _)), true ->
           begin match token_id with
             | Some tid when id <> tid -> "", Z.minus_one, None, None
@@ -1510,16 +1533,36 @@ let insert_token_balances ~dbh ~op ~contract ?(ft=false) ?token_id balances =
       if kind <> "" then
         let>? () = [%pgsql dbh
             "insert into token_balance_updates(transaction, index, block, level, \
-             tsp, kind, contract, token_id, account, balance) \
+             tsp, kind, contract, token_id, account, balance, main) \
              values(${op.bo_hash}, ${op.bo_index}, ${op.bo_block}, ${op.bo_level}, \
-             ${op.bo_tsp}, $kind, $contract, ${Z.to_string token_id}, $?account, $?balance) on conflict do nothing"] in
+             ${op.bo_tsp}, $kind, $contract, ${Z.to_string token_id}, $?account, $?balance, $forward) \
+             on conflict do nothing"] in
         match account, ft with
         | None, _ | _, true -> Lwt.return_ok ()
         | Some a, _ ->
-          [%pgsql dbh
-              "insert into tokens(contract, token_id, owner, amount) \
-               values($contract, ${Z.to_string token_id}, $a, 0) on conflict do nothing"]
-          (* todo: get supply from other owner *)
+          if not forward then
+            [%pgsql dbh
+                "insert into tokens(contract, token_id, owner, amount) \
+                 values($contract, ${Z.to_string token_id}, $a, 0) on conflict do nothing"]
+          else match balance with
+            | Some b ->
+              let creators = [
+                Some (EzEncoding.construct part_enc {
+                    part_account=a; part_value = 10000l })
+              ] in
+              let>? () = [%pgsql dbh
+                  "insert into token_info(contract, token_id, transaction, block, \
+                   level, tsp, main, last_block, last_level, last, creators)
+                   values($contract, ${Z.to_string token_id}, ${op.bo_hash}, \
+                   ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, true, \
+                   ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, $creators)
+                   on conflict do nothing"] in
+              [%pgsql dbh
+                  "insert into tokens(contract, token_id, owner, amount, balance) \
+                   values($contract, ${Z.to_string token_id}, $a, $b, $b) \
+                   on conflict (contract, token_id, owner) do update \
+                   set amount = $b, balance = $b"]
+            | _ -> Lwt.return_ok ()
       else Lwt.return_ok ()) balances
 
 let insert_update_operator ~dbh ~op ~contract lt =
@@ -1624,15 +1667,26 @@ let db_from_asset ?dbh asset =
     Lwt.return_ok (string_of_asset_type asset.asset_type, Some fa2.asset_contract,
                    Some fa2.asset_token_id, asset.asset_value, None)
 
-let insert_royalties ~dbh ~op roy =
+let insert_royalties ~dbh ~op ?(forward=false) roy =
   let royalties = EzEncoding.construct Json_encoding.(list part_enc) roy.roy_royalties in
   let source = op.bo_op.source in
-  [%pgsql dbh
-      "insert into token_updates(transaction, index, block, level, tsp, \
-       source, token_id, contract, royalties) \
-       values(${op.bo_hash}, ${op.bo_index}, ${op.bo_block}, ${op.bo_level}, \
-       ${op.bo_tsp}, $source, $?{Option.map Z.to_string roy.roy_token_id}, ${roy.roy_contract}, $royalties) \
-       on conflict do nothing"]
+  if not forward then
+    [%pgsql dbh
+        "insert into token_updates(transaction, index, block, level, tsp, \
+         source, token_id, contract, royalties) \
+         values(${op.bo_hash}, ${op.bo_index}, ${op.bo_block}, ${op.bo_level}, \
+         ${op.bo_tsp}, $source, $?{Option.map Z.to_string roy.roy_token_id}, ${roy.roy_contract}, $royalties) \
+         on conflict do nothing"]
+  else
+    let no_token_id = Option.is_none roy.roy_token_id in
+    [%pgsql dbh
+        "update token_info set royalties = $royalties, \
+         last_block = ${op.bo_block},
+         last_level = ${op.bo_level}, \
+         last = ${op.bo_tsp} \
+         where contract = ${roy.roy_contract} and \
+         ($no_token_id or token_id = $?{Option.map Z.to_string roy.roy_token_id})"]
+
 
 let insert_order_activity ?(main=false)
     dbh id match_left match_right hash transaction block level date order_activity_type =
@@ -1969,7 +2023,7 @@ let check_ft_status ~dbh ~config ~crawled contract =
       Lwt.return_ok c
     | _ -> Lwt.return_ok false
 
-let insert_ft ~dbh ~config ~op ~contract ft =
+let insert_ft ~dbh ~config ~op ~contract ?(forward=false) ft =
   Format.printf "\027[0;35mFT update %s %ld %s\027[0m@."
     (short op.bo_hash) op.bo_index (short contract);
   let>? crawled = check_ft_status ~dbh ~config ~crawled:ft.ft_crawled contract in
@@ -1986,10 +2040,22 @@ let insert_ft ~dbh ~config ~op ~contract ft =
       | Fa2_multiple_inversed -> Contract_spec.ledger_fa2_multiple_inversed_field
       | Custom {ledger_key; ledger_value} -> ledger_key, ledger_value in
     let balances = Storage_diff.get_big_map_updates ~id key value meta.op_lazy_storage_diff in
-    insert_token_balances ~dbh ~op ~contract ~ft:true ?token_id:ft.ft_token_id balances
+    insert_token_balances ~dbh ~op ~contract ~ft:true ?token_id:ft.ft_token_id ~forward balances
 
-let insert_nft ~dbh ~meta ~op ~contract ~nft ~entrypoint ~param =
-  let>? () = match Parameters.parse_fa2 entrypoint param with
+let string_of_entrypoint = function
+  | EPdefault -> "default"
+  | EProot -> "root"
+  | EPdo -> "do"
+  | EPset -> "set"
+  | EPremove -> "remove"
+  | EPnamed s -> s
+
+let insert_nft ~dbh ~meta ~op ~contract ~nft ~entrypoint ?(forward=false) param =
+  Format.printf "\027[0;35mNFT update %s %ld %s -> %s\027[0m@."
+    (short op.bo_hash) op.bo_index (short contract) (string_of_entrypoint entrypoint);
+  let>? () =
+    if forward then Lwt.return_ok ()
+    else match Parameters.parse_fa2 entrypoint param with
     | Ok (Mint_tokens m) ->
       Format.printf "\027[0;35mmint %s[%ld] %s\027[0m@."
         (short op.bo_hash) op.bo_index (short contract);
@@ -2026,20 +2092,20 @@ let insert_nft ~dbh ~meta ~op ~contract ~nft ~entrypoint ~param =
       Format.printf "\027[0;35mset token uri pattern %s[%ld] %s %s\027[0m@."
         (short op.bo_hash) op.bo_index (short contract) s;
       insert_uri_pattern ~dbh ~op ~contract s
-    | Error _ -> Lwt.return_ok () in
+    | _ -> Lwt.return_ok () in
   let balances = Storage_diff.get_big_map_updates ~id:nft.nft_ledger_id
       nft.nft_ledger_type.ledger_key nft.nft_ledger_type.ledger_value
       meta.op_lazy_storage_diff in
-  let>? () = insert_token_balances ~dbh ~op ~contract balances in
+  let>? () = insert_token_balances ~dbh ~op ~contract ~forward balances in
   let token_meta_k, token_meta_v = Contract_spec.token_metadata_field in
   match nft.nft_token_meta_id with
   | None -> Lwt.return_ok ()
   | Some id ->
     let metadata = Storage_diff.get_big_map_updates ~id token_meta_k token_meta_v
         meta.op_lazy_storage_diff in
-    insert_metadatas ~dbh ~op ~contract metadata
+    insert_metadatas ~dbh ~op ~contract ~forward metadata
 
-let insert_transaction ~config ~dbh ~op tr =
+let insert_transaction ~config ~dbh ~op ?(forward=false) tr =
   let contract = tr.destination in
   match tr.parameters, op.bo_meta with
   | None, _ | Some { value = Other _; _ }, _ | Some { value = Bytes _; _ }, _ | _, None -> Lwt.return_ok ()
@@ -2048,15 +2114,16 @@ let insert_transaction ~config ~dbh ~op tr =
       match Parameters.parse_royalties entrypoint m with
       | Ok roy ->
         Format.printf "\027[0;35mset royalties %s %ld\027[0m@." (Utils.short op.bo_hash) op.bo_index;
-        insert_royalties ~dbh ~op roy
+        insert_royalties ~dbh ~op ~forward roy
       | _ -> Lwt.return_ok ()
     else if contract = config.Crawlori.Config.extra.exchange then (* exchange *)
       begin match Parameters.parse_cancel entrypoint m with
         | Ok { cc_hash; cc_maker_edpk; cc_maker; cc_make ; cc_take; cc_salt } ->
           Format.printf "\027[0;35mcancel order %s %ld %s\027[0m@."
             (short op.bo_hash) op.bo_index (short (cc_hash :> string));
-          insert_cancel ~dbh ~op ~maker_edpk:cc_maker_edpk ~maker:cc_maker
-            ~make:cc_make ~take:cc_take ~salt:cc_salt cc_hash
+          if not forward then insert_cancel ~dbh ~op ~maker_edpk:cc_maker_edpk ~maker:cc_maker
+              ~make:cc_make ~take:cc_take ~salt:cc_salt cc_hash
+          else Lwt.return_ok ()
         | _ -> Lwt.return_ok ()
       end
     else if contract = config.Crawlori.Config.extra.transfer_manager then (* transfer_manager *)
@@ -2068,22 +2135,23 @@ let insert_transaction ~config ~dbh ~op tr =
               dt_fill_make_value; dt_fill_take_value} ->
           Format.printf "\027[0;35mdo transfers %s %ld %s %s\027[0m@."
             (short op.bo_hash) op.bo_index (short (dt_left :> string)) (short (dt_right :> string));
-          insert_do_transfers
-            ~dbh ~op
-            ~left:dt_left ~left_maker_edpk:dt_left_maker_edpk
-            ~left_maker:dt_left_maker ~left_make_asset:dt_left_make_asset
-            ~left_take_asset:dt_left_take_asset ~left_salt:dt_left_salt
-            ~right:dt_right ~right_maker_edpk:dt_right_maker_edpk
-            ~right_maker:dt_right_maker ~right_make_asset:dt_right_make_asset
-            ~right_take_asset:dt_right_take_asset ~right_salt:dt_right_salt
-            ~fill_make_value:dt_fill_make_value ~fill_take_value:dt_fill_take_value
+          if not forward then insert_do_transfers
+              ~dbh ~op
+              ~left:dt_left ~left_maker_edpk:dt_left_maker_edpk
+              ~left_maker:dt_left_maker ~left_make_asset:dt_left_make_asset
+              ~left_take_asset:dt_left_take_asset ~left_salt:dt_left_salt
+              ~right:dt_right ~right_maker_edpk:dt_right_maker_edpk
+              ~right_maker:dt_right_maker ~right_make_asset:dt_right_make_asset
+              ~right_take_asset:dt_right_take_asset ~right_salt:dt_right_salt
+              ~fill_make_value:dt_fill_make_value ~fill_take_value:dt_fill_take_value
+          else Lwt.return_ok ()
         | _ -> Lwt.return_ok ()
       end
     else match
         SMap.find_opt contract config.Crawlori.Config.extra.ft_contracts,
         SMap.find_opt contract config.Crawlori.Config.extra.contracts with
-    | Some ft, _ -> insert_ft ~dbh ~config ~op ~contract ft
-    | _, Some nft -> insert_nft ~dbh ~meta ~op ~contract ~nft ~entrypoint ~param:m
+    | Some ft, _ -> insert_ft ~dbh ~config ~op ~contract ~forward ft
+    | _, Some nft -> insert_nft ~dbh ~meta ~op ~contract ~nft ~entrypoint ~forward m
     | _, _ -> Lwt.return_ok ()
 
 let ledger_kind k v =
@@ -2142,7 +2210,7 @@ let filter_contracts op ori =
     end
   | _ -> None
 
-let insert_origination config dbh op ori =
+let insert_origination ?(forward=false) config dbh op ori =
   match filter_contracts op ori, op.bo_meta with
   | None, _ | _, None ->
     Lwt.return_ok ()
@@ -2158,12 +2226,12 @@ let insert_origination config dbh op ori =
     let>? () = [%pgsql dbh
         "insert into contracts(kind, address, owner, block, level, tsp, \
          last_block, last_level, last, ledger_id, ledger_key, ledger_value, \
-         uri_pattern, token_metadata_id, metadata_id, metadata, name, symbol) \
+         uri_pattern, token_metadata_id, metadata_id, metadata, name, symbol, main) \
          values($kind, $kt1, $?owner, ${op.bo_block}, ${op.bo_level}, \
          ${op.bo_tsp}, ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, \
          ${Z.to_string nft.nft_ledger_id}, \
          $ledger_key, $ledger_value, $?uri, $?{Option.map Z.to_string nft.nft_token_meta_id}, \
-         $?{Option.map Z.to_string nft.nft_meta_id}, $metadata, $?name, $?symbol) \
+         $?{Option.map Z.to_string nft.nft_meta_id}, $metadata, $?name, $?symbol, $forward) \
          on conflict do nothing"] in
     let open Crawlori.Config in
     config.extra.contracts <- SMap.add kt1 nft config.extra.contracts;
@@ -2180,21 +2248,21 @@ let insert_origination config dbh op ori =
     | Some id ->
       let metadata = Storage_diff.get_big_map_updates ~id token_meta_k token_meta_v
           meta.op_lazy_storage_diff in
-      insert_metadatas ~dbh ~op ~contract:kt1 metadata
+      insert_metadatas ~dbh ~op ~contract:kt1 ~forward metadata
 
-let insert_operation config ?forward:_ dbh op =
+let insert_operation config ?forward dbh op =
   let open Hooks in
   match op.bo_meta with
   | Some meta ->
     if meta.op_status = `applied then
       match op.bo_op.kind with
-      | Transaction tr -> insert_transaction ~config ~dbh ~op tr
+      | Transaction tr -> insert_transaction ?forward ~config ~dbh ~op tr
       (* | Origination ori -> set_origination config dbh op ori *)
       | _ -> Lwt.return_ok ()
     else Lwt.return_ok ()
   | _ -> Lwt.return_ok ()
 
-let insert_block config ?forward:_ dbh b =
+let insert_block config ?forward dbh b =
   (* EzEncoding.construct Tzfunc.Proto.full_block_enc.Encoding.json b
    * |> Rarible_kafka.produce_test >>= fun () -> *)
   iter_rp (fun op ->
@@ -2212,26 +2280,20 @@ let insert_block config ?forward:_ dbh b =
                   bo_meta = Option.map (fun m -> m.man_operation_result) c.man_metadata;
                   bo_numbers = Some c.man_numbers; bo_nonce = None;
                   bo_counter = c.man_numbers.counter } in
-                insert_origination config dbh op ori
+                insert_origination ?forward config dbh op ori
               | _ -> Lwt.return_ok ()
             else Lwt.return_ok ()
         ) op.op_contents
     ) b.operations
 
-let contract_updates_base dbh ~main ~contract ~block ~level ~tsp ~burn
-    ~account ~token_id ~amount =
+let recalculate_creators ~main ~burn ~supply ~amount ~account ~creators =
   let main_s = if main then Z.one else Z.minus_one in
   let factor = if burn then Z.neg main_s else main_s in
-  let>? old_supply, creators =
-    let>? l = [%pgsql dbh
-        "select supply, creators from token_info where contract = $contract and \
-         token_id = ${Z.to_string token_id} limit 1"] in
-    one l in
-  let new_supply = Z.(add old_supply (mul factor amount)) in
+  let new_supply = Z.(add supply (mul factor amount)) in
   let creators = List.filter_map (function
       | None -> None
       | Some json -> Some (EzEncoding.destruct part_enc json)) creators in
-  let creator_values_old = List.map (fun p -> p.part_account, Z.(mul (of_int32 p.part_value) old_supply)) creators in
+  let creator_values_old = List.map (fun p -> p.part_account, Z.(mul (of_int32 p.part_value) supply)) creators in
   let creator_values_new =
     if main && not burn || not main && burn then
       match List.assoc_opt account creator_values_old with
@@ -2250,6 +2312,17 @@ let contract_updates_base dbh ~main ~contract ~block ~level ~tsp ~burn
           Some (EzEncoding.construct part_enc {
               part_account;
               part_value = Z.(to_int32 @@ div v new_supply)})) creator_values_new in
+  creators, new_supply, factor
+
+let contract_updates_base dbh ~main ~contract ~block ~level ~tsp ~burn
+    ~account ~token_id ~amount =
+  let>? old_supply, creators =
+    let>? l = [%pgsql dbh
+        "select supply, creators from token_info where contract = $contract and \
+         token_id = ${Z.to_string token_id} limit 1"] in
+    one l in
+  let creators, new_supply, factor =
+    recalculate_creators ~main ~burn ~supply:old_supply ~amount ~account ~creators in
   let>? () = [%pgsql dbh
       "update token_info set supply = $new_supply, creators = $creators, \
        last_block = case when $main then $block else last_block end, \
@@ -2536,55 +2609,58 @@ let produce_collection_events main l =
       else Lwt.return_ok ())
     l
 
-let set_main _config ?forward:_ dbh {Hooks.m_main; m_hash} =
+let set_main _config ?(forward=false) dbh {Hooks.m_main; m_hash} =
   let sort l = List.sort (fun r1 r2 ->
       if m_main then Int32.compare r1#index r2#index
       else Int32.compare r2#index r1#index) l in
-  use (Some dbh) @@ fun dbh ->
-  let>? collections =
-    [%pgsql.object dbh
-        "update contracts set main = $m_main where block = $m_hash returning *"] in
-  let>? () = [%pgsql dbh "update token_info set main = $m_main where block = $m_hash"] in
-  let>? nactivities =
-    [%pgsql.object dbh
-        "update nft_activities set main = $m_main where block = $m_hash returning *"] in
-  let>? () =
-    [%pgsql dbh "update order_activities set main = $m_main where block = $m_hash"] in
-  let>? t_updates =
-    [%pgsql.object dbh
-        "update token_updates set main = $m_main where block = $m_hash returning *"] in
-  let>? c_updates =
-    [%pgsql.object dbh
-        "update contract_updates set main = $m_main where block = $m_hash returning *"] in
-  let>? cancels =
-    [%pgsql.object
-      dbh "update order_cancel set main = $m_main where block = $m_hash returning *"] in
-  let>? matches =
-    [%pgsql.object
-      dbh "update order_match set main = $m_main where block = $m_hash returning *"] in
-  let>? tb_updates =
-    [%pgsql.object dbh
-        "update token_balance_updates set main = $m_main where block = $m_hash returning *"] in
-  let>? () = contract_updates dbh m_main @@ sort c_updates in
-  let>? () = token_updates dbh m_main @@ sort t_updates in
-  let>? () = token_balance_updates dbh m_main @@ sort tb_updates in
-  let>? () =
-    [%pgsql dbh
-        "update tzip21_metadata set main = $m_main where block = $m_hash"] in
-  let>? () =
-    [%pgsql dbh
-        "update tzip21_formats set main = $m_main where block = $m_hash"] in
-  let>? () =
-    [%pgsql dbh
-        "update tzip21_attributes set main = $m_main where block = $m_hash"] in
-  let>? () =
-    [%pgsql dbh
-        "update tzip21_creators set main = $m_main where block = $m_hash"] in
-  let>? () = produce_collection_events m_main collections in
-  let>? () = produce_cancel_events dbh m_main @@ sort cancels in
-  let>? () = produce_match_events dbh m_main @@ sort matches in
-  let>? () = produce_nft_activity_events m_main @@ sort nactivities in
-  Lwt.return_ok ()
+  if not forward then
+    use (Some dbh) @@ fun dbh ->
+    let>? collections =
+      [%pgsql.object dbh
+          "update contracts set main = $m_main where block = $m_hash returning *"] in
+    let>? () = [%pgsql dbh "update token_info set main = $m_main where block = $m_hash"] in
+    let>? nactivities =
+      [%pgsql.object dbh
+          "update nft_activities set main = $m_main where block = $m_hash returning *"] in
+    let>? () =
+      [%pgsql dbh "update order_activities set main = $m_main where block = $m_hash"] in
+    let>? t_updates =
+      [%pgsql.object dbh
+          "update token_updates set main = $m_main where block = $m_hash returning *"] in
+    let>? c_updates =
+      [%pgsql.object dbh
+          "update contract_updates set main = $m_main where block = $m_hash returning *"] in
+    let>? cancels =
+      [%pgsql.object
+        dbh "update order_cancel set main = $m_main where block = $m_hash returning *"] in
+    let>? matches =
+      [%pgsql.object
+        dbh "update order_match set main = $m_main where block = $m_hash returning *"] in
+    let>? tb_updates =
+      [%pgsql.object dbh
+          "update token_balance_updates set main = $m_main where block = $m_hash returning *"] in
+    let>? () = contract_updates dbh m_main @@ sort c_updates in
+    let>? () = token_updates dbh m_main @@ sort t_updates in
+    let>? () = token_balance_updates dbh m_main @@ sort tb_updates in
+    let>? () =
+      [%pgsql dbh
+          "update tzip21_metadata set main = $m_main where block = $m_hash"] in
+    let>? () =
+      [%pgsql dbh
+          "update tzip21_formats set main = $m_main where block = $m_hash"] in
+    let>? () =
+      [%pgsql dbh
+          "update tzip21_attributes set main = $m_main where block = $m_hash"] in
+    let>? () =
+      [%pgsql dbh
+          "update tzip21_creators set main = $m_main where block = $m_hash"] in
+    let>? () = produce_collection_events m_main collections in
+    let>? () = produce_cancel_events dbh m_main @@ sort cancels in
+    let>? () = produce_match_events dbh m_main @@ sort matches in
+    let>? () = produce_nft_activity_events m_main @@ sort nactivities in
+    Lwt.return_ok ()
+  else
+    Lwt.return_ok ()
 
 let get_level ?dbh () =
   use dbh @@ fun dbh ->
@@ -4670,69 +4746,29 @@ let update_metadata ?(set_metadata=false)
         Lwt.return_ok ()
       end
 
-(* let update_unknown_token_metadata ?dbh ?contract () =
- *   let no_contract = Option.is_none contract in
- *   use dbh @@ fun dbh ->
- *   let>? l = [%pgsql.object dbh
- *       "select i.contract, i.token_id, i.block, i.level, i.tsp, metadata, metadata_uri \
- *        from token_info i left join tzip21_metadata t on i.token_id = t.token_id and i.contract = t.contract where \
- *        i.main and t.contract is null and ($no_contract or i.contract = $?contract)"] in
- *   Format.eprintf "fetching metadata for %d item(s)@." @@ List.length l ;
- *   iter_rp (fun r ->
- *       Format.eprintf "%s %s@." r#contract r#token_id;
- *       let metadata_uri, set_metadata = match r#metadata_uri with
- *         | None ->
- *           let l = EzEncoding.destruct Json_encoding.(assoc string) r#metadata in
- *           begin match List.assoc_opt "" l with
- *             | None -> None
- *             | Some uri -> Some uri
- *           end
- *         | Some uri -> Some uri in
- *       match metadata_uri with
- *       | None ->
- *         Format.eprintf "  can't find uri for metadata, try to decode@." ;
- *         begin try
- *             let metadata = EzEncoding.destruct token_metadata_enc r#metadata in
- *             let block, level, tsp, contract, token_id =
- *               r#block, r#level, r#tsp, r#contract, Z.of_string r#token_id in
- *             let>? () =
- *               insert_mint_metadata dbh ~contract ~token_id ~block ~level ~tsp ~metadata in
- *             Format.eprintf "  OK@." ;
- *             Lwt.return_ok ()
- *           with _ ->
- *             Format.eprintf "  can't find uri or metadata in %s@." r#metadata ;
- *             Lwt.return_ok ()
- *         end
- *       | Some uri ->
- *         if uri <> "" then
- *           let> re = get_metadata_json ~quiet:true uri in
- *           match re with
- *           | Ok (_json, metadata, _uri) ->
- *             let block, level, tsp, contract, token_id =
- *               r#block, r#level, r#tsp, r#contract, Z.of_string r#token_id in
- *             let>? () =
- *               insert_mint_metadata dbh ~contract ~token_id ~block ~level ~tsp ~metadata in
- *             let>? () =
- *               [%pgsql dbh
- *                   "update tzip21_metadata set main = true where block = $block"] in
- *             let>? () =
- *               [%pgsql dbh
- *                   "update tzip21_formats set main = true where block = $block"] in
- *             let>? () =
- *               [%pgsql dbh
- *                   "update tzip21_attributes set main = true where block = $block"] in
- *             let>? () =
- *               [%pgsql dbh
- *                   "update tzip21_creators set main = true where block = $block"] in
- *             Format.eprintf "  OK@." ;
- *             Lwt.return_ok ()
- *           | Error (code, str) ->
- *             (Format.eprintf "  fetch metadata error %d:%s@." code @@
- *              Option.value ~default:"None" str);
- *             Lwt.return_ok ()
- *         else
- *           begin
- *             Format.eprintf "  can't find uri for metadata %s@." r#metadata ;
- *             Lwt.return_ok ()
- *           end)
- *     l *)
+let update_supply ?dbh () =
+  use dbh @@ fun dbh ->
+  [%pgsql dbh
+      "with tmp(contract, token_id, supply) as (\
+       select i.contract, i.token_id, sum(amount) \
+       from token_info i \
+       inner join tokens t on t.contract = i.contract and t.token_id = i.token_id \
+       where main and supply = 0 \
+       group by i.contract, i.token_id) \
+       update token_info i set supply = tmp.supply from tmp \
+       where i.contract = tmp.contract and i.token_id = tmp.token_id"]
+
+let random_tokens ?dbh ?contract ?token_id ?owner ?(number=100L) () =
+  let no_contract, no_token_id, no_owner =
+    Option.is_none contract, Option.is_none token_id, Option.is_none owner in
+  use dbh @@ fun dbh ->
+  [%pgsql.object dbh
+      "select contract, token_id, t.owner, amount, balance, \
+       ledger_id, ledger_key, ledger_value \
+       from tokens t \
+       inner join contracts on address = contract
+       where ($no_contract or contract = $?contract) and \
+       ($no_token_id or token_id = $?{Option.map Z.to_string token_id}) and \
+       ($no_owner or t.owner = $?owner) and ledger_key is not null and \
+       ledger_value is not null \
+       order by random() limit $number"]

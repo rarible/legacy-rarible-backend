@@ -2,7 +2,7 @@
  (name crawler_config)
  (modules crawler_config)
  (package rarible)
- (libraries crawlori))
+ (libraries crawlori db))
 
 (executable
  (name crawler)
@@ -20,3 +20,9 @@
  (modules metadata_daemon)
  (preprocess (pps ppx_deriving_encoding))
  (libraries crawler_config db ez_api.icurl_lwt))
+
+(executable
+ (name direct_crawl)
+ (modules direct_crawl)
+ (preprocess (pps pgocaml_ppx))
+ (libraries crawler_config ez_api.icurl_lwt))

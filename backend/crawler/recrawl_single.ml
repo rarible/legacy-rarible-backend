@@ -16,6 +16,7 @@ let spec = [
 ]
 
 let handle_operation contract ft config () op =
+  Format.printf "Block %s (%ld)\r@?" (Common.Utils.short op.bo_block) op.bo_level;
   match op.bo_meta with
   | None -> Lwt.return_ok ()
   | Some meta ->

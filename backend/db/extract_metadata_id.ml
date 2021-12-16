@@ -43,6 +43,7 @@ let spec = [
 ]
 
 let () =
+  Arg.parse spec (fun _ -> ()) "extract_metadata_id";
   Lwt_main.run @@
   Lwt.map (function
       | Error _ -> Format.printf "Error@."

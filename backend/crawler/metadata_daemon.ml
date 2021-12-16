@@ -46,6 +46,7 @@ let retrieve_token_metadata ~token_metadata_id ~token_id =
 
 let () =
   Arg.parse spec (fun _ -> ()) "metadata_daemon";
+  EzCurl_common.set_timeout (Some 3);
   Lwt_main.run @@ Lwt.map (fun _ -> ()) @@
   let>? () =
     if !retrieve then
