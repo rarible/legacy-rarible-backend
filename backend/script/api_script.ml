@@ -2755,24 +2755,45 @@ let cancel_order_bid ?royalties ?(exchange=exchange) ~kind ~privacy () =
   begin match !crawler_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
   Lwt.return_ok ()
 
+let insert_metadata contract token_id uri =
+  (* let open Crawlori.Hooks0 in *)
+  (* let open Tzfunc.Proto in *)
+  Db.use None @@ fun dbh ->
+  let token_id = Z.of_string token_id in
+  let block = "blFAKE" in
+  let level = 1l in
+  let tsp = CalendarLib.Calendar.now () in
+  let transaction = "opFAKE" in
+  let l = [ "", uri ] in
+  let meta = EzEncoding.construct Json_encoding.(assoc string) l in
+  (* Db.insert_metadata_update ~dbh ~op ~contract ~token_id l *)
+  Db.token_metadata_updates ~dbh ~main:true ~contract ~block ~level ~tsp ~token_id ~transaction meta
+
 (** main *)
 
 let actions = [
-  ["call_upsert_order"], "call upsert endpoint with randomly generated order";
-  ["update_order_make_value <order_hash> <new_make_value>"], "change order's make value";
-  ["update_order_take_value <order_hash> <new_take_value>"], "change order's take value";
-  (* ["update_order_date <order_hash> <start_date> <end_date>"], "change order's start date and end date"; *)
-  ["update_order_taker <order_hash> <new_taker>"], "change order's taker (should fail)";
-  ["create_collection <royalties_contract?>"], "create collection (optionnal royalties contract)" ;
-  ["mint_nft <contract_alias> <dest>"], "mint an nft" ;
-  ["mint_multi <contract_alias> <dest> <amount>"], "mint amount nfts in contract for dest" ;
-  ["transfer_nft <contract_alias> <token_id> <dest>"], "transfer a nft" ;
-  ["transfer_multi <contract_alias> <token_id> <dest> <amount>"], "transfer amount nft" ;
-  ["run_test"], "will run some test (orig, mint, burn and trasnfer (will erase rarible db)";
+  [ "private_nft_transfer" ], "create nft private collection / mint / transer" ;
+  [ "private_nft_burn" ], "create nft private collection / mint / burn" ;
+  [ "private_nft" ], "create nft private collection / mint / transer / burn" ;
+  [ "private_multi_transfer" ], "create multi private collection / mint / transer" ;
+  [ "private_multi_burn" ], "create multi private collection / mint / burn" ;
+  [ "private_multi" ], "create multi private collection / mint / transer / burn" ;
+  [ "public_nft_transfer" ], "create nft public collection / mint / transer" ;
+  [ "public_nft_burn" ], "create nft public collection / mint / burn" ;
+  [ "public_nft" ], "create nft public collection / mint / transer / burn" ;
+  [ "public_multi_transfer" ], "create multi public collection / mint / transer" ;
+  [ "public_multi_burn" ], "create multi public collection / mint / burn" ;
+  [ "public_multi" ], "create multi public collection / mint / transer / burn" ;
   ["match_order_nft_bid"], "create sell orders then exchange the nfts (will erase rarible db)" ;
-  ["match_order_tezos_bid"], "create sell orders then buy the nft for one tezos (will erase rarible db)" ;
-  ["cancel_order"], "create sell orders then cancel it (will erase rarible db)" ;
+  ["match_order_tezos_list"], "create sell orders then buy the nft for one tezos (will erase rarible db)" ;
+  ["match_order_tezos_bid"], "create buy orders then accept to sell the nft for one tezos (will erase rarible db)" ;
+  [ "match_order_lugh_bid" ], "create sell orders then buy nft for one lugh (will erase rarible db)" ;
   ["fill_orders"], "make random sell/bid orders (will erase rarible db)";
+  ["cancel_order_list"], "create sell orders then cancel it (will erase rarible db)" ;
+  ["cancel_order_bid"], "create buy orders then cancel it (will erase rarible db)" ;
+  [ "reset_metadata" ], "create collection / mint item then try to reset metadata" ;
+  [ "simulate_fetch_metadata <contract> <token_id> <uri>" ], "rough insert of metadata into db" ;
+
 ]
 
 let usage =
@@ -3104,6 +3125,20 @@ let main () =
           setup_test_env () >>= function
           | Ok (royalties, _exchange) ->
             reset_meta_test ~royalties ~kind ~privacy () >>= fun _ ->
+            Lwt.return @@ clean_test_env ()
+          | Error _err -> Lwt.return @@ clean_test_env ())
+        (fun exn ->
+           Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;
+           begin match !api_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
+           begin match !crawler_pid with None -> () | Some pid -> Unix.kill pid 9 end ;
+           Lwt.return_unit))
+  | "simulate_fetch_metadata" :: contract :: token_id :: uri :: [] ->
+    Lwt_main.run (
+      Lwt.catch (fun () ->
+          setup_test_env () >>= function
+          | Ok (_royalties, _exchange) ->
+            insert_metadata contract token_id uri >>= fun _ ->
+            call_reset_nft_item_meta_by_id contract token_id >>= fun _ ->
             Lwt.return @@ clean_test_env ()
           | Error _err -> Lwt.return @@ clean_test_env ())
         (fun exn ->

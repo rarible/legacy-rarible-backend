@@ -531,7 +531,12 @@ let rarible_meta_of_tzip21_meta meta =
         end ;
       nft_item_meta_animation =
         match m.tzip21_tm_artifact_uri, m.tzip21_tm_formats with
-        | None, _ | Some _, None -> None
+        | None, _ -> None
+        | Some uri, None ->
+          begin match Filename.extension uri with
+            | ".mp4" -> Some uri
+            | _ -> None
+          end
         | Some uri, Some formats ->
           if List.exists (fun f -> match f.format_mime_type with
               | None -> false
