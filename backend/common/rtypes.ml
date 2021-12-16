@@ -1009,6 +1009,14 @@ let int_or_string_enc = Json_encoding.(union [
          match int_of_string_opt s with None -> failwith ("can't cast to int " ^ s) | Some i -> i) ;
   ])
 
+let bool_or_string_enc = Json_encoding.(union [
+    case bool (fun b -> Some b ) (fun b -> b) ;
+    case string
+      (fun b -> Some (string_of_bool b))
+      (fun s ->
+         match bool_of_string_opt s with None -> failwith ("can't cast to int " ^ s) | Some i -> i) ;
+  ])
+
 type tzip21_format = {
   format_uri : string ; [@dft "no_format_uri"]
   format_hash : string option ;
@@ -1061,7 +1069,7 @@ type tzip21_token_metadata = {
   tzip21_tm_description : string option ;
   tzip21_tm_minter : string option ;
   tzip21_tm_creators : ext_creators option ;
-  tzip21_tm_is_boolean_amount : bool option ;
+  tzip21_tm_is_boolean_amount : (bool [@encoding bool_or_string_enc]) option ;
   tzip21_tm_formats : tzip21_formats option ;
   tzip21_tm_attributes : tzip21_attributes option ;
   tzip21_tm_tags : string list option ;
@@ -1073,8 +1081,8 @@ type tzip21_token_metadata = {
   tzip21_tm_language : string option ;
   tzip21_tm_rights : string option ;
   tzip21_tm_right_uri : string option ;
-  tzip21_tm_is_transferable : bool option ;
-  tzip21_tm_should_prefer_symbol : bool option ;
+  tzip21_tm_is_transferable : (bool [@encoding bool_or_string_enc]) option ;
+  tzip21_tm_should_prefer_symbol : (bool [@encoding bool_or_string_enc]) option ;
 } [@@deriving encoding {camel; option="option"}]
 
 type currency_order_type =
