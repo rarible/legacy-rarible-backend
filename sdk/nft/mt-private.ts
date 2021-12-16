@@ -1,4 +1,5 @@
-import { Provider, OperationResult, to_hex } from "../common/base"
+import { Provider, OperationResult } from "../common/base"
+import { make_metadata } from "./contract-metadata"
 
 export const mt_private_code : any =
   [  {  "prim": "storage",
@@ -7647,8 +7648,7 @@ export const mt_private_code : any =
      ]
   }  ]
 
-export function mt_private_storage(owner : string, metadata_uri?: string) : any {
-  const bytes = (metadata_uri) ? to_hex(metadata_uri) : ""
+export function mt_private_storage(owner : string, metadata?: { [key : string] : string }, metadata_uri?: string) : any {
   return {  "prim": "Pair",
             "args": [
               {  "string": owner  },
@@ -7682,14 +7682,7 @@ export function mt_private_storage(owner : string, metadata_uri?: string) : any 
                                                            {  "prim": "Pair",
                                                               "args": [
                                                                 {  "int": "31556952"  },
-                                                                [  {
-                                                                "prim": "Elt",
-                                                                "args": [
-                                                                  {  "string": ""  },
-                                                                  {  "bytes": bytes  }
-                                                                ]
-                                                                }  ]
-                                                              ]
+                                                                make_metadata(metadata_uri, metadata)                                                       ]
                                                            }
                                                          ]
                                                       }
@@ -7711,13 +7704,14 @@ export function mt_private_storage(owner : string, metadata_uri?: string) : any 
               }
             ]
          }
-  }
+}
 
 export async function deploy_mt_private(
   provider : Provider,
   owner: string,
+  metadata?: { [key:string]: string },
   metadata_uri?: string
 ) : Promise<OperationResult> {
-  const init = mt_private_storage(owner, metadata_uri)
+  const init = mt_private_storage(owner, metadata, metadata_uri)
   return provider.tezos.originate({init, code: mt_private_code})
 }

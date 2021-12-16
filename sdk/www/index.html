@@ -26,17 +26,19 @@
             <b-nav-item :active="path=='api'" @click="path='api'">API</b-nav-item>
             <b-nav-item :active="path=='sign'" @click="path='sign'">Sign</b-nav-item>
             <b-nav-item :active="path=='test'" @click="path='test'">Test</b-nav-item>
+            <b-nav-item v-if="connected" disabled>{{ address.substring(0, 10) }}</b-nav-item>
           </b-navbar-nav>
           <b-navbar-nav class="ms-auto">
-              <b-input-group prepend="Node" class="mx-2">
-                <b-form-input size="sm" v-model="node"></b-form-input>
-              </b-input-group>
-              <b-input-group prepend="API" class="mx-2">
-                <b-form-input size="sm" v-model="api_url"></b-form-input>
-              </b-input-group>
-              <b-input-group prepend="Wallet" class="mx-2">
-                <b-form-input size="sm" v-model="wallet"></b-form-input>
-              </b-input-group>
+            <b-button v-if="!connected" @click="connect()" class="mx-2">CONNECT</b-button>
+            <b-input-group prepend="Node" class="mx-2">
+              <b-form-input size="sm" v-model="node"></b-form-input>
+            </b-input-group>
+            <b-input-group prepend="API" class="mx-2">
+              <b-form-input size="sm" v-model="api_url"></b-form-input>
+            </b-input-group>
+            <b-input-group prepend="Wallet" class="mx-2">
+              <b-form-input size="sm" v-model="wallet"></b-form-input>
+            </b-input-group>
           </b-navbar-nav>
         </b-collapse>
       </b-navbar>
@@ -60,6 +62,9 @@
               </b-form-group>
               <b-form-group label="Kind" class="mb-2">
                 <b-form-select v-model="deploy.kind" :options="['NFT', 'MT']"></b-form-select>
+              </b-form-group>
+              <b-form-group label="Metadata" class="mb-2">
+                <b-form-textarea v-model="deploy.metadata"></b-form-textarea>
               </b-form-group>
               <div class="text-center" class="mb-2">
                 <b-button class="m-2" @click="deploy_fa2()">
