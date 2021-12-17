@@ -1098,33 +1098,37 @@ let reset_mint_metadata_creators  dbh ~contract ~token_id ~metadata =
       l
   | Some (CTZIP12 l) ->
     let len = List.length l in
-    let value = Int32.of_int (10000 / len) in
-    iter_rp (fun part_account ->
-        try
-          ignore @@
-          Tzfunc.Crypto.(Base58.decode ~prefix:Prefix.contract_public_key_hash part_account) ;
-          [%pgsql dbh
-              "update tzip21_creators set \
-               account = $part_account, \
-               value = $value \
-               where contract = $contract and token_id = $token_id"]
-        with _ -> Lwt.return_ok ())
-      l
+    if len > 0 then
+      let value = Int32.of_int (10000 / len) in
+      iter_rp (fun part_account ->
+          try
+            ignore @@
+            Tzfunc.Crypto.(Base58.decode ~prefix:Prefix.contract_public_key_hash part_account) ;
+            [%pgsql dbh
+                "update tzip21_creators set \
+                 account = $part_account, \
+                 value = $value \
+                 where contract = $contract and token_id = $token_id"]
+          with _ -> Lwt.return_ok ())
+        l
+    else Lwt.return_ok ()
   | Some (CNull l) ->
     let l = List.filter_map (fun x -> x) l in
     let len = List.length l in
-    let value = Int32.of_int (10000 / len) in
-    iter_rp (fun part_account ->
-        try
-          ignore @@
-          Tzfunc.Crypto.(Base58.decode ~prefix:Prefix.contract_public_key_hash part_account) ;
-          [%pgsql dbh
-              "update tzip21_creators set \
-               account = $part_account, \
-               value = $value \
-               where contract = $contract and token_id = $token_id"]
-        with _ -> Lwt.return_ok ())
-      l
+    if len > 0 then
+      let value = Int32.of_int (10000 / len) in
+      iter_rp (fun part_account ->
+          try
+            ignore @@
+            Tzfunc.Crypto.(Base58.decode ~prefix:Prefix.contract_public_key_hash part_account) ;
+            [%pgsql dbh
+                "update tzip21_creators set \
+                 account = $part_account, \
+                 value = $value \
+                 where contract = $contract and token_id = $token_id"]
+          with _ -> Lwt.return_ok ())
+        l
+    else Lwt.return_ok ()
   | None -> Lwt.return_ok ()
 
 let insert_mint_metadata_creators  dbh ~contract ~token_id ~block ~level ~tsp ~metadata =
@@ -1157,35 +1161,40 @@ let insert_mint_metadata_creators  dbh ~contract ~token_id ~block ~level ~tsp ~m
       l
   | Some (CTZIP12 l) ->
     let len = List.length l in
-    let value = Int32.of_int (10000 / len) in
-    iter_rp (fun part_account ->
-        try
-          ignore @@
-          Tzfunc.Crypto.(Base58.decode ~prefix:Prefix.contract_public_key_hash part_account) ;
-          [%pgsql dbh
-              "insert into tzip21_creators(contract, token_id, block, level, \
-               tsp, account, value) \
-               values($contract, ${Z.to_string token_id}, $block, $level, $tsp, \
-               $part_account, $value) \
-               on conflict do nothing"]
-        with _ -> Lwt.return_ok ())
-      l
+    if len > 0 then
+      let value = Int32.of_int (10000 / len) in
+      iter_rp (fun part_account ->
+          try
+            ignore @@
+            Tzfunc.Crypto.(Base58.decode ~prefix:Prefix.contract_public_key_hash part_account) ;
+            [%pgsql dbh
+                "insert into tzip21_creators(contract, token_id, block, level, \
+                 tsp, account, value) \
+                 values($contract, ${Z.to_string token_id}, $block, $level, $tsp, \
+                 $part_account, $value) \
+                 on conflict do nothing"]
+          with _ -> Lwt.return_ok ())
+        l
+    else Lwt.return_ok ()
   | Some (CNull l) ->
     let l = List.filter_map (fun x -> x) l in
     let len = List.length l in
-    let value = Int32.of_int (10000 / len) in
-    iter_rp (fun part_account ->
-        try
-          ignore @@
-          Tzfunc.Crypto.(Base58.decode ~prefix:Prefix.contract_public_key_hash part_account) ;
-          [%pgsql dbh
-              "insert into tzip21_creators(contract, token_id, block, level, \
-               tsp, account, value) \
-               values($contract, ${Z.to_string token_id}, $block, $level, $tsp, \
-               $part_account, $value) \
-               on conflict do nothing"]
-        with _ -> Lwt.return_ok ())
-      l
+    if len > 0 then
+      let value = Int32.of_int (10000 / len) in
+      iter_rp (fun part_account ->
+          try
+            ignore @@
+            Tzfunc.Crypto.(Base58.decode ~prefix:Prefix.contract_public_key_hash part_account) ;
+            [%pgsql dbh
+                "insert into tzip21_creators(contract, token_id, block, level, \
+                 tsp, account, value) \
+                 values($contract, ${Z.to_string token_id}, $block, $level, $tsp, \
+                 $part_account, $value) \
+                 on conflict do nothing"]
+          with _ -> Lwt.return_ok ())
+        l
+    else Lwt.return_ok ()
+
   | None -> Lwt.return_ok ()
 
 let insert_mint_metadata_formats dbh ~contract ~token_id ~block ~level ~tsp ~metadata =
