@@ -964,6 +964,7 @@ type ledger_type = {
 type nft_ledger = {
   nft_ledger_type: ledger_type;
   nft_ledger_id: z;
+  nft_token_meta_id: z option;
   nft_meta_id: z option;
 } [@@deriving encoding]
 

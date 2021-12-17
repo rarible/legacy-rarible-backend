@@ -113,3 +113,8 @@ let ledger_lugh_field = `tuple [ `address; `nat ], `tuple [`nat; `bool ]
 let set_royalties_entry = `tuple [`address; `nat; `map (`address, `nat)]
 
 let token_metadata_field = `nat, `tuple [ `nat; `map (`string, `bytes) ]
+let metadata_field = `string, `bytes
+
+let checked_field ~expected = function
+  | (_, Some (id, k, v)) when (k, v) = expected -> Some id
+  | _ -> None

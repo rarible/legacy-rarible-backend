@@ -298,10 +298,21 @@ let upgrade_1_to_2 dbh version =
 
   ]
 
+let upgrade_2_to_3 dbh version =
+  EzPG.upgrade ~dbh ~version
+    ~downgrade:[
+      "alter table contracts drop column metadata_id";
+      "alter table contracts rename column token_metadata_id to metadata_id";
+    ] [
+    "alter table contracts rename column metadata_id to token_metadata_id";
+    "alter table contracts add column metadata_id varchar";
+  ]
+
 let upgrades =
   let last_version = fst List.(hd @@ rev !Versions.upgrades) in
   !Versions.upgrades @ [
     last_version + 1, upgrade_1_to_2;
+    last_version + 2, upgrade_2_to_3;
   ]
 
 let () =
