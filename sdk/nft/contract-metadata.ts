@@ -20,7 +20,7 @@ export function make_metadata(metadata_uri?: string, metadata?: { [key : string]
         {  "bytes": to_hex(metadata_uri)  }
       ] } ]
   } else if (metadata) {
-    return Object.keys(metadata).map(function(k) {
+    return Object.keys(metadata).sort().map(function(k) {
       return {
       "prim": "Elt",
       "args": [
