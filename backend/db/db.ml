@@ -4551,12 +4551,13 @@ let set_metadata_id ?dbh ~contract id =
   use dbh @@ fun dbh ->
   [%pgsql dbh "update contracts set metadata_id = ${Z.to_string id} where address = $contract"]
 
-let update_unknown_metadata ?dbh () =
+let update_unknown_metadata ?dbh ?contract () =
+  let no_contract = Option.is_none contract in
   use dbh @@ fun dbh ->
   let>? l = [%pgsql.object dbh
       "select i.contract, i.token_id, i.block, i.level, i.tsp, metadata, metadata_uri \
        from token_info i left join tzip21_metadata t on i.token_id = t.token_id and i.contract = t.contract where \
-       i.main and t.contract is null"] in
+       i.main and t.contract is null and ($no_contract or i.contract = $?contract)"] in
   iter_rp (fun r ->
       let metadata_uri = match r#metadata_uri with
         | None ->
@@ -4588,6 +4589,6 @@ let update_unknown_metadata ?dbh () =
           [%pgsql dbh
               "update tzip21_creators set main = true where block = $block"]
         | Error (code, str) ->
-          (Format.eprintf "fetch metadata error %d:%s" code @@
+          (Format.eprintf "fetch metadata error %d:%s@." code @@
            Option.value ~default:"None" str);
           Lwt.return_ok ()) l
