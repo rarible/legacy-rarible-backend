@@ -7,10 +7,15 @@ let no_update = true")))
  (modules db_env)
  (implements crawlori.db_env))
 
+(library
+ (name updates)
+ (modules updates)
+ (libraries db_env_rarible ez_pgocaml crawlori.versions))
+
 (executable
  (name update)
  (modules update)
- (libraries db_env_rarible ez_pgocaml crawlori.versions crawlori.config))
+ (libraries updates crawlori.config))
 
 (rule
  (deps update.exe)

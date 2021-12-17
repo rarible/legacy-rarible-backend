@@ -51,6 +51,7 @@ let () =
   Arg.parse args (fun f -> filename := Some f) usage;
   Lwt.map (fun _ -> ()) @@
   let>? () = Db.Rarible_kafka.may_set_kafka_config !kafka_config_file in
+  EzPGUpdater.main Cconfig.database ~upgrades:Updates.upgrades;
   let>? config = Lwt.return @@ Crawler_config.get !filename Rtypes.config_enc in
   Hooks.set_operation Db.insert_operation;
   Hooks.set_block Db.insert_block;
