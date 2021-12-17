@@ -4588,7 +4588,6 @@ let update_unknown_metadata ?dbh () =
           [%pgsql dbh
               "update tzip21_creators set main = true where block = $block"]
         | Error (code, str) ->
-          Lwt.return_error
-            (`hook_error
-               (Printf.sprintf "fetch metadata error %d:%s" code @@
-                Option.value ~default:"None" str))) l
+          (Format.eprintf "fetch metadata error %d:%s" code @@
+           Option.value ~default:"None" str);
+          Lwt.return_ok ()) l
