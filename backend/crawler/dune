@@ -7,7 +7,7 @@
 (executable
  (name crawler)
  (modules crawler)
- (libraries crawler_config db ez_api.icurl_lwt))
+ (libraries crawler_config db updates ez_api.icurl_lwt))
 
 (executable
  (name recrawl_single)
