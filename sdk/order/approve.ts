@@ -141,8 +141,10 @@ export async function approve(
   asset: Asset,
   infinite?: boolean,
 ): Promise<OperationResult | undefined> {
-  if (asset.asset_type.asset_class == "FT") {
+  if (asset.asset_type.asset_class == "FT" && asset.asset_type.token_id==undefined) {
     return approve_fa1_2(provider, owner, asset.asset_type.contract, asset.value, infinite)
+  } else if (asset.asset_type.asset_class == "FT") {
+    return approve_fa2(provider, owner, asset.asset_type.contract, asset.asset_type.token_id)
   } else if (asset.asset_type.asset_class == "NFT") {
     return approve_fa2(provider, owner, asset.asset_type.contract || provider.config.nft_public)
   } else if (asset.asset_type.asset_class == "MT") {
@@ -175,8 +177,10 @@ export async function approve_token(
   asset: Asset,
   infinite?: boolean,
 ): Promise<OperationResult | undefined> {
-  if (asset.asset_type.asset_class == "FT") {
+  if (asset.asset_type.asset_class == "FT" && asset.asset_type.token_id==undefined) {
     return approve_fa1_2(provider, owner, asset.asset_type.contract, asset.value, infinite)
+  } else if (asset.asset_type.asset_class == "FT") {
+    return approve_fa2(provider, owner, asset.asset_type.contract, asset.asset_type.token_id)
   } else if (asset.asset_type.asset_class == "NFT") {
     return approve_fa2(provider, owner, asset.asset_type.contract || provider.config.nft_public, asset.asset_type.token_id)
   } else if (asset.asset_type.asset_class == "MT") {

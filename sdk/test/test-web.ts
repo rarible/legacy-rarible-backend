@@ -516,7 +516,7 @@ export default new Vue({
         const amount = new BigNumber(this.bid.amount)
         const price = new BigNumber(this.bid.price)
         let payouts = parse_parts(this.bid.payouts)
-        if (payouts.length == 0) payouts = [ { account: pk_to_pkh(maker), value: new BigNumber(10000)} ]
+        if (payouts.length == 0) payouts = [ { account: maker, value: new BigNumber(10000)} ]
         const origin_fees = parse_parts(this.bid.origin_fees)
         if (!make_asset_type) {
           this.bid.status = 'danger'
