@@ -1072,7 +1072,7 @@ type tzip21_attributes = tzip21_attribute list [@@deriving encoding]
 type ext_creators =
   | CParts of part list
   | CAssoc of (string * int32) list
-  | CTZIP12 of string list
+  | CTZIP12 of (string list [@encoding string_array_or_string_enc])
   | CNull of string option list
 [@@deriving encoding]
 
