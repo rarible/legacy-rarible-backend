@@ -1066,14 +1066,14 @@ type tzip21_attribute = {
   attribute_name : string ; [@encoding name_or_trait_type_enc] [@merge] [@dft "no_attribute_name"]
   attribute_type : string option ; [@encoding type_or_display_type_enc] [@merge]
   attribute_value : Json_repr.ezjsonm ; [@dft `O []]
-} [@@deriving encoding]
+} [@@deriving encoding {ignore}]
 
 type tzip21_attributes = tzip21_attribute list [@@deriving encoding]
 
 type ext_creators =
   | CParts of part list
   | CAssoc of (string * int32) list
-  | CTZIP12 of string list
+  | CTZIP12 of (string list [@encoding string_array_or_string_enc])
   | CNull of string option list
 [@@deriving encoding]
 
