@@ -38,6 +38,8 @@ module A = struct
     with _ ->
     try CalendarLib.Calendar.from_unixfloat (Float.of_string s)
     with _ ->
+    try CalendarLib.Printer.Calendar.from_fstring "%Y-%m-%d" s
+    with _ ->
     try CalendarLib.Printer.Calendar.from_fstring "%Y-%m-%dT%H:%M:%S" s
     with _ ->
       if String.length s < 5 then failwith "cannot parse timestamp"
@@ -1017,6 +1019,16 @@ let bool_or_string_enc = Json_encoding.(union [
          match bool_of_string_opt s with None -> failwith ("can't cast to int " ^ s) | Some i -> i) ;
   ])
 
+let string_array_or_string_enc = Json_encoding.(union [
+    case (list string) (fun s -> Some s) (fun l -> l) ;
+    case string (fun _l -> None) (fun s -> [ s ]) ;
+  ])
+
+let string_or_string_array_enc = Json_encoding.(union [
+    case string (fun s -> Some s) (fun s -> s) ;
+    case (list string) (fun s -> Some [ s ]) (fun l -> String.concat "," l) ;
+  ])
+
 type tzip21_format = {
   format_uri : string ; [@dft "no_format_uri"]
   format_hash : string option ;
@@ -1029,6 +1041,11 @@ type tzip21_format = {
 } [@@deriving encoding {camel ; option="option"}]
 
 type tzip21_formats = tzip21_format list [@@deriving encoding]
+
+let tzip21_formats_or_tzip_format_enc = Json_encoding.(union [
+    case tzip21_formats_enc (fun f -> Some f) (fun f -> f) ;
+    case tzip21_format_enc (fun _f -> None) (fun s -> [ s ]) ;
+  ])
 
 let name_or_trait_type_enc = Json_encoding.(union [
     case (obj1 (req "name" string)) (fun s -> Some s ) (fun s -> s) ;
@@ -1059,10 +1076,15 @@ type ext_creators =
   | CNull of string option list
 [@@deriving encoding]
 
+let date_or_error_enc = Json_encoding.(union [
+    case A.date_enc (fun d -> d) (fun d -> Some d) ;
+    case Json_encoding.any_value (fun _ -> None) (fun _ -> None) ;
+  ])
+
 type tzip21_token_metadata = {
-  tzip21_tm_name : string option ;
+  tzip21_tm_name : (string [@encoding string_or_string_array_enc]) option ;
   tzip21_tm_symbol : string option ;
-  tzip21_tm_decimals : int option ;
+  tzip21_tm_decimals : (int [@encoding int_or_string_enc]) option ;
   tzip21_tm_artifact_uri : string option ;
   tzip21_tm_display_uri : string option ;
   tzip21_tm_thumbnail_uri : string option ;
@@ -1070,12 +1092,12 @@ type tzip21_token_metadata = {
   tzip21_tm_minter : string option ;
   tzip21_tm_creators : ext_creators option ;
   tzip21_tm_is_boolean_amount : (bool [@encoding bool_or_string_enc]) option ;
-  tzip21_tm_formats : tzip21_formats option ;
+  tzip21_tm_formats : (tzip21_formats [@encoding tzip21_formats_or_tzip_format_enc]) option ;
   tzip21_tm_attributes : tzip21_attributes option ;
-  tzip21_tm_tags : string list option ;
+  tzip21_tm_tags : (string list [@encoding string_array_or_string_enc]) option ;
   tzip21_tm_contributors : string list option ;
   tzip21_tm_publishers : string list option ;
-  tzip21_tm_date : A.date option ;
+  tzip21_tm_date : A.date option [@encoding date_or_error_enc] ;
   tzip21_tm_block_level : int option ;
   tzip21_tm_genres : string list option ;
   tzip21_tm_language : string option ;
