@@ -456,7 +456,7 @@ let get_order_updates ?dbh obj make maker take data =
   let>? cancel = [%pgsql.object dbh
       "select * from order_cancel where (cancel = $hash) order by tsp"] in
   match cancel with
-  | [ cancel ] ->
+  | cancel :: _ ->
     Lwt.return_ok (Z.zero, Z.zero, true, cancel#tsp, Z.zero)
   | _ ->
     let>? matches = [%pgsql.object dbh
