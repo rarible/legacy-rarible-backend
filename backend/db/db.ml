@@ -2008,7 +2008,7 @@ let insert_nft ~dbh ~meta ~op ~contract ~nft ~entrypoint ~param =
       meta.op_lazy_storage_diff in
   let>? () = insert_token_balances ~dbh ~op ~contract balances in
   let token_meta_k, token_meta_v = Contract_spec.token_metadata_field in
-  match nft.nft_meta_id with
+  match nft.nft_token_meta_id with
   | None -> Lwt.return_ok ()
   | Some id ->
     let metadata = Storage_diff.get_big_map_updates ~id token_meta_k token_meta_v
@@ -2150,11 +2150,11 @@ let insert_origination config dbh op ori =
         nft.nft_ledger_type.ledger_key nft.nft_ledger_type.ledger_value
         meta.op_lazy_storage_diff in
     let>? () = insert_token_balances ~dbh ~op ~contract:kt1 balances in
-    let meta_k, meta_v = Contract_spec.token_metadata_field in
-    match nft.nft_meta_id with
+    let token_meta_k, token_meta_v = Contract_spec.token_metadata_field in
+    match nft.nft_token_meta_id with
     | None -> Lwt.return_ok ()
     | Some id ->
-      let metadata = Storage_diff.get_big_map_updates ~id meta_k meta_v
+      let metadata = Storage_diff.get_big_map_updates ~id token_meta_k token_meta_v
           meta.op_lazy_storage_diff in
       insert_metadatas ~dbh ~op ~contract:kt1 metadata
 
