@@ -2158,7 +2158,7 @@ let insert_origination config dbh op ori =
           meta.op_lazy_storage_diff in
       insert_metadatas ~dbh ~op ~contract:kt1 metadata
 
-let insert_operation config dbh op =
+let insert_operation config ?forward:_ dbh op =
   let open Hooks in
   match op.bo_meta with
   | Some meta ->
@@ -2170,7 +2170,7 @@ let insert_operation config dbh op =
     else Lwt.return_ok ()
   | _ -> Lwt.return_ok ()
 
-let insert_block config dbh b =
+let insert_block config ?forward:_ dbh b =
   (* EzEncoding.construct Tzfunc.Proto.full_block_enc.Encoding.json b
    * |> Rarible_kafka.produce_test >>= fun () -> *)
   iter_rp (fun op ->
@@ -2512,7 +2512,7 @@ let produce_collection_events main l =
       else Lwt.return_ok ())
     l
 
-let set_main _config dbh {Hooks.m_main; m_hash} =
+let set_main _config ?forward:_ dbh {Hooks.m_main; m_hash} =
   let sort l = List.sort (fun r1 r2 ->
       if m_main then Int32.compare r1#index r2#index
       else Int32.compare r2#index r1#index) l in
