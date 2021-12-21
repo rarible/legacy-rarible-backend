@@ -1,0 +1,5 @@
+(executable
+ (name permit)
+ (modules permit)
+ (preprocess (pps ppx_deriving_encoding ez_api.ppx_err_case ez_api.ppx_server))
+ (libraries db))
