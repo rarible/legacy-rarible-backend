@@ -9,7 +9,6 @@ let port = ref 8081
 
 type config = {
   secret_key: string;
-  transfer_proxy: string;
   exchange: string;
   whitelist: string list; [@dft []]
   edsk: string; [@dft ""]
@@ -54,7 +53,6 @@ let spec = [
 let config =
   ref {
     secret_key = "";
-    transfer_proxy = "";
     exchange = "";
     whitelist = [];
     edsk = "";
@@ -123,9 +121,13 @@ let inject_ops ~code ops =
       EzAPIServer.return (Ok hash)
 
 let add_permit permit =
-  let ops = mk_ops ~entrypoint:"permit" ~source:!config.tz1 ~destination:permit.contract
-      (Mseq [ Mstring permit.pk; Mstring permit.signature; Mbytes (H.mk permit.hash)]) in
-  inject_ops ~code:`PERMIT_ERROR ops
+  if List.mem permit.contract !config.whitelist then
+    let ops = mk_ops ~entrypoint:"permit" ~source:!config.tz1 ~destination:permit.contract
+        (Mseq [ Mstring permit.pk; Mstring permit.signature; Mbytes (H.mk permit.hash)]) in
+    inject_ops ~code:`PERMIT_ERROR ops
+  else
+    let message = Format.sprintf "contract %s not whitelisted for feeless transaction" permit.contract in
+    EzAPIServer.return (Error { code = `PERMIT_ERROR; message })
 [@@post
   {path="/v0.1/permit/add";
    input=permit_enc;
@@ -139,25 +141,44 @@ let z_order order =
   let|>? taked = Db.get_decimals ~do_error:true order.order_elt.order_elt_take.asset_type in
   Common.Balance.z_order ?maked ?taked order
 
+let get_contract = function
+  | ATXTZ -> assert false
+  | ATFT { contract; _ } | ATNFT { asset_contract=contract; _ }
+  | ATMT { asset_contract=contract; _ } -> contract
+
 let match_orders orders =
-  let> rleft = z_order orders.left in
-  let> rright = z_order orders.right in
-  match rleft, rright with
-  | Error e, _ | _, Error e ->
-    EzAPIServer.return (Error { code = `ORDER_ERROR; message = Crp.string_of_error e })
-  | Ok left, Ok right ->
-    match Common.Utils.flat_order left, Common.Utils.flat_order right with
-    | Error e, _ | _, Error e ->
-      EzAPIServer.return (Error { code = `ORDER_ERROR; message = Let.string_of_error e })
-    | Ok m_left, Ok m_right ->
-      let signature_left =
-        Forge.prim `Some ~args:[Mstring left.order_elt.order_elt_signature] in
-      let signature_right =
-        Forge.prim `Some ~args:[Mstring right.order_elt.order_elt_signature] in
-      let mich = Forge.prim `Pair ~args:[m_left; signature_left; m_right; signature_right] in
-      let ops = mk_ops ~entrypoint:"match_orders" ~source:!config.tz1 ~destination:!config.exchange
-          mich in
-      inject_ops ~code:`ORDER_ERROR ops
+  match orders.left.order_elt.order_elt_make.asset_type,
+        orders.right.order_elt.order_elt_make.asset_type with
+  | ATXTZ, _ | _, ATXTZ ->
+    let message = "XTZ transfer not possible for feeless transaction" in
+    EzAPIServer.return (Error { code = `ORDER_ERROR; message })
+  | _ ->
+    let contract_left = get_contract orders.left.order_elt.order_elt_make.asset_type in
+    let contract_right = get_contract orders.right.order_elt.order_elt_make.asset_type in
+    if List.mem contract_left !config.whitelist || List.mem contract_right !config.whitelist then
+
+      let> rleft = z_order orders.left in
+      let> rright = z_order orders.right in
+      match rleft, rright with
+      | Error e, _ | _, Error e ->
+        EzAPIServer.return (Error { code = `ORDER_ERROR; message = Crp.string_of_error e })
+      | Ok left, Ok right ->
+        match Common.Utils.flat_order left, Common.Utils.flat_order right with
+        | Error e, _ | _, Error e ->
+          EzAPIServer.return (Error { code = `ORDER_ERROR; message = Let.string_of_error e })
+        | Ok m_left, Ok m_right ->
+          let signature_left =
+            Forge.prim `Some ~args:[Mstring left.order_elt.order_elt_signature] in
+          let signature_right =
+            Forge.prim `Some ~args:[Mstring right.order_elt.order_elt_signature] in
+          let mich = Forge.prim `Pair ~args:[m_left; signature_left; m_right; signature_right] in
+          let ops = mk_ops ~entrypoint:"match_orders" ~source:!config.tz1 ~destination:!config.exchange
+              mich in
+          inject_ops ~code:`ORDER_ERROR ops
+    else
+      let message = Format.sprintf "No contract whitelisted in order (%s, %s)"
+          contract_left contract_right in
+      EzAPIServer.return (Error { code = `ORDER_ERROR; message })
 [@@post
   {path="/v0.1/permit/match_orders";
    input=orders_enc;
