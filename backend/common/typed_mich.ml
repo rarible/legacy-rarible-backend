@@ -88,7 +88,7 @@ let parse_value t m : (micheline_value, _) result =
       Ok (`address s)
     | `signature, Mstring s -> Ok (`signature s)
     | `chain_id, Mstring s -> Ok (`chain_id s)
-    | `timestamp, Mstring s -> Ok (`timestamp (Proto.A.cal_of_str s))
+    | `timestamp, Mstring s -> Ok (`timestamp (A.cal_of_str s))
     | `nat, Mint i -> Ok (`nat i)
     | `int, Mint i -> Ok (`int i)
     | `mutez, Mint i -> Ok (`mutez i)
