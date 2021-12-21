@@ -267,13 +267,19 @@ let mk_order_activity_match ~dbh obj =
          from order_match where transaction = $?{obj#transaction}"] in
   let left_value, right_value = match r with
     | Ok [ r ] ->
-      if r#fill_make_value = obj#oleft_make_asset_value ||
-         r#fill_take_value = obj#oright_make_asset_value then
-        r#fill_make_value, r#fill_take_value
+      if r#fill_make_value = Z.zero || r#fill_take_value = Z.zero then
+        obj#oleft_make_asset_value, obj#oright_make_asset_value
       else
-      if r#fill_make_value = obj#oright_make_asset_value || r#fill_take_value = obj#oleft_make_asset_value then
-        r#fill_take_value, r#fill_make_value
-      else obj#oleft_make_asset_value, obj#oright_make_asset_value
+        let price1 = Z.div r#fill_make_value r#fill_take_value in
+        let price2 = Z.div r#fill_take_value r#fill_make_value in
+        if price1 = Z.div obj#oleft_make_asset_value obj#oleft_take_asset_value ||
+           price1 = Z.div obj#oright_take_asset_value obj#oright_make_asset_value then
+          r#fill_make_value, r#fill_take_value
+        else
+        if price2 = Z.div obj#oleft_take_asset_value obj#oleft_make_asset_value ||
+           price2 = Z.div obj#oright_take_asset_value obj#oright_make_asset_value then
+          r#fill_take_value, r#fill_make_value
+        else obj#oleft_make_asset_value, obj#oright_make_asset_value
     | _ -> obj#oleft_make_asset_value, obj#oright_make_asset_value
   in
   let$ left, left_decimals = mk_left_side obj left_value in
