@@ -1022,6 +1022,12 @@ type config = {
   mutable contracts: nft_ledger SMap.t; [@map] [@dft SMap.empty]
 } [@@deriving encoding]
 
+type daemon_config = {
+  daemon_nodes : string list [@dft ["https://tz.functori.com"]];
+  daemon_ipfs_sources : string list [@dft ["https://rarible.mypinata.cloud/"]];
+  daemon_timeout : int ; [@dft 5]
+} [@@deriving encoding]
+
 type kafka_config = {
   kafka_broker : string;
   kafka_username : string;

@@ -1058,8 +1058,8 @@ let get_metadata meta =
   with _ ->
     None, None, None, None, None
 
-let get_or_timeout ?msg url =
-  let timeout = Lwt_unix.sleep 30. >>= fun () -> Lwt.return_error (-1, Some "timeout") in
+let get_or_timeout ?(timeout=30.) ?msg url =
+  let timeout = Lwt_unix.sleep timeout >>= fun () -> Lwt.return_error (-1, Some "timeout") in
   Lwt.pick [ timeout ; EzReq_lwt.get ?msg url ]
 
 let get_metadata_uri s =
@@ -1068,7 +1068,7 @@ let get_metadata_uri s =
   else if proto = "ipfs:/" then Some s
   else None
 
-let get_metadata_json ?(quiet=false) meta =
+let get_metadata_json ?(source="https://rarible.mypinata.cloud/") ?(quiet=false) ?timeout meta =
   if not quiet then Format.eprintf "get_metadata_json %s@." meta ;
   let msg = if not quiet then Some "get_metadata_json" else None in
   (* 3 ways to recovers metadata :directly json, ipfs link and http(s) link *)
@@ -1078,7 +1078,7 @@ let get_metadata_json ?(quiet=false) meta =
     begin
       let proto = try String.sub meta 0 6 with _ -> "" in
       if proto = "https:" || proto = "http:/" then
-        let|>? json = get_or_timeout (EzAPI.URL meta) in
+        let|>? json = get_or_timeout ?timeout (EzAPI.URL meta) in
         json, meta
       else if proto = "ipfs:/" then
         let url = try String.sub meta 7 ((String.length meta) - 7) with _ -> "" in
@@ -1090,8 +1090,8 @@ let get_metadata_json ?(quiet=false) meta =
               "ipns/", String.sub url 5 ((String.length meta) - 5)
             else "ipfs/", url
           with _ -> "", url in
-        let uri = Printf.sprintf "https://rarible.mypinata.cloud/%s%s" fs url in
-        let|>? json = get_or_timeout ?msg (EzAPI.URL uri) in
+        let uri = Printf.sprintf "%s%s%s" source fs url in
+        let|>? json = get_or_timeout ?timeout ?msg (EzAPI.URL uri) in
         json, uri
       else Lwt.return_error (0, Some (Printf.sprintf "unknow scheme %S" proto))
     end >>= function
@@ -4694,11 +4694,104 @@ let set_bm_id ?dbh ?(kind=`token) ~contract id =
   | `royalties ->
     [%pgsql dbh "update contracts set royalties_id = ${Z.to_string id} where address = $contract"]
 
+let fetch_metadata_from_source ?(verbose=0) ~timeout ~source l =
+  let cpt = ref 0 in
+  let err = ref 0 in
+  let empty = ref 0 in
+  let oks = ref 0 in
+  let len = List.length l in
+  if verbose > 0 then
+    Format.eprintf "fetching metadata for %d item(s) from %s @." (List.length l) source ;
+  use None @@ fun dbh ->
+  iter_rp (fun r ->
+      if !cpt <> 0 then
+        Format.eprintf "[%d / %d | \027[0;91mErr %d\027[0m | \
+                        \027[0;93mEmpty %d\027[0m | \027[0;92mOk %d\027[0m] %s@."
+          !cpt len !err !empty !oks source;
+      incr cpt ;
+      if verbose > 0 then
+        Format.eprintf "%s %s %s@." source r#contract r#token_id;
+      let metadata_uri = match r#metadata_uri with
+        | None ->
+          let l = EzEncoding.destruct Json_encoding.(assoc string) r#metadata in
+          begin match List.assoc_opt "" l with
+            | None -> None
+            | Some uri -> Some uri
+          end
+        | Some uri -> Some uri in
+      match metadata_uri with
+      | None ->
+        if verbose > 0 then
+          Format.eprintf "  can't find uri for metadata, try to decode@." ;
+        begin try
+            if r#metadata <> "{}" then
+              let metadata = EzEncoding.destruct token_metadata_enc r#metadata in
+              let block, level, tsp, contract, token_id =
+                r#block, r#level, r#tsp, r#contract, Z.of_string r#token_id in
+              let>? () =
+                insert_mint_metadata dbh ~contract ~token_id ~block ~level ~tsp ~metadata in
+              if verbose > 0 then Format.eprintf "  OK@." ;
+              incr oks ;
+              Lwt.return_ok ()
+            else
+              begin
+                if verbose > 0 then Format.eprintf "  empty metadata@." ;
+                incr empty ;
+                Lwt.return_ok ()
+              end
+          with _ ->
+            if verbose > 0 then Format.eprintf "  can't decode metadata in %s@." r#metadata ;
+            incr err ;
+            Lwt.return_ok ()
+        end
+      | Some uri ->
+        if uri <> "" then
+          let> re = get_metadata_json ~quiet:true ~source ~timeout uri in
+          match re with
+          | Ok (_json, metadata, _uri) ->
+            let block, level, tsp, contract, token_id =
+              r#block, r#level, r#tsp, r#contract, Z.of_string r#token_id in
+            let>? () =
+              insert_mint_metadata dbh ~contract ~token_id ~block ~level ~tsp ~metadata in
+            let>? () =
+              [%pgsql dbh
+                  "update tzip21_metadata set main = true where block = $block"] in
+            let>? () =
+              [%pgsql dbh
+                  "update tzip21_formats set main = true where block = $block"] in
+            let>? () =
+              [%pgsql dbh
+                  "update tzip21_attributes set main = true where block = $block"] in
+            let>? () =
+              [%pgsql dbh
+                  "update tzip21_creators set main = true where block = $block"] in
+            if verbose > 0 then Format.eprintf "  OK@." ;
+            incr oks ;
+            Lwt.return_ok ()
+          | Error (code, str) ->
+            incr err ;
+            (if verbose > 0 then Format.eprintf "  fetch metadata error %d:%s@." code @@
+               Option.value ~default:"None" str);
+            if code = 429 then
+              (* TOO MANY REQUESTS *)
+              Lwt_unix.sleep 30. >>= fun () ->
+              Lwt.return_ok ()
+            else
+              Lwt.return_ok ()
+        else
+          begin
+            if verbose > 0 then Format.eprintf "  can't find uri for metadata %s@." r#metadata ;
+            incr err ;
+            Lwt.return_ok ()
+          end)
+    l
+
 let empty_token_metadata ?dbh ?contract () =
   let no_contract = Option.is_none contract in
   use dbh @@ fun dbh ->
   [%pgsql.object dbh
-      "select contract, token_id, t.block, t.level, t.tsp, c.token_metadata_id from token_info t \
+      "select contract, token_id, t.block, t.level, t.tsp, t.metadata, \
+       t.metadata_uri, c.token_metadata_id from token_info t \
        inner join contracts c on t.contract = c.address \
        where t.main and metadata_uri is null and t.metadata = '{}' \
        and ($no_contract or contract = $?contract) and token_metadata_id is not null"]
@@ -4707,13 +4800,20 @@ let unknown_token_metadata ?dbh ?contract () =
   let no_contract = Option.is_none contract in
   use dbh @@ fun dbh ->
   [%pgsql.object dbh
-      "select i.contract, i.token_id, i.block, i.level, i.tsp, metadata, metadata_uri \
-       from token_info i left join tzip21_metadata t on i.token_id = t.token_id and i.contract = t.contract where \
+      "select i.contract, i.token_id, i.block, i.level, i.tsp, metadata, \
+       metadata_uri, null as token_metadata_id \
+       from token_info i left join tzip21_metadata t on \
+       i.token_id = t.token_id and i.contract = t.contract where \
        i.main and t.contract is null and ($no_contract or i.contract = $?contract)"]
 
 let update_metadata ?(set_metadata=false)
     ?metadata_uri ?dbh ~metadata ~contract ~token_id ~block ~level ~tsp () =
   Format.eprintf "%s[%s]@." contract token_id;
+  if set_metadata then
+    use dbh @@ fun dbh ->
+    [%pgsql dbh "update token_info set metadata = $metadata \
+                 where contract = $contract and token_id = ${token_id}"]
+  else
   let metadata_uri = match metadata_uri with
     | None ->
       let l = EzEncoding.destruct Json_encoding.(assoc string) metadata in
@@ -4725,13 +4825,9 @@ let update_metadata ?(set_metadata=false)
     begin try
         let metadata_tzip = EzEncoding.destruct token_metadata_enc metadata in
         let token_id = Z.of_string token_id in
+        use dbh @@ fun dbh ->
         let>? () =
-          use dbh @@ fun dbh ->
-          let>? () = insert_mint_metadata dbh ~contract ~token_id ~block ~level ~tsp ~metadata:metadata_tzip in
-          if set_metadata then
-            [%pgsql dbh "update token_info set metadata = $metadata \
-                         where contract = $contract and token_id = ${Z.to_string token_id}"]
-          else Lwt.return_ok () in
+          insert_mint_metadata dbh ~contract ~token_id ~block ~level ~tsp ~metadata:metadata_tzip in
         Format.eprintf "  OK@." ;
         Lwt.return_ok ()
       with _ ->
@@ -4760,10 +4856,7 @@ let update_metadata ?(set_metadata=false)
           [%pgsql dbh
               "update tzip21_creators set main = true where block = $block"] in
         Format.eprintf "  OK@." ;
-        if set_metadata then
-          [%pgsql dbh "update token_info set metadata = $metadata, metadata_uri = $uri \
-                       where contract = $contract and token_id = ${Z.to_string token_id}"]
-        else Lwt.return_ok ()
+        Lwt.return_ok ()
       | Error (code, str) ->
         (Format.eprintf "  fetch metadata error %d:%s@." code @@
          Option.value ~default:"None" str);
