@@ -77,11 +77,13 @@ export interface Config {
   fees: BigNumber;
   nft_public: string;
   mt_public: string;
+  permit_whitelist: string[];
+  api: string;
+  api_permit: string;
 }
 
 export interface Provider {
   tezos: TezosProvider ;
-  api: string;
   config: Config;
 }
 
@@ -201,7 +203,7 @@ export async function send_batch(
 export async function get_transaction(
   provider: Provider,
   op_hash: string) {
-  const r = await fetch(provider.api + '/transaction/' + op_hash)
+  const r = await fetch(provider.config.api + '/transaction/' + op_hash)
   if (r.ok) { return r.json() }
   else throw new Error("/transaction/" + op_hash + " failed")
 }

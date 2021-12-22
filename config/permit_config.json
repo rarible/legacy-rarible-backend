@@ -1,0 +1,6 @@
+{
+  "secret_key": "edsk3UUamwmemNBJgDvS8jXCgKsvjL2NoTwYRFpGSRPut4Hmfs6dG8",
+  "exchange": "KT1ULGjK8FtaJ9QqCgJVN14B6tY76Ykaz6M8",
+  "whitelist": [ "KT1VY7fDqc2FxhfCPM1DrELKFz6EHwudAXQb" ],
+  "node": "https://hangzhou.tz.functori.com"
+}

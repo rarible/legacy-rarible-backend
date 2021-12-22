@@ -20,6 +20,9 @@ async function main() {
       fees: new BigNumber(0),
       nft_public: "",
       mt_public: "",
+      api: "https://rarible-api.functori.com/v0.1/",
+      api_permit: "http://localhost:8081/v0.1/",
+      permit_whitelist: []
     }
 
     const tezos = in_memory_provider(
@@ -27,7 +30,6 @@ async function main() {
       'https://hangzhou.tz.functori.com')
     const provider = {
       tezos: tezos,
-      api: "https://rarible-api.functori.com/v0.1/",
       config
     }
 
@@ -68,15 +70,15 @@ async function main() {
 
     // const s = await sign(provider, "I would like to save like for itemId: 0xf5de760f2e916647fd766b4ad9e85ff943ce3a2b:16440")
     // console.log(s)
-    // const op = await deploy_fa1(provider, await provider.tezos.address(), new BigNumber(1000), 2)
+    const op = await deploy_fa1(provider, await provider.tezos.address(), new BigNumber(1000), 2)
 
     // const op = await send(provider, {
     //   destination: "KT1XZCojvmT858LXRmgAa7NFqAFkS35hs4fH",
     //   entrypoint: 'approve',
     //   parameter: [ {string: 'tz1iA1KggftRjKtAxQs9QbGra2YdsB5MZmgX' }, {int: "42"} ] })
 
-    // console.log(op)
-    // await op.confirmation()
+    console.log(op)
+    await op.confirmation()
 
     // const st : StorageFA1_2 = await provider.tezos.storage('KT1L5WyeKsBMTvseptzcX9Vtbn7Qw4naW98X')
     // const v : any = await st.token_metadata.get('0')

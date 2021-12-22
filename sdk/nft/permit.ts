@@ -47,11 +47,15 @@ export async function get_counter(
   contract: string,
   mandator?: string) : Promise<BigNumber> {
   const st = await provider.tezos.storage(contract)
-  const permit : BigMapAbstraction = st.permit
+  const permits : BigMapAbstraction = st.permits
   const issuer = (mandator==undefined) ? await provider.tezos.address() : mandator
-  const info : any | undefined = await permit.get(issuer)
-  if (info==undefined) return new BigNumber(0)
-  else return info.counter
+  try {
+    const info : any | undefined = await permits.get(issuer)
+    if (info==undefined) return new BigNumber(0)
+    else return info.counter
+  } catch(_e) {
+    return new BigNumber(0)
+  }
 }
 
 export async function make_permit(
