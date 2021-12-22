@@ -42,13 +42,13 @@ let db_contracts =
   List.fold_left (fun acc r ->
       match r#ledger_key, r#ledger_value with
       | Some k, Some v ->
-        let ledger_key = EzEncoding.destruct micheline_type_short_enc k in
-        let ledger_value = EzEncoding.destruct micheline_type_short_enc v in
+        let bmt_key = EzEncoding.destruct micheline_type_short_enc k in
+        let bmt_value = EzEncoding.destruct micheline_type_short_enc v in
         let v = {
-          nft_ledger_type = {ledger_key; ledger_value};
-          nft_ledger_id=Z.of_string r#ledger_id;
+          nft_ledger = {bm_types = {bmt_key; bmt_value}; bm_id = Z.of_string r#ledger_id};
           nft_meta_id=Option.map Z.of_string r#metadata_id;
           nft_token_meta_id=Option.map Z.of_string r#token_metadata_id;
+          nft_royalties_id=Option.map Z.of_string r#royalties_id;
         } in
         SMap.add r#address v acc
       | _ -> acc) SMap.empty
@@ -61,9 +61,9 @@ let db_ft_contract r =
     | "lugh", _, _ -> Some Lugh
     | "fa2_multiple_inversed", _, _ -> Some Fa2_multiple_inversed
     | "custom", Some k, Some v ->
-      let ledger_key = EzEncoding.destruct micheline_type_short_enc k in
-      let ledger_value = EzEncoding.destruct micheline_type_short_enc v in
-      Some (Custom {ledger_key; ledger_value})
+      let bmt_key = EzEncoding.destruct micheline_type_short_enc k in
+      let bmt_value = EzEncoding.destruct micheline_type_short_enc v in
+      Some (Custom {bmt_key; bmt_value})
     | _ -> None in
   match v with
   | None -> None
@@ -81,7 +81,8 @@ let get_extra_config ?dbh () =
   use dbh @@ fun dbh ->
   let>? contracts =
     [%pgsql.object dbh
-        "select address, ledger_id, ledger_key, ledger_value, metadata_id, token_metadata_id \
+        "select address, ledger_id, ledger_key, ledger_value, metadata_id, \
+         token_metadata_id, royalties_id \
          from contracts where main"] in
   let>? ft_contracts =
     [%pgsql.object dbh
@@ -123,10 +124,10 @@ let update_extra_config ?dbh e =
         | Fa2_multiple_inversed -> "fa2_multiple_inversed", None, None
         | Fa1 -> "fa1", None, None
         | Lugh -> "lugh", None, None
-        | Custom {ledger_key; ledger_value} ->
+        | Custom {bmt_key; bmt_value} ->
           "custom",
-          Some (EzEncoding.construct micheline_type_short_enc ledger_key),
-          Some (EzEncoding.construct micheline_type_short_enc ledger_value) in
+          Some (EzEncoding.construct micheline_type_short_enc bmt_key),
+          Some (EzEncoding.construct micheline_type_short_enc bmt_value) in
       [%pgsql dbh
           "insert into ft_contracts(address, kind, ledger_id, ledger_key, ledger_value, crawled, token_id, decimals) \
            values($address, $kind, $id, $?k, $?v, ${lk.ft_crawled}, $?token_id, ${lk.ft_decimals}) on conflict do nothing"])
@@ -1687,6 +1688,20 @@ let insert_royalties ~dbh ~op ?(forward=false) roy =
          where contract = ${roy.roy_contract} and \
          ($no_token_id or token_id = $?{Option.map Z.to_string roy.roy_token_id})"]
 
+let insert_royalties_bms ~dbh ~op ~contract ?forward royalties =
+  let royalties = List.filter_map (function
+      | `nat token_id, Some (`seq l) ->
+        let roy_royalties = List.filter_map (function
+            | `tuple [ `address part_account; `nat v ] ->
+              Some { part_account; part_value = Z.to_int32 v }
+            | _ -> None) l in
+        Some { roy_contract = contract; roy_token_id = Some token_id;
+               roy_royalties }
+      | `nat token_id, None ->
+        Some { roy_contract = contract; roy_token_id = Some token_id;
+               roy_royalties = [] }
+      | _ -> None) royalties in
+  iter_rp (insert_royalties ~dbh ~op ?forward) royalties
 
 let insert_order_activity ?(main=false)
     dbh id match_left match_right hash transaction block level date order_activity_type =
@@ -2031,15 +2046,15 @@ let insert_ft ~dbh ~config ~op ~contract ?(forward=false) ft =
   | false, _ | _, None ->
     Lwt.return_ok ()
   | _, Some meta ->
-    let id = ft.ft_ledger_id in
-    let key, value = match ft.ft_kind with
+    let bm_id = ft.ft_ledger_id in
+    let bm_types = match ft.ft_kind with
       | Fa2_single -> Contract_spec.ledger_fa2_single_field
       | Fa2_multiple -> Contract_spec.ledger_fa2_multiple_field
       | Lugh -> Contract_spec.ledger_lugh_field
       | Fa1 -> Contract_spec.ledger_fa1_field
       | Fa2_multiple_inversed -> Contract_spec.ledger_fa2_multiple_inversed_field
-      | Custom {ledger_key; ledger_value} -> ledger_key, ledger_value in
-    let balances = Storage_diff.get_big_map_updates ~id key value meta.op_lazy_storage_diff in
+      | Custom bm -> bm in
+    let balances = Storage_diff.get_big_map_updates {bm_id; bm_types} meta.op_lazy_storage_diff in
     insert_token_balances ~dbh ~op ~contract ~ft:true ?token_id:ft.ft_token_id ~forward balances
 
 let string_of_entrypoint = function
@@ -2093,17 +2108,22 @@ let insert_nft ~dbh ~meta ~op ~contract ~nft ~entrypoint ?(forward=false) param 
         (short op.bo_hash) op.bo_index (short contract) s;
       insert_uri_pattern ~dbh ~op ~contract s
     | _ -> Lwt.return_ok () in
-  let balances = Storage_diff.get_big_map_updates ~id:nft.nft_ledger_id
-      nft.nft_ledger_type.ledger_key nft.nft_ledger_type.ledger_value
+  let balances = Storage_diff.get_big_map_updates nft.nft_ledger
       meta.op_lazy_storage_diff in
   let>? () = insert_token_balances ~dbh ~op ~contract ~forward balances in
-  let token_meta_k, token_meta_v = Contract_spec.token_metadata_field in
-  match nft.nft_token_meta_id with
+  let>? () = match nft.nft_token_meta_id with
   | None -> Lwt.return_ok ()
-  | Some id ->
-    let metadata = Storage_diff.get_big_map_updates ~id token_meta_k token_meta_v
-        meta.op_lazy_storage_diff in
-    insert_metadatas ~dbh ~op ~contract ~forward metadata
+  | Some bm_id ->
+    let bm = {bm_id; bm_types = Contract_spec.token_metadata_field} in
+    let metadata = Storage_diff.get_big_map_updates bm meta.op_lazy_storage_diff in
+    insert_metadatas ~dbh ~op ~contract ~forward metadata in
+  match nft.nft_royalties_id with
+  | None -> Lwt.return_ok ()
+  | Some bm_id ->
+    let bm = { bm_id; bm_types = Contract_spec.royalties_field } in
+    let royalties = Storage_diff.get_big_map_updates bm meta.op_lazy_storage_diff in
+    insert_royalties_bms ~dbh ~op ~contract ~forward royalties
+
 
 let insert_transaction ~config ~dbh ~op ?(forward=false) tr =
   let contract = tr.destination in
@@ -2154,10 +2174,10 @@ let insert_transaction ~config ~dbh ~op ?(forward=false) tr =
     | _, Some nft -> insert_nft ~dbh ~meta ~op ~contract ~nft ~entrypoint ~forward m
     | _, _ -> Lwt.return_ok ()
 
-let ledger_kind k v =
-  if (k, v) = Contract_spec.ledger_nft_field then `nft
-  else if (k, v) = Contract_spec.ledger_fa2_multiple_field ||
-          (k, v) = Contract_spec.ledger_fa2_multiple_inversed_field then `multiple
+let ledger_kind types =
+  if types = Contract_spec.ledger_nft_field then `nft
+  else if types = Contract_spec.ledger_fa2_multiple_field ||
+          types = Contract_spec.ledger_fa2_multiple_inversed_field then `multiple
   else `unknown
 
 let filter_contracts op ori =
@@ -2169,13 +2189,15 @@ let filter_contracts op ori =
         match_entrypoints ~expected:(fa2_entrypoints @ fa2_ext_entrypoints) ~entrypoints,
         match_fields ~expected:[
           "ledger"; "token_metadata"; "owner"; "admin";
-          "token_metadata_uri"; "metadata"] ~allocs ori.script
+          "token_metadata_uri"; "metadata"; "royalties"] ~allocs ori.script
       with
       | [ b_balance; b_update; b_transfer; b_update_all; b_mint_nft; b_mint_mt;
           b_burn_nft; b_burn_mt ],
-        Ok [ f_ledger; f_token_metadata; f_owner; f_admin; f_uri_pattern; f_metadata ] ->
+        Ok [ f_ledger; f_token_metadata; f_owner; f_admin; f_uri_pattern;
+             f_metadata; f_royalties ] ->
         let nft_token_meta_id = checked_field ~expected:token_metadata_field f_token_metadata in
         let nft_meta_id = checked_field ~expected:metadata_field f_metadata in
+        let nft_royalties_id = checked_field ~expected:royalties_field f_royalties in
         let metadata = match f_metadata with
           | (Some (`assoc l), _) ->
             List.filter_map (function
@@ -2186,11 +2208,11 @@ let filter_contracts op ori =
                 | _ -> None) l
           | _ -> [] in
         begin match b_balance && b_update && b_transfer, f_ledger with
-          | true, (_, Some (nft_ledger_id, ledger_key, ledger_value))  ->
-            begin match ledger_kind ledger_key ledger_value with
+          | true, (_, Some ({bm_types; _} as nft_ledger)) ->
+            begin match ledger_kind bm_types with
               | `nft | `multiple ->
-                let nft_ledger_type = { ledger_key; ledger_value } in
-                let nft = { nft_ledger_type; nft_ledger_id; nft_token_meta_id; nft_meta_id } in
+                let nft = { nft_ledger; nft_token_meta_id;
+                            nft_meta_id; nft_royalties_id } in
                 let kind = "fa2" in
                 let owner, uri_pattern, kind = match f_admin, f_uri_pattern with
                   | (Some (`address owner), _), (Some (`string uri), _) ->
@@ -2216,8 +2238,8 @@ let insert_origination ?(forward=false) config dbh op ori =
     Lwt.return_ok ()
   | Some (kind, nft, owner, uri, metadata), Some meta ->
     let kt1 = Tzfunc.Crypto.op_to_KT1 op.bo_hash in
-    let ledger_key = EzEncoding.construct micheline_type_short_enc nft.nft_ledger_type.ledger_key in
-    let ledger_value = EzEncoding.construct micheline_type_short_enc nft.nft_ledger_type.ledger_value in
+    let ledger_key = EzEncoding.construct micheline_type_short_enc nft.nft_ledger.bm_types.bmt_key in
+    let ledger_value = EzEncoding.construct micheline_type_short_enc nft.nft_ledger.bm_types.bmt_value in
     Format.printf "\027[0;93morigination %s (%s, %s)\027[0m@."
       (Utils.short kt1) kind (EzEncoding.construct nft_ledger_enc nft);
     let name = List.assoc_opt "name" metadata in
@@ -2226,29 +2248,34 @@ let insert_origination ?(forward=false) config dbh op ori =
     let>? () = [%pgsql dbh
         "insert into contracts(kind, address, owner, block, level, tsp, \
          last_block, last_level, last, ledger_id, ledger_key, ledger_value, \
-         uri_pattern, token_metadata_id, metadata_id, metadata, name, symbol, main) \
+         uri_pattern, token_metadata_id, metadata_id, royalties_id, \
+         metadata, name, symbol, main) \
          values($kind, $kt1, $?owner, ${op.bo_block}, ${op.bo_level}, \
          ${op.bo_tsp}, ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, \
-         ${Z.to_string nft.nft_ledger_id}, \
+         ${Z.to_string nft.nft_ledger.bm_id}, \
          $ledger_key, $ledger_value, $?uri, $?{Option.map Z.to_string nft.nft_token_meta_id}, \
-         $?{Option.map Z.to_string nft.nft_meta_id}, $metadata, $?name, $?symbol, $forward) \
+         $?{Option.map Z.to_string nft.nft_meta_id}, $?{Option.map Z.to_string nft.nft_royalties_id}, \
+         $metadata, $?name, $?symbol, $forward) \
          on conflict do nothing"] in
     let open Crawlori.Config in
     config.extra.contracts <- SMap.add kt1 nft config.extra.contracts;
     let () = match config.accounts with
       | None -> config.accounts <- Some (SSet.singleton kt1)
       | Some accs -> config.accounts <- Some (SSet.add kt1 accs) in
-    let balances = Storage_diff.get_big_map_updates ~id:nft.nft_ledger_id
-        nft.nft_ledger_type.ledger_key nft.nft_ledger_type.ledger_value
-        meta.op_lazy_storage_diff in
+    let balances = Storage_diff.get_big_map_updates nft.nft_ledger meta.op_lazy_storage_diff in
     let>? () = insert_token_balances ~dbh ~op ~contract:kt1 balances in
-    let token_meta_k, token_meta_v = Contract_spec.token_metadata_field in
-    match nft.nft_token_meta_id with
+    let>? () = match nft.nft_token_meta_id with
+      | None -> Lwt.return_ok ()
+      | Some bm_id ->
+        let bm = { bm_id; bm_types = Contract_spec.token_metadata_field } in
+        let metadata = Storage_diff.get_big_map_updates bm meta.op_lazy_storage_diff in
+        insert_metadatas ~dbh ~op ~contract:kt1 ~forward metadata in
+    match nft.nft_royalties_id with
     | None -> Lwt.return_ok ()
-    | Some id ->
-      let metadata = Storage_diff.get_big_map_updates ~id token_meta_k token_meta_v
-          meta.op_lazy_storage_diff in
-      insert_metadatas ~dbh ~op ~contract:kt1 ~forward metadata
+    | Some bm_id ->
+      let bm = { bm_id; bm_types = Contract_spec.royalties_field } in
+      let royalties = Storage_diff.get_big_map_updates bm meta.op_lazy_storage_diff in
+      insert_royalties_bms ~dbh ~op ~contract:kt1 ~forward royalties
 
 let insert_operation config ?forward dbh op =
   let open Hooks in
@@ -4650,21 +4677,22 @@ let get_ft_contract ?dbh contract =
   let>? l = [%pgsql.object dbh "select * from ft_contracts where address = $contract"] in
   one @@ List.map db_ft_contract l
 
-let get_unknown_token_metadata_id ?dbh () =
+let get_unknown_bm_id ?dbh ?(kind=`token) () =
   use dbh @@ fun dbh ->
-  [%pgsql dbh "select address from contracts where token_metadata_id is null"]
+  match kind with
+  | `token -> [%pgsql dbh "select address from contracts where token_metadata_id is null"]
+  | `contract -> [%pgsql dbh "select address from contracts where metadata_id is null"]
+  | `royalties -> [%pgsql dbh "select address from contracts where royalties_id is null"]
 
-let get_unknown_metadata_id ?dbh () =
+let set_bm_id ?dbh ?(kind=`token) ~contract id =
   use dbh @@ fun dbh ->
-  [%pgsql dbh "select address from contracts where metadata_id is null"]
-
-let set_token_metadata_id ?dbh ~contract id =
-  use dbh @@ fun dbh ->
-  [%pgsql dbh "update contracts set token_metadata_id = ${Z.to_string id} where address = $contract"]
-
-let set_metadata_id ?dbh ~contract id =
-  use dbh @@ fun dbh ->
-  [%pgsql dbh "update contracts set metadata_id = ${Z.to_string id} where address = $contract"]
+  match kind with
+  | `token ->
+    [%pgsql dbh "update contracts set token_metadata_id = ${Z.to_string id} where address = $contract"]
+  | `contract ->
+    [%pgsql dbh "update contracts set metadata_id = ${Z.to_string id} where address = $contract"]
+  | `royalties ->
+    [%pgsql dbh "update contracts set royalties_id = ${Z.to_string id} where address = $contract"]
 
 let empty_token_metadata ?dbh ?contract () =
   let no_contract = Option.is_none contract in

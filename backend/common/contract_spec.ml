@@ -100,21 +100,22 @@ let match_fields ~expected ~allocs script =
           Typed_mich.search_value ~name storage_type storage_value,
           (match Storage_diff.get_big_map_id ~allocs bm_index k v with
            | None -> None
-           | Some id -> Some (id, k, v))
+           | Some bm_id -> Some {bm_id; bm_types = {bmt_key=k; bmt_value=v}})
       ) expected)
 
-let ledger_fa2_multiple_field = `tuple [ `address; `nat ], `nat
-let ledger_nft_field = `nat, `address
-let ledger_fa2_multiple_inversed_field = `tuple [ `nat; `address ], `nat
-let ledger_fa2_single_field = `address, `nat
-let ledger_fa1_field = `address, `tuple [`nat; `map (`address, `nat) ]
-let ledger_lugh_field = `tuple [ `address; `nat ], `tuple [`nat; `bool ]
+let ledger_fa2_multiple_field = { bmt_key = `tuple [ `address; `nat ]; bmt_value = `nat }
+let ledger_nft_field = { bmt_key = `nat; bmt_value = `address }
+let ledger_fa2_multiple_inversed_field = { bmt_key = `tuple [ `nat; `address ]; bmt_value = `nat }
+let ledger_fa2_single_field = { bmt_key = `address; bmt_value = `nat }
+let ledger_fa1_field = { bmt_key = `address; bmt_value = `tuple [`nat; `map (`address, `nat) ] }
+let ledger_lugh_field = { bmt_key = `tuple [ `address; `nat ]; bmt_value = `tuple [`nat; `bool ] }
+
+let token_metadata_field = { bmt_key = `nat; bmt_value = `tuple [ `nat; `map (`string, `bytes) ] }
+let metadata_field = { bmt_key = `string; bmt_value = `bytes }
+let royalties_field = { bmt_key = `nat; bmt_value = `seq (`tuple [ `address; `nat ]) }
 
 let set_royalties_entry = `tuple [`address; `nat; `map (`address, `nat)]
 
-let token_metadata_field = `nat, `tuple [ `nat; `map (`string, `bytes) ]
-let metadata_field = `string, `bytes
-
 let checked_field ~expected = function
-  | (_, Some (id, k, v)) when (k, v) = expected -> Some id
+  | (_, Some {bm_id; bm_types}) when bm_types = expected -> Some bm_id
   | _ -> None

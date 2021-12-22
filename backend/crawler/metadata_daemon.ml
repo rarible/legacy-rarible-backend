@@ -35,8 +35,7 @@ let retrieve_token_metadata ~token_metadata_id ~token_id =
       Format.eprintf "Wrong token metadata format@.";
       Lwt.return None
     | Ok (Micheline m) ->
-      let _, value_type = Contract_spec.token_metadata_field in
-      begin match Typed_mich.parse_value value_type m with
+      begin match Typed_mich.parse_value Contract_spec.token_metadata_field.Rtypes.bmt_value m with
         | Ok (`tuple [`nat _; `assoc l]) ->
           Lwt.return (Some (Parameters.parse_metadata l))
         | _ ->
