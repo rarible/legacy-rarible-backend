@@ -3,9 +3,17 @@ open Common
 open Proto
 open Let
 
-let node = ref "https://hangzhou.tz.functori.com"
+type bm_kind = [ `token | `contract | `royalties ]
+
+let node = ref "https://tz.functori.com"
 let contracts = ref None
-let kind = ref "token"
+let kind = ref `token
+
+let kind_of_string = function
+  | "token" -> `token
+  | "contract" -> `contract
+  | "royalties" -> `royalties
+  | _ -> failwith "unknown kind"
 
 let get contract =
   let> account = Node.get_account_info ~base:(EzAPI.BASE !node) contract in
@@ -28,7 +36,10 @@ let get contract =
       | Micheline storage_value, Ok fields, Some storage_type ->
         let>? storage_type = Lwt.return @@ Typed_mich.parse_type storage_type in
         let|>? storage_value = Lwt.return @@ Typed_mich.(parse_value (short_micheline_type storage_type) storage_value) in
-        let name = if !kind = "token" then "token_metadata" else "metadata" in
+        let name = match !kind with
+          | `token -> "token_metadata"
+          | `contract -> "metadata"
+          | `royalties -> "royalties" in
         match List.assoc_opt name fields with
         | None -> None
         | Some _ ->
@@ -39,28 +50,24 @@ let spec = [
       contracts := Some (String.split_on_char ',' s)),
   "Contracts to retrieve metadata id (separated by ',')";
   "--node", Arg.Set_string node, "Node address";
-  "--kind", Arg.Set_string kind, "Kind of metadata ID to get ('token' or 'contract')"
+  "--kind", Arg.String (fun s -> kind := kind_of_string s),
+  "Kind of metadata ID to get ('token', 'contract', 'royalties')"
 ]
 
 let () =
+  Arg.parse spec (fun _ -> ()) "extract_bigmap_id";
   Lwt_main.run @@
   Lwt.map (function
       | Error _ -> Format.printf "Error@."
       | Ok _ -> ()) @@
   let>? contracts = match !contracts with
-    | None ->
-      if !kind = "token" then Db.get_unknown_token_metadata_id ()
-      else if !kind = "contract" then Db.get_unknown_metadata_id ()
-      else Lwt.return_ok []
+    | None -> Db.get_unknown_bm_id ~kind:!kind ()
     | Some contracts -> Lwt.return_ok contracts in
   iter_rp (fun contract ->
       Format.printf "contract %s@." contract;
       let> o = get contract in
       match o with
-      | Ok (Some (`nat id)) ->
-        if !kind = "token" then Db.set_token_metadata_id ~contract id
-        else if !kind = "contract" then Db.set_metadata_id ~contract id
-        else Lwt.return_ok ()
+      | Ok (Some (`nat id)) -> Db.set_bm_id ~contract ~kind:!kind id
       | _ ->
         Format.printf "No value@.";
         Lwt.return_ok ()) contracts

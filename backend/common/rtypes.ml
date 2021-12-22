@@ -980,16 +980,21 @@ module TMap = Map.Make(struct
         else String.compare o1 o2
   end)
 
-type ledger_type = {
-  ledger_key: micheline_type_short;
-  ledger_value: micheline_type_short;
+type bigmap_types = {
+  bmt_key: micheline_type_short;
+  bmt_value: micheline_type_short;
+} [@@deriving encoding]
+
+type bigmap_info = {
+  bm_id: z;
+  bm_types: bigmap_types
 } [@@deriving encoding]
 
 type nft_ledger = {
-  nft_ledger_type: ledger_type;
-  nft_ledger_id: z;
+  nft_ledger: bigmap_info;
   nft_token_meta_id: z option;
   nft_meta_id: z option;
+  nft_royalties_id: z option;
 } [@@deriving encoding]
 
 type ft_ledger_kind =
@@ -998,7 +1003,7 @@ type ft_ledger_kind =
   | Fa2_multiple_inversed
   | Fa1
   | Lugh
-  | Custom of ledger_type
+  | Custom of bigmap_types
 [@@deriving encoding]
 
 type ft_ledger = {
