@@ -24,5 +24,6 @@
 (executable
  (name direct_crawl)
  (modules direct_crawl)
+ (preprocessor_deps (env_var "PGDATABASE") ../db/.rarible_witness)
  (preprocess (pps pgocaml_ppx))
  (libraries crawler_config ez_api.icurl_lwt))
