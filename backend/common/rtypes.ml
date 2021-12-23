@@ -1034,8 +1034,13 @@ type kafka_config = {
   kafka_password : string;
 } [@@deriving encoding]
 
+let string_or_int_enc = Json_encoding.(union [
+    case string (fun s -> Some s) (fun s -> s) ;
+    case int (fun _ -> None) (fun i -> string_of_int i) ;
+  ])
+
 type format_dimensions = {
-  format_dim_value : string ;
+  format_dim_value : string [@encoding string_or_int_enc] ;
   format_dim_unit : string ;
 } [@@deriving encoding]
 
@@ -1074,7 +1079,7 @@ type tzip21_format = {
   format_duration : string option ;
   format_dimensions : format_dimensions option ;
   format_data_rate : format_dimensions option ;
-} [@@deriving encoding {camel ; option="option"}]
+} [@@deriving encoding {camel ; option="option" ; ignore}]
 
 type tzip21_formats = tzip21_format list [@@deriving encoding]
 
