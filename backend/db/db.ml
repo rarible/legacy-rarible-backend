@@ -2853,7 +2853,7 @@ let get_nft_all_items
       "select i.id, \
        last, i.supply, i.tsp, i.creators, i.royalties, \
        array_agg(case when t.amount <> 0 then t.owner end) as owners \
-       from (select * from tokens where \
+       from (select tid, amount, owner from tokens where \
        (amount > 0 or (not $no_show_deleted and $show_deleted_v))) t \
        inner join token_info i on i.id = t.tid \
        and i.id in (\
