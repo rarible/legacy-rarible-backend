@@ -2253,7 +2253,7 @@ let insert_origination ?(forward=false) config dbh op ori =
       | None -> config.accounts <- Some (SSet.singleton kt1)
       | Some accs -> config.accounts <- Some (SSet.add kt1 accs) in
     let balances = Storage_diff.get_big_map_updates nft.nft_ledger meta.op_lazy_storage_diff in
-    let>? () = insert_token_balances ~dbh ~op ~contract:kt1 balances in
+    let>? () = insert_token_balances ~dbh ~op ~contract:kt1 ~forward balances in
     let>? () = match nft.nft_token_meta_id with
       | None -> Lwt.return_ok ()
       | Some bm_id ->
@@ -4879,3 +4879,13 @@ let random_tokens ?dbh ?contract ?token_id ?owner ?(number=100L) () =
        ($no_owner or t.owner = $?owner) and ledger_key is not null and \
        ledger_value is not null \
        order by random() limit $number"]
+
+let find_hash ?dbh h =
+  let h = h ^ "%s" in
+  use dbh @@ fun dbh ->
+  match String.get h 0 with
+  | 'B' -> [%pgsql dbh "select hash from predecessors where hash like $h"]
+  | 'o' -> [%pgsql dbh "select transaction from token_balance_updates where transaction like $h"]
+  | 't' | 'K' ->
+    [%pgsql dbh "select contract from token_balance_updates where contract like $h"]
+  | _ -> Lwt.return_ok []

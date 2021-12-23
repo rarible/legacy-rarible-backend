@@ -21,6 +21,8 @@ copy: build openapi
 	@cp -f _build/default/backend/crawler/metadata_daemon.exe _bin/metadata_daemon
 	@cp -f _build/default/backend/crawler/direct_crawl.exe _bin/direct_crawl
 	@cp -f _build/default/backend/db/check_ledger.exe _bin/check_ledger
+	@cp -f _build/default/backend/db/prefix_hash.exe _bin/prefix_hash
+	@cp -f _build/default/backend/db/update_supply.exe _bin/update_supply
 
 clean:
 	@dune clean
