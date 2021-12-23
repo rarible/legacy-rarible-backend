@@ -95,35 +95,20 @@ let permit_section =
   EzAPI.Doc.{section_name = "permit-controller"; section_docs = []}
 let sections = [ permit_section ]
 
-let mk_ops ?(fee=0L) ?(counter=Z.zero) ?(gas_limit=Z.zero) ?(storage_limit=Z.zero)
-    ?(amount=0L) ?metadata ~source ~destination ~entrypoint params =
-  let parameters = Some { entrypoint = EPnamed entrypoint; value = Micheline params } in
-  [ {
-    man_info = { source; kind = Transaction { amount; destination; parameters } };
-    man_numbers = { fee; counter; gas_limit; storage_limit };
-    man_metadata = metadata } ]
-
 let inject_ops ~code ops =
   let get_pk () = Lwt.return_ok !config.edpk in
   let sign bytes = Node.sign ~edsk:!config.edsk bytes in
-  let> r =
-    Node.forge_manager_operations ~base:(EzAPI.BASE !config.node) ~get_pk
-      ~src:!config.tz1 ops in
+  let> r = Utils.send ~base:(EzAPI.BASE !config.node) ~get_pk ~sign ops in
   match r with
   | Error e ->
     EzAPIServer.return (Error { code; message = Rp.string_of_error e })
-  | Ok (bytes, protocol, branch, ops) ->
-    let> r = Node.inject ~base:(EzAPI.BASE !config.node) ~sign ~bytes ~branch ~protocol ops in
-    match r with
-    | Error e ->
-      EzAPIServer.return (Error { code; message = Rp.string_of_error e })
-    | Ok hash ->
-      EzAPIServer.return (Ok hash)
+  | Ok hash ->
+    EzAPIServer.return (Ok hash)
 
 let add_permit permit =
   if List.mem permit.contract !config.whitelist then
-    let ops = mk_ops ~entrypoint:"permit" ~source:!config.tz1 ~destination:permit.contract
-        (Mseq [ Mstring permit.pk; Mstring permit.signature; Mbytes (H.mk permit.hash)]) in
+    let param = Micheline (Mseq [ Mstring permit.pk; Mstring permit.signature; Mbytes (H.mk permit.hash)]) in
+    let ops = [ Utils.transaction ~entrypoint:"permit" ~source:!config.tz1 ~param permit.contract ] in
     inject_ops ~code:`PERMIT_ERROR ops
   else
     let message = Format.sprintf "contract %s not whitelisted for feeless transaction" permit.contract in
@@ -171,9 +156,8 @@ let match_orders orders =
             Forge.prim `Some ~args:[Mstring left.order_elt.order_elt_signature] in
           let signature_right =
             Forge.prim `Some ~args:[Mstring right.order_elt.order_elt_signature] in
-          let mich = Forge.prim `Pair ~args:[m_left; signature_left; m_right; signature_right] in
-          let ops = mk_ops ~entrypoint:"match_orders" ~source:!config.tz1 ~destination:!config.exchange
-              mich in
+          let param = Micheline (Forge.prim `Pair ~args:[m_left; signature_left; m_right; signature_right]) in
+          let ops = [ Utils.transaction ~entrypoint:"match_orders" ~source:!config.tz1 ~param !config.exchange ] in
           inject_ops ~code:`ORDER_ERROR ops
     else
       let message = Format.sprintf "No contract whitelisted in order (%s, %s)"
