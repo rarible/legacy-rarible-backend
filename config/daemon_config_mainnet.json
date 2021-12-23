@@ -1,0 +1,21 @@
+{
+  "nodes": [
+    "https://tezos-node.rarible.org/",
+    "https://tz.functori.com",
+    "https://mainnet.api.tez.ie/",
+    "https://mainnet.smartpy.io/",
+    "https://teznode.letzbake.com/"
+  ],
+  "ipfs_sources": [
+    "https://rarible.mypinata.cloud/",
+    "https://ipfs.io/",
+    "https://ipfs.fleek.co/",
+    "https://ravencoinipfs-gateway.com/",
+    "https://ipfs.kxv.io/",
+    "https://ipfs.fleek.co/",
+    "https://crustwebsites.net/",
+    "https://cloudflare-ipfs.com/"
+  ],
+  "timeout": 3
+}
+
