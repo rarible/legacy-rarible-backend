@@ -2718,10 +2718,14 @@ let get_nft_items_by_owner ?dbh ?include_meta ?continuation ?(size=50) owner =
     continuation = None,
     (match continuation with None -> CalendarLib.Calendar.now (), "" | Some (ts, h) -> (ts, h)) in
   let>? l = [%pgsql.object dbh
-      "select i.id, i.contract, i.token_id, \
+      "select i.id, \
        last, supply, metadata, tsp, creators, royalties, \
-       array_agg(case when balance is not null and balance <> 0 or amount <> 0 then owner end) as owners from tokens t \
-       inner join token_info i on i.contract = t.contract and i.token_id = t.token_id \
+       array_agg(case when balance is not null and balance <> 0 \
+       or amount <> 0 then owner end) as owners \
+       from (select tid, amount, balance, owner from tokens where \
+       owner = $owner and
+       ((balance is not null and balance > 0 or amount > 0))) t \
+       inner join token_info i on i.id = t.tid \
        where \
        main and metadata <> '{}' and owner = $owner and (balance is not null and balance > 0 or amount > 0) and \
        ($no_continuation or (last = $ts and i.id < $id) or (last < $ts)) \
@@ -2750,17 +2754,16 @@ let get_nft_items_by_creator ?dbh ?include_meta ?continuation ?(size=50) creator
     continuation = None,
     (match continuation with None -> CalendarLib.Calendar.now (), "" | Some (ts, h) -> (ts, h)) in
   let>? l = [%pgsql.object dbh
-      "select i.id, i.contract, i.token_id, \
+      "select i.id, \
        last, supply, metadata, i.tsp, creators, royalties, \
        array_agg(case when balance is not null and balance <> 0 or amount <> 0 then owner end) as owners \
        from tokens as t, token_info i, unnest(i.creators) as c \
        where c->>'account' = $creator and \
-       t.contract = i.contract and t.token_id = i.token_id and \
+       t.tid = i.id and \
        i.main and metadata <> '{}' and (balance is not null and balance > 0 or amount > 0) and \
        ($no_continuation or (last = $ts and i.id < $id) or (last < $ts)) \
        group by (i.id) \
-       order by last desc, i.id desc \
-       limit $size64"] in
+       order by last desc, i.id desc limit $size64"] in
   let>? nft_items_items = map_rp (fun r -> mk_nft_item dbh ?include_meta r) l in
   let len = List.length nft_items_items in
   let nft_items_continuation =
@@ -2784,15 +2787,21 @@ let get_nft_items_by_collection ?dbh ?include_meta ?continuation ?(size=50) cont
     continuation = None,
     (match continuation with None -> CalendarLib.Calendar.now (), "" | Some (ts, h) -> (ts, h)) in
   let>? l = [%pgsql.object dbh
-      "select i.id, i.contract, i.token_id, \
-       last, supply, metadata, tsp, creators, royalties, \
-       array_agg(case when balance is not null and balance <> 0 or amount <> 0 then owner end) as owners \
-       from tokens t inner join token_info i \
-       on i.contract = t.contract and i.token_id = t.token_id where \
-       main and metadata <> '{}' and i.contract = $contract and (balance is not null and balance > 0 or amount > 0) and \
-       ($no_continuation or (last = $ts and i.id < $id) or (last < $ts)) \
-       group by (i.id, i.contract, i.token_id) \
-       order by last desc, i.id desc limit $size64"] in
+      "select i.id, \
+       last, i.supply, i.tsp, i.creators, i.royalties, \
+       array_agg(case when t.balance is not null and t.balance <> 0 or \
+       t.amount <> 0 then t.owner end) as owners \
+       from (select tid, amount, balance, owner from tokens where \
+       contract = $contract and
+       ((balance is not null and balance > 0 or amount > 0))) t \
+       inner join token_info i on i.id = t.tid \
+       and i.id in (\
+       select id from token_info where \
+       main and metadata <> '{}' and \
+       ($no_continuation or (last = $ts and id < $id) or (last < $ts)) \
+       order by last desc, id desc limit $size64) \
+       group by (i.id) \
+       order by i.last desc, i.id desc limit $size64"] in
   let>? nft_items_items = map_rp (fun r -> mk_nft_item dbh ?include_meta r) l in
   let len = List.length nft_items_items in
   let nft_items_continuation =
