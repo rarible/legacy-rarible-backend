@@ -43,3 +43,8 @@ let no_update = true")))
  (name update_supply)
  (modules update_supply)
  (libraries db))
+
+(executable
+ (name prefix_hash)
+ (modules prefix_hash)
+ (libraries db))
