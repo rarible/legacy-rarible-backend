@@ -313,10 +313,49 @@ let upgrade_3_to_4 dbh version =
     ~downgrade:[ "alter table contracts drop column royalties_id" ]
     [ "alter table contracts add column royalties_id varchar" ]
 
+let upgrade_4_to_5 dbh version =
+  EzPG.upgrade ~dbh ~version
+    ~downgrade:
+      [ "alter table token_info drop constraint token_info_pkey";
+        "alter table token_info drop column id";
+        "alter table token_info add constraint token_info_pkey primary key (contract, token_id)";
+
+        "alter table tokens drop column tid";
+        "alter table tokens drop column oid";
+
+        "drop index tokens_amount_index";
+        "drop index token_info_amount_index";
+        "drop index token_info_last_index";
+        "drop index token_info_metadata_index";
+        "drop index token_info_main_index";
+        "drop index token_info_token_id_index";
+        "drop index token_info_contract_index"]
+    [ "alter table token_info add column id varchar collate \"C\" not null default ''";
+      "update token_info set id = concat(contract, ':', token_id)";
+      "alter table token_info drop constraint token_info_pkey";
+      "alter table token_info add constraint token_info_pkey primary key (id)";
+      "alter table token_info alter id set default null";
+
+      "alter table tokens add column tid varchar collate \"C\" not null default ''";
+      "update tokens set tid = concat(contract, ':', token_id)";
+      "alter table tokens alter tid set default null";
+      "alter table tokens add column oid varchar collate \"C\" not null default ''";
+      "update tokens set oid = concat(contract, ':', token_id, ':', owner)";
+      "alter table tokens alter oid set default null";
+
+      "create index tokens_amount_index on tokens(amount)";
+      "create index token_info_last_desc_index on token_info(last desc)";
+      "create index token_info_last_index on token_info(last)";
+      "create index token_info_metadata_index on token_info(metadata)";
+      "create index token_info_main_index on token_info(main)";
+      "create index token_info_token_id_index on token_info(token_id)";
+      "create index token_info_contract_index on token_info(contract)"]
+
 let upgrades =
   let last_version = fst List.(hd @@ rev !Versions.upgrades) in
   !Versions.upgrades @ List.map (fun (i, f) -> last_version + i, f) [
     1, upgrade_1_to_2;
     2, upgrade_2_to_3;
     3, upgrade_3_to_4;
+    4, upgrade_4_to_5;
   ]
