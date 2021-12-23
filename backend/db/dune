@@ -38,3 +38,8 @@ let no_update = true")))
  (name check_ledger)
  (modules check_ledger)
  (libraries db ez_api.icurl_lwt))
+
+(executable
+ (name update_supply)
+ (modules update_supply)
+ (libraries db))

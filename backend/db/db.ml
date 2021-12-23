@@ -1499,72 +1499,86 @@ let insert_transfer ~dbh ~op ~contract lt =
 
 let insert_token_balances ~dbh ~op ~contract ?(ft=false) ?token_id ?(forward=false) balances =
   iter_rp (fun (k, v) ->
-      let kind, token_id, account, balance = match k, v, ft with
+      let r = match k, v, ft with
         | `nat id, Some (`address a), false ->
-          "nft", id, Some a, Some Z.one
-        | `nat id, None, false -> "nft", id, None, None
+          Some ("nft", id, Some a, Z.one)
+        | `nat id, None, false ->
+          Some ("nft", id, None, Z.zero)
         | `tuple [`nat id; `address a], Some (`nat bal), false
         | `tuple [`address a; `nat id], Some (`nat bal), false ->
-          "mt", id, Some a, Some bal
+          Some ("mt", id, Some a, bal)
         | `tuple [`nat id; `address a], None, false
         | `tuple [`address a; `nat id], None, false ->
-          "mt", id, Some a, Some Z.zero
+          Some ("mt", id, Some a, Z.zero)
         | `tuple [`nat id; `address a], Some (`nat bal), true
         | `tuple [`address a; `nat id], Some (`nat bal), true ->
           begin match token_id with
-            | Some tid when tid <> id -> "", Z.minus_one, None, None
-            | _ -> "ft_multi", id, Some a, Some bal
+            | Some tid when tid <> id -> None
+            | _ -> Some ("ft_multi", id, Some a, bal)
           end
         | `tuple [`nat id; `address a], None, true
         | `tuple [`address a; `nat id], None, true ->
           begin match token_id with
-            | Some tid when id <> tid -> "", Z.minus_one, None, None
-            | _ -> "ft_multi", id, Some a, Some Z.zero
+            | Some tid when id <> tid -> None
+            | _ -> Some ("ft_multi", id, Some a, Z.zero)
           end
         | `address a, Some (`nat bal), true ->
-          "ft", Z.minus_one, Some a, Some bal
+          Some ("ft", Z.minus_one, Some a, bal)
         | `address a, None, true ->
-          "ft", Z.minus_one, Some a, Some Z.zero
+          Some ("ft", Z.minus_one, Some a, Z.zero)
         | `tuple [`address a; `nat id], Some (`tuple (`nat bal :: _)), true ->
           begin match token_id with
-            | Some tid when id <> tid -> "", Z.minus_one, None, None
-            | _ -> "ft", id, Some a, Some bal
+            | Some tid when id <> tid -> None
+            | _ -> Some ("ft", id, Some a, bal)
           end
-        | _ -> "", Z.minus_one, None, None in
-      if kind <> "" then
+        | _ -> None in
+      match r with
+      | None -> Lwt.return_ok ()
+      | Some (kind, token_id, account, balance) ->
         let>? () = [%pgsql dbh
             "insert into token_balance_updates(transaction, index, block, level, \
              tsp, kind, contract, token_id, account, balance, main) \
              values(${op.bo_hash}, ${op.bo_index}, ${op.bo_block}, ${op.bo_level}, \
-             ${op.bo_tsp}, $kind, $contract, ${Z.to_string token_id}, $?account, $?balance, $forward) \
+             ${op.bo_tsp}, $kind, $contract, ${Z.to_string token_id}, $?account, $balance, $forward) \
              on conflict do nothing"] in
-        match account, ft with
-        | None, _ | _, true -> Lwt.return_ok ()
-        | Some a, _ ->
-          if not forward then
-            [%pgsql dbh
-                "insert into tokens(contract, token_id, owner, amount) \
-                 values($contract, ${Z.to_string token_id}, $a, 0) on conflict do nothing"]
-          else match balance with
-            | Some b ->
+        match account, ft, forward with
+        | _, true, _ -> Lwt.return_ok ()
+        | None, _, true ->
+          [%pgsql dbh
+              "update tokens set amount = 0, balance = 0 \
+               where contract = $contract and token_id = ${Z.to_string token_id}"]
+        | Some a, _, false ->
+          [%pgsql dbh
+              "insert into tokens(contract, token_id, owner, amount) \
+               values($contract, ${Z.to_string token_id}, $a, 0) on conflict do nothing"]
+        | Some a, _, true ->
+          let>? () =
+            if balance <> Z.zero then
               let creators = [
                 Some (EzEncoding.construct part_enc {
                     part_account=a; part_value = 10000l })
               ] in
-              let>? () = [%pgsql dbh
+              [%pgsql dbh
                   "insert into token_info(contract, token_id, transaction, block, \
-                   level, tsp, main, last_block, last_level, last, creators)
+                   level, tsp, main, last_block, last_level, last, creators, supply) \
                    values($contract, ${Z.to_string token_id}, ${op.bo_hash}, \
                    ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, true, \
-                   ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, $creators)
-                   on conflict do nothing"] in
-              [%pgsql dbh
-                  "insert into tokens(contract, token_id, owner, amount, balance) \
-                   values($contract, ${Z.to_string token_id}, $a, $b, $b) \
-                   on conflict (contract, token_id, owner) do update \
-                   set amount = $b, balance = $b"]
-            | _ -> Lwt.return_ok ()
-      else Lwt.return_ok ()) balances
+                   ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, $creators, $balance) \
+                   on conflict do nothing"]
+            else Lwt.return_ok () in
+          let>? () =
+            if kind = "nft" then
+              [%pgsql dbh "update tokens set balance = 0, amount = 0 \
+                           where contract = $contract and token_id = ${Z.to_string token_id}"]
+            else Lwt.return_ok () in
+          [%pgsql dbh
+              "insert into tokens(contract, token_id, owner, amount, balance) \
+               values($contract, ${Z.to_string token_id}, $a, $balance, $balance) \
+               on conflict (contract, token_id, owner) do update \
+               set amount = $balance, balance = $balance \
+               where tokens.contract = $contract and tokens.token_id = ${Z.to_string token_id}"]
+        | _ -> Lwt.return_ok ()
+    ) balances
 
 let insert_update_operator ~dbh ~op ~contract lt =
   iter_rp (fun {op_owner; op_operator; op_token_id; op_add} ->
@@ -2057,6 +2071,10 @@ let insert_ft ~dbh ~config ~op ~contract ?(forward=false) ft =
     let balances = Storage_diff.get_big_map_updates {bm_id; bm_types} meta.op_lazy_storage_diff in
     insert_token_balances ~dbh ~op ~contract ~ft:true ?token_id:ft.ft_token_id ~forward balances
 
+let crawled_entrypoints = List.map (fun s -> EPnamed s) [
+    "mint"; "burn"; "transfer"; "set_metadata"; "add_minter"; "remove_minter";
+    "set_token_metadata_uri" ]
+
 let string_of_entrypoint = function
   | EPdefault -> "default"
   | EProot -> "root"
@@ -2066,47 +2084,19 @@ let string_of_entrypoint = function
   | EPnamed s -> s
 
 let insert_nft ~dbh ~meta ~op ~contract ~nft ~entrypoint ?(forward=false) param =
-  Format.printf "\027[0;35mNFT update %s %ld %s -> %s\027[0m@."
-    (short op.bo_hash) op.bo_index (short contract) (string_of_entrypoint entrypoint);
+  if List.mem entrypoint crawled_entrypoints then
+    Format.printf "\027[0;35mNFT %s %s[%ld] %s\027[0m@."
+      (string_of_entrypoint entrypoint) (short op.bo_hash) op.bo_index (short contract);
   let>? () =
     if forward then Lwt.return_ok ()
     else match Parameters.parse_fa2 entrypoint param with
-    | Ok (Mint_tokens m) ->
-      Format.printf "\027[0;35mmint %s[%ld] %s\027[0m@."
-        (short op.bo_hash) op.bo_index (short contract);
-      insert_mint ~dbh ~op ~contract m
-    | Ok (Burn_tokens b) ->
-      Format.printf "\027[0;35mburn %s[%ld] %s\027[0m@."
-        (short op.bo_hash) op.bo_index (short contract);
-      insert_burn ~dbh ~op ~contract b
-    | Ok (Transfers t) ->
-      Format.printf "\027[0;35mtransfer %s[%ld] %s\027[0m@."
-        (short op.bo_hash) op.bo_index (short contract);
-      insert_transfer ~dbh ~op ~contract t
-    | Ok (Operator_updates t) ->
-      Format.printf "\027[0;35mupdate operator %s[%ld] %s\027[0m@."
-        (short op.bo_hash) op.bo_index (short contract);
-      insert_update_operator ~dbh ~op ~contract t
-    | Ok (Operator_updates_all t) ->
-      Format.printf "\027[0;35mupdate operator all %s[%ld] %s\027[0m@."
-        (short op.bo_hash) op.bo_index (short contract);
-      insert_update_operator_all ~dbh ~op ~contract t
-    | Ok (Metadata (key, value)) ->
-      Format.printf "\027[0;35mset uri %s[%ld] %s\027[0m@."
-        (short op.bo_hash) op.bo_index (short contract);
-      insert_metadata ~dbh ~op ~contract ~key ~value
-    | Ok (Add_minter a) ->
-      Format.printf "\027[0;35madd minter %s[%ld] %s %s\027[0m@."
-        (short op.bo_hash) op.bo_index (short contract) (short a);
-      insert_minter ~dbh ~op ~contract ~add:true a
-    | Ok (Remove_minter a) ->
-      Format.printf "\027[0;35mremove minter %s[%ld] %s %s\027[0m@."
-        (short op.bo_hash) op.bo_index (short contract) (short a);
-      insert_minter ~dbh ~op ~contract ~add:false a
-    | Ok (Token_uri_pattern s) ->
-      Format.printf "\027[0;35mset token uri pattern %s[%ld] %s %s\027[0m@."
-        (short op.bo_hash) op.bo_index (short contract) s;
-      insert_uri_pattern ~dbh ~op ~contract s
+    | Ok (Mint_tokens m) -> insert_mint ~dbh ~op ~contract m
+    | Ok (Burn_tokens b) -> insert_burn ~dbh ~op ~contract b
+    | Ok (Transfers t) -> insert_transfer ~dbh ~op ~contract t
+    | Ok (Metadata (key, value)) -> insert_metadata ~dbh ~op ~contract ~key ~value
+    | Ok (Add_minter a) -> insert_minter ~dbh ~op ~contract ~add:true a
+    | Ok (Remove_minter a) -> insert_minter ~dbh ~op ~contract ~add:false a
+    | Ok (Token_uri_pattern s) -> insert_uri_pattern ~dbh ~op ~contract s
     | _ -> Lwt.return_ok () in
   let balances = Storage_diff.get_big_map_updates nft.nft_ledger
       meta.op_lazy_storage_diff in
@@ -2540,48 +2530,47 @@ let token_updates dbh main l =
 
 let token_balance_updates dbh main l =
   let>? m = fold_rp (fun acc r ->
-      let l = match r#kind, r#account, r#balance with
+      let info = match r#kind, r#account, r#balance with
         | "mt", Some account, Some balance ->
           let balance = if main then Some balance else None in
-          [ Some account, balance, None ]
+          Some (Some account, balance, None)
         | "mt", Some account, None ->
           let balance = if main then Some Z.zero else None in
-          [ Some account, balance, None ]
+          Some (Some account, balance, None)
         | "nft", Some account, _ ->
           let balance_src = if main then Some Z.zero else Some Z.one in
           let balance_dst = if main then Some Z.one else Some Z.zero in
-          [ Some account, balance_dst, balance_src  ]
+          Some (Some account, balance_dst, balance_src)
         | "nft", None, _ ->
           let balance = if main then Some Z.zero else Some Z.one in
-          [ None, balance, None ]
-        | _ -> [] in
-      let>? l = fold_rp (fun acc (account, balance, other) ->
-          let>? l = match account with
-            | Some account ->
-              let amount = Option.value ~default:Z.zero balance in
-              let>? l = [%pgsql dbh
-                  "insert into tokens(contract, token_id, owner, amount, balance) \
-                   values(${r#contract}, ${r#token_id}, $account, $amount, $?balance) \
-                   on conflict (contract, token_id, owner) \
-                   do update set balance = $?balance where tokens.contract = ${r#contract} \
-                   and tokens.token_id = ${r#token_id} and tokens.owner = $account \
-                   returning owner, amount, balance"] in
-              begin match other with
-                | None -> Lwt.return_ok l
-                | Some b ->
-                  let|>? l2 =
-                    [%pgsql dbh
-                        "update tokens set balance = $b where tokens.contract = ${r#contract} \
-                         and tokens.token_id = ${r#token_id} and owner <> $account \
-                         returning owner, amount, balance"] in
-                  l @ l2
-              end
-            | None ->
-              [%pgsql dbh
-                  "update tokens set balance = $?balance where tokens.contract = ${r#contract} \
-                   and tokens.token_id = ${r#token_id} returning owner, amount, balance"]
-          in
-          Lwt.return_ok (acc @ l)) [] l in
+          Some (None, balance, None)
+        | _ -> None in
+      let>? l = match info with
+        | None -> Lwt.return_ok []
+        | Some (account, balance, other) ->
+          match account with
+          | None ->
+            [%pgsql dbh
+                "update tokens set balance = $?balance where tokens.contract = ${r#contract} \
+                 and tokens.token_id = ${r#token_id} returning owner, amount, balance"]
+          | Some account ->
+            let amount = Option.value ~default:Z.zero balance in
+            let>? l = [%pgsql dbh
+                "insert into tokens(contract, token_id, owner, amount, balance) \
+                 values(${r#contract}, ${r#token_id}, $account, $amount, $?balance) \
+                 on conflict (contract, token_id, owner) \
+                 do update set balance = $?balance where tokens.contract = ${r#contract} \
+                 and tokens.token_id = ${r#token_id} and tokens.owner = $account \
+                 returning owner, amount, balance"] in
+            match other with
+            | None -> Lwt.return_ok l
+            | Some b ->
+              let|>? l2 =
+                [%pgsql dbh
+                    "update tokens set balance = $b where tokens.contract = ${r#contract} \
+                     and tokens.token_id = ${r#token_id} and owner <> $account \
+                     returning owner, amount, balance"] in
+              l @ l2 in
       Lwt.return_ok @@
       List.fold_left (fun acc (account, amount, balance) ->
           match balance with
@@ -2590,8 +2579,8 @@ let token_balance_updates dbh main l =
           | _ -> acc) acc l
     ) TMap.empty l in
   iter_rp (fun ((contract, token_id, owner), (amount, balance)) ->
-      Format.printf "\027[0;33mWarning: wrong aggregate amount for %s %s %s: %s, balance = %s\027[0m@."
-        contract (Z.to_string token_id) owner (Z.to_string amount) (Z.to_string balance);
+      Format.printf "\027[0;33mupdate amount for %s[%s][%s]: %s -> %s\027[0m@."
+        (short contract) (Z.to_string token_id) (short owner) (Z.to_string amount) (Z.to_string balance);
       [%pgsql dbh
           "update tokens set amount = $balance where contract = $contract \
            and token_id = ${Z.to_string token_id} and owner = $owner"]) @@ TMap.bindings m
@@ -4871,11 +4860,8 @@ let update_supply ?dbh () =
   use dbh @@ fun dbh ->
   [%pgsql dbh
       "with tmp(contract, token_id, supply) as (\
-       select i.contract, i.token_id, sum(amount) \
-       from token_info i \
-       inner join tokens t on t.contract = i.contract and t.token_id = i.token_id \
-       where main and supply = 0 \
-       group by i.contract, i.token_id) \
+       select contract, token_id, sum(amount) from tokens \
+       group by contract, token_id) \
        update token_info i set supply = tmp.supply from tmp \
        where i.contract = tmp.contract and i.token_id = tmp.token_id"]
 

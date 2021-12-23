@@ -31,7 +31,7 @@ let main () =
     Db.random_tokens ?contract:!contract ?token_id:!token_id ?owner:!owner
       ?number:!number () in
   iter_rp (fun r ->
-      Format.printf "Check %s[%s] for %s (%s, %s)@."
+      Format.printf "\027[0;36mCheck %s[%s] for %s (%s, %s)\027[0m@."
         (String.sub r#contract 0 10) r#token_id (String.sub r#owner 0 10) (Z.to_string r#amount)
         (Option.fold ~none:"None" ~some:Z.to_string r#balance);
       let ok, typ, value = match Option.map (EzEncoding.destruct Rtypes.micheline_type_short_enc) r#ledger_key with
@@ -41,34 +41,30 @@ let main () =
         | Some `nat -> true, prim `nat, Mint (Z.of_string r#token_id)
         | _ -> false, prim `unit, prim `Unit in
       if not ok then (
-        Format.printf "Ledger type unknown@.";
+        Format.printf "\027[0;33mLedger type unknown\027[0m@.";
         Lwt.return_ok ())
-      else match expr ~typ value with
-        | None ->
-          Format.printf "Pack error@.";
+      else
+        let> v = Node.get_big_map_value ~block:!block ~typ ~base:(EzAPI.BASE !node)
+            (int_of_string r#ledger_id) value in
+        match Option.map (EzEncoding.destruct Rtypes.micheline_type_short_enc) r#ledger_value, v with
+        | Some `nat, Ok (Micheline (Mint z)) ->
+          if z = r#amount then Format.printf "\027[0;32mOk\027[0m@."
+          else Format.printf "\027[0;31mWrong %s %s\027[0m@." (Z.to_string r#amount) (Z.to_string z);
           Lwt.return_ok ()
-        | Some expr ->
-          let> v = Node.get_big_map_value_raw ~base:(EzAPI.BASE !node)
-              (int_of_string r#ledger_id) expr in
-          match Option.map (EzEncoding.destruct Rtypes.micheline_type_short_enc) r#ledger_value, v with
-          | Some `nat, Ok (Micheline (Mint z)) ->
-            if z = r#amount then Format.printf "Ok@."
-            else Format.printf "Wrong %s %s@." (Z.to_string r#amount) (Z.to_string z);
-            Lwt.return_ok ()
-          | Some `address, Ok (Micheline (Mstring s)) ->
-            if r#amount = Z.zero && s <> r#owner then Format.printf "Ok@."
-            else if r#amount = Z.one && s = r#owner then Format.printf "Ok@."
-            else Format.printf "Wrong %s@." s;
-            Lwt.return_ok ()
-          | Some `nat, _ ->
-            if r#amount = Z.zero then Format.printf "Ok@."
-            else Format.printf "Wrong@.";
-            Lwt.return_ok ()
-          | Some `address, _ ->
-            if r#amount = Z.zero then Format.printf "Ok@."
-            else Format.printf "Wrong@.";
-            Lwt.return_ok ()
-          | _ -> Lwt.return_ok ()
+        | Some `address, Ok (Micheline (Mstring s)) ->
+          if r#amount = Z.zero && s <> r#owner then Format.printf "\027[0;32mOk\027[0m@."
+          else if r#amount = Z.one && s = r#owner then Format.printf "\027[0;32mOk\027[0m@."
+          else Format.printf "\027[0;31mWrong %s\027[0m@." s;
+          Lwt.return_ok ()
+        | Some `nat, _ ->
+          if r#amount = Z.zero then Format.printf "\027[0;32mOk\027[0m@."
+          else Format.printf "\027[0;31mWrong\027[0m@.";
+          Lwt.return_ok ()
+        | Some `address, _ ->
+          if r#amount = Z.zero then Format.printf "\027[0;32mOk\027[0m@."
+          else Format.printf "\027[0;31mWrong\027[0m@.";
+          Lwt.return_ok ()
+        | _ -> Lwt.return_ok ()
     ) l
 
 
