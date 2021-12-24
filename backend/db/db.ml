@@ -1656,7 +1656,7 @@ let reset_nft_item_meta_by_id ?dbh contract token_id =
       Format.eprintf "ok@." ;
       let l = EzEncoding.destruct Rtypes.token_metadata_enc metadata in
       let>? _ =
-        insert_token_metadata ~dbh ~block ~level ~tsp ~contract (token_id, l) in
+        insert_token_metadata ~forward:true ~dbh ~block ~level ~tsp ~contract (token_id, l) in
       Lwt.return_ok ()
     end
   | [ block, level, tsp, _, Some uri ] ->
