@@ -2685,9 +2685,9 @@ let set_main _config ?(forward=false) dbh {Hooks.m_main; m_hash} =
     let>? () = produce_cancel_events dbh m_main @@ sort cancels in
     let>? () = produce_match_events dbh m_main @@ sort matches in
     let>? () = produce_nft_activity_events m_main @@ sort nactivities in
-    Lwt.return_ok ()
+    Lwt.return_ok (fun () -> Lwt.return_ok ())
   else
-    Lwt.return_ok ()
+    Lwt.return_ok (fun () -> Lwt.return_ok ())
 
 let get_level ?dbh () =
   use dbh @@ fun dbh ->
