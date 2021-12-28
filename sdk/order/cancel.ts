@@ -1,6 +1,7 @@
-import { Provider, send, TransactionArg, OperationResult } from "../common/base"
+import { Provider, send_batch, TransactionArg, OperationResult } from "../common/base"
 import { OrderForm } from "./utils"
 import { order_to_struct } from "./sign-order"
+import { unwrap_arg } from "./wrapper"
 import BigNumber from "bignumber.js"
 
 export async function cancel_arg(
@@ -18,6 +19,9 @@ export async function cancel(
   provider: Provider,
   order: OrderForm
 ): Promise<OperationResult> {
-  const arg = await cancel_arg(provider, order)
-  return send(provider, arg)
+  let arg = [ await cancel_arg(provider, order) ]
+  if (order.make.asset_type.asset_class == "FT" && order.make.asset_type.contract == provider.config.wrapper && order.make.asset_type.token_id == new BigNumber(0)) {
+    arg = arg.concat(await unwrap_arg(provider, order.make.value))
+  }
+  return send_batch(provider, arg)
 }

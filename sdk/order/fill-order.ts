@@ -7,6 +7,7 @@ import { add_fee } from "./add-fee"
 import { approve_arg } from "./approve"
 import { order_to_struct, some_struct, none_struct, get_decimals, sign_order } from "./sign-order"
 import { make_permit } from "../nft/permit"
+import { unwrap_arg } from "./wrapper"
 import BigNumber from "bignumber.js"
 import fetch from "node-fetch"
 
@@ -94,7 +95,6 @@ export async function fill_order(
       ? await approve_arg(provider, await get_address(provider), make, request.infinite)
       : undefined
     let args = (arg_approve) ? [ arg_approve ] : []
-    console.log(args)
     const amount =
       (left.make.asset_type.asset_class === "XTZ" && left.salt == '0')
       ? await get_real_value(provider, left)
@@ -102,9 +102,11 @@ export async function fill_order(
       ? await get_real_value(provider, right)
       : undefined
     const parameter = await match_order_to_struct(provider, left, right)
-    args = args.concat([{
-      destination: provider.config.exchange, entrypoint: "match_orders", parameter, amount }])
-    console.log(args)
+    args = args.concat({
+      destination: provider.config.exchange, entrypoint: "match_orders", parameter, amount })
+    if (left.take.asset_type.asset_class == "FT" && left.take.asset_type.contract == provider.config.wrapper && left.take.asset_type.token_id == new BigNumber(0)) {
+      args = args.concat(await unwrap_arg(provider, left.take.value))
+    }
     if (args.length == 1) return send(provider, args[0])
     else return send_batch(provider, args)
   }

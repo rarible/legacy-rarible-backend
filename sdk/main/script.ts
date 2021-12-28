@@ -26,6 +26,7 @@ async function main() {
     transfer_manager: {type: 'string', default: 'KT1DyDkW16XBuFzpLkXKraD46SAxQDrha5gm'},
     fee_receiver: {type: 'string'},
     protocol_fee: {type: 'number', default: 300},
+    wrapper: {type: 'string', default: 'KT1LkKaeLBvTBo6knGeN5RsEunERCaqVcLr9'},
   }).argv
 
   const token_id_opt = (argv.token_id!=undefined) ? new BigNumber(argv.token_id) : undefined
@@ -53,7 +54,8 @@ async function main() {
     mt_public: "",
     api: "https://localhost:8080/v0.1",
     api_permit: "https://localhost:8081/v0.1",
-    permit_whitelist: []
+    permit_whitelist: [],
+    wrapper: argv.wrapper
   }
 
   const provider = {

@@ -91,7 +91,8 @@ async function provider(node: string, api:string, wallet: 'temple' | 'beacon' | 
     nft_public: "",
     mt_public: "",
     api, api_permit: "http://localhost:8081/v0.1/",
-    permit_whitelist: [ "KT1VY7fDqc2FxhfCPM1DrELKFz6EHwudAXQb" ]
+    permit_whitelist: [ "KT1VY7fDqc2FxhfCPM1DrELKFz6EHwudAXQb" ],
+    wrapper: 'KT1LkKaeLBvTBo6knGeN5RsEunERCaqVcLr9',
   }
   return { tezos, config }
 }

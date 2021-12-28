@@ -72,15 +72,17 @@ export async function approve_fa2_arg(
   let key_exists = false
   if (token_id!=undefined) {
     try {
-      let r = await st.operator.get({ 0 : operator, 1 : token_id, 2: owner })
-      key_exists = (r!=undefined)
+      if (st.operator) {
+        let r = await st.operator.get({ 0 : operator, 1 : token_id, 2: owner })
+        key_exists = (r!=undefined)
+      } else if (st.operators) {
+        let id = st.operators.toString()
+        let value : MichelsonData = { prim: "Pair", args: [ { string: owner }, { prim: "Pair", args: [ { string: operator }, { int : token_id.toString() } ] } ] }
+        let type : MichelsonType = { prim: "pair", args: [ { prim: "address" }, { prim: "pair", args: [ { prim: "address" }, { prim: "nat" } ] } ] }
+        let r = await get_big_map_value(provider, id, value, type)
+        key_exists = (r!=undefined)
+      }
     } catch {
-      // lugh
-      let id = st.operators.toString()
-      let value : MichelsonData = { prim: "Pair", args: [ { string: owner }, { prim: "Pair", args: [ { string: operator }, { int : token_id.toString() } ] } ] }
-      let type : MichelsonType = { prim: "pair", args: [ { prim: "address" }, { prim: "pair", args: [ { prim: "address" }, { prim: "nat" } ] } ] }
-      let r = await get_big_map_value(provider, id, value, type)
-      key_exists = (r!=undefined)
     }
     if (!key_exists) {
       let parameter : MichelsonData = [
@@ -94,8 +96,10 @@ export async function approve_fa2_arg(
     }
   } else {
     try {
-      let r = await st.operator_for_all.get({ 0 : operator, 1 : owner })
-      key_exists = (r!=undefined)
+      if (st.operator_for_all) {
+        let r = await st.operator_for_all.get({ 0 : operator, 1 : owner })
+        key_exists = (r!=undefined)
+      }
     } catch {
       key_exists = false
     }
