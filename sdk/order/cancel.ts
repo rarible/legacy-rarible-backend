@@ -20,7 +20,7 @@ export async function cancel(
   order: OrderForm
 ): Promise<OperationResult> {
   let arg = [ await cancel_arg(provider, order) ]
-  if (order.make.asset_type.asset_class == "FT" && order.make.asset_type.contract == provider.config.wrapper && order.make.asset_type.token_id == new BigNumber(0)) {
+  if (order.make.asset_type.asset_class == "FT" && order.make.asset_type.contract == provider.config.wrapper && order.make.asset_type.token_id != undefined && order.make.asset_type.token_id.isZero()) {
     arg = arg.concat(await unwrap_arg(provider, order.make.value))
   }
   return send_batch(provider, arg)

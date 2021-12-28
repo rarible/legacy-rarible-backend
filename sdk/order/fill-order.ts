@@ -104,11 +104,10 @@ export async function fill_order(
     const parameter = await match_order_to_struct(provider, left, right)
     args = args.concat({
       destination: provider.config.exchange, entrypoint: "match_orders", parameter, amount })
-    if (left.take.asset_type.asset_class == "FT" && left.take.asset_type.contract == provider.config.wrapper && left.take.asset_type.token_id == new BigNumber(0)) {
-      args = args.concat(await unwrap_arg(provider, left.take.value))
+    if (left.make.asset_type.asset_class == "FT" && left.make.asset_type.contract == provider.config.wrapper && left.make.asset_type.token_id != undefined && left.make.asset_type.token_id.isZero()) {
+      args = args.concat(await unwrap_arg(provider, left.make.value))
     }
-    if (args.length == 1) return send(provider, args[0])
-    else return send_batch(provider, args)
+    return send_batch(provider, args)
   }
 
   else {
