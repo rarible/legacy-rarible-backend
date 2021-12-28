@@ -90,8 +90,18 @@ async function provider(node: string, api:string, wallet: 'temple' | 'beacon' | 
     fees: new BigNumber(300),
     nft_public: "",
     mt_public: "",
+    api, api_permit: "http://localhost:8081/v0.1/",
+    permit_whitelist: [ "KT1VY7fDqc2FxhfCPM1DrELKFz6EHwudAXQb" ]
   }
-  return { tezos, api, config }
+  return { tezos, config }
+}
+
+function not_connected(connected: boolean, output : { status: string, result: string }) {
+  if (!connected) {
+    output.status = 'danger'
+    output.result = 'not connected'
+    throw new Error('not connected')
+  }
 }
 
 export default new Vue({
@@ -99,7 +109,7 @@ export default new Vue({
   data: {
     api_url: "http://localhost:8080/v0.1/",
     node: 'https://hangzhou.tz.functori.com',
-    wallet: 'beacon' as 'temple' | 'beacon' | 'kukai',
+    wallet: 'temple' as 'temple' | 'beacon' | 'kukai',
     provider: {} as Provider,
     path: "home",
     connected: false,
@@ -160,7 +170,7 @@ export default new Vue({
       path: '',
       data: '',
       result: '',
-      status: undefined as string | undefined
+      status: ''
     },
     upsert: {
       maker: '',
@@ -243,7 +253,9 @@ export default new Vue({
       origin_fees: ''
     },
     sign : {
-      message: ''
+      message: '',
+      status: 'info',
+      result: ''
     },
     nft_contracts: new Set<StorageContract>()
   },
@@ -278,8 +290,15 @@ export default new Vue({
       this.provider = await provider(this.node, this.api_url, this.wallet)
       this.connected = true
       this.address = await this.provider.tezos.address()
+      this.path = (this.path=="home") ? "tokens" : this.path
+    },
+    disconnect() {
+      this.provider = {} as Provider
+      this.connected = false
+      this.address = ""
     },
     async ftransfer() {
+      not_connected(this.connected, this.transfer)
       this.transfer.status = 'info'
       this.transfer.result = ''
       const asset_type = parse_asset_type(this.transfer.asset_type) as TokenAssetType
@@ -292,6 +311,7 @@ export default new Vue({
     },
 
     async fmint() {
+      not_connected(this.connected, this.mint)
       this.mint.status = 'info'
       this.mint.result = ''
       if (!this.mint.contract) {
@@ -319,6 +339,7 @@ export default new Vue({
     },
 
     async fburn() {
+      not_connected(this.connected, this.burn)
       this.burn.status = 'info'
       this.burn.result = ''
       const asset_type = parse_asset_type(this.burn.asset_type) as TokenAssetType
@@ -330,31 +351,29 @@ export default new Vue({
     },
 
     async deploy_fa2() {
+      not_connected(this.connected, this.deploy)
       this.deploy.status = 'info'
       this.deploy.result = ''
-      if (!this.deploy.owner) {
+      const owner = (this.deploy.owner) ? this.deploy.owner : this.address
+      let metadata = (this.deploy.metadata=='') ? undefined : JSON.parse(this.deploy.metadata)
+      let op : DeployResult | undefined ;
+      if (this.deploy.kind == 'NFT') op = await deploy_nft_private(this.provider, owner, metadata)
+      else if (this.deploy.kind == 'MT') op = await deploy_mt_private(this.provider, owner, metadata)
+      if (!op) {
         this.deploy.status = 'danger'
-        this.deploy.result = "no owner given"
+        this.deploy.result = "kind not understood"
       } else {
-        let metadata = (this.deploy.metadata=='') ? undefined : JSON.parse(this.deploy.metadata)
-        let op : DeployResult | undefined ;
-        if (this.deploy.kind == 'NFT') op = await deploy_nft_private(this.provider, this.deploy.owner, metadata)
-        else if (this.deploy.kind == 'MT') op = await deploy_mt_private(this.provider, this.deploy.owner, metadata)
-        if (!op) {
-          this.deploy.status = 'danger'
-          this.deploy.result = "kind not understood"
-        } else {
-          this.deploy.result = `operation ${op.hash} injected -> new contract: ${op.contract}`
-          await op.confirmation()
-          this.deploy.status = 'success'
-          this.deploy.result = `operation ${op.hash} confirmed -> new contract: ${op.contract}`
-          this.nft_contracts.add({contract: op.contract, owner: this.deploy.owner })
-          localStorage.setItem('nft_contracts', JSON.stringify(Array.from(this.nft_contracts)))
-        }
+        this.deploy.result = `operation ${op.hash} injected -> new contract: ${op.contract}`
+        await op.confirmation()
+        this.deploy.status = 'success'
+        this.deploy.result = `operation ${op.hash} confirmed -> new contract: ${op.contract}`
+        this.nft_contracts.add({contract: op.contract, owner: this.deploy.owner })
+        localStorage.setItem('nft_contracts', JSON.stringify(Array.from(this.nft_contracts)))
       }
     },
 
     async fapprove() {
+      not_connected(this.connected, this.approve)
       this.approve.status = 'info'
       this.approve.result = ''
       const asset_type = parse_asset_type(this.approve.asset_type) as TokenAssetType
@@ -377,7 +396,8 @@ export default new Vue({
     },
 
     async api_request() {
-      this.api.status = undefined
+      not_connected(this.connected, this.api)
+      this.api.status = 'info'
       const elt = document.getElementById("api-request-result")
       if (!elt) throw new Error('element "api-request-result" not found')
       elt.innerHTML = ''
@@ -401,6 +421,7 @@ export default new Vue({
     },
 
     async fupsert_order() {
+      not_connected(this.connected, this.upsert)
       this.upsert.status = 'info'
       this.upsert.result = ''
       const elt = document.getElementById("upsert-result")
@@ -452,6 +473,7 @@ export default new Vue({
     },
 
     async sell_order() {
+      not_connected(this.connected, this.sell)
       this.sell.status = 'info'
       this.sell.result = ''
       const elt = document.getElementById("sell-result")
@@ -500,6 +522,7 @@ export default new Vue({
     },
 
     async bid_order() {
+      not_connected(this.connected, this.bid)
       this.bid.status = 'info'
       this.bid.result = ''
       const elt = document.getElementById("bid-result")
@@ -566,10 +589,24 @@ export default new Vue({
     },
 
     onselected(items : any) {
-      this.fill.selected = items[0]
+      this.fill.selected = {
+        type: items[0].type,
+        maker: items[0].maker,
+        maker_edpk: items[0].maker_edpk,
+        taker: items[0].taker,
+        taker_edpk: items[0].taker_edpk,
+        make: items[0].make,
+        take: items[0].take,
+        salt: items[0].salt,
+        start: items[0].start,
+        end: items[0].end,
+        signature: items[0].signature,
+        data: items[0].data,
+      }
     },
 
     async ffill_order() {
+      not_connected(this.connected, this.fill)
       this.fill.status = 'info'
       this.fill.result = ''
       if (!this.fill.selected) {
@@ -592,12 +629,19 @@ export default new Vue({
     },
 
     async sign_message() {
+      not_connected(this.connected, this.sign)
+      this.sign.status = 'info'
+      this.sign.result = ''
       const elt = document.getElementById("sign-result")
       if (!elt) throw new Error('element "sign-result" not found')
       elt.innerHTML = ''
       let r = await sign(this.provider, this.sign.message, "message")
       const formatter = new JSONFormatter(r, 3)
       elt.appendChild(formatter.render())
+    },
+
+    async copy(text : string) {
+      await navigator.clipboard.writeText(text)
     },
 
     async test() {

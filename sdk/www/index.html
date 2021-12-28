@@ -26,10 +26,11 @@
             <b-nav-item :active="path=='api'" @click="path='api'">API</b-nav-item>
             <b-nav-item :active="path=='sign'" @click="path='sign'">Sign</b-nav-item>
             <b-nav-item :active="path=='test'" @click="path='test'">Test</b-nav-item>
-            <b-nav-item v-if="connected" disabled>{{ address.substring(0, 10) }}</b-nav-item>
+            <b-nav-item v-if="connected" @click="copy(address)">{{ address.substring(0, 10) }}</b-nav-item>
           </b-navbar-nav>
           <b-navbar-nav class="ms-auto">
             <b-button v-if="!connected" @click="connect()" class="mx-2">CONNECT</b-button>
+            <b-button v-else @click="disconnect()" class="mx-2">DISCONNECT</b-button>
             <b-input-group prepend="Node" class="mx-2">
               <b-form-input size="sm" v-model="node"></b-form-input>
             </b-input-group>
@@ -48,7 +49,8 @@
           Rarible SDK Example
         </h3>
         <div class="text-center">
-          <b-button size="lg" @click="connect()">CONNECT</b-button>
+          <b-button v-if="!connected" size="lg" class="m-3" @click="connect()">CONNECT</b-button>
+          <b-button v-else @click="disconnect()" size="lg" class="m-3">DISCONNECT</b-button>
         </div>
       </b-container>
 
@@ -57,7 +59,7 @@
 
           <b-tab title="Deploy" class="mt-4">
             <div>
-              <b-form-group label="Owner *" class="mb-2">
+              <b-form-group label="Owner" class="mb-2">
                 <b-form-input v-model="deploy.owner"></b-form-input>
               </b-form-group>
               <b-form-group label="Kind" class="mb-2">

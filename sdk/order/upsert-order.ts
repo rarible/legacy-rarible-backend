@@ -16,7 +16,7 @@ export async function upsert_order(
     await approve(provider, order.maker, order.make, infinite)
   }
   const signature = await sign_order(provider, order)
-  const r = await fetch(provider.api + '/orders', {
+  const r = await fetch(provider.config.api + '/orders', {
     method: 'POST', headers: [[ 'content-type', 'application/json' ]],
     body: JSON.stringify(order_to_json({...order, signature}))
   })

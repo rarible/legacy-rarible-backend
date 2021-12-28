@@ -51,11 +51,14 @@ async function main() {
     fees: new BigNumber(argv.protocol_fee),
     nft_public: "",
     mt_public: "",
+    api: "https://localhost:8080/v0.1",
+    api_permit: "https://localhost:8081/v0.1",
+    permit_whitelist: []
   }
 
   const provider = {
     tezos,
-    api: "https://localhost:8080/v0.1",
+
     config
   }
   const to = (argv.to) ? argv.to : await provider.tezos.address()

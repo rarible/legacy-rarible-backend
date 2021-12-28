@@ -23,6 +23,7 @@ copy: build openapi
 	@cp -f _build/default/backend/db/check_ledger.exe _bin/check_ledger
 	@cp -f _build/default/backend/db/prefix_hash.exe _bin/prefix_hash
 	@cp -f _build/default/backend/db/update_supply.exe _bin/update_supply
+	@cp -f _build/default/backend/permit/permit.exe _bin/permit_api
 
 clean:
 	@dune clean

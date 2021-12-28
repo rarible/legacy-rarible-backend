@@ -26,8 +26,8 @@ type permit = {
 } [@@deriving encoding]
 
 type orders = {
-  left: A.big_decimal order;
-  right: A.big_decimal order;
+  left: A.big_decimal order_form;
+  right: A.big_decimal order_form;
 } [@@deriving encoding]
 
 type error = {
@@ -44,6 +44,8 @@ let order_error_case =
   EzAPI.Err.make ~code:400 ~name:"OrderError" ~encoding:error_enc
     ~select:(fun e -> match e.code with `ORDER_ERROR -> Some e | _ -> None)
     ~deselect:(fun e -> e)
+
+let hash_enc = Json_encoding.(obj1 (req "hash" string))
 
 let usage = "permit.exe config.json"
 let spec = [
@@ -95,6 +97,7 @@ let permit_section =
   EzAPI.Doc.{section_name = "permit-controller"; section_docs = []}
 let sections = [ permit_section ]
 
+
 let inject_ops ~code ops =
   let get_pk () = Lwt.return_ok !config.edpk in
   let sign bytes = Node.sign ~edsk:!config.edsk bytes in
@@ -116,15 +119,29 @@ let add_permit permit =
 [@@post
   {path="/v0.1/permit/add";
    input=permit_enc;
-   output=Json_encoding.string;
+   output=hash_enc;
    name="add_permit";
    errors=[permit_error_case];
    section=permit_section}]
 
-let z_order order =
-  let>? maked = Db.get_decimals ~do_error:true order.order_elt.order_elt_make.asset_type in
-  let|>? taked = Db.get_decimals ~do_error:true order.order_elt.order_elt_take.asset_type in
-  Common.Balance.z_order ?maked ?taked order
+let flat_order_form order =
+  let maker = order.order_form_elt.order_form_elt_maker_edpk in
+  let make = order.order_form_elt.order_form_elt_make in
+  let taker = order.order_form_elt.order_form_elt_taker_edpk in
+  let take = order.order_form_elt.order_form_elt_take in
+  let salt = order.order_form_elt.order_form_elt_salt in
+  let start_date = order.order_form_elt.order_form_elt_start in
+  let end_date = order.order_form_elt.order_form_elt_end in
+  Common.Utils.flat_order_type
+    ~maker ~make ~taker ~take ~salt ~start_date ~end_date
+    ~data_type:"V1"
+    ~payouts:order.order_form_data.order_rarible_v2_data_v1_payouts
+    ~origin_fees:order.order_form_data.order_rarible_v2_data_v1_origin_fees
+
+let z_order_form order =
+  let>? maked = Db.get_decimals ~do_error:true order.order_form_elt.order_form_elt_make.asset_type in
+  let|>? taked = Db.get_decimals ~do_error:true order.order_form_elt.order_form_elt_take.asset_type in
+  Common.Balance.z_order_form ?maked ?taked order
 
 let get_contract = function
   | ATXTZ -> assert false
@@ -132,30 +149,29 @@ let get_contract = function
   | ATMT { asset_contract=contract; _ } -> contract
 
 let match_orders orders =
-  match orders.left.order_elt.order_elt_make.asset_type,
-        orders.right.order_elt.order_elt_make.asset_type with
+  match orders.left.order_form_elt.order_form_elt_make.asset_type,
+        orders.right.order_form_elt.order_form_elt_make.asset_type with
   | ATXTZ, _ | _, ATXTZ ->
     let message = "XTZ transfer not possible for feeless transaction" in
     EzAPIServer.return (Error { code = `ORDER_ERROR; message })
   | _ ->
-    let contract_left = get_contract orders.left.order_elt.order_elt_make.asset_type in
-    let contract_right = get_contract orders.right.order_elt.order_elt_make.asset_type in
+    let contract_left = get_contract orders.left.order_form_elt.order_form_elt_make.asset_type in
+    let contract_right = get_contract orders.right.order_form_elt.order_form_elt_make.asset_type in
     if List.mem contract_left !config.whitelist || List.mem contract_right !config.whitelist then
-
-      let> rleft = z_order orders.left in
-      let> rright = z_order orders.right in
+      let> rleft = z_order_form orders.left in
+      let> rright = z_order_form orders.right in
       match rleft, rright with
       | Error e, _ | _, Error e ->
         EzAPIServer.return (Error { code = `ORDER_ERROR; message = Crp.string_of_error e })
       | Ok left, Ok right ->
-        match Common.Utils.flat_order left, Common.Utils.flat_order right with
+        match flat_order_form left, flat_order_form right with
         | Error e, _ | _, Error e ->
           EzAPIServer.return (Error { code = `ORDER_ERROR; message = Let.string_of_error e })
         | Ok m_left, Ok m_right ->
           let signature_left =
-            Forge.prim `Some ~args:[Mstring left.order_elt.order_elt_signature] in
+            Forge.prim `Some ~args:[Mstring left.order_form_elt.order_form_elt_signature] in
           let signature_right =
-            Forge.prim `Some ~args:[Mstring right.order_elt.order_elt_signature] in
+            Forge.prim `Some ~args:[Mstring right.order_form_elt.order_form_elt_signature] in
           let param = Micheline (Forge.prim `Pair ~args:[m_left; signature_left; m_right; signature_right]) in
           let ops = [ Utils.transaction ~entrypoint:"match_orders" ~source:!config.tz1 ~param !config.exchange ] in
           inject_ops ~code:`ORDER_ERROR ops
@@ -166,7 +182,7 @@ let match_orders orders =
 [@@post
   {path="/v0.1/permit/match_orders";
    input=orders_enc;
-   output=Json_encoding.string;
+   output=hash_enc;
    name="match_orders";
    errors=[order_error_case];
    section=permit_section}]

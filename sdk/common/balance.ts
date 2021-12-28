@@ -10,7 +10,7 @@ export async function get_balance(
       const b_tz = await provider.tezos.balance()
       return b_tz.toString()
     case "FT":
-      const r = await fetch(provider.api + '/v0.1/balances/' + asset_type.contract + '/' + owner)
+      const r = await fetch(provider.config.api + '/v0.1/balances/' + asset_type.contract + '/' + owner)
       if (r.ok) {
         const json = await r.json()
         return json.balance
