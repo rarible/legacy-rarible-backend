@@ -1,5 +1,5 @@
 import { BigMapAbstraction, TransferParams, OriginateParams, TezosToolkit } from "@taquito/taquito"
-import { MichelsonData, MichelsonType, packDataBytes } from "@taquito/michel-codec"
+import { MichelsonData } from "@taquito/michel-codec"
 import BigNumber from "bignumber.js"
 import fetch from "node-fetch"
 const {TextEncoder, TextDecoder} = require("text-encoder")
@@ -80,6 +80,7 @@ export interface Config {
   permit_whitelist: string[];
   api: string;
   api_permit: string;
+  wrapper: string;
 }
 
 export interface Provider {

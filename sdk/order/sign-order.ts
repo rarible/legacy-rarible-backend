@@ -112,8 +112,12 @@ export async function asset_to_struct(p: Provider, a: Asset) : Promise<Michelson
       value = a.value.times(new BigNumber(1000000)).toString()
       break
     case "FT":
-      let decimals = await get_decimals(p, a.asset_type.contract, a.asset_type.token_id)
-      value = a.value.times((new BigNumber(10).pow(decimals))).toString()
+      if (a.asset_type.contract == p.config.wrapper && a.asset_type.token_id != undefined && a.asset_type.token_id.isZero()) {
+        value = a.value.times(new BigNumber(1000000)).toString()
+      } else {
+        let decimals = await get_decimals(p, a.asset_type.contract, a.asset_type.token_id)
+        value = a.value.times((new BigNumber(10).pow(decimals))).toString()
+      }
       break
     default:
       value = a.value.toString()

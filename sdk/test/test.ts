@@ -22,7 +22,8 @@ async function main() {
       mt_public: "",
       api: "https://rarible-api.functori.com/v0.1/",
       api_permit: "http://localhost:8081/v0.1/",
-      permit_whitelist: []
+      permit_whitelist: [],
+      wrapper: 'KT1LkKaeLBvTBo6knGeN5RsEunERCaqVcLr9',
     }
 
     const tezos = in_memory_provider(
