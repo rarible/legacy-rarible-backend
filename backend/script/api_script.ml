@@ -1491,7 +1491,7 @@ let check_royalties item_royalties royalties =
         let v = List.assoc p.part_account royalties in
         v = Int64.of_int32 p.part_value
       with Not_found ->
-  false) item_royalties
+  false) item_royalties.nft_item_roy_list
 
 let check_owners item_owners owner =
   List.exists (fun o -> owner = o) item_owners

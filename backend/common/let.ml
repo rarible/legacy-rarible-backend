@@ -49,3 +49,6 @@ let string_of_error : error -> string = function
   | #Crawlori.Rp.error as e -> Crawlori.Rp.string_of_error e
   | `unexpected_michelson_value -> "unexpected_michelson_value"
   | `unmatched_curve -> "unmatched_curve"
+
+let print_error e =
+  Format.eprintf "\027[0;31mError: %s\027[0m" (string_of_error e)

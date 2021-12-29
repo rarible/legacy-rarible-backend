@@ -6,6 +6,7 @@ let config = ref None
 let contract = ref None
 let retrieve  = ref false
 let node = ref "https://tz.functori.com"
+let force = ref false
 
 let spec = [
   "--retrieve-context", Arg.Set retrieve,
@@ -14,6 +15,10 @@ let spec = [
   "Node to use to retrieve metadata from context";
   "--split-load", Arg.String (fun s -> config := Some s),
   "fetch missing metadata (this uses config to fetch from different sources)";
+  "--contract", Arg.String (fun s -> contract := Some s),
+  "Update metadata only for this contract";
+  "--force", Arg.Set force,
+  "Force reset of metadata";
 ]
 
 let expr token_id =
@@ -75,62 +80,64 @@ let usage =
 let () =
   Arg.parse spec (fun _ -> ()) usage;
   EzCurl_common.set_timeout (Some 3);
-  Lwt_main.run @@ Lwt.map (fun _ -> ()) @@
-  let>? () =
-    match !config with
-    | Some c ->
-      let open Rtypes in
-      let ic = open_in c in
-      let s = really_input_string ic (in_channel_length ic) in
-      close_in ic ;
-      let config = EzEncoding.destruct Rtypes.daemon_config_enc s in
-      let sources, f =
-        if !retrieve then
-          config.daemon_nodes,
-          (fun ~source l ->
-             iter_rp (fun r ->
-                 match r#token_metadata_id with
-                 | None -> Lwt.return_ok ()
-                 | Some id ->
-                   let token_metadata_id = int_of_string id in
-                   let> metadata =
-                     retrieve_token_metadata
-                       ~source ~token_metadata_id ~token_id:(Z.of_string r#token_id) in
-                   match metadata with
-                   | None -> Lwt.return_ok ()
-                   | Some l ->
-                     let metadata = EzEncoding.construct Json_encoding.(assoc string) l in
-                     Db.update_metadata ~contract:r#contract ~token_id:r#token_id ~block:r#block
-                       ~level:r#level ~tsp:r#tsp ~metadata ~set_metadata:true ()) l)
-        else
-          config.daemon_ipfs_sources,
-          Db.fetch_metadata_from_source ~verbose:0 ~timeout:(float_of_int config.daemon_timeout) in
-      let>? l =
-        if !retrieve then
-          Db.empty_token_metadata ?contract:!contract ()
-        else
-          Db.unknown_token_metadata ?contract:!contract () in
-      split l sources f
-    | None ->
+  Lwt_main.run @@ Lwt.map (Result.iter_error Crp.print_error) @@
+  match !config with
+  | Some c ->
+    let open Rtypes in
+    let ic = open_in c in
+    let s = really_input_string ic (in_channel_length ic) in
+    close_in ic ;
+    let config = EzEncoding.destruct Rtypes.daemon_config_enc s in
+    let sources, f =
       if !retrieve then
-        let>? l = Db.empty_token_metadata ?contract:!contract () in
-        iter_rp (fun r ->
-            match r#token_metadata_id with
-            | None -> Lwt.return_ok ()
-            | Some id ->
-              let token_metadata_id = int_of_string id in
-              let> metadata =
-                retrieve_token_metadata
-                  ~source:!node ~token_metadata_id ~token_id:(Z.of_string r#token_id) in
-              match metadata with
-              | None -> Lwt.return_ok ()
-              | Some l ->
-                let metadata = EzEncoding.construct Json_encoding.(assoc string) l in
-                Db.update_metadata ~contract:r#contract ~token_id:r#token_id ~block:r#block
-                  ~level:r#level ~tsp:r#tsp ~metadata ~set_metadata:true ()) l
+        config.daemon_nodes,
+        (fun ~source l ->
+           iter_rp (fun r ->
+               match r#token_metadata_id with
+               | None -> Lwt.return_ok ()
+               | Some id ->
+                 let token_metadata_id = int_of_string id in
+                 let> metadata =
+                   retrieve_token_metadata
+                     ~source ~token_metadata_id ~token_id:(Z.of_string r#token_id) in
+                 match metadata with
+                 | None -> Lwt.return_ok ()
+                 | Some l ->
+                   let metadata = EzEncoding.construct Json_encoding.(assoc string) l in
+                   Db.update_metadata ~contract:r#contract ~token_id:r#token_id ~block:r#block
+                     ~level:r#level ~tsp:r#tsp ~metadata ~set_metadata:true ()) l)
       else
-        let>? l = Db.unknown_token_metadata ?contract:!contract () in
-        iter_rp (fun r ->
-            Db.update_metadata ~contract:r#contract ~token_id:r#token_id ~block:r#block
-              ~level:r#level ~tsp:r#tsp ~metadata:r#metadata ?metadata_uri:r#metadata_uri ()) l in
-  Lwt.return_ok ()
+        config.daemon_ipfs_sources,
+        Db.fetch_metadata_from_source ~verbose:0 ~timeout:(float_of_int config.daemon_timeout) in
+    let>? l =
+      match !force, !contract, !retrieve with
+      | true, Some contract, _ -> Db.contract_token_metadata contract
+      | _, _, true -> Db.empty_token_metadata ?contract:!contract ()
+      | _ -> Db.unknown_token_metadata ?contract:!contract () in
+    split l sources f
+  | None ->
+    if !retrieve then
+      let>? l = match !force, !contract with
+        | true, Some contract -> Db.contract_token_metadata contract
+        | _ -> Db.empty_token_metadata ?contract:!contract () in
+      iter_rp (fun r ->
+          match r#token_metadata_id with
+          | None -> Lwt.return_ok ()
+          | Some id ->
+            let token_metadata_id = int_of_string id in
+            let> metadata =
+              retrieve_token_metadata
+                ~source:!node ~token_metadata_id ~token_id:(Z.of_string r#token_id) in
+            match metadata with
+            | None -> Lwt.return_ok ()
+            | Some l ->
+              let metadata = EzEncoding.construct Json_encoding.(assoc string) l in
+              Db.update_metadata ~contract:r#contract ~token_id:r#token_id ~block:r#block
+                ~level:r#level ~tsp:r#tsp ~metadata ~set_metadata:true ()) l
+    else
+      let>? l = match !force, !contract with
+        | true, Some contract -> Db.contract_token_metadata contract
+        | _ -> Db.unknown_token_metadata ?contract:!contract () in
+      iter_rp (fun r ->
+          Db.update_metadata ~contract:r#contract ~token_id:r#token_id ~block:r#block
+            ~level:r#level ~tsp:r#tsp ~metadata:r#metadata ?metadata_uri:r#metadata_uri ()) l
