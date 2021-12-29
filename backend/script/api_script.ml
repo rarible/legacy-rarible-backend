@@ -2225,6 +2225,8 @@ let make_config ~exchange ~royalties ~transfer_manager ~contracts ~ft_contracts
       verbose = 0 ;
       register_kinds = None ;
       allow_no_metadata = false ;
+      retry = None;
+      retry_timeout = 5.;
       extra = { exchange; royalties; transfer_manager; contracts; ft_contracts } ;
     } in
     let temp_fn = Filename.temp_file "config" "" in
