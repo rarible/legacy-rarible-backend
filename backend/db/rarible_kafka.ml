@@ -59,7 +59,10 @@ let create topic =
   Lwt.return topic
 
 let kafka_produce ?(partition=0) ?key topic message =
-  Kafka_lwt.produce ?key topic partition message
+  Lwt.catch
+    (fun () -> Kafka_lwt.produce ?key topic partition message)
+    (fun exn -> Format.eprintf "\027[0;33mKafka error: %s\027[0m" (Printexc.to_string exn);
+      Lwt.return_unit)
 
 (** Producer *)
 let produce_item_event item_event =
