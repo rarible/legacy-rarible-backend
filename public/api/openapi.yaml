@@ -1924,9 +1924,7 @@ components:
           items:
             $ref: '#/components/schemas/Address'
         royalties:
-          type: array
-          items:
-            $ref: '#/components/schemas/Part'
+          $ref: '#/components/schemas/NftItemRoyalties'
         date:
           type: string
           format: date-time
@@ -2002,6 +2000,18 @@ components:
           type: string
       required:
       - name
+      additionalProperties: false
+    NftItemRoyalties:
+      type: object
+      properties:
+        onchain:
+          type: boolean
+        list:
+          type: array
+          items:
+            $ref: '#/components/schemas/Part'
+      required:
+      - list
       additionalProperties: false
     NftItems:
       type: object

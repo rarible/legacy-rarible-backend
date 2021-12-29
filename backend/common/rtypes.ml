@@ -96,6 +96,8 @@ type part = {
   part_value : A.uint32 ;
 } [@@deriving encoding {title="Part"; def_title} ]
 
+let parts_enc = Json_encoding.list part_enc
+
 type create_transaction_request = {
   req_hash : string;
   req_from : A.address;
@@ -200,6 +202,11 @@ type nft_item_meta = {
   nft_item_meta_animation : string option; [@opt]
 } [@@deriving encoding {title="NftItemMeta"; def_title}]
 
+type nft_item_royalties = {
+  nft_item_roy_onchain: bool option;
+  nft_item_roy_list: part list;
+} [@@deriving encoding {title="NftItemRoyalties"; def_title}]
+
 type nft_item = {
   nft_item_id : string ;
   nft_item_contract : A.address;
@@ -208,7 +215,7 @@ type nft_item = {
   nft_item_supply : A.big_integer;
   nft_item_lazy_supply : A.big_integer;
   nft_item_owners : A.address list;
-  nft_item_royalties : part list;
+  nft_item_royalties : nft_item_royalties;
   nft_item_date : A.date;
   nft_item_minted_at : A.date;
   nft_item_deleted : bool;
@@ -1130,6 +1137,14 @@ let date_or_error_enc = Json_encoding.(union [
     case Json_encoding.any_value (fun _ -> None) (fun _ -> None) ;
   ])
 
+let royalties_enc = Json_encoding.(union [
+    case (list part_enc) (fun l -> Some l) (fun l -> l);
+    case (assoc A.uint32_enc)
+      (fun l -> Some (List.map (fun p -> p.part_account, p.part_value) l))
+      (fun l -> List.map (fun (part_account, part_value) -> {part_account; part_value}) l);
+    case Json_encoding.any_value (fun _ -> None) (fun _ -> []) ;
+  ])
+
 type tzip21_token_metadata = {
   tzip21_tm_name : (string [@encoding string_or_string_array_enc]) option ;
   tzip21_tm_symbol : string option ;
@@ -1154,6 +1169,7 @@ type tzip21_token_metadata = {
   tzip21_tm_right_uri : string option ;
   tzip21_tm_is_transferable : (bool [@encoding bool_or_string_enc]) option ;
   tzip21_tm_should_prefer_symbol : (bool [@encoding bool_or_string_enc]) option ;
+  tzip21_tm_royalties : (part list [@encoding royalties_enc]) option; [@opt]
 } [@@deriving encoding {camel; option="option"}]
 
 type currency_order_type =

@@ -351,6 +351,16 @@ let upgrade_4_to_5 dbh version =
       "create index token_info_token_id_index on token_info(token_id)";
       "create index token_info_contract_index on token_info(contract)"]
 
+let upgrade_5_to_6 dbh version =
+  EzPG.upgrade ~dbh ~version
+    ~downgrade:[
+      "alter table tzip21_metadata drop column royalties";
+      "alter table token_info drop column royalties_metadata";
+    ] [
+    "alter table tzip21_metadata add column royalties jsonb";
+    "alter table token_info add column royalties_metadata jsonb";
+  ]
+
 let upgrades =
   let last_version = fst List.(hd @@ rev !Versions.upgrades) in
   !Versions.upgrades @ List.map (fun (i, f) -> last_version + i, f) [
@@ -358,4 +368,5 @@ let upgrades =
     2, upgrade_2_to_3;
     3, upgrade_3_to_4;
     4, upgrade_4_to_5;
+    5, upgrade_5_to_6;
   ]
