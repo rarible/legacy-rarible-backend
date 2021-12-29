@@ -1027,10 +1027,11 @@ let uri_pattern_update dbh ~main ~contract ~block ~level ~tsp uri =
   else Lwt.return_ok ()
 
 let contract_updates dbh main l =
-  let>? contracts = fold_rp (fun acc r ->
+  let>? contracts, events = fold_rp (fun (acc, events) r ->
       let contract, block, level, tsp = r#contract, r#block, r#level, r#tsp in
       let acc = SSet.add contract acc in
-      let>? () = match r#mint, r#burn, r#metadata_key, r#metadata_value, r#minter, r#uri_pattern with
+      let>? events =
+        match r#mint, r#burn, r#metadata_key, r#metadata_value, r#minter, r#uri_pattern with
         | Some json, _, _, _, _, _ ->
           let m = EzEncoding.destruct mint_enc json in
           let token_id, owner, amount, has_uri = match m with
@@ -1050,12 +1051,13 @@ let contract_updates dbh main l =
             contract_updates_base
               dbh ~main ~contract ~block ~level ~tsp ~burn:false
               ~account:owner ~token_id ~amount in
-          let>? () =
+          let events =
             if has_uri then
               (* Mint without metadata will produce this event on setMetadata call *)
-              Produce.nft_item_event dbh contract token_id
-            else Lwt.return_ok () in
-          Produce.nft_ownership_event dbh contract token_id owner
+              (Produce.nft_item_event dbh contract token_id) :: events
+            else events in
+          Lwt.return_ok @@
+          (Produce.nft_ownership_event dbh contract token_id owner) :: events
         | _, Some json, _, _, _, _ ->
           let b, account = EzEncoding.destruct Json_encoding.(tup2 burn_enc string) json in
           let token_id, amount = match b with
@@ -1064,38 +1066,43 @@ let contract_updates dbh main l =
           let>? () =
             contract_updates_base
               dbh ~main ~contract ~block ~level ~tsp ~burn:true ~account ~token_id ~amount in
-          let>? () =
-            Produce.nft_item_event dbh contract token_id in
-          let>? () = Produce.nft_ownership_event dbh contract token_id account in
-          Produce.order_event_item dbh account contract token_id
+          let events = (Produce.nft_item_event dbh contract token_id) :: events in
+          let events = (Produce.nft_ownership_event dbh contract token_id account) :: events in
+          Lwt.return_ok @@
+          (Produce.order_event_item dbh account contract token_id) :: events
         | _, _, Some key, Some value, _, _ ->
           let>? () = metadata_update dbh ~main ~contract ~block ~level ~tsp ~key ~value in
-          Produce.update_collection_event dbh contract
+          Lwt.return_ok @@
+          (Produce.update_collection_event dbh contract) :: events
         | _, _, _, _, Some minter, _ ->
           let>? () = minter_update dbh ~main ~contract ~block ~level ~tsp minter in
-          Produce.update_collection_event dbh contract
+          Lwt.return_ok @@
+          (Produce.update_collection_event dbh contract) :: events
         | _, _, _, _, _, Some uri_pattern ->
           let>? () = uri_pattern_update dbh ~main ~contract ~block ~level ~tsp uri_pattern in
-          Produce.update_collection_event dbh contract
-        | _ -> Lwt.return_ok () in
-      Lwt.return_ok (SSet.add contract acc)) SSet.empty l in
+          Lwt.return_ok @@
+          (Produce.update_collection_event dbh contract) :: events
+        | _ -> Lwt.return_ok events in
+      Lwt.return_ok (SSet.add contract acc, events)) (SSet.empty, []) l in
   (* update contracts *)
-  iter_rp (fun c ->
-      let>? l =
+  let>? () =
+    iter_rp (fun c ->
+        let>? l =
+          [%pgsql dbh
+              "select count(token_id), max(token_id::numeric) from \
+               (select distinct token_id FROM tokens where \
+               contract = $c) AS temp"] in
+        let tokens_number, last_token_id = match l with
+          | [] | _ :: _ :: _ -> 0L, Z.zero
+          | [ tokens_number, last_token_id ] ->
+            Option.value ~default:0L tokens_number,
+            Option.fold ~none:Z.zero ~some:Z.of_string last_token_id in
         [%pgsql dbh
-            "select count(token_id), max(token_id::numeric) from \
-             (select distinct token_id FROM tokens where \
-             contract = $c) AS temp"] in
-      let tokens_number, last_token_id = match l with
-        | [] | _ :: _ :: _ -> 0L, Z.zero
-        | [ tokens_number, last_token_id ] ->
-          Option.value ~default:0L tokens_number,
-          Option.fold ~none:Z.zero ~some:Z.of_string last_token_id in
-      [%pgsql dbh
-          "update contracts set \
-           tokens_number = $tokens_number, \
-           last_token_id = $last_token_id \
-           where address = $c"]) (SSet.elements contracts)
+            "update contracts set \
+             tokens_number = $tokens_number, \
+             last_token_id = $last_token_id \
+             where address = $c"]) (SSet.elements contracts) in
+  Lwt.return_ok @@ List.rev events
 
 let transfer_updates dbh main ~contract ~token_id ~source amount destination =
   let amount = if main then amount else Z.neg amount in
@@ -1109,11 +1116,12 @@ let transfer_updates dbh main ~contract ~token_id ~source amount destination =
          where token_id = ${Z.to_string token_id} and \
          owner = $destination and contract = $contract"] in
   if main then
-    let>? () = Produce.nft_item_event dbh contract token_id in
-    let>? () = Produce.nft_ownership_event dbh contract token_id source in
-    let>? () = Produce.nft_ownership_event dbh contract token_id destination in
-    Produce.order_event_item dbh source contract token_id
-  else Lwt.return_ok ()
+    let ev1 = Produce.nft_item_event dbh contract token_id in
+    let ev2 = Produce.nft_ownership_event dbh contract token_id source in
+    let ev3 = Produce.nft_ownership_event dbh contract token_id destination in
+    let ev4 = Produce.order_event_item dbh source contract token_id in
+    Lwt.return_ok @@ Some (ev1, ev2, ev3, ev4)
+  else Lwt.return_ok None
 
 let royalties_updates ~dbh ~main ~contract ~block ~level ~tsp ?token_id royalties =
   let no_token_id = Option.is_none token_id in
@@ -1148,19 +1156,36 @@ let token_metadata_updates ~dbh ~main ~contract ~block ~level ~tsp ~token_id ~tr
        where token_info.contract = $contract and token_info.token_id = ${Z.to_string token_id}"]
 
 let token_updates dbh main l =
-  iter_rp (fun r ->
+  fold_rp (fun acc r ->
       let contract, block, level, tsp, source, transaction =
         r#contract, r#block, r#level, r#tsp, r#source, r#transaction in
       match r#destination, Option.map Z.of_string r#token_id,
             r#amount, r#operator, r#add, r#royalties, r#metadata  with
       | Some destination, Some token_id, Some amount, _, _, _, _ ->
-        transfer_updates
-          dbh main ~contract ~token_id ~source amount destination
+        let>? ev =
+          transfer_updates
+            dbh main ~contract ~token_id ~source amount destination in
+        begin match ev with
+          | None -> Lwt.return_ok acc
+          | Some (ev_it, ev_o1, ev_o2, ev_or) ->
+            let new_acc =
+              try
+                let old_ev = List.assoc (contract, token_id) acc in
+                ((contract,token_id), ([ ev_o1; ev_o2; ev_or ] @ old_ev)) ::
+                List.remove_assoc (contract, token_id) acc
+              with Not_found ->
+                ((contract,token_id), [ ev_it; ev_o1; ev_o2; ev_or ]) :: acc in
+            Lwt.return_ok new_acc
+        end
       | _, token_id, _, _, _, Some royalties, _ ->
-        royalties_updates ~dbh ~main ~contract ~block ~level ~tsp ?token_id royalties
+        let>? () =
+          royalties_updates ~dbh ~main ~contract ~block ~level ~tsp ?token_id royalties in
+        Lwt.return_ok acc
       | _, Some token_id, _, _, _, _, Some meta ->
-        token_metadata_updates ~dbh ~main ~contract ~block ~level ~tsp ~token_id ~transaction meta
-      | _ -> Lwt.return_error (`hook_error "invalid token_update")) l
+        let>? () =
+          token_metadata_updates ~dbh ~main ~contract ~block ~level ~tsp ~token_id ~transaction meta in
+        Lwt.return_ok acc
+      | _ -> Lwt.return_error (`hook_error "invalid token_update")) [] l
 
 let token_balance_updates dbh main l =
   let>? m = fold_rp (fun acc r ->
@@ -1269,8 +1294,8 @@ let set_main _config ?(forward=false) dbh {Hooks.m_main; m_hash} =
     let>? tb_updates =
       [%pgsql.object dbh
           "update token_balance_updates set main = $m_main where block = $m_hash returning *"] in
-    let>? () = contract_updates dbh m_main @@ sort c_updates in
-    let>? () = token_updates dbh m_main @@ sort t_updates in
+    let>? cevents = contract_updates dbh m_main @@ sort c_updates in
+    let>? tevents = token_updates dbh m_main @@ sort t_updates in
     let>? () = token_balance_updates dbh m_main @@ sort tb_updates in
     let>? () =
       [%pgsql dbh
@@ -1284,10 +1309,13 @@ let set_main _config ?(forward=false) dbh {Hooks.m_main; m_hash} =
     let>? () =
       [%pgsql dbh
           "update tzip21_creators set main = $m_main where block = $m_hash"] in
-    let>? () = Produce.collection_events m_main collections in
-    let>? () = Produce.cancel_events dbh m_main @@ sort cancels in
-    let>? () = Produce.match_events dbh m_main @@ sort matches in
-    let>? () = Produce.nft_activity_events m_main @@ sort nactivities in
-    Lwt.return_ok (fun () -> Lwt.return_ok ())
+    Lwt.return_ok (fun () ->
+        let>? () = Produce.collection_events m_main collections in
+        let>? () = Produce.cancel_events dbh m_main @@ sort cancels in
+        let>? () = Produce.match_events dbh m_main @@ sort matches in
+        let>? () = Produce.nft_activity_events m_main @@ sort nactivities in
+        let>? () = iter_rp (fun ev -> ev ()) cevents in
+        let tevents = List.fold_left (fun acc (_, ev) -> ev @ acc) [] tevents in
+        iter_rp (fun ev -> ev ()) tevents)
   else
     Lwt.return_ok (fun () -> Lwt.return_ok ())

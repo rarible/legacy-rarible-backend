@@ -3,7 +3,7 @@ open Rtypes
 open Common
 open Misc
 
-let order_event_hash dbh hash =
+let order_event_hash dbh hash () =
   match !Rarible_kafka.kafka_config with
   | None -> Lwt.return_ok ()
   | Some _ ->
@@ -16,7 +16,7 @@ let order_event_hash dbh hash =
     end >>= fun () ->
     Lwt.return_ok ()
 
-let order_event_item dbh old_owner contract token_id =
+let order_event_item dbh old_owner contract token_id () =
   match !Rarible_kafka.kafka_config with
   | None -> Lwt.return_ok ()
   | Some _ ->
@@ -38,7 +38,7 @@ let order_event_item dbh old_owner contract token_id =
           | _ -> Lwt.return_ok ())
       l
 
-let nft_item_event dbh contract token_id =
+let nft_item_event dbh contract token_id () =
   match !Rarible_kafka.kafka_config with
   | None -> Lwt.return_ok ()
   | Some _ ->
@@ -65,7 +65,7 @@ let nft_collection_event c =
     >>= fun () ->
     Lwt.return_ok ()
 
-let update_collection_event dbh contract =
+let update_collection_event dbh contract () =
   match !Rarible_kafka.kafka_config with
   | None -> Lwt.return_ok ()
   | Some _ ->
@@ -82,7 +82,7 @@ let nft_ownership_update_event os =
   else
     Rarible_kafka.produce_ownership_event (Utils.mk_update_ownership_event os)
 
-let nft_ownership_event dbh contract token_id owner =
+let nft_ownership_event dbh contract token_id owner () =
   match !Rarible_kafka.kafka_config with
   | None -> Lwt.return_ok ()
   | Some _ ->
@@ -102,15 +102,15 @@ let cancel_events dbh main l =
         match r#cancel with
         | None -> Lwt.return_ok ()
         | Some h ->
-          order_event_hash dbh h
+          order_event_hash dbh h ()
       else Lwt.return_ok ())
     l
 
 let match_events dbh main l =
   iter_rp (fun r ->
       if main then
-        let>? () = order_event_hash dbh r#hash_left in
-        order_event_hash dbh r#hash_right
+        let>? () = order_event_hash dbh r#hash_left () in
+        order_event_hash dbh r#hash_right ()
       else Lwt.return_ok ())
     l
 
