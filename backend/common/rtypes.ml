@@ -980,6 +980,14 @@ module TMap = Map.Make(struct
         else String.compare o1 o2
   end)
 
+module TIMap = Map.Make(struct
+    type t = (string * z)
+    let compare (c1, id1) (c2, id2) =
+      let c = String.compare c1 c2 in
+      if c <> 0 then c
+      else Z.compare id1 id2
+  end)
+
 type bigmap_types = {
   bmt_key: micheline_type_short;
   bmt_value: micheline_type_short;
