@@ -2586,15 +2586,34 @@ let token_balance_updates dbh main l =
       List.fold_left (fun acc (account, amount, balance) ->
           match balance with
           | Some b when b <> amount ->
-            TMap.add (r#contract, Z.of_string r#token_id, account) (amount, b) acc
+            TMap.add (r#contract, Z.of_string r#token_id, account) (amount, b, r) acc
           | _ -> acc) acc l
     ) TMap.empty l in
-  iter_rp (fun ((contract, token_id, owner), (amount, balance)) ->
+  let>? m = fold_rp (fun acc ((contract, token_id, owner), (amount, balance, r)) ->
       Format.printf "\027[0;33mupdate amount for %s[%s][%s]: %s -> %s\027[0m@."
         (short contract) (Z.to_string token_id) (short owner) (Z.to_string amount) (Z.to_string balance);
-      [%pgsql dbh
+      let>? () = [%pgsql dbh
           "update tokens set amount = $balance where contract = $contract \
-           and token_id = ${Z.to_string token_id} and owner = $owner"]) @@ TMap.bindings m
+           and token_id = ${Z.to_string token_id} and owner = $owner"] in
+      Lwt.return_ok @@ match TIMap.find_opt (contract, token_id) acc with
+      | None -> TIMap.add (contract, token_id) (Z.sub balance amount, r) acc
+      | Some (s, _) -> TIMap.add (contract, token_id) (Z.(add s (sub balance amount)), r) acc
+    ) TIMap.empty (TMap.bindings m) in
+  iter_rp (fun ((contract, token_id), (supply, r)) ->
+      let id = contract ^ ":" ^ Z.to_string token_id in
+      [%pgsql dbh
+          "insert into token_info(id, contract, token_id, block, level, tsp, \
+           last_block, last_level, last, transaction, supply, main) \
+           values($id, $contract, ${Z.to_string token_id}, ${r#block}, ${r#level}, ${r#tsp}, \
+           ${r#block}, ${r#level}, ${r#tsp}, ${r#transaction}, $supply, true) \
+           on conflict (id) do update \
+           set supply = $supply,
+           last_block = case when $main then ${r#block} else token_info.last_block end, \
+           last_level = case when $main then ${r#level} else token_info.last_level end, \
+           last = case when $main then ${r#tsp} else token_info.last end \
+           where token_info.contract = $contract and token_info.token_id = ${Z.to_string token_id}"]) @@
+  TIMap.bindings m
+
 
 let produce_cancel_events dbh main l =
   iter_rp (fun r ->
