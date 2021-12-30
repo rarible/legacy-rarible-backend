@@ -2487,7 +2487,7 @@ let contract_updates dbh main l =
         [%pgsql dbh
             "select count(token_id), max(token_id::numeric) from \
              (select distinct token_id FROM tokens where \
-             contract = 'KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton') AS temp"] in
+             contract = $c) AS temp"] in
       let tokens_number, last_token_id = match l with
         | [] | _ :: _ :: _ -> 0L, Z.zero
         | [ tokens_number, last_token_id ] ->
