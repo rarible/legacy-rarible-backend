@@ -6,7 +6,7 @@ let () =
   Arg.parse [] (fun s -> hashes := !hashes @ [ s ]) "prefix_hash";
   Lwt_main.run @@ Lwt.map (fun _ -> ()) @@
   iter_rp (fun h ->
-      let> r = Db.find_hash h in
+      let> r = Db.Utils.find_hash h in
       Format.printf "%s -> @?" h;
       let () = match r with
         | Error _ | Ok [] -> Format.printf "not found@."

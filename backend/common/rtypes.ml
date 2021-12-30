@@ -1170,7 +1170,7 @@ type tzip21_token_metadata = {
   tzip21_tm_is_transferable : (bool [@encoding bool_or_string_enc]) option ;
   tzip21_tm_should_prefer_symbol : (bool [@encoding bool_or_string_enc]) option ;
   tzip21_tm_royalties : (part list [@encoding royalties_enc]) option; [@opt]
-} [@@deriving encoding {camel; option="option"}]
+} [@@deriving encoding {camel; option="option"; ignore}]
 
 type currency_order_type =
   | COTSELL

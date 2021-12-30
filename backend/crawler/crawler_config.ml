@@ -46,7 +46,7 @@ let rarible_contracts ?(db=dummy_extra) config =
     Lwt.return_ok { config with accounts = Some s; extra }
 
 let fill_config config =
-  let>? db_extra = Db.get_extra_config () in
+  let>? db_extra = Db.Config.get_extra_config () in
   let>? config = rarible_contracts ?db:db_extra config in
-  let>? () = Db.update_extra_config config.extra in
+  let>? () = Db.Config.update_extra_config config.extra in
   Lwt.return_ok config

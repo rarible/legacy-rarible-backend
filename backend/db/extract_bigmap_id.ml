@@ -61,13 +61,13 @@ let () =
       | Error _ -> Format.printf "Error@."
       | Ok _ -> ()) @@
   let>? contracts = match !contracts with
-    | None -> Db.get_unknown_bm_id ~kind:!kind ()
+    | None -> Db.Utils.get_unknown_bm_id ~kind:!kind ()
     | Some contracts -> Lwt.return_ok contracts in
   iter_rp (fun contract ->
       Format.printf "contract %s@." contract;
       let> o = get contract in
       match o with
-      | Ok (Some (`nat id)) -> Db.set_bm_id ~contract ~kind:!kind id
+      | Ok (Some (`nat id)) -> Db.Utils.set_bm_id ~contract ~kind:!kind id
       | _ ->
         Format.printf "No value@.";
         Lwt.return_ok ()) contracts

@@ -492,7 +492,7 @@ let get_nft_activities req input =
       match get_continuation_last_update_param req with
       | Error err -> return @@ Error err
       | Ok continuation ->
-        Db.get_nft_activities ?sort ?continuation ?size input >>= function
+        Db.Api.get_nft_activities ?sort ?continuation ?size input >>= function
         | Error db_err ->
           let message = Crawlori.Rp.string_of_error db_err in
           return (Error {code=`UNEXPECTED_API_ERROR; message})
@@ -513,7 +513,7 @@ let get_nft_ownership_by_id (_, ownership_id) () =
   match parse_ownership_id ownership_id with
   | Error err -> return @@ Error err
   | Ok (contract, token_id, owner) ->
-    Db.get_nft_ownership_by_id contract token_id owner >>= function
+    Db.Get.get_nft_ownership_by_id contract token_id owner >>= function
     | Error (`hook_error "ownership not found") ->
       return (Error {code=`OWNERSHIP_NOT_FOUND; message=ownership_id})
     | Error db_err ->
@@ -540,7 +540,7 @@ let get_nft_ownerships_by_item req () =
         match get_continuation_ownerships_param req with
         | Error err -> return @@ Error err
         | Ok continuation ->
-          Db.get_nft_ownerships_by_item ?continuation ?size contract token_id >>= function
+          Db.Api.get_nft_ownerships_by_item ?continuation ?size contract token_id >>= function
           | Error db_err ->
             let message = Crawlori.Rp.string_of_error db_err in
             return (Error {code=`UNEXPECTED_API_ERROR; message})
@@ -560,7 +560,7 @@ let get_nft_all_ownerships req () =
     match get_continuation_ownerships_param req with
     | Error err -> return @@ Error err
     | Ok continuation ->
-      Db.get_nft_all_ownerships ?continuation ?size () >>= function
+      Db.Api.get_nft_all_ownerships ?continuation ?size () >>= function
       | Error db_err ->
         let message = Crawlori.Rp.string_of_error db_err in
         return (Error {code=`UNEXPECTED_API_ERROR; message})
@@ -578,7 +578,7 @@ let reset_nft_item_meta_by_id (_req, item_id) () =
   match parse_item_id item_id with
   | Error err -> return @@ Error err
   | Ok (contract, token_id) ->
-    Db.reset_nft_item_meta_by_id contract token_id >>= function
+    Db.Api.reset_nft_item_meta_by_id contract token_id >>= function
     | Error db_err ->
       let message = Crawlori.Rp.string_of_error db_err in
       return (Error {code=`UNEXPECTED_API_ERROR; message})
@@ -593,7 +593,7 @@ let get_nft_item_meta_by_id (_req, item_id) () =
   match parse_item_id item_id with
   | Error err -> return @@ Error err
   | Ok (contract, token_id) ->
-    Db.get_nft_item_meta_by_id contract token_id >>= function
+    Db.Api.get_nft_item_meta_by_id contract token_id >>= function
     | Error db_err ->
       let message = Crawlori.Rp.string_of_error db_err in
       return (Error {code=`UNEXPECTED_API_ERROR; message})
@@ -613,7 +613,7 @@ let get_nft_item_by_id (req, item_id) () =
     match get_include_meta_param req with
     | Error err -> return @@ Error err
     | Ok include_meta ->
-      Db.get_nft_item_by_id ?include_meta contract token_id >>= function
+      Db.Get.get_nft_item_by_id ?include_meta contract token_id >>= function
       | Error (`hook_error "item not found") ->
         return (Error {code=`ITEM_NOT_FOUND; message=item_id})
       | Error db_err ->
@@ -641,7 +641,7 @@ let get_nft_items_by_owner req () =
         match get_continuation_items_param req with
         | Error err -> return @@ Error err
         | Ok continuation ->
-          Db.get_nft_items_by_owner ?include_meta ?continuation ?size owner >>= function
+          Db.Api.get_nft_items_by_owner ?include_meta ?continuation ?size owner >>= function
           | Error db_err ->
             let message = Crawlori.Rp.string_of_error db_err in
             return (Error {code=`UNEXPECTED_API_ERROR; message})
@@ -667,7 +667,7 @@ let get_nft_items_by_creator req () =
         match get_continuation_items_param req with
         | Error err -> return @@ Error err
         | Ok continuation ->
-          Db.get_nft_items_by_creator ?include_meta ?continuation ?size creator >>= function
+          Db.Api.get_nft_items_by_creator ?include_meta ?continuation ?size creator >>= function
           | Error db_err ->
             let message = Crawlori.Rp.string_of_error db_err in
             return (Error {code=`UNEXPECTED_API_ERROR; message})
@@ -693,7 +693,7 @@ let get_nft_items_by_collection req () =
         match get_continuation_items_param req with
         | Error err -> return @@ Error err
         | Ok continuation ->
-          Db.get_nft_items_by_collection ?include_meta ?continuation ?size collection >>= function
+          Db.Api.get_nft_items_by_collection ?include_meta ?continuation ?size collection >>= function
           | Error db_err ->
             let message = Crawlori.Rp.string_of_error db_err in
             return (Error {code=`UNEXPECTED_API_ERROR; message})
@@ -725,7 +725,7 @@ let get_nft_all_items req () =
             match get_continuation_items_param req with
             | Error err -> return @@ Error err
             | Ok continuation ->
-              Db.get_nft_all_items
+              Db.Api.get_nft_all_items
                 ?last_updated_to
                 ?last_updated_from
                 ?show_deleted
@@ -751,7 +751,7 @@ let generate_nft_token_id (_req, collection) () =
   match parse_collection_id collection with
   | Error err -> return @@ Error err
   | Ok collection ->
-    Db.generate_nft_token_id collection >>= function
+    Db.Api.generate_nft_token_id collection >>= function
     | Error db_err ->
       let message = Crawlori.Rp.string_of_error db_err in
       return (Error {code=`UNEXPECTED_API_ERROR; message})
@@ -767,7 +767,7 @@ let get_nft_collection_by_id (_req, collection) () =
   match parse_collection_id collection with
   | Error err -> return @@ Error err
   | Ok collection ->
-    Db.get_nft_collection_by_id collection >>= function
+    Db.Get.get_nft_collection_by_id collection >>= function
     | Error (`hook_error "collection not found") ->
       return (Error {code=`COLLECTION_NOT_FOUND; message=collection})
     | Error db_err ->
@@ -791,7 +791,7 @@ let search_nft_collections_by_owner req () =
       match get_continuation_collections_param req with
       | Error err -> return @@ Error err
       | Ok continuation ->
-        Db.search_nft_collections_by_owner ?continuation ?size owner >>= function
+        Db.Api.search_nft_collections_by_owner ?continuation ?size owner >>= function
         | Error db_err ->
           let message = Crawlori.Rp.string_of_error db_err in
           return (Error {code=`UNEXPECTED_API_ERROR; message})
@@ -811,7 +811,7 @@ let search_nft_all_collections req () =
     match get_continuation_collections_param req with
     | Error err -> return @@ Error err
     | Ok continuation ->
-      Db.get_nft_all_collections ?continuation ?size () >>= function
+      Db.Api.get_nft_all_collections ?continuation ?size () >>= function
       | Error db_err ->
         let message = Crawlori.Rp.string_of_error db_err in
         return (Error {code=`UNEXPECTED_API_ERROR; message})
@@ -898,11 +898,11 @@ let validate existing update =
 
 let get_existing_order hash_key_order =
   Format.eprintf "get_existing_order\n%!";
-  Db.get_order hash_key_order
+  Db.Get.get_order hash_key_order
 
 let z_order_form order =
-  let>? maked = Db.get_decimals ~do_error:true order.order_form_elt.order_form_elt_make.asset_type in
-  let|>? taked = Db.get_decimals ~do_error:true order.order_form_elt.order_form_elt_take.asset_type in
+  let>? maked = Db.Get.get_decimals ~do_error:true order.order_form_elt.order_form_elt_make.asset_type in
+  let|>? taked = Db.Get.get_decimals ~do_error:true order.order_form_elt.order_form_elt_take.asset_type in
   Balance.z_order_form ?maked ?taked order
 
 let upsert_order _req input =
@@ -954,12 +954,12 @@ let upsert_order _req input =
           | Ok order ->
             (* TODO : USDVALUES *)
             (* TODO : pricehistory *)
-            Db.upsert_order order >>= function
+            Db.Api.upsert_order order >>= function
             | Error db_err ->
               let message = Crawlori.Rp.string_of_error db_err in
               return (Error {code=`UNEXPECTED_API_ERROR; message})
             | Ok () ->
-              Db.get_order order.order_elt.order_elt_hash >>= function
+              Db.Get.get_order order.order_elt.order_elt_hash >>= function
               | Error db_err ->
                 let message = Crawlori.Rp.string_of_error db_err in
                 return (Error {code=`UNEXPECTED_API_ERROR; message})
@@ -995,7 +995,7 @@ let get_orders_all req () =
           match get_continuation_last_update_param req with
           | Error err -> return @@ Error err
           | Ok continuation ->
-            Db.get_orders_all ?origin ?sort ?statuses ?continuation ?size () >>= function
+            Db.Api.get_orders_all ?origin ?sort ?statuses ?continuation ?size () >>= function
             | Error db_err ->
               let message = Crawlori.Rp.string_of_error db_err in
               return (Error {code=`UNEXPECTED_API_ERROR; message})
@@ -1011,7 +1011,7 @@ let get_orders_all req () =
    section=orders_section}]
 
 let get_order_by_hash (_req, hash) () =
-  Db.get_order hash >>= function
+  Db.Get.get_order hash >>= function
   | Ok (Some (order, (maked, taked))) ->
     let order = Balance.dec_order ?maked ?taked order in
     return_ok order
@@ -1029,7 +1029,7 @@ let get_order_by_hash (_req, hash) () =
 let get_order_by_ids _req ids =
   Lwt_list.fold_left_s (fun res id -> match res with
       | Ok list ->
-        Db.get_order id >>= begin function
+        Db.Get.get_order id >>= begin function
           | Ok (Some (order, (maked, taked))) ->
             Lwt.return @@ Ok ((Balance.dec_order ?maked ?taked order) :: list)
           | Ok None -> Lwt.return @@ Ok list
@@ -1080,7 +1080,7 @@ let get_sell_orders_by_maker req () =
         match get_continuation_last_update_param req with
         | Error err -> return @@ Error err
         | Ok continuation ->
-          Db.get_sell_orders_by_maker ?origin ?continuation ?size maker >>= function
+          Db.Api.get_sell_orders_by_maker ?origin ?continuation ?size maker >>= function
           | Error db_err ->
             let message = Crawlori.Rp.string_of_error db_err in
             return (Error {code=`UNEXPECTED_API_ERROR; message})
@@ -1127,7 +1127,7 @@ let get_sell_orders_by_item req () =
                     match get_continuation_price_param req with
                     | Error err -> return @@ Error err
                     | Ok continuation ->
-                      Db.get_sell_orders_by_item
+                      Db.Api.get_sell_orders_by_item
                         ?origin ?continuation ?size ?maker ?currency
                         ?statuses ?start_date ?end_date contract token_id >>= function
                       | Error db_err ->
@@ -1159,7 +1159,7 @@ let get_sell_orders_by_collection req () =
         match get_continuation_last_update_param req with
         | Error err -> return @@ Error err
         | Ok continuation ->
-          Db.get_sell_orders_by_collection
+          Db.Api.get_sell_orders_by_collection
             ?origin ?continuation ?size collection >>= function
           | Error db_err ->
             let message = Crawlori.Rp.string_of_error db_err in
@@ -1185,7 +1185,7 @@ let get_sell_orders req () =
       match get_continuation_last_update_param req with
       | Error err -> return @@ Error err
       | Ok continuation ->
-        Db.get_sell_orders ?origin ?continuation ?size () >>= function
+        Db.Api.get_sell_orders ?origin ?continuation ?size () >>= function
         | Error db_err ->
           let message = Crawlori.Rp.string_of_error db_err in
           return (Error {code=`UNEXPECTED_API_ERROR; message})
@@ -1213,7 +1213,7 @@ let get_order_bids_by_maker req () =
         match get_continuation_last_update_param req with
         | Error err -> return @@ Error err
         | Ok continuation ->
-          Db.get_bid_orders_by_maker ?origin ?continuation ?size maker >>= function
+          Db.Api.get_bid_orders_by_maker ?origin ?continuation ?size maker >>= function
           | Error db_err ->
             let message = Crawlori.Rp.string_of_error db_err in
             return (Error {code=`UNEXPECTED_API_ERROR; message})
@@ -1259,7 +1259,7 @@ let get_order_bids_by_item req () =
                     match get_continuation_price_param req with
                     | Error err -> return @@ Error err
                     | Ok continuation ->
-                      Db.get_bid_orders_by_item
+                      Db.Api.get_bid_orders_by_item
                         ?origin ?continuation ?size ?maker ?currency
                         ?statuses ?start_date ?end_date contract token_id
                       >>= function
@@ -1285,7 +1285,7 @@ let get_currencies_by_bid_orders_of_item req () =
     match get_required_token_id_param req with
     | Error err -> return @@ Error err
     | Ok token_id ->
-      Db.get_currencies_by_bid_orders_of_item contract token_id >>= function
+      Db.Api.get_currencies_by_bid_orders_of_item contract token_id >>= function
       | Error db_err ->
         let message = Crawlori.Rp.string_of_error db_err in
         return (Error {code=`UNEXPECTED_API_ERROR; message})
@@ -1306,7 +1306,7 @@ let get_currencies_by_sell_orders_of_item req () =
     match get_required_token_id_param req with
     | Error err -> return @@ Error err
     | Ok token_id ->
-      Db.get_currencies_by_sell_orders_of_item contract token_id >>= function
+      Db.Api.get_currencies_by_sell_orders_of_item contract token_id >>= function
       | Error db_err ->
         let message = Crawlori.Rp.string_of_error db_err in
         return (Error {code=`UNEXPECTED_API_ERROR; message})
@@ -1330,7 +1330,7 @@ let get_order_activities req input =
       match get_continuation_last_update_param req with
       | Error err -> return @@ Error err
       | Ok continuation ->
-        Db.get_order_activities ?sort ?continuation ?size input >>= function
+        Db.Api.get_order_activities ?sort ?continuation ?size input >>= function
         | Error db_err ->
           let message = Crawlori.Rp.string_of_error db_err in
           return (Error {code=`UNEXPECTED_API_ERROR; message})
@@ -1378,7 +1378,7 @@ let validate _req input =
 (* ft-balance-controller *)
 let get_ft_balance ((req, contract), ft_owner) () =
   let token_id = Option.map Z.of_string (EzAPI.Req.find_param token_id_param req) in
-  let> r = Db.get_ft_balance ?token_id ~do_error:true ~contract ft_owner in
+  let> r = Db.Get.get_ft_balance ?token_id ~do_error:true ~contract ft_owner in
   match r with
   | Error (`hook_error "ft_contract_not_found") ->
     return (Error {code=`TOKEN_NOT_FOUND; message=contract})
@@ -1397,18 +1397,3 @@ let get_ft_balance ((req, contract), ft_owner) () =
    output=ft_balance_enc A.big_decimal_enc;
    errors=[unexpected_case;entity_not_found_case];
    section=balance_section}]
-
-(* module V_0_1 = struct
- *
- *   module Acontroller = struct
- *     let dir = empty
- *   end
- *
- *   module Bcontroller = struct
- *     let dir = Acontroller.dir
- *   end
- *   module Ccontroler = struct
- *     let dur = Bcontroller.dir
- *   end
- *
- * end *)

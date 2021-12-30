@@ -129,7 +129,7 @@ let spec = [
 
 let wait_next_block () =
   let rec aux level0 =
-    Db.get_level () >>= function
+    Db.Utils.get_level () >>= function
     | Ok level ->
       Printf.eprintf "wait_next_block level0 %d level %d\n%!" level0 level ;
       if level > level0 then Lwt.return_unit
@@ -139,7 +139,7 @@ let wait_next_block () =
     | Error err ->
       Lwt.return @@ Format.eprintf "ERROR %s\n%!" @@ Crp.string_of_error err
   in
-  Db.get_level () >>= function
+  Db.Utils.get_level () >>= function
   | Error err ->
     Lwt.return @@ Format.eprintf "wait_next_block error %s\n%!" @@ Crp.string_of_error err
   | Ok level ->
@@ -148,7 +148,7 @@ let wait_next_block () =
 let wait_op_included ?(timeout=180.) hash =
   Format.eprintf "wait_op_included %s@." hash ;
   let rec aux () =
-    let>? b = Db.is_op_included hash in
+    let>? b = Db.Utils.is_op_included hash in
     if b then
       begin
         Printf.eprintf "op %s crawled\n%!" hash ;
@@ -166,7 +166,7 @@ let wait_op_included ?(timeout=180.) hash =
 let wait_deploy_crawled ?(timeout=180.) address =
   Format.eprintf "wait_deploy_crawled %s@." address ;
   let rec aux () =
-    let>? b = Db.is_collection_crawled address in
+    let>? b = Db.Utils.is_collection_crawled address in
     if b then
       begin
         Printf.eprintf "contract %s crawled\n%!" address ;
@@ -721,7 +721,7 @@ let call_get_order hash =
   handle_ezreq_result r
 
 let update_order_make_value hash make_value =
-  Db.get_order hash >>= function
+  Db.Get.get_order hash >>= function
   | Error err ->
     let err = Format.sprintf "ERROR %s" @@ Crp.string_of_error err in
     Lwt.fail_with err
@@ -765,7 +765,7 @@ let update_order_make_value hash make_value =
         call_upsert_order ~d:decs order_form
 
 let update_order_take_value hash take_value =
-  Db.get_order hash >>= function
+  Db.Get.get_order hash >>= function
   | Error err ->
     let err = Format.sprintf "ERROR %s" @@ Crp.string_of_error err in
     Lwt.fail_with err
@@ -2760,7 +2760,7 @@ let cancel_order_bid ?royalties ?(exchange=exchange) ~kind ~privacy () =
 let insert_metadata contract token_id uri =
   (* let open Crawlori.Hooks0 in *)
   (* let open Tzfunc.Proto in *)
-  Db.use None @@ fun dbh ->
+  Db.Misc.use None @@ fun dbh ->
   let token_id = Z.of_string token_id in
   let block = "blFAKE" in
   let level = 1l in
@@ -2769,7 +2769,7 @@ let insert_metadata contract token_id uri =
   let l = [ "", uri ] in
   let meta = EzEncoding.construct Json_encoding.(assoc string) l in
   (* Db.insert_metadata_update ~dbh ~op ~contract ~token_id l *)
-  Db.token_metadata_updates ~dbh ~main:true ~contract ~block ~level ~tsp ~token_id ~transaction meta
+  Db.Crawl.token_metadata_updates ~dbh ~main:true ~contract ~block ~level ~tsp ~token_id ~transaction meta
 
 (** main *)
 

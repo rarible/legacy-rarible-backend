@@ -563,3 +563,12 @@ let rarible_meta_of_tzip21_meta meta =
             Some uri
           else find_video_asset m
     }
+
+let check_address a =
+  match Tzfunc.Crypto.Pkh.b58dec a with
+  | Ok _ -> true
+  | Error _ ->
+    try
+      let _ = Tzfunc.Crypto.(Base58.decode ~prefix:Prefix.contract_public_key_hash a) in
+      true
+    with _ -> false
