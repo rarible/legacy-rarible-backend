@@ -361,6 +361,64 @@ let upgrade_5_to_6 dbh version =
     "alter table token_info add column royalties_metadata jsonb";
   ]
 
+let upgrade_6_to_7 dbh version =
+  EzPG.upgrade ~dbh ~version
+    ~downgrade:
+      [ "drop index order_date_desc_index";
+        "drop index order_transaction_index";
+        "drop index order_make_asset_type_class_index";
+        "drop index order_take_asset_type_class_index";
+        "drop index ft_contracts_token_id_index";
+        "drop index order_cancel_cancel_index";
+        "drop index order_match_left_index";
+        "drop index order_match_right_index";
+        "drop index contracts_ledger_key_index";
+        "drop index contracts_ledger_value_index";
+        "drop index contracts_owner_index";
+        "drop index tokens_oid_index";
+        "drop index tokens_tid_index";
+
+        "alter table tzip21_attributes drop constraint tzip21_attributes_pkey";
+        "alter table tzip21_formats drop constraint tip21_formats_pkey";
+        "alter table tzip21_creators drop constraint tzip21_creators_pkey";
+        "alter table tzip21_attributes add constraint tzip21_attributes_pkey \
+         primary key (name, contract, token_id)";
+        "alter table tzip21_formats add constraint tip21_formats_pkey \
+         primary key (uri, contract, token_id)";
+        "alter table tzip21_creators add constraint tzip21_creators_pkey \
+         primary_key (account, contract, token_id)"]
+    [ "alter table nft_activities alter transaction set data type varchar collate \"C\"";
+      "alter table contracts alter address set data type varchar collate \"C\"";
+      "alter table orders alter hash set data type varchar collate \"C\"";
+      "alter table order_activities alter id set data type varchar collate \"C\"";
+
+      "alter table tzip21_attributes drop constraint tzip21_attributes_pkey";
+      "alter table tzip21_formats drop constraint tzip21_formats_pkey";
+      "alter table tzip21_creators drop constraint tzip21_creators_pkey";
+      "alter table tokens drop constraint tokens_pkey";
+      "alter table tzip21_attributes add constraint tzip21_attributes_pkey \
+       primary key (contract, token_id, name)";
+      "alter table tzip21_formats add constraint tzip21_formats_pkey \
+       primary key (contract, token_id, uri)";
+      "alter table tzip21_creators add constraint tzip21_creators_pkey \
+       primary key (contract, token_id, account)";
+      "alter table tokens add constraint tokens_pkey primary key (contract ,token_id, owner)";
+
+      "create index order_match_transaction_index on order_match(transaction)";
+      "create index order_cancel_transaction_index on order_cancel(transaction)";
+      "create index order_make_asset_type_class_index on orders(make_asset_type_class)";
+      "create index order_take_asset_type_class_index on orders(take_asset_type_class)";
+      "create index ft_contracts_token_id_index on ft_contracts(token_id)";
+      "create index order_cancel_cancel_index on order_cancel(cancel)";
+      "create index order_match_left_index on order_match(hash_left)";
+      "create index order_match_right_index on order_match(hash_right)";
+      "create index contracts_ledger_key_index on contracts(ledger_key)";
+      "create index contracts_ledger_value_index on contracts(ledger_value)";
+      "create index contracts_owner_index on contracts(owner)";
+      "create index tokens_oid_index on tokens(oid)";
+      "create index tokens_tid_index on tokens(tid)";
+]
+
 let upgrades =
   let last_version = fst List.(hd @@ rev !Versions.upgrades) in
   !Versions.upgrades @ List.map (fun (i, f) -> last_version + i, f) [
@@ -369,4 +427,5 @@ let upgrades =
     3, upgrade_3_to_4;
     4, upgrade_4_to_5;
     5, upgrade_5_to_6;
+    6, upgrade_6_to_7;
   ]
