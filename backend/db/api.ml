@@ -1414,7 +1414,7 @@ let upsert_order ?dbh order =
     else Lwt.return_ok ()
   end >>=? fun () ->
   insert_payouts dbh payouts hash_key >>=? fun () ->
-  Produce.order_event_hash dbh order.order_elt.order_elt_hash
+  Produce.order_event_hash dbh order.order_elt.order_elt_hash ()
 
 let mk_order_activity_continuation obj =
   Printf.sprintf "%Ld_%s"
