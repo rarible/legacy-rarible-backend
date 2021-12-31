@@ -104,22 +104,22 @@ let () =
                  | None -> Lwt.return_ok ()
                  | Some l ->
                    let metadata = EzEncoding.construct Json_encoding.(assoc string) l in
-                   Db.update_metadata ~contract:r#contract ~token_id:r#token_id ~block:r#block
+                   Db.Utils.update_metadata ~contract:r#contract ~token_id:r#token_id ~block:r#block
                      ~level:r#level ~tsp:r#tsp ~metadata ~set_metadata:true ()) l)
       else
         config.daemon_ipfs_sources,
-        Db.fetch_metadata_from_source ~verbose:0 ~timeout:(float_of_int config.daemon_timeout) in
+        Db.Utils.fetch_metadata_from_source ~verbose:0 ~timeout:(float_of_int config.daemon_timeout) in
     let>? l =
       match !force, !contract, !retrieve with
-      | true, Some contract, _ -> Db.contract_token_metadata contract
-      | _, _, true -> Db.empty_token_metadata ?contract:!contract ()
-      | _ -> Db.unknown_token_metadata ?contract:!contract () in
+      | true, Some contract, _ -> Db.Utils.contract_token_metadata contract
+      | _, _, true -> Db.Utils.empty_token_metadata ?contract:!contract ()
+      | _ -> Db.Utils.unknown_token_metadata ?contract:!contract () in
     split l sources f
   | None ->
     if !retrieve then
       let>? l = match !force, !contract with
-        | true, Some contract -> Db.contract_token_metadata contract
-        | _ -> Db.empty_token_metadata ?contract:!contract () in
+        | true, Some contract -> Db.Utils.contract_token_metadata contract
+        | _ -> Db.Utils.empty_token_metadata ?contract:!contract () in
       iter_rp (fun r ->
           match r#token_metadata_id with
           | None -> Lwt.return_ok ()
@@ -132,12 +132,12 @@ let () =
             | None -> Lwt.return_ok ()
             | Some l ->
               let metadata = EzEncoding.construct Json_encoding.(assoc string) l in
-              Db.update_metadata ~contract:r#contract ~token_id:r#token_id ~block:r#block
+              Db.Utils.update_metadata ~contract:r#contract ~token_id:r#token_id ~block:r#block
                 ~level:r#level ~tsp:r#tsp ~metadata ~set_metadata:true ()) l
     else
       let>? l = match !force, !contract with
-        | true, Some contract -> Db.contract_token_metadata contract
-        | _ -> Db.unknown_token_metadata ?contract:!contract () in
+        | true, Some contract -> Db.Utils.contract_token_metadata contract
+        | _ -> Db.Utils.unknown_token_metadata ?contract:!contract () in
       iter_rp (fun r ->
-          Db.update_metadata ~contract:r#contract ~token_id:r#token_id ~block:r#block
+          Db.Utils.update_metadata ~contract:r#contract ~token_id:r#token_id ~block:r#block
             ~level:r#level ~tsp:r#tsp ~metadata:r#metadata ?metadata_uri:r#metadata_uri ()) l

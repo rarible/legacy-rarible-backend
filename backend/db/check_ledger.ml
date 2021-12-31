@@ -28,7 +28,7 @@ let expr ~typ value =
 
 let main () =
   let>? l =
-    Db.random_tokens ?contract:!contract ?token_id:!token_id ?owner:!owner
+    Db.Utils.random_tokens ?contract:!contract ?token_id:!token_id ?owner:!owner
       ?number:!number () in
   iter_rp (fun r ->
       Format.printf "\027[0;36mCheck %s[%s] for %s (%s, %s)\027[0m@."

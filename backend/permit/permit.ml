@@ -139,8 +139,8 @@ let flat_order_form order =
     ~origin_fees:order.order_form_data.order_rarible_v2_data_v1_origin_fees
 
 let z_order_form order =
-  let>? maked = Db.get_decimals ~do_error:true order.order_form_elt.order_form_elt_make.asset_type in
-  let|>? taked = Db.get_decimals ~do_error:true order.order_form_elt.order_form_elt_take.asset_type in
+  let>? maked = Db.Get.get_decimals ~do_error:true order.order_form_elt.order_form_elt_make.asset_type in
+  let|>? taked = Db.Get.get_decimals ~do_error:true order.order_form_elt.order_form_elt_take.asset_type in
   Common.Balance.z_order_form ?maked ?taked order
 
 let get_contract = function

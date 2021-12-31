@@ -1,25 +1,24 @@
 open Let
 open Crawlori
 open Proto
-
-module PGOCaml = Pg.PGOCaml
+open Db.Misc
 
 let register_predecessor ?dbh b =
-  Db.use dbh @@ fun dbh ->
+  use dbh @@ fun dbh ->
   [%pgsql dbh
       "insert into predecessors(hash, predecessor, level, main) \
        values(${b.hash}, ${b.header.shell.predecessor}, ${b.header.shell.level}, true) \
        on conflict do nothing"]
 
 let head ?dbh () =
-  Db.use dbh @@ fun dbh ->
+  use dbh @@ fun dbh ->
   let|>? l = [%pgsql dbh "select level from predecessors where main order by level desc limit 1"] in
   match l with
   | [ level ] -> Some level
   | _ -> None
 
 let transaction f =
-  Db.use None @@ fun dbh ->
+  use None @@ fun dbh ->
   let>? () = PGOCaml.begin_work dbh in
   let> r = f dbh in match r with
   | Ok r ->
@@ -49,9 +48,9 @@ let handle_block ~config b =
               if meta.man_operation_result.op_status = `applied then
                 match c.man_info.kind with
                 | Origination ori ->
-                  Db.insert_origination ~forward:true config dbh bop ori
+                  Db.Crawl.insert_origination ~forward:true config dbh bop ori
                 | Transaction tr ->
-                  Db.insert_transaction ~forward:true ~config ~dbh ~op:bop tr
+                  Db.Crawl.insert_transaction ~forward:true ~config ~dbh ~op:bop tr
                 | _ -> Lwt.return_ok ()
               else Lwt.return_ok () in
             let id = Int32.succ id in
@@ -66,9 +65,9 @@ let handle_block ~config b =
                   if meta.man_operation_result.op_status = `applied then
                     match iop.in_content.kind with
                     | Origination ori ->
-                      Db.insert_origination ~forward:true config dbh bop ori
+                      Db.Crawl.insert_origination ~forward:true config dbh bop ori
                     | Transaction tr ->
-                      Db.insert_transaction ~forward:true ~config ~dbh ~op:bop tr
+                      Db.Crawl.insert_transaction ~forward:true ~config ~dbh ~op:bop tr
                     | _ -> Lwt.return_ok ()
                   else Lwt.return_ok () in
                 Lwt.return_ok (Int32.succ id)
@@ -82,7 +81,7 @@ let register_level config level =
   handle_block ~config block
 
 let update_finally () =
-  Db.update_supply ()
+  Db.Utils.update_supply ()
 
 let register_direct config ~start ~end_ =
   let rec aux level =

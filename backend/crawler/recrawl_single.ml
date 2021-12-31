@@ -25,21 +25,21 @@ let handle_operation contract ft config () op =
       | Transaction tr ->
         if not (tr.destination = contract) then Lwt.return_ok ()
         else
-          Db.use None (fun dbh ->
+          Db.Misc.use None (fun dbh ->
               Format.printf "Block %s (%ld)@." (Common.Utils.short op.bo_block) op.bo_level;
-              Db.insert_ft ~dbh ~config ~op ~contract {ft with Rtypes.ft_crawled=true})
+              Db.Crawl.insert_ft ~dbh ~config ~op ~contract {ft with Rtypes.ft_crawled=true})
       | _ -> Lwt.return_ok ()
     else Lwt.return_ok ()
 
 let handle_block _config () bl =
-  Db.use None (fun dbh -> Db.set_main_recrawl ~dbh bl.hash)
+  Db.Misc.use None (fun dbh -> Db.Utils.set_main_recrawl ~dbh bl.hash)
 
 let main () =
   Arg.parse spec (fun f -> filename := Some f) "recrawl_async.exe [options] config.json";
   let>? config = Lwt.return @@ Crawler_config.get !filename Rtypes.config_enc in
   match !ft_contract, !recrawl_start with
   | Some ft_contract, Some start ->
-    let>? ft = Db.get_ft_contract ft_contract in
+    let>? ft = Db.Utils.get_ft_contract ft_contract in
     begin match ft with
       | None ->
         Format.printf "Contract not in DB@.";
@@ -50,7 +50,7 @@ let main () =
             ~operation:(handle_operation ft_contract ft)
             ~block:handle_block
             ((), ()) in
-        Db.set_crawled ft_contract
+        Db.Utils.set_crawled ft_contract
     end
   | _ ->
       Format.printf "Missing arguments: '--contract', '--kind', '--id', '--start' are required@.";

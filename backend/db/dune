@@ -24,7 +24,7 @@ let no_update = true")))
 
 (library
  (name db)
- (modules db rarible_kafka)
+ (modules rarible_kafka misc config get produce metadata crawl api utils db)
  (preprocessor_deps (env_var "PGDATABASE") .rarible_witness)
  (preprocess (pps pgocaml_ppx))
  (libraries db_env_rarible crawlori.pg common lwt kafka kafka_lwt))
