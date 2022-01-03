@@ -267,9 +267,18 @@ let find_hash ?dbh h =
     [%pgsql dbh "select contract from token_balance_updates where contract like $h"]
   | _ -> Lwt.return_ok []
 
-let hen_token_ids ?dbh contract =
+let hen_token_ids ?dbh ?(limit=10000L) ?(offset=0L) contract =
   use dbh @@ fun dbh ->
-  [%pgsql dbh "select token_id from token_info where contract = $contract"]
+  [%pgsql dbh
+      "select token_id from token_info where contract = $contract \
+       offset $offset limit $limit"]
+
+let hen_token_ids_count ?dbh contract =
+  use dbh @@ fun dbh ->
+  let|>? l = [%pgsql dbh "select count(token_id) from token_info where contract = $contract"] in
+  match l with
+  | [ Some n ] -> n
+  | _ -> 0L
 
 let update_hen_royalties ?dbh ~contract ~token_id ~account ~value () =
   let part_value =

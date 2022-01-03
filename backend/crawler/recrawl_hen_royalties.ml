@@ -6,9 +6,11 @@ open Rtypes
 
 let filename = ref None
 let node = ref "https://tz.functori.com"
+let step = ref 10000L
 
 let spec = [
   "--node", Arg.Set_string node, "Node to use";
+  "--step", Arg.Int (fun i -> step := Int64.of_int i), "Steps";
 ]
 
 let update_royalties ?dbh ~node ~id ~contract token_id =
@@ -30,12 +32,17 @@ let main () =
   let>? config = Lwt.return @@ Crawler_config.get !filename Rtypes.config_enc in
   match config.Config.extra.hen_info with
   | Some info ->
-    let>? token_ids = Db.Utils.hen_token_ids info.hen_contract in
     Db.Misc.use None (fun dbh ->
-        iter_rp (fun token_id ->
-            update_royalties ~dbh ~node:!node ~id:info.hen_minter_id
-              ~contract:info.hen_contract token_id)
-          @@ List.map Z.of_string token_ids)
+        let>? n = Db.Utils.hen_token_ids_count ~dbh info.hen_contract in
+        let m = Int64.div n !step in
+        iter_rp (fun i ->
+            let offset = Int64.mul !step i in
+            let>? token_ids = Db.Utils.hen_token_ids ~dbh ~offset ~limit:!step info.hen_contract in
+            iter_rp (fun token_id ->
+                update_royalties ~dbh ~node:!node ~id:info.hen_minter_id
+                  ~contract:info.hen_contract token_id)
+            @@ List.map Z.of_string token_ids)
+        @@ List.init Int64.(to_int @@ succ m) Int64.of_int)
   | _ ->
     Format.printf "Missing 'hen_info' in config file@.";
     Lwt.return_ok ()
