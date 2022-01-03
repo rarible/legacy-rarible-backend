@@ -230,15 +230,17 @@ let update_metadata ?(set_metadata=false)
 
 let update_supply ?dbh () =
   use dbh @@ fun dbh ->
+  Format.eprintf "[update_supply] updating balances..@." ;
   let>? () =
     [%pgsql dbh
         "update tokens set amount = balance \
          where balance is not null and amount <> balance"] in
+  Format.eprintf "[update_supply] updating supplies..@." ;
   [%pgsql dbh
       "with tmp(tid, supply) as (\
        select tid, sum(amount) from tokens group by tid) \
        update token_info i set supply = tmp.supply from tmp \
-       where i.id = tmp.tid"]
+       where i.id = tmp.tid and i.supply <> tmp.supply"]
 
 let random_tokens ?dbh ?contract ?token_id ?owner ?(number=100L) () =
   let no_contract, no_token_id, no_owner =

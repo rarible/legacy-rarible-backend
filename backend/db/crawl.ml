@@ -1215,6 +1215,18 @@ let token_updates dbh main l =
       | _ -> Lwt.return_error (`hook_error "invalid token_update")) [] l
 
 let token_balance_updates dbh main l =
+  let agg =
+    List.fold_left (fun acc r -> match r#account with
+        | None -> ("", r) :: acc
+        | Some a ->
+          let oid = Printf.sprintf "%s:%s:%s" r#contract r#token_id a in
+          try
+            let _ = List.assoc oid acc in
+            (oid, r) :: (List.remove_assoc oid acc)
+          with Not_found -> (oid, r) :: acc)
+      [] l in
+  let _, l = List.split agg in
+  let l = List.rev l in
   let>? m = fold_rp (fun acc r ->
       let info = match r#kind, r#account, r#balance with
         | "mt", Some account, Some balance ->
@@ -1272,23 +1284,31 @@ let token_balance_updates dbh main l =
       let>? () = [%pgsql dbh
           "update tokens set amount = $balance where contract = $contract \
            and token_id = ${Z.to_string token_id} and owner = $owner"] in
+      let diff = Z.sub balance amount in
       Lwt.return_ok @@ match TIMap.find_opt (contract, token_id) acc with
-      | None -> TIMap.add (contract, token_id) (Z.sub balance amount, r) acc
-      | Some (s, _) -> TIMap.add (contract, token_id) (Z.(add s (sub balance amount)), r) acc
+      | None -> TIMap.add (contract, token_id) (diff, r) acc
+      | Some (s, _) -> TIMap.add (contract, token_id) (Z.(add s diff), r) acc
     ) TIMap.empty (TMap.bindings m) in
-  iter_rp (fun ((contract, token_id), (supply, r)) ->
-      let id = contract ^ ":" ^ Z.to_string token_id in
-      [%pgsql dbh
-          "insert into token_info(id, contract, token_id, block, level, tsp, \
-           last_block, last_level, last, transaction, supply, main) \
-           values($id, $contract, ${Z.to_string token_id}, ${r#block}, ${r#level}, ${r#tsp}, \
-           ${r#block}, ${r#level}, ${r#tsp}, ${r#transaction}, $supply, true) \
-           on conflict (id) do update \
-           set supply = $supply,
-           last_block = case when $main then ${r#block} else token_info.last_block end, \
-           last_level = case when $main then ${r#level} else token_info.last_level end, \
-           last = case when $main then ${r#tsp} else token_info.last end \
-           where token_info.contract = $contract and token_info.token_id = ${Z.to_string token_id}"]) @@
+  iter_rp (fun ((contract, token_id), (supply_diff, r)) ->
+      if supply_diff = Z.zero then
+        Lwt.return_ok ()
+      else
+        begin
+          Format.printf "\027[0;33mupdate supply for %s[%s]: %s\027[0m@."
+            (Utils.short contract) (Z.to_string token_id) (Z.to_string supply_diff);
+          let id = contract ^ ":" ^ Z.to_string token_id in
+          [%pgsql dbh
+              "insert into token_info(id, contract, token_id, block, level, tsp, \
+               last_block, last_level, last, transaction, supply, main) \
+               values($id, $contract, ${Z.to_string token_id}, ${r#block}, ${r#level}, ${r#tsp}, \
+               ${r#block}, ${r#level}, ${r#tsp}, ${r#transaction}, $supply_diff, true) \
+               on conflict (id) do update \
+               set supply = token_info.supply + ${Z.to_string supply_diff}, \
+               last_block = case when $main then ${r#block} else token_info.last_block end, \
+               last_level = case when $main then ${r#level} else token_info.last_level end, \
+               last = case when $main then ${r#tsp} else token_info.last end \
+               where token_info.id = $id"]
+        end) @@
   TIMap.bindings m
 
 let set_main _config ?(forward=false) dbh {Hooks.m_main; m_hash} =
