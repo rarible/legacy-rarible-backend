@@ -167,13 +167,12 @@ let contract_token_metadata ?dbh contract =
 
 let update_metadata ?(set_metadata=false)
     ?metadata_uri ?dbh ~metadata ~contract ~token_id ~block ~level ~tsp () =
-  let update_royalties dbh = function
-    | Some ((_ :: _) as l) ->
-      let royalties = EzEncoding.construct parts_enc l in
-      [%pgsql dbh
-          "update token_info set royalties_metadata = $royalties \
-           where contract = $contract and token_id = $token_id"]
-    | _ -> Lwt.return_ok () in
+  let update_royalties dbh r =
+    let shares = Metadata.to_4_decimals r in
+    let royalties = EzEncoding.construct parts_enc shares in
+    [%pgsql dbh
+        "update token_info set royalties_metadata = $royalties \
+         where contract = $contract and token_id = $token_id"] in
   Format.eprintf "%s[%s]@." contract token_id;
   if set_metadata then
     use dbh @@ fun dbh ->
@@ -194,7 +193,10 @@ let update_metadata ?(set_metadata=false)
         use dbh @@ fun dbh ->
         let>? () =
           Metadata.insert_mint_metadata dbh ~forward:true ~contract ~token_id ~block ~level ~tsp metadata_tzip in
-        let>? () = update_royalties dbh metadata_tzip.tzip21_tm_royalties in
+        let>? () =
+          match metadata_tzip.tzip21_tm_royalties with
+          | None -> Lwt.return_ok ()
+          | Some r -> update_royalties dbh r in
         Format.eprintf "  OK@." ;
         Lwt.return_ok ()
       with _ ->
@@ -210,7 +212,10 @@ let update_metadata ?(set_metadata=false)
         use dbh @@ fun dbh ->
         let>? () =
           Metadata.insert_mint_metadata dbh ~forward:true ~contract ~token_id ~block ~level ~tsp metadata_tzip in
-        let>? () = update_royalties dbh metadata_tzip.tzip21_tm_royalties in
+        let>? () =
+          match metadata_tzip.tzip21_tm_royalties with
+          | None -> Lwt.return_ok ()
+          | Some r -> update_royalties dbh r in
         Format.eprintf "  OK@." ;
         Lwt.return_ok ()
       | Error (code, str) ->
@@ -230,11 +235,10 @@ let update_supply ?dbh () =
         "update tokens set amount = balance \
          where balance is not null and amount <> balance"] in
   [%pgsql dbh
-      "with tmp(contract, token_id, supply) as (\
-       select contract, token_id, sum(amount) from tokens \
-       group by contract, token_id) \
+      "with tmp(tid, supply) as (\
+       select tid, sum(amount) from tokens group by tid) \
        update token_info i set supply = tmp.supply from tmp \
-       where i.contract = tmp.contract and i.token_id = tmp.token_id"]
+       where i.id = tmp.tid"]
 
 let random_tokens ?dbh ?contract ?token_id ?owner ?(number=100L) () =
   let no_contract, no_token_id, no_owner =

@@ -625,7 +625,11 @@ let mk_nft_item_meta dbh ~contract ~token_id =
       tzip21_tm_right_uri = r#right_uri ;
       tzip21_tm_is_transferable = r#is_transferable ;
       tzip21_tm_should_prefer_symbol = r#should_prefer_symbol ;
-      tzip21_tm_royalties = Option.map (fun ro -> EzEncoding.destruct parts_enc ro) r#royalties ;
+      tzip21_tm_royalties =
+        match Option.map (fun ro -> EzEncoding.destruct parts_enc ro) r#royalties with
+        | None -> None
+        | Some shares ->
+          Some { royalties_decimals = 4 ; royalties_shares = shares }
     }
 
 let mk_nft_item dbh ?include_meta obj =

@@ -910,26 +910,50 @@ let insert_operation config ?forward dbh op =
 let insert_block config ?forward dbh b =
   (* EzEncoding.construct Tzfunc.Proto.full_block_enc.Encoding.json b
    * |> Rarible_kafka.produce_test >>= fun () -> *)
-  iter_rp (fun op ->
-      iter_rp (fun c ->
+  let>? _ = fold_rp (fun index op ->
+      fold_rp (fun index c ->
           match c.man_metadata with
-          | None -> Lwt.return_ok ()
+          | None -> Lwt.return_ok index
           | Some meta ->
             if meta.man_operation_result.op_status = `applied then
-              match c.man_info.kind with
-              | Origination ori ->
-                let op = {
-                  Hooks.bo_block = b.hash; bo_level = b.header.shell.level;
-                  bo_tsp = b.header.shell.timestamp; bo_hash = op.op_hash;
-                  bo_op = c.man_info; bo_index = 0l;
-                  bo_meta = Option.map (fun m -> m.man_operation_result) c.man_metadata;
-                  bo_numbers = Some c.man_numbers; bo_nonce = None;
-                  bo_counter = c.man_numbers.counter } in
-                insert_origination ?forward config dbh op ori
-              | _ -> Lwt.return_ok ()
-            else Lwt.return_ok ()
-        ) op.op_contents
-    ) b.operations
+              let>? index = match c.man_info.kind with
+                | Origination ori ->
+                  let op = {
+                    Hooks.bo_block = b.hash; bo_level = b.header.shell.level;
+                    bo_tsp = b.header.shell.timestamp; bo_hash = op.op_hash;
+                    bo_op = c.man_info; bo_index = index;
+                    bo_meta = Option.map (fun m -> m.man_operation_result) c.man_metadata;
+                    bo_numbers = Some c.man_numbers; bo_nonce = None;
+                    bo_counter = c.man_numbers.counter } in
+                  let|>? () = insert_origination ?forward config dbh op ori in
+                  Int32.succ index
+                | _ -> Lwt.return_ok index in
+              fold_rp (fun index iop ->
+                  if iop.in_result.op_status = `applied then
+                    match iop.in_content.kind with
+                    | Origination ori ->
+                      let bo_meta = Some {
+                        iop.in_result with
+                        op_lazy_storage_diff =
+                          iop.in_result.op_lazy_storage_diff @
+                          (Option.fold ~none:[] ~some:(fun m -> m.man_operation_result.op_lazy_storage_diff)
+                             c.man_metadata) } in
+                      let op = {
+                        Hooks.bo_block = b.hash; bo_level = b.header.shell.level;
+                        bo_tsp = b.header.shell.timestamp; bo_hash = op.op_hash;
+                        bo_op = iop.in_content; bo_index = index; bo_meta;
+                        bo_numbers = Some c.man_numbers; bo_nonce = Some iop.in_nonce;
+                        bo_counter = c.man_numbers.counter } in
+                      let|>? () = insert_origination ?forward config dbh op ori in
+                      Int32.succ index
+                    | _ -> Lwt.return_ok index
+                  else
+                    Lwt.return_ok index
+                ) index meta.man_internal_operation_results
+            else Lwt.return_ok index
+        ) index op.op_contents
+    ) 0l b.operations in
+  Lwt.return_ok ()
 
 let recalculate_creators ~main ~burn ~supply ~amount ~account ~creators =
   let main_s = if main then Z.one else Z.minus_one in
@@ -1141,7 +1165,10 @@ let token_metadata_updates ~dbh ~main ~contract ~block ~level ~tsp ~token_id ~tr
   let meta = EzEncoding.destruct Json_encoding.(assoc string) meta in
   let>? meta, uri, royalties =
     Metadata.insert_token_metadata ~dbh ~block ~level ~tsp ~contract (token_id, meta) in
-  let royalties = Option.map (fun r -> EzEncoding.construct parts_enc r) royalties in
+  let royalties =
+    match royalties with
+    | None -> None
+    | Some r -> Some (EzEncoding.construct parts_enc @@ Metadata.to_4_decimals r) in
   [%pgsql dbh
       "insert into token_info(id, contract, token_id, block, level, tsp, \
        last_block, last_level, last, transaction, metadata, metadata_uri, \

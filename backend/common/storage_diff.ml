@@ -2,14 +2,21 @@ open Proto
 open Rtypes
 
 let big_map_allocs l =
+  let f id key_type value_type =
+    match Typed_mich.parse_type key_type, Typed_mich.parse_type value_type with
+    | Error _, _ | _, Error _ -> id, None
+    | Ok k, Ok v ->
+      id, Some (Typed_mich.short_micheline_type k, Typed_mich.short_micheline_type v) in
   List.sort (fun (id1, _) (id2, _) -> compare id1 id2) @@
   List.filter_map (function
       | Big_map { id; diff = SDAlloc {key_type; value_type; _} } ->
-        begin match Typed_mich.parse_type key_type, Typed_mich.parse_type value_type with
-          | Error _, _ | _, Error _ -> Some (id, None)
-          | Ok k, Ok v -> Some (id, Some (Typed_mich.short_micheline_type k,
-                                          Typed_mich.short_micheline_type v))
-        end
+        if id < Z.zero then None
+        else Some (f id key_type value_type)
+      | Big_map { id; diff = SDCopy {source; _} } ->
+        List.find_map (function
+            | Big_map { id = idc; diff = SDAlloc {key_type; value_type; _} } when source = Z.to_string idc ->
+              Some (f id key_type value_type)
+            | _ -> None) l
       | _ -> None) l
 
 let get_big_map_id ~allocs bm_index k v =

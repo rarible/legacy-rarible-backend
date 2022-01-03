@@ -3,6 +3,18 @@ open Rtypes
 open Common
 open Misc
 
+let to_4_decimals r =
+  if r.royalties_decimals <> 4 then
+    List.map (fun p ->
+        let db =
+          Common.Utils.decimal_balance
+            ~decimals:(Int32.of_int r.royalties_decimals)
+            (Z.of_int32 p.part_value) in
+        let ab = Common.Utils.absolute_balance ~decimals:4l db in
+        { p with part_value = Z.to_int32 ab })
+      r.royalties_shares
+  else r.royalties_shares
+
 let parse meta =
   try
     let tzip21_meta = EzEncoding.destruct tzip21_token_metadata_enc meta in
@@ -231,8 +243,9 @@ let insert_mint_metadata dbh ?(forward=false) ~contract ~token_id ~block ~level 
   let right_uri = metadata.tzip21_tm_right_uri in
   let is_transferable = metadata.tzip21_tm_is_transferable in
   let should_prefer_symbol = metadata.tzip21_tm_should_prefer_symbol in
-  let royalties = Option.map (fun r -> EzEncoding.construct parts_enc r)
-      metadata.tzip21_tm_royalties in
+  let royalties = match metadata.tzip21_tm_royalties with
+    | None -> None
+    | Some r -> Some (EzEncoding.construct parts_enc @@ to_4_decimals r) in
   [%pgsql dbh
       "insert into tzip21_metadata(contract, token_id, block, level, tsp, \
        name, symbol, decimals, artifact_uri, display_uri, thumbnail_uri, \

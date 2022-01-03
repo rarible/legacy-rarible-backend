@@ -14,7 +14,6 @@ let get_balance ?dbh ~contract ~owner token_id =
   | [ amount ] -> amount
   | _ -> None
 
-
 let reset_mint_metadata_creators  dbh ~contract ~token_id ~metadata =
   match metadata.tzip21_tm_creators with
   | Some (CParts l) ->
@@ -76,17 +75,15 @@ let reset_mint_metadata_creators  dbh ~contract ~token_id ~metadata =
     else Lwt.return_ok ()
   | None -> Lwt.return_ok ()
 
-
 let reset_nft_item_meta_by_id ?dbh contract token_id =
   Printf.eprintf "reset_nft_item_meta_by_id %s %s\n%!" contract (Z.to_string token_id) ;
-  let update_royalties dbh royalties =
-    match royalties with
-      | Some ((_ :: _) as l) ->
-        let royalties = EzEncoding.construct parts_enc l in
-        [%pgsql dbh
-            "update token_info set royalties_metadata = $royalties \
-             where contract = $contract and token_id = ${Z.to_string token_id}"]
-      | _ -> Lwt.return_ok () in
+  let update_royalties dbh royalties = match royalties with
+    | Some r ->
+      let royalties = EzEncoding.construct parts_enc @@ Metadata.to_4_decimals r in
+      [%pgsql dbh
+          "update token_info set royalties_metadata = $royalties \
+           where contract = $contract and token_id = ${Z.to_string token_id}"]
+    | _ -> Lwt.return_ok () in
   use dbh @@ fun dbh ->
   let>? l = [%pgsql dbh
       "select last_block, last_level, last, metadata, metadata_uri from token_info where \
