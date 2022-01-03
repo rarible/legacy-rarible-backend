@@ -62,7 +62,8 @@ let get_extra_config ?dbh () =
       exchange = r#exchange;
       royalties = r#royalties;
       transfer_manager = r#transfer_manager;
-      ft_contracts; contracts
+      ft_contracts; contracts;
+      hen_info = None;
     })
   | [] -> Lwt.return_ok None
   | _ -> Lwt.return_error (`hook_error "wrong_state")

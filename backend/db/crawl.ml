@@ -786,11 +786,22 @@ let insert_transaction ~config ~dbh ~op ?(forward=false) tr =
         | _ -> Lwt.return_ok ()
       end
     else match
+        config.Crawlori.Config.extra.hen_info,
         SMap.find_opt contract config.Crawlori.Config.extra.ft_contracts,
         SMap.find_opt contract config.Crawlori.Config.extra.contracts with
-    | Some ft, _ -> insert_ft ~dbh ~config ~op ~contract ~forward ft
-    | _, Some nft -> insert_nft ~dbh ~meta ~op ~contract ~nft ~entrypoint ~forward m
-    | _, _ -> Lwt.return_ok ()
+    | Some hen_info, _, _ when hen_info.hen_minter = contract ->
+      let bm = { bm_id = hen_info.hen_minter_id;
+                 bm_types = Contract_spec.hen_royalties_field } in
+      let royalties = Storage_diff.get_big_map_updates bm meta.op_lazy_storage_diff in
+      iter_rp (function
+          | `nat token_id, Some (`tuple [ `address part_account; `nat v ]) ->
+            insert_royalties ~dbh ~op ~forward {
+              roy_contract = hen_info.hen_contract; roy_token_id = Some token_id;
+              roy_royalties = [ { part_account; part_value = Z.to_int32 v } ]}
+          | _ -> Lwt.return_ok ()) royalties
+    | _, Some ft, _ -> insert_ft ~dbh ~config ~op ~contract ~forward ft
+    | _, _, Some nft -> insert_nft ~dbh ~meta ~op ~contract ~nft ~entrypoint ~forward m
+    | _ -> Lwt.return_ok ()
 
 let ledger_kind types =
   if types = Contract_spec.ledger_nft_field then `nft

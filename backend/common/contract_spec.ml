@@ -113,6 +113,7 @@ let ledger_lugh_field = { bmt_key = `tuple [ `address; `nat ]; bmt_value = `tupl
 let token_metadata_field = { bmt_key = `nat; bmt_value = `tuple [ `nat; `map (`string, `bytes) ] }
 let metadata_field = { bmt_key = `string; bmt_value = `bytes }
 let royalties_field = { bmt_key = `nat; bmt_value = `seq (`tuple [ `address; `nat ]) }
+let hen_royalties_field = { bmt_key = `nat; bmt_value = `tuple [ `address; `nat ] }
 
 let set_royalties_entry = `tuple [`address; `nat; `map (`address, `nat)]
 
