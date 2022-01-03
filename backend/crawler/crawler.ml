@@ -27,6 +27,7 @@ let () =
   Hooks.set_operation Db.Crawl.insert_operation;
   Hooks.set_block Db.Crawl.insert_block;
   Hooks.set_main Db.Crawl.set_main;
+  Hooks.set_forward_end (fun _config _level -> Db.Utils.update_supply ());
   let>? config = Crawler_config.fill_config config in
   Format.printf "Config used:\n%s@." @@
   EzEncoding.construct ~compact:false (Config.enc Rtypes.config_enc) config;
