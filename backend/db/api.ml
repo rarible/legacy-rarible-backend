@@ -137,7 +137,8 @@ let get_nft_items_by_owner ?dbh ?include_meta ?continuation ?(size=50) owner =
     (match continuation with None -> CalendarLib.Calendar.now (), "" | Some (ts, h) -> (ts, h)) in
   let>? l = [%pgsql.object dbh
       "select i.id, \
-       last, supply, metadata, tsp, creators, royalties, royalties_metadata, \
+       last, metadata, tsp, creators, royalties, royalties_metadata, \
+       sum(case when t.balance is not null then t.balance else t.amount end) as supply, \
        array_agg(case when balance is not null and balance <> 0 \
        or amount <> 0 then owner end) as owners \
        from (select tid, amount, balance, owner from tokens where \
@@ -173,8 +174,9 @@ let get_nft_items_by_creator ?dbh ?include_meta ?continuation ?(size=50) creator
     (match continuation with None -> CalendarLib.Calendar.now (), "" | Some (ts, h) -> (ts, h)) in
   let>? l = [%pgsql.object dbh
       "select i.id, \
-       last, supply, metadata, i.tsp, creators, royalties, royalties_metadata, \
-       array_agg(case when balance is not null and balance <> 0 or amount <> 0 then owner end) as owners \
+       last, metadata, i.tsp, creators, royalties, royalties_metadata, \
+       array_agg(case when balance is not null and balance <> 0 or amount <> 0 then owner end) as owners, \
+       sum(case when t.balance is not null then t.balance else t.amount end) as supply \
        from tokens as t, token_info i, unnest(i.creators) as c \
        where c->>'account' = $creator and \
        t.tid = i.id and \
@@ -206,9 +208,10 @@ let get_nft_items_by_collection ?dbh ?include_meta ?continuation ?(size=50) cont
     (match continuation with None -> CalendarLib.Calendar.now (), "" | Some (ts, h) -> (ts, h)) in
   let>? l = [%pgsql.object dbh
       "select i.id, \
-       last, i.supply, i.tsp, i.creators, i.royalties, i.royalties_metadata, \
+       last, i.tsp, i.creators, i.royalties, i.royalties_metadata, \
        array_agg(case when t.balance is not null and t.balance <> 0 or \
-       t.amount <> 0 then t.owner end) as owners \
+       t.amount <> 0 then t.owner end) as owners, \
+       sum(case when t.balance is not null then t.balance else t.amount end) as supply \
        from (select tid, amount, balance, owner from tokens where \
        contract = $contract and
        ((balance is not null and balance > 0 or amount > 0))) t \
@@ -272,14 +275,15 @@ let get_nft_all_items
     (match show_deleted with None -> false | Some b -> b) in
   let>? l = [%pgsql.object dbh
       "select i.id, \
-       last, i.supply, i.tsp, i.creators, i.royalties, i.royalties_metadata, \
+       last, i.tsp, i.creators, i.royalties, i.royalties_metadata, \
+       sum(case when t.balance is not null then t.balance else t.amount end) as supply, \
        array_agg(case when t.balance is not null and t.balance <> 0 or t.amount <> 0 then t.owner end) as owners \
-       from (select tid, amount, balance, owner from tokens where \
-       ((balance is not null and balance > 0 or amount > 0) or (not $no_show_deleted and $show_deleted_v))) t \
+       from (select tid, amount, balance, owner from tokens) t \
        inner join token_info i on i.id = t.tid \
        and i.id in (\
        select id from token_info where \
        main and metadata <> '{}' and \
+       ((supply > 0) or (not $no_show_deleted and $show_deleted_v)) and \
        ($no_last_updated_to or (last <= $last_updated_to_v)) and \
        ($no_last_updated_from or (last >= $last_updated_from_v)) and \
        ($no_continuation or (last = $ts and id < $id) or (last < $ts)) \
@@ -538,7 +542,7 @@ let get_nft_ownerships_by_item ?dbh ?continuation ?(size=50) contract token_id =
     (match continuation with None -> CalendarLib.Calendar.now (), "" | Some (ts, h) -> (ts, h)) in
   use dbh @@ fun dbh ->
   let>? l = [%pgsql.object dbh
-      "select oid as id, tsp, last, amount, balance, supply, metadata, creators \
+      "select oid as id, tsp, last, amount, balance, metadata, creators \
        from tokens t inner join token_info i on t.tid = i.id \
        where main and i.contract = $contract and i.token_id = ${Z.to_string token_id} \
        and (balance is not null and balance > 0 or amount > 0) and \
@@ -568,7 +572,7 @@ let get_nft_all_ownerships ?dbh ?continuation ?(size=50) () =
     (match continuation with None -> CalendarLib.Calendar.now (), "" | Some (ts, h) -> (ts, h)) in
   use dbh @@ fun dbh ->
   let>? l = [%pgsql.object dbh
-      "select oid as id, tsp, last, amount, balance, supply, metadata, creators \
+      "select oid as id, tsp, last, amount, balance, metadata, creators \
        from tokens t inner join token_info i on i.id = t.tid \
        where main and (balance is not null and balance > 0 or amount > 0) and \
        ($no_continuation or \
