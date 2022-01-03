@@ -479,7 +479,7 @@ let get_nft_ownership_by_id ?dbh ?(old=false) contract token_id owner =
   Format.eprintf "get_nft_ownership_by_id %s %s %s@." contract (Z.to_string token_id) owner ;
   use dbh @@ fun dbh ->
   let>? l = [%pgsql.object dbh
-      "select oid as id, last, tsp, amount, balance, supply, metadata, creators \
+      "select oid as id, last, tsp, amount, balance, metadata, creators \
        from tokens t inner join token_info i on i.id = t.tid \
        where main and i.contract = $contract and i.token_id = ${Z.to_string token_id} and \
        owner = $owner and (balance is not null and balance > 0 or amount > 0 or $old)"] in
@@ -636,6 +636,7 @@ let mk_nft_item dbh ?include_meta obj =
   match String.split_on_char ':' obj#id with
   | contract :: token_id :: [] ->
     let token_id = Z.of_string token_id in
+    let supply = Option.value ~default:Z.zero obj#supply in
     let creators = List.filter_map (function
         | None -> None
         | Some json -> Some (EzEncoding.destruct part_enc json)) obj#creators in
@@ -652,13 +653,13 @@ let mk_nft_item dbh ?include_meta obj =
       nft_item_contract = contract ;
       nft_item_token_id = token_id ;
       nft_item_creators = creators ;
-      nft_item_supply = obj#supply ;
+      nft_item_supply = supply ;
       nft_item_lazy_supply = Z.zero ;
       nft_item_owners = List.filter_map (fun x -> x) @@ Option.value ~default:[] obj#owners ;
       nft_item_royalties ;
       nft_item_date = obj#last ;
       nft_item_minted_at = obj#tsp ;
-      nft_item_deleted = obj#supply = Z.zero ;
+      nft_item_deleted = supply = Z.zero ;
       nft_item_meta = Utils.rarible_meta_of_tzip21_meta meta ;
     }
   | _ ->
@@ -672,7 +673,8 @@ let get_nft_item_by_id ?dbh ?include_meta contract token_id =
   use dbh @@ fun dbh ->
   let>? l = [%pgsql.object dbh
       "select i.id, i.contract, i.token_id, \
-       last, supply, metadata, tsp, creators, royalties, royalties_metadata, \
+       last, metadata, tsp, creators, royalties, royalties_metadata, \
+       sum(case when t.balance is not null then t.balance else t.amount end) as supply, \
        array_agg(case when (balance is not null and balance <> 0 or amount <> 0) then owner end) as owners \
        from tokens t \
        inner join token_info i on i.id = t.tid \
