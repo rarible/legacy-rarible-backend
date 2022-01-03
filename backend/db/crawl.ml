@@ -1165,7 +1165,10 @@ let token_metadata_updates ~dbh ~main ~contract ~block ~level ~tsp ~token_id ~tr
   let meta = EzEncoding.destruct Json_encoding.(assoc string) meta in
   let>? meta, uri, royalties =
     Metadata.insert_token_metadata ~dbh ~block ~level ~tsp ~contract (token_id, meta) in
-  let royalties = Option.map (fun r -> EzEncoding.construct parts_enc r) royalties in
+  let royalties =
+    match royalties with
+    | None -> None
+    | Some r -> Some (EzEncoding.construct parts_enc @@ Metadata.to_4_decimals r) in
   [%pgsql dbh
       "insert into token_info(id, contract, token_id, block, level, tsp, \
        last_block, last_level, last, transaction, metadata, metadata_uri, \

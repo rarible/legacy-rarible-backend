@@ -1145,6 +1145,11 @@ let royalties_enc = Json_encoding.(union [
     case Json_encoding.any_value (fun _ -> None) (fun _ -> []) ;
   ])
 
+type tzip21_royalties = {
+  royalties_decimals : int [@dft 0] ;
+  royalties_shares : (part list [@encoding royalties_enc]) [@dft []];
+} [@@deriving encoding {camel; option="option"}]
+
 type tzip21_token_metadata = {
   tzip21_tm_name : (string [@encoding string_or_string_array_enc]) option ;
   tzip21_tm_symbol : string option ;
@@ -1169,7 +1174,7 @@ type tzip21_token_metadata = {
   tzip21_tm_right_uri : string option ;
   tzip21_tm_is_transferable : (bool [@encoding bool_or_string_enc]) option ;
   tzip21_tm_should_prefer_symbol : (bool [@encoding bool_or_string_enc]) option ;
-  tzip21_tm_royalties : (part list [@encoding royalties_enc]) option; [@opt]
+  tzip21_tm_royalties : tzip21_royalties option ;
 } [@@deriving encoding {camel; option="option"; ignore}]
 
 type currency_order_type =
