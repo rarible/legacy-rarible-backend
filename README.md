@@ -1,6 +1,6 @@
 # Rarible Integration by Functori
 
-This project contains:
+This project is done by [Functori](https://functori.com). It contains:
 
 - A backend for Rarible to allow users of the platform to be able to
   create NFTs on the Tezos blockchain.
@@ -87,7 +87,11 @@ If you want to test on the granadanet (current Tezos testnet), you need to get a
 
 ### Archetype Smart Contract Language
 
-[todo]
+Rarible's exchange contract on Tezos is available [here](https://gitlab.com/tezos-paris-hub/rarible/rarible-smart-contracts). It is a port of the [Rarible ExchangeV2](https://github.com/rarible/protocol-contracts/tree/master/exchange-v2) contract on Tezos.
+
+Rarible NFT Contract is available [here](https://gitlab.com/tezos-paris-hub/rarible/rarible-nft-contracts). 
+
+Contracts are written in [Archetype](http://archetype-lang.org) by [Edukera](https://www.edukera.com).
 
 ## Building and Deploying
 
@@ -123,9 +127,17 @@ Then you can deploy (which will compile again):
 
 ## Crawl the blockchain data of the smart contract
 
-We use [Crawlori](https://gitlab.com/functori/crawlori) to crawl the Tezos blockchain.
-[TODO]
+We use [Crawlori](https://gitlab.com/functori/crawlori) to crawl the Tezos blockchain. 
 
+Crawlori is a powerful crawler developed by [Functori](https://functori.com).
+It allows to crawl Tezos blockchain in a very fast and modular way.
+
+A strong and rich filter system allows you to crawl only the data that you want like monitoring an account or a smart contract, etc.
+
+Moreover, a callback mechanism allows some customization of the data collected by the crawler.
+When an operation hits your filters, you can decide whatever you want to do with it (display it, add it to another database, etc.).
+
+More details are available on the [Gitlab](https://gitlab.com/functori/crawlori) repository.
 
 ## Deployment
 
