@@ -289,3 +289,19 @@ let update_hen_royalties ?dbh ~contract ~token_id ~account ~value () =
   [%pgsql dbh
       "update token_info set royalties = $royalties \
        where contract = $contract and token_id = ${Z.to_string token_id}"]
+
+let clean_balance_updates ?level ?dbh () =
+  let no_level = Option.is_none level in
+  use dbh @@ fun dbh ->
+  [%pgsql dbh
+      "with t1(ablock, aindex, contract, token_id, account) as (\
+       select array_agg(block order by level desc, index desc), \
+       array_agg(index order by level desc, index desc), \
+       contract, token_id, account from token_balance_updates \
+       where ($no_level or level < $?level) \
+       group by contract, token_id, account), \
+       t2(block, index, contract, token_id, account) as (\
+       select unnest(ablock[2:]), unnest(aindex[2:]), contract, token_id, account from t1) \
+       delete from token_balance_updates t using t2 \
+       where t2.contract = t.contract and t2.token_id = t.token_id and \
+       t2.account = t.account and t2.block = t.block and t2.index = t.index"]

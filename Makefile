@@ -25,6 +25,8 @@ copy: build openapi
 	@cp -f _build/default/backend/db/update_supply.exe _bin/update_supply
 	@cp -f _build/default/backend/permit/permit.exe _bin/permit_api
 	@cp -f _build/default/backend/crawler/recrawl_hen_royalties.exe _bin/recrawl_hen_royalties
+	@cp -f _build/default/backend/crawler/recrawl_objkt.exe _bin/recrawl_objkt
+	@cp -f _build/default/backend/db/clean_balance_updates.exe _bin/clean_balance_updates
 
 clean:
 	@dune clean

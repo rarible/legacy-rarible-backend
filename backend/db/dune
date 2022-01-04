@@ -48,3 +48,8 @@ let no_update = true")))
  (name prefix_hash)
  (modules prefix_hash)
  (libraries db))
+
+(executable
+ (name clean_balance_updates)
+ (modules clean_balance_updates)
+ (libraries db))
