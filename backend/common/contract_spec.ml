@@ -68,8 +68,8 @@ let fa2_ext_entrypoints : (string * micheline_type_short) list = [
 
 let get_storage_fields script =
   let rec aux bm_index acc = function
-    | {name=None; typ=`tuple []} -> bm_index, acc
-    | {name=None; typ=`tuple (h :: t)} ->
+    | {typ=`tuple []; name = None} -> bm_index, acc
+    | {typ=`tuple (h :: t); _} ->
       let bm_index, acc = aux bm_index acc h in
       aux bm_index acc {name=None; typ=`tuple t}
     | {name=Some n; typ = `big_map (k, v)} ->
