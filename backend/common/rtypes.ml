@@ -1029,10 +1029,17 @@ type ft_ledger = {
   ft_decimals: int32; [@dft 0l]
 } [@@deriving encoding]
 
+type hen_info = {
+  hen_contract: string;
+  hen_minter: string;
+  hen_minter_id: z;
+} [@@deriving encoding]
+
 type config = {
   exchange: string; [@dft ""]
   royalties: string; [@dft ""]
   transfer_manager: string; [@dft ""]
+  hen_info: hen_info option;
   mutable ft_contracts: ft_ledger SMap.t; [@map] [@dft SMap.empty]
   mutable contracts: nft_ledger SMap.t; [@map] [@dft SMap.empty]
 } [@@deriving encoding]

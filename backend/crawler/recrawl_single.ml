@@ -27,12 +27,9 @@ let handle_operation contract ft config () op =
         else
           Db.Misc.use None (fun dbh ->
               Format.printf "Block %s (%ld)@." (Common.Utils.short op.bo_block) op.bo_level;
-              Db.Crawl.insert_ft ~dbh ~config ~op ~contract {ft with Rtypes.ft_crawled=true})
+              Db.Crawl.insert_ft ~dbh ~config ~op ~contract ~forward:true {ft with Rtypes.ft_crawled=true})
       | _ -> Lwt.return_ok ()
     else Lwt.return_ok ()
-
-let handle_block _config () bl =
-  Db.Misc.use None (fun dbh -> Db.Utils.set_main_recrawl ~dbh bl.hash)
 
 let main () =
   Arg.parse spec (fun f -> filename := Some f) "recrawl_async.exe [options] config.json";
@@ -45,10 +42,8 @@ let main () =
         Format.printf "Contract not in DB@.";
         Lwt.return_ok ()
       | Some ft ->
-
         let>? _ = async_recrawl ~config ~start ?end_:!recrawl_end
             ~operation:(handle_operation ft_contract ft)
-            ~block:handle_block
             ((), ()) in
         Db.Utils.set_crawled ft_contract
     end

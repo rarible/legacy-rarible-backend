@@ -27,3 +27,9 @@
  (preprocessor_deps (env_var "PGDATABASE") ../db/.rarible_witness)
  (preprocess (pps pgocaml_ppx))
  (libraries crawler_config ez_api.icurl_lwt))
+
+(executable
+ (name recrawl_hen_royalties)
+ (modules recrawl_hen_royalties)
+ (preprocess (pps ppx_deriving_encoding))
+ (libraries crawler_config db ez_api.icurl_lwt))

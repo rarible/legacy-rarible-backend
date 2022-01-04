@@ -266,3 +266,26 @@ let find_hash ?dbh h =
   | 't' | 'K' ->
     [%pgsql dbh "select contract from token_balance_updates where contract like $h"]
   | _ -> Lwt.return_ok []
+
+let hen_token_ids ?dbh ?(limit=10000L) ?(offset=0L) contract =
+  use dbh @@ fun dbh ->
+  [%pgsql dbh
+      "select token_id from token_info where contract = $contract \
+       offset $offset limit $limit"]
+
+let hen_token_ids_count ?dbh contract =
+  use dbh @@ fun dbh ->
+  let|>? l = [%pgsql dbh "select count(token_id) from token_info where contract = $contract"] in
+  match l with
+  | [ Some n ] -> n
+  | _ -> 0L
+
+let update_hen_royalties ?dbh ~contract ~token_id ~account ~value () =
+  let part_value =
+    Z.to_int32 @@ Common.Utils.absolute_balance ~decimals:4l @@
+    Common.Utils.decimal_balance ~decimals:(Int32.of_int 3) value in
+  let royalties = EzEncoding.construct parts_enc [ {part_account=account; part_value} ] in
+  use dbh @@ fun dbh ->
+  [%pgsql dbh
+      "update token_info set royalties = $royalties \
+       where contract = $contract and token_id = ${Z.to_string token_id}"]
