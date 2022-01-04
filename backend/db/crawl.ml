@@ -973,7 +973,7 @@ let recalculate_creators ~main ~burn ~supply ~amount ~account ~creators =
       | None ->
         Format.eprintf "Error in creators during a burn or a reset mint@.";
         creator_values_old
-      | Some v -> (List.remove_assoc account creator_values_old) @ [ account, Z.(sub v (mul amount (of_int 10000))) ] in
+      | Some v -> (List.remove_assoc account creator_values_old) @ [ account, max Z.(sub v (mul amount (of_int 10000))) Z.zero ] in
   let creators =
     if new_supply = Z.zero then []
     else
