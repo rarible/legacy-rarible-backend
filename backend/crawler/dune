@@ -31,5 +31,9 @@
 (executable
  (name recrawl_hen_royalties)
  (modules recrawl_hen_royalties)
- (preprocess (pps ppx_deriving_encoding))
+ (libraries crawler_config db ez_api.icurl_lwt))
+
+(executable
+ (name recrawl_objkt)
+ (modules recrawl_objkt)
  (libraries crawler_config db ez_api.icurl_lwt))
