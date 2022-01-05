@@ -7,21 +7,18 @@ module SSet = Set.Make(String)
 
 let filename = ref None
 let objkt_contract = ref "KT1Aq4wWmVanpQhq4TTfjZXB5AjFpx15iQMM"
-let contract_list = ref []
 let recrawl_start = ref None
 let recrawl_end = ref None
 
 let spec = [
   "--contract", Arg.String (fun s -> objkt_contract := s), "OBJKT contract";
-  "--contracts", Arg.String (fun s ->
-      contract_list := List.map String.trim (String.split_on_char ',' s)), "OBJKT collections to crawl";
   "--start", Arg.Int (fun i -> recrawl_start := Some (Int32.of_int i)), "Start level for recrawl";
   "--end", Arg.Int (fun i -> recrawl_end := Some (Int32.of_int i)), "Optional end level for recrawl";
 ]
 
 let handle_result config = function
   | Error e ->
-    Format.printf "OBJKT originated contracts:\n%s" @@
+    Format.printf "OBJKT originated contracts:\n%s@." @@
     EzEncoding.construct (Config.enc Rtypes.config_enc) config;
     Lwt.return_error e
   | Ok _ -> Lwt.return_ok ()
@@ -39,6 +36,8 @@ let ext ~config bop =
       | _ -> Lwt.return_ok ()
     else Lwt.return_ok ()
 
+let config_r = ref None
+
 let int ~config bop =
   match bop.bo_meta with
   | None -> Lwt.return_ok ()
@@ -51,12 +50,17 @@ let int ~config bop =
         handle_result config r
       | Origination ori ->
         if bop.bo_op.source = !objkt_contract then
+          let () = Format.printf "Block %s (%ld)@." (Common.Utils.short bop.bo_block) bop.bo_level in
           let> r = Db.Misc.use None (fun dbh ->
-              Db.Crawl.insert_origination ~forward:true config dbh bop ori) in
+              let>? () = Db.Crawl.insert_origination ~forward:true config dbh bop ori in
+              config_r := Some config;
+              Lwt.return_ok ()
+            ) in
           handle_result config r
         else Lwt.return_ok ()
       | _ -> Lwt.return_ok ()
     else Lwt.return_ok ()
+
 
 let operation ~config (index, ()) b o =
   fold_rp (fun (index, ()) m ->
@@ -89,11 +93,18 @@ let operation ~config (index, ()) b o =
       (next_index, ())) (index, ()) o.op_contents
 
 let block config () b =
-  Format.printf "Block %s (%ld)@?" (Common.Utils.short b.hash) b.header.shell.level;
+  Format.printf "Block %s (%ld)\r@?" (Common.Utils.short b.hash) b.header.shell.level;
   let|>? _, acc =
     fold_rp (fun (index, ()) o -> operation ~config (index, ()) b o)
       (0l, ()) b.operations in
   acc
+
+let print_config_r () =
+  match !config_r with
+  | None -> ()
+  | Some c ->
+    Format.printf "OBJKT originated contracts:\n%s@." @@
+    EzEncoding.construct (Config.enc Rtypes.config_enc) c
 
 let main () =
   Arg.parse spec (fun f -> filename := Some f) "recrawl_objkt.exe [options] config.json";
@@ -109,15 +120,16 @@ let main () =
   let config = { config with Config.accounts = Some s } in
   match !recrawl_start with
   | Some start ->
-    let>? _ = async_recrawl ~config ~start ?end_:!recrawl_end ~block ((), ()) in
-    Lwt.return_ok ()
+    let> r = async_recrawl ~config ~start ?end_:!recrawl_end ~block ((), ()) in
+    print_config_r ();
+    Lwt.return r
   | _ ->
     Format.printf "Missing arguments: '--start' is required@.";
-    Lwt.return_ok ()
+    Lwt.return_ok ((), ())
 
 let () =
+  Sys.(set_signal sigint (Signal_handle (fun _ -> print_config_r ())));
   EzLwtSys.run @@ fun () ->
   Lwt.map (function
-      | Error e ->
-        Rp.print_error e
+      | Error e -> Rp.print_error e
       | Ok _ -> ()) (main ())
