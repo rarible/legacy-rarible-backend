@@ -1368,9 +1368,24 @@ let token_balance_updates dbh main l =
 
 let tezos_domain_updates dbh main l =
   iter_rp (fun r ->
-      [%pgsql dbh
-          "update tezos_domains set main = not $main \
-           where key = ${r#key} and block <> ${r#block}"]) l
+      let>? l2 = [%pgsql.object dbh
+          "select * from tezos_domains where key = ${r#key} and block <> ${r#block}"] in
+      let>? () = [%pgsql dbh "delete from tezos_domains where key = ${r#key}"] in
+      let>? () = [%pgsql dbh
+          "insert into tezos_domains(key, owner, level, address, expiry_key, \
+           token_id, data, internal_data, block, blevel, index, tsp, main) \
+           values(${r#key}, ${r#owner}, ${r#level}, $?{r#address}, $?{r#expiry_key}, \
+           $?{r#token_id}, ${r#data}, ${r#internal_data}, ${r#block}, ${r#blevel}, \
+           ${r#index}, ${r#tsp}, $main)"] in
+      match l2 with
+      | [ r2 ] ->
+        [%pgsql dbh
+            "insert into tezos_domains(key, owner, level, address, expiry_key, \
+             token_id, data, internal_data, block, blevel, index, tsp, main) \
+             values(${r2#key}, ${r2#owner}, ${r2#level}, $?{r2#address}, \
+             $?{r2#expiry_key}, $?{r2#token_id}, ${r2#data}, ${r2#internal_data}, \
+             ${r2#block}, ${r2#blevel}, ${r2#index}, ${r2#tsp}, not $main)"]
+      | _ -> Lwt.return_ok ()) l
 
 let set_main _config ?(forward=false) dbh {Hooks.m_main; m_hash} =
   let sort l = List.sort (fun r1 r2 ->
@@ -1403,8 +1418,7 @@ let set_main _config ?(forward=false) dbh {Hooks.m_main; m_hash} =
       [%pgsql.object dbh
           "update token_balance_updates set main = $m_main where block = $m_hash returning *"] in
     let>? td_updates =
-      [%pgsql.object dbh
-          "update tezos_domains set main = $m_main where block = $m_hash returning *"] in
+      [%pgsql.object dbh "select * from tezos_domains where block = $m_hash"] in
     let>? cevents = contract_updates dbh m_main @@ sort c_updates in
     let>? tevents = token_updates dbh m_main @@ sort t_updates in
     let>? () = token_balance_updates dbh m_main @@ sort tb_updates in
