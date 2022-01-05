@@ -576,6 +576,7 @@ let get_metadata_attributes dbh ~contract ~token_id =
     Lwt.return_ok (Some attributes)
 
 let mk_nft_item_meta dbh ~contract ~token_id =
+  let id = Printf.sprintf "%s:%s" contract (Z.to_string token_id) in
   let>? creators = get_nft_item_creators dbh ~contract ~token_id in
   let>? formats = get_metadata_formats dbh ~contract ~token_id in
   let>? attributes = get_metadata_attributes dbh ~contract ~token_id in
@@ -585,7 +586,7 @@ let mk_nft_item_meta dbh ~contract ~token_id =
        description, minter, is_boolean_amount, tags, contributors, \
        publishers, date, block_level, genres, language, rights, right_uri, \
        is_transferable, should_prefer_symbol, royalties from tzip21_metadata where \
-       contract = $contract and token_id = ${Z.to_string token_id} and main"] in
+       id = $id and main"] in
   match l with
   | [] ->
     Format.eprintf "metadata not found for %s:%s@." contract (Z.to_string token_id) ;
