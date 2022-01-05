@@ -185,6 +185,7 @@ let upgrade_1_to_2 dbh version =
       account varchar,
       balance zarith,
       unique (block, index, contract, token_id, account))|};
+    {|create index token_balance_updates_block_index on token_balance_updates(block)|};
 
     {|create table orders(
       maker varchar not null,
@@ -457,6 +458,11 @@ let upgrade_8_to_9 dbh version =
       "create index tzip21_metadata_token_id_index on tzip21_metadata(token_id)";
       "create index tzip21_metadata_contract_index on tzip21_metadata(contract)"]
 
+let upgrade_9_to_10 dbh version =
+  EzPG.upgrade ~dbh ~version
+    ~downgrade:[ "drop index token_info_block_index" ] [
+    "create index token_info_block_index on token_info(block)" ]
+
 let upgrades =
   let last_version = fst List.(hd @@ rev !Versions.upgrades) in
   !Versions.upgrades @ List.map (fun (i, f) -> last_version + i, f) [
@@ -468,4 +474,5 @@ let upgrades =
     6, upgrade_6_to_7;
     7, upgrade_7_to_8;
     8, upgrade_8_to_9;
+    9, upgrade_9_to_10;
   ]
