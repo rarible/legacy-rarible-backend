@@ -22,6 +22,7 @@ let get file extra_enc =
 let dummy_extra = {
   exchange = ""; royalties = ""; transfer_manager = "";
   contracts = SMap.empty; ft_contracts = SMap.empty; hen_info = None;
+  tezos_domains = None;
 }
 
 let rarible_contracts ?(db=dummy_extra) config =
@@ -41,6 +42,8 @@ let rarible_contracts ?(db=dummy_extra) config =
     let s = SSet.add extra.exchange s in
     let s = SSet.add extra.royalties s in
     let s = SSet.add extra.transfer_manager s in
+    let s = match extra.hen_info with None -> s | Some info -> SSet.add info.hen_minter s in
+    let s = match extra.tezos_domains with None -> s | Some (c, _) -> SSet.add c s in
     let s = SMap.fold (fun a _ acc -> SSet.add a acc) extra.ft_contracts s in
     let s = SMap.fold (fun a _ acc -> SSet.add a acc) extra.contracts s in
     Lwt.return_ok { config with accounts = Some s; extra }

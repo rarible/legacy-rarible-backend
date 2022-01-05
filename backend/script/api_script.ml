@@ -23,7 +23,7 @@ let config = {
   royalties ;
   transfer_manager ;
   contracts = SMap.empty;
-  hen_info = None;
+  hen_info = None; tezos_domains = None;
   ft_contracts =
     SMap.singleton
       lugh_contract
@@ -2228,7 +2228,8 @@ let make_config ~exchange ~royalties ~transfer_manager ~contracts ~ft_contracts
       allow_no_metadata = false ;
       retry = None;
       retry_timeout = 5.;
-      extra = { exchange; royalties; transfer_manager; contracts; ft_contracts; hen_info = None } ;
+      extra = { exchange; royalties; transfer_manager; contracts; ft_contracts;
+                hen_info = None; tezos_domains = None } ;
     } in
     let temp_fn = Filename.temp_file "config" "" in
     let json = EzEncoding.construct (Cconfig.enc Rtypes.config_enc) config in

@@ -419,6 +419,28 @@ let upgrade_6_to_7 dbh version =
       "create index tokens_tid_index on tokens(tid)";
 ]
 
+let upgrade_7_to_8 dbh version =
+  EzPG.upgrade ~dbh ~version
+    ~downgrade:[ "drop table tezos_domains" ] [
+    "create table tezos_domains(\
+     key varchar not null, \
+     owner varchar not null, \
+     level int not null, \
+     address varchar, \
+     expiry_key varchar, \
+     token_id varchar, \
+     data jsonb not null, \
+     internal_data jsonb not null, \
+     block varchar not null, \
+     blevel int not null, \
+     index int not null, \
+     tsp timestamp not null, \
+     main boolean not null, \
+     primary key (key, main))";
+    "create index tezos_domains_block_index on tezos_domains(block)";
+  ]
+
+
 let upgrades =
   let last_version = fst List.(hd @@ rev !Versions.upgrades) in
   !Versions.upgrades @ List.map (fun (i, f) -> last_version + i, f) [
@@ -428,4 +450,5 @@ let upgrades =
     4, upgrade_4_to_5;
     5, upgrade_5_to_6;
     6, upgrade_6_to_7;
+    7, upgrade_7_to_8;
   ]

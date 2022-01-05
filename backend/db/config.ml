@@ -63,7 +63,7 @@ let get_extra_config ?dbh () =
       royalties = r#royalties;
       transfer_manager = r#transfer_manager;
       ft_contracts; contracts;
-      hen_info = None;
+      hen_info = None; tezos_domains = None;
     })
   | [] -> Lwt.return_ok None
   | _ -> Lwt.return_error (`hook_error "wrong_state")
