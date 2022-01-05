@@ -204,6 +204,7 @@ let insert_mint_metadata dbh ?(forward=false) ~contract ~token_id ~block ~level 
     insert_mint_metadata_formats dbh ~forward ~contract ~token_id ~block ~level ~tsp metadata in
   let>? () =
     insert_mint_metadata_attributes dbh ~forward ~contract ~token_id ~block ~level ~tsp metadata in
+  let id = Printf.sprintf "%s:%s" contract (Z.to_string token_id) in
   let name = match metadata.tzip21_tm_name with
     | None -> None
     | Some n -> if Parameters.decode n then Some n else None in
@@ -247,17 +248,17 @@ let insert_mint_metadata dbh ?(forward=false) ~contract ~token_id ~block ~level 
     | None -> None
     | Some r -> Some (EzEncoding.construct parts_enc @@ to_4_decimals r) in
   [%pgsql dbh
-      "insert into tzip21_metadata(contract, token_id, block, level, tsp, \
+      "insert into tzip21_metadata(id, contract, token_id, block, level, tsp, \
        name, symbol, decimals, artifact_uri, display_uri, thumbnail_uri, \
        description, minter, is_boolean_amount, tags, contributors, \
        publishers, date, block_level, genres, language, rights, right_uri, \
        is_transferable, should_prefer_symbol, royalties, main) \
-       values ($contract, ${Z.to_string token_id}, $block, $level, $tsp, $?name, $?symbol, \
+       values ($id, $contract, ${Z.to_string token_id}, $block, $level, $tsp, $?name, $?symbol, \
        $?decimals, $?artifact_uri, $?display_uri, $?thumbnail_uri, \
        $?description, $?minter, $?is_boolean_amount, $?tags, $?contributors, \
        $?publishers, $?date, $?block_level, $?genres, $?language, $?rights, \
        $?right_uri, $?is_transferable, $?should_prefer_symbol, $?royalties, $forward) \
-       on conflict (contract, token_id) do update set \
+       on conflict (id) do update set \
        name = $?name, symbol = $?symbol, decimals = $?decimals, \
        artifact_uri = $?artifact_uri, display_uri = $?display_uri, \
        thumbnail_uri = $?thumbnail_uri, description = $?description, \
@@ -269,8 +270,7 @@ let insert_mint_metadata dbh ?(forward=false) ~contract ~token_id ~block ~level 
        should_prefer_symbol = $?should_prefer_symbol, \
        royalties = $?royalties, \
        main = $forward \
-       where tzip21_metadata.contract = $contract and \
-       tzip21_metadata.token_id = ${Z.to_string token_id}"]
+       where tzip21_metadata.id = $id"]
 
 let get_uri_pattern ~dbh contract =
   let>? l =

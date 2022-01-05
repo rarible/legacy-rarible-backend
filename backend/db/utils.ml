@@ -153,9 +153,8 @@ let unknown_token_metadata ?dbh ?contract () =
   [%pgsql.object dbh
       "select i.contract, i.token_id, i.block, i.level, i.tsp, metadata, \
        metadata_uri, null as token_metadata_id \
-       from token_info i left join tzip21_metadata t on \
-       i.token_id = t.token_id and i.contract = t.contract where \
-       i.main and t.contract is null and ($no_contract or i.contract = $?contract)"]
+       from token_info i left join tzip21_metadata t on i.id = t.id \
+       where i.main and t.contract is null and ($no_contract or i.contract = $?contract)"]
 
 let contract_token_metadata ?dbh contract =
   use dbh @@ fun dbh ->

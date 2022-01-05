@@ -440,6 +440,22 @@ let upgrade_7_to_8 dbh version =
     "create index tezos_domains_block_index on tezos_domains(block)";
   ]
 
+let upgrade_8_to_9 dbh version =
+  EzPG.upgrade ~dbh ~version
+    ~downgrade:[
+      "alter table tzip21_metadata drop constraint tzip21_metadata_pkey";
+      "alter table tzip21_metadata drop column id";
+      "alter table tzip21_metadata add constraint tzip21_metadata_pkey primary key (contract, token_id)";
+      "drop index tzip21_metadata_token_id_index";
+      "drop index tzip21_metadata_contract_index"]
+    [ "alter table tzip21_metadata add column id varchar not null default ''";
+      "update tzip21_metadata set id = concat(contract, ':', token_id)";
+      "alter table tzip21_metadata drop constraint tzip21_metadata_pkey";
+      "alter table tzip21_metadata add constraint tzip21_metadata_pkey primary key (id)";
+      "alter table tzip21_metadata alter id set default null";
+
+      "create index tzip21_metadata_token_id_index on tzip21_metadata(token_id)";
+      "create index tzip21_metadata_contract_index on tzip21_metadata(contract)"]
 
 let upgrades =
   let last_version = fst List.(hd @@ rev !Versions.upgrades) in
@@ -451,4 +467,5 @@ let upgrades =
     5, upgrade_5_to_6;
     6, upgrade_6_to_7;
     7, upgrade_7_to_8;
+    8, upgrade_8_to_9;
   ]
