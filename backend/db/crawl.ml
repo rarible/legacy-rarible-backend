@@ -1124,17 +1124,13 @@ let contract_updates dbh main l =
     iter_rp (fun c ->
         let>? l =
           [%pgsql dbh
-              "select count(token_id), max(token_id::numeric) from \
-               (select distinct token_id FROM tokens where \
-               contract = $c) AS temp"] in
-        let tokens_number, last_token_id = match l with
-          | [] | _ :: _ :: _ -> 0L, Z.zero
-          | [ tokens_number, last_token_id ] ->
-            Option.value ~default:0L tokens_number,
+              "select max(token_id::numeric) from tokens where contract = $c"] in
+        let last_token_id = match l with
+          | [] | _ :: _ :: _ -> Z.zero
+          | [ last_token_id ] ->
             Option.fold ~none:Z.zero ~some:Z.of_string last_token_id in
         [%pgsql dbh
             "update contracts set \
-             tokens_number = $tokens_number, \
              last_token_id = $last_token_id \
              where address = $c"]) (SSet.elements contracts) in
   Lwt.return_ok @@ List.rev events
