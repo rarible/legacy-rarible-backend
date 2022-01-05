@@ -24,7 +24,7 @@ RUN mkdir data && $(pg_config --bindir)/initdb -D data -U functori && \
 echo 'host all  all    0.0.0.0/0  trust' >> data/pg_hba.conf && \
 echo "listen_addresses='*'" >> data/postgresql.conf
 
-COPY --from=compilation --chown=functori /home/functori/rarible/deployment/crawler_config.json /home/functori/rarible/docker/entrypoint.sh /home/functori/rarible/_bin/* /home/functori/
+COPY --from=compilation --chown=functori /home/functori/rarible/deployment/crawler_config.json /home/functori/rarible/docker/entrypoint.sh /home/functori/rarible/_bin/* /home/functori/rarible/scripts/reset_royalties.sh /home/functori/
 
 RUN $(pg_config --bindir)/pg_ctl start -D data && ./update_db
 EXPOSE 5432

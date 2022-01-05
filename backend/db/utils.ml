@@ -58,6 +58,14 @@ let set_bm_id ?dbh ?(kind=`token) ~contract id =
   | `royalties ->
     [%pgsql dbh "update contracts set royalties_id = ${Z.to_string id} where address = $contract"]
 
+let update_royalties dbh ~contract ~token_id r =
+  let token_id = Z.to_string token_id in
+  let shares = Metadata.to_4_decimals r in
+  let royalties = EzEncoding.construct parts_enc shares in
+  [%pgsql dbh
+      "update token_info set royalties_metadata = $royalties \
+       where contract = $contract and token_id = $token_id"]
+
 let fetch_metadata_from_source ?(verbose=0) ~timeout ~source l =
   let cpt = ref 0 in
   let err = ref 0 in
@@ -94,6 +102,10 @@ let fetch_metadata_from_source ?(verbose=0) ~timeout ~source l =
                 r#block, r#level, r#tsp, r#contract, Z.of_string r#token_id in
               let>? () =
                 Metadata.insert_mint_metadata dbh ~forward:true ~contract ~token_id ~block ~level ~tsp metadata in
+              let>? () =
+                match metadata.tzip21_tm_royalties with
+                | None -> Lwt.return_ok ()
+                | Some r -> update_royalties dbh ~contract ~token_id r in
               if verbose > 0 then Format.eprintf "  OK@." ;
               incr oks ;
               Lwt.return_ok ()
@@ -116,6 +128,10 @@ let fetch_metadata_from_source ?(verbose=0) ~timeout ~source l =
             let block, level, tsp, contract, token_id =
               r#block, r#level, r#tsp, r#contract, Z.of_string r#token_id in
             let>? () = Metadata.insert_mint_metadata dbh ~forward:true ~contract ~token_id ~block ~level ~tsp metadata in
+            let>? () =
+              match metadata.tzip21_tm_royalties with
+              | None -> Lwt.return_ok ()
+              | Some r -> update_royalties dbh ~contract ~token_id r in
             if verbose > 0 then Format.eprintf "  OK@." ;
             incr oks ;
             Lwt.return_ok ()
@@ -156,22 +172,18 @@ let unknown_token_metadata ?dbh ?contract () =
        from token_info i left join tzip21_metadata t on i.id = t.id \
        where i.main and t.contract is null and ($no_contract or i.contract = $?contract)"]
 
-let contract_token_metadata ?dbh contract =
+let contract_token_metadata ?dbh ?(royalties=false) contract =
   use dbh @@ fun dbh ->
   [%pgsql.object dbh
       "select contract, token_id, i.block, i.level, i.tsp, i.metadata, \
        metadata_uri, token_metadata_id \
        from token_info i inner join contracts c on c.address = i.contract \
-       where i.main and contract = $contract"]
+       where i.main and contract = $contract and \
+       (not $royalties or \
+       (royalties_metadata is null or royalties_metadata = '[]' or royalties_metadata = '{}'))"]
 
 let update_metadata ?(set_metadata=false)
     ?metadata_uri ?dbh ~metadata ~contract ~token_id ~block ~level ~tsp () =
-  let update_royalties dbh r =
-    let shares = Metadata.to_4_decimals r in
-    let royalties = EzEncoding.construct parts_enc shares in
-    [%pgsql dbh
-        "update token_info set royalties_metadata = $royalties \
-         where contract = $contract and token_id = $token_id"] in
   Format.eprintf "%s[%s]@." contract token_id;
   if set_metadata then
     use dbh @@ fun dbh ->
@@ -195,7 +207,7 @@ let update_metadata ?(set_metadata=false)
         let>? () =
           match metadata_tzip.tzip21_tm_royalties with
           | None -> Lwt.return_ok ()
-          | Some r -> update_royalties dbh r in
+          | Some r -> update_royalties dbh ~contract ~token_id r in
         Format.eprintf "  OK@." ;
         Lwt.return_ok ()
       with _ ->
@@ -214,7 +226,7 @@ let update_metadata ?(set_metadata=false)
         let>? () =
           match metadata_tzip.tzip21_tm_royalties with
           | None -> Lwt.return_ok ()
-          | Some r -> update_royalties dbh r in
+          | Some r -> update_royalties dbh ~contract ~token_id r in
         Format.eprintf "  OK@." ;
         Lwt.return_ok ()
       | Error (code, str) ->
