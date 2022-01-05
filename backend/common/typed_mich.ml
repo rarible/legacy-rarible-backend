@@ -175,7 +175,7 @@ let rec short_micheline_type (t : micheline_type) : micheline_type_short = match
   | `nat -> `nat
   | `operation -> `operation
   | `signature -> `signature
-  |`string -> `string
+  | `string -> `string
   | `timestamp -> `timestamp
   | `unit -> `unit
   | `map (k, v) -> `map (short_micheline_type k, short_micheline_type v)

@@ -100,7 +100,8 @@ let main () =
   let>? config = Lwt.return @@ Crawler_config.get !filename Rtypes.config_enc in
   let config = { config with Config.extra = {
       Rtypes.exchange = ""; royalties = ""; transfer_manager = ""; hen_info = None;
-      ft_contracts = Rtypes.SMap.empty; contracts = config.Config.extra.Rtypes.contracts } } in
+      ft_contracts = Rtypes.SMap.empty; contracts = config.Config.extra.Rtypes.contracts;
+      tezos_domains = None } } in
   let s = match config.Config.accounts with
     | None -> SSet.empty
     | Some s -> s in

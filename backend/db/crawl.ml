@@ -667,6 +667,50 @@ let insert_do_transfers ~dbh ~op
     left left_maker left_make_asset left_salt
     right right_maker right_make_asset right_salt
 
+let insert_hen_royalties ~dbh ~op ?forward ~info l =
+  let f = function
+    | `nat token_id, Some (`tuple [ `address part_account; `nat v ]) ->
+      insert_royalties ~dbh ~op ?forward {
+        roy_contract = info.hen_contract; roy_token_id = Some token_id;
+        roy_royalties = [ { part_account; part_value = Z.to_int32 v } ]}
+    | _ -> Lwt.return_ok () in
+  iter_rp f l
+
+let insert_tezos_domains ~dbh ~op ?(forward=false) l =
+  let f = function
+    | `bytes key, Some (
+        `tuple [
+          `tuple [ `tuple [ address; `assoc data ];
+                   `tuple [ expiry_key; `assoc internal ] ];
+          `tuple [ `tuple [ `nat level; `address owner ]; token_id ] ]) ->
+      let address = match address with `some (`address a) -> Some a | _ -> None in
+      let expiry_key = match expiry_key with
+        | `some (`bytes b) -> Some (Tzfunc.Crypto.hex_to_raw b :> string)
+        | _ -> None in
+      let token_id = match token_id with `some (`nat id) -> Some (Z.to_string id) | _ -> None in
+      let level = Z.to_int32 level in
+      let key = (Tzfunc.Crypto.hex_to_raw key :> string) in
+      let data = EzEncoding.construct Json_encoding.(assoc string) @@
+        List.filter_map (function (`string k, `bytes (v : hex)) -> Some (k, (v :> string)) | _ -> None) data in
+      let internal = EzEncoding.construct Json_encoding.(assoc string) @@
+        List.filter_map (function (`string k, `bytes (v : hex)) -> Some (k, (v :> string)) | _ -> None) internal in
+      if Parameters.decode key then
+        [%pgsql dbh
+            "insert into tezos_domains(key, owner, level, address, expiry_key, \
+             token_id, data, internal_data, block, blevel, index, tsp, main) \
+             values($key, $owner, $level, $?address, $?expiry_key, $?token_id, \
+             $data, $internal, ${op.bo_block}, ${op.bo_level}, ${op.bo_index}, \
+             ${op.bo_tsp}, $forward) \
+             on conflict (key, main) do update set \
+             owner = $owner, level = $level, address = $?address, \
+             expiry_key = $?expiry_key, token_id = $?token_id, data = $data, \
+             internal_data = $internal, block = ${op.bo_block}, \
+             blevel = ${op.bo_level}, index = ${op.bo_index}, tsp = ${op.bo_tsp} \
+             where tezos_domains.key = $key and tezos_domains.main = $forward"]
+      else Lwt.return_ok ()
+    | _ -> Lwt.return_ok () in
+  iter_rp f l
+
 let check_ft_status ~dbh ~config ~crawled contract =
   if crawled then Lwt.return_ok true
   else
@@ -787,20 +831,24 @@ let insert_transaction ~config ~dbh ~op ?(forward=false) tr =
       end
     else match
         config.Crawlori.Config.extra.hen_info,
+        config.Crawlori.Config.extra.tezos_domains,
         SMap.find_opt contract config.Crawlori.Config.extra.ft_contracts,
         SMap.find_opt contract config.Crawlori.Config.extra.contracts with
-    | Some hen_info, _, _ when hen_info.hen_minter = contract ->
-      let bm = { bm_id = hen_info.hen_minter_id;
+    | Some info, _, _, _ when info.hen_minter = contract ->
+      let bm = { bm_id = info.hen_minter_id;
                  bm_types = Contract_spec.hen_royalties_field } in
       let royalties = Storage_diff.get_big_map_updates bm meta.op_lazy_storage_diff in
-      iter_rp (function
-          | `nat token_id, Some (`tuple [ `address part_account; `nat v ]) ->
-            insert_royalties ~dbh ~op ~forward {
-              roy_contract = hen_info.hen_contract; roy_token_id = Some token_id;
-              roy_royalties = [ { part_account; part_value = Z.to_int32 v } ]}
-          | _ -> Lwt.return_ok ()) royalties
-    | _, Some ft, _ -> insert_ft ~dbh ~config ~op ~contract ~forward ft
-    | _, _, Some nft -> insert_nft ~dbh ~meta ~op ~contract ~nft ~entrypoint ~forward m
+      if royalties <> [] then
+        Format.printf "\027[0;35mhen_royalties %s %ld\027[0m@." (Utils.short op.bo_hash) op.bo_index;
+      insert_hen_royalties ~dbh ~forward ~op ~info royalties
+    | _, Some (c, bm_id), _, _ when c = contract ->
+      let bm = { bm_id; bm_types = Contract_spec.tezos_domains_field } in
+      let l = Storage_diff.get_big_map_updates bm meta.op_lazy_storage_diff in
+      if l <> [] then
+        Format.printf "\027[0;35mtezos_domains %s %ld\027[0m@." (Utils.short op.bo_hash) op.bo_index;
+      insert_tezos_domains ~dbh ~op ~forward l
+    | _, _, Some ft, _ -> insert_ft ~dbh ~config ~op ~contract ~forward ft
+    | _, _, _, Some nft -> insert_nft ~dbh ~meta ~op ~contract ~nft ~entrypoint ~forward m
     | _ -> Lwt.return_ok ()
 
 let ledger_kind types =
@@ -1318,6 +1366,12 @@ let token_balance_updates dbh main l =
         end) @@
   TIMap.bindings m
 
+let tezos_domain_updates dbh main l =
+  iter_rp (fun r ->
+      [%pgsql dbh
+          "update tezos_domains set main = not $main \
+           where key = ${r#key} and block <> ${r#block}"]) l
+
 let set_main _config ?(forward=false) dbh {Hooks.m_main; m_hash} =
   let sort l = List.sort (fun r1 r2 ->
       if m_main then Int32.compare r1#index r2#index
@@ -1348,9 +1402,13 @@ let set_main _config ?(forward=false) dbh {Hooks.m_main; m_hash} =
     let>? tb_updates =
       [%pgsql.object dbh
           "update token_balance_updates set main = $m_main where block = $m_hash returning *"] in
+    let>? td_updates =
+      [%pgsql.object dbh
+          "update tezos_domains set main = $m_main where block = $m_hash returning *"] in
     let>? cevents = contract_updates dbh m_main @@ sort c_updates in
     let>? tevents = token_updates dbh m_main @@ sort t_updates in
     let>? () = token_balance_updates dbh m_main @@ sort tb_updates in
+    let>? () = tezos_domain_updates dbh m_main @@ sort td_updates in
     let>? () =
       [%pgsql dbh
           "update tzip21_metadata set main = $m_main where block = $m_hash"] in

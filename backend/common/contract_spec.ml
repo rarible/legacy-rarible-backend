@@ -120,3 +120,12 @@ let set_royalties_entry = `tuple [`address; `nat; `map (`address, `nat)]
 let checked_field ~expected = function
   | (_, Some {bm_id; bm_types}) when bm_types = expected -> Some bm_id
   | _ -> None
+
+let tezos_domains_field = {
+  bmt_key = `bytes;
+  bmt_value =
+    `tuple [
+      `tuple [ `tuple [ `option `address; `map (`string, `bytes) ];
+               `tuple [ `option `bytes; `map (`string, `bytes) ] ];
+      `tuple [ `tuple [ `nat; `address ]; `option `nat ] ]
+}

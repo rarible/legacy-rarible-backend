@@ -1040,6 +1040,7 @@ type config = {
   royalties: string; [@dft ""]
   transfer_manager: string; [@dft ""]
   hen_info: hen_info option;
+  tezos_domains: (((string [@key "contract"]) * (z [@key "id"])) [@object]) option;
   mutable ft_contracts: ft_ledger SMap.t; [@map] [@dft SMap.empty]
   mutable contracts: nft_ledger SMap.t; [@map] [@dft SMap.empty]
 } [@@deriving encoding]
@@ -1200,3 +1201,14 @@ type activity_sort =
 [@@deriving encoding {enum;title="ActivitySort"; def_title}]
 
 type ids = { ids : string list } [@@deriving encoding {title="OrderIds"; def_title}]
+
+type tezos_domain = {
+  td_key: string;
+  td_address: A.address option;
+  td_data: (string * string) list; [@assoc]
+  td_expiry_key: string;
+  td_internal_data: (string * string) list; [@assoc]
+  td_level: A.uint32;
+  td_owner: A.address;
+  td_token_id: A.big_integer;
+} [@@deriving encoding {title="TezosDomain"; def_title}]

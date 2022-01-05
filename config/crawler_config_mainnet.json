@@ -16,5 +16,6 @@
       "decimals": 6,
       "token_id": "0"
     }
-  }
+  },
+  "tezos_domains": { "contract": "KT1GBZmSxmnKJXGMdMLbugPfLyUPmuLSMwKS", "id": "1264"}
 }
