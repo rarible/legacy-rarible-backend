@@ -7,6 +7,7 @@ let contract = ref None
 let retrieve  = ref false
 let node = ref "https://tz.functori.com"
 let force = ref false
+let royalties= ref false
 
 let spec = [
   "--retrieve-context", Arg.Set retrieve,
@@ -19,6 +20,8 @@ let spec = [
   "Update metadata only for this contract";
   "--force", Arg.Set force,
   "Force reset of metadata";
+  "--royalties", Arg.Set royalties,
+  "Fetch metadata for missing royalties items";
 ]
 
 let expr token_id =
@@ -111,14 +114,14 @@ let () =
         Db.Utils.fetch_metadata_from_source ~verbose:0 ~timeout:(float_of_int config.daemon_timeout) in
     let>? l =
       match !force, !contract, !retrieve with
-      | true, Some contract, _ -> Db.Utils.contract_token_metadata contract
+      | true, Some contract, _ -> Db.Utils.contract_token_metadata ~royalties:!royalties contract
       | _, _, true -> Db.Utils.empty_token_metadata ?contract:!contract ()
       | _ -> Db.Utils.unknown_token_metadata ?contract:!contract () in
     split l sources f
   | None ->
     if !retrieve then
       let>? l = match !force, !contract with
-        | true, Some contract -> Db.Utils.contract_token_metadata contract
+        | true, Some contract -> Db.Utils.contract_token_metadata ~royalties:!royalties contract
         | _ -> Db.Utils.empty_token_metadata ?contract:!contract () in
       iter_rp (fun r ->
           match r#token_metadata_id with
@@ -136,7 +139,7 @@ let () =
                 ~level:r#level ~tsp:r#tsp ~metadata ~set_metadata:true ()) l
     else
       let>? l = match !force, !contract with
-        | true, Some contract -> Db.Utils.contract_token_metadata contract
+        | true, Some contract -> Db.Utils.contract_token_metadata ~royalties:!royalties contract
         | _ -> Db.Utils.unknown_token_metadata ?contract:!contract () in
       iter_rp (fun r ->
           Db.Utils.update_metadata ~contract:r#contract ~token_id:r#token_id ~block:r#block
