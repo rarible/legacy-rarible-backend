@@ -50,7 +50,6 @@ let int ~config bop =
         handle_result config r
       | Origination ori ->
         if bop.bo_op.source = !objkt_contract then
-          let () = Format.printf "Block %s (%ld)@." (Common.Utils.short bop.bo_block) bop.bo_level in
           let> r = Db.Misc.use None (fun dbh ->
               let>? () = Db.Crawl.insert_origination ~forward:true config dbh bop ori in
               config_r := Some config;
@@ -60,7 +59,6 @@ let int ~config bop =
         else Lwt.return_ok ()
       | _ -> Lwt.return_ok ()
     else Lwt.return_ok ()
-
 
 let operation ~config (index, ()) b o =
   fold_rp (fun (index, ()) m ->
@@ -93,7 +91,7 @@ let operation ~config (index, ()) b o =
       (next_index, ())) (index, ()) o.op_contents
 
 let block config () b =
-  Format.printf "Block %s (%ld)\r@?" (Common.Utils.short b.hash) b.header.shell.level;
+  Format.printf "Block %s (%ld)@." (Common.Utils.short b.hash) b.header.shell.level;
   let|>? _, acc =
     fold_rp (fun (index, ()) o -> operation ~config (index, ()) b o)
       (0l, ()) b.operations in
