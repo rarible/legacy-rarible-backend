@@ -1,6 +1,6 @@
 module PGOCaml = Pg.PGOCaml
 
-let () = Pg.PG.Pool.init ~database:Cconfig.database ()
+let () = Pg.PG.Pool.init ()
 
 let use dbh f = match dbh with
   | None -> Pg.PG.Pool.use f
