@@ -21,7 +21,7 @@ export async function upsert_order(
   }
   const approve_a = await approve_arg(provider, order.maker, make, infinite)
   if (approve_a) args = args.concat(approve_a)
-  await send_batch(provider, args)
+  if (args.length!=0) await send_batch(provider, args)
   const order2 = { ...order, make: { asset_type: make.asset_type, value: order.make.value } }
   const signature = await sign_order(provider, order2)
   const r = await fetch(provider.config.api + '/orders', {

@@ -1,4 +1,4 @@
-import { Asset, asset_to_json, asset_of_json } from "../common/base"
+import { Provider, Asset, NFTAssetType, MultipleAssetType, asset_to_json, asset_of_json } from "../common/base"
 import BigNumber from "bignumber.js"
 const getRandomValues = require('get-random-values')
 
@@ -82,4 +82,35 @@ export function salt() : string {
   let a = new Uint8Array(32)
   a = getRandomValues(a)
   return a.reduce((acc, x) => acc + x.toString(10).padStart(2, '0'), '')
+}
+
+export async function fill_royalties_payouts(provider : Provider, order: OrderForm) : Promise<OrderForm> {
+  if (order.data.payouts.length != 0) return order
+  let assett : NFTAssetType | MultipleAssetType | undefined ;
+  if ((order.make.asset_type.asset_class=="NFT" || order.make.asset_type.asset_class=="MT") && order.make.asset_type.asset_class!="NFT" && order.make.asset_type.asset_class!="MT") {
+    assett = order.make.asset_type }
+  if (!assett) return order
+  let contract = (assett.contract) ? assett.contract
+    : (assett.asset_class=="NFT") ? provider.config.nft_public
+    : provider.config.mt_public
+  let id = contract + ':' + assett.token_id.toString()
+  const r = await fetch(provider.config.api + '/items/' + id)
+  if (r.ok) {
+    const json = await r.json()
+    if (json.royalties) {
+      if (json.royalties.onchain) return order
+      else {
+        let payouts = json.royalties.list.map(function(x : { account: string, value: number }) {
+          return {...x, value: new BigNumber(x.value)}
+        })
+        let total : BigNumber = payouts.reduce((acc : BigNumber, x : Part ) => acc.plus(x.value), new BigNumber(0))
+        if (total.comparedTo(10000) > 0) throw new Error('payouts sum above 10000: ' + total.toString())
+        payouts = payouts.concat({ account: order.maker, value: (new BigNumber(10000)).minus(total) })
+        let data = { ...order.data, payouts }
+        return { ...order, data }
+      }
+    } else {
+      throw new Error("cannot get royalties for " + id)
+    }
+  } else throw new Error("cannot get royalties for " + id)
 }
