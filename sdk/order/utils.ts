@@ -87,7 +87,7 @@ export function salt() : string {
 export async function fill_royalties_payouts(provider : Provider, order: OrderForm) : Promise<OrderForm> {
   if (order.data.payouts.length != 0) return order
   let assett : NFTAssetType | MultipleAssetType | undefined ;
-  if ((order.make.asset_type.asset_class=="NFT" || order.make.asset_type.asset_class=="MT") && order.make.asset_type.asset_class!="NFT" && order.make.asset_type.asset_class!="MT") {
+  if ((order.make.asset_type.asset_class=="NFT" || order.make.asset_type.asset_class=="MT") && order.take.asset_type.asset_class!="NFT" && order.take.asset_type.asset_class!="MT") {
     assett = order.make.asset_type }
   if (!assett) return order
   let contract = (assett.contract) ? assett.contract
