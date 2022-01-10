@@ -648,7 +648,9 @@ let mk_nft_item dbh ?include_meta obj =
       match EzEncoding.destruct parts_enc obj#royalties, Option.map (EzEncoding.destruct parts_enc) obj#royalties_metadata with
       | [], Some ((_ :: _) as nft_item_roy_list) -> { nft_item_roy_onchain = Some false; nft_item_roy_list }
       | [], _ -> { nft_item_roy_onchain = None; nft_item_roy_list = [] }
-      | nft_item_roy_list, _ -> { nft_item_roy_onchain = Some true; nft_item_roy_list } in
+      | nft_item_roy_list, _ ->
+        let onchain = contract <> "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton" in
+        { nft_item_roy_onchain = Some onchain; nft_item_roy_list } in
     Lwt.return_ok {
       nft_item_id = obj#id ;
       nft_item_contract = contract ;
