@@ -438,7 +438,6 @@ export default new Vue({
         const make_value = new BigNumber(this.upsert.make.value)
         const take_value = new BigNumber(this.upsert.take.value)
         let payouts = parse_parts(this.upsert.payouts)
-        if (payouts.length == 0) payouts = [ { account: pk_to_pkh(maker_edpk), value: new BigNumber(10000)} ]
         const origin_fees = parse_parts(this.upsert.origin_fees)
         if (!make_asset_type) {
           this.upsert.status = 'danger'
@@ -491,7 +490,6 @@ export default new Vue({
         const amount = new BigNumber(this.sell.amount)
         const price = new BigNumber(this.sell.price)
         let payouts = parse_parts(this.sell.payouts)
-        if (payouts.length == 0) payouts = [ { account: maker, value: new BigNumber(10000)} ]
         const origin_fees = parse_parts(this.sell.origin_fees)
         if (!make_asset_type) {
           this.sell.status = 'danger'
@@ -540,7 +538,6 @@ export default new Vue({
         const amount = new BigNumber(this.bid.amount)
         const price = new BigNumber(this.bid.price)
         let payouts = parse_parts(this.bid.payouts)
-        if (payouts.length == 0) payouts = [ { account: maker, value: new BigNumber(10000)} ]
         const origin_fees = parse_parts(this.bid.origin_fees)
         if (!make_asset_type) {
           this.bid.status = 'danger'
@@ -616,8 +613,6 @@ export default new Vue({
       } else {
         let payouts = parse_parts(this.upsert.payouts)
         const origin_fees = parse_parts(this.upsert.origin_fees)
-        let account = await get_address(this.provider)
-        if (payouts.length == 0) payouts = [ { account, value: new BigNumber(10000)} ]
         const op = await fill_order(this.provider, this.fill.selected, {
           amount: new BigNumber(this.fill.amount),
           payouts, origin_fees

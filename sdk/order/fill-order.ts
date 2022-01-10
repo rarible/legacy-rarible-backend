@@ -1,6 +1,6 @@
 import { MichelsonData } from "@taquito/michel-codec"
-import { Provider, send, send_batch, get_public_key, OperationResult, Asset, get_address } from "../common/base"
-import { Part, OrderForm, order_to_json, salt } from "./utils"
+import { Provider, send_batch, get_public_key, OperationResult, Asset, get_address } from "../common/base"
+import { Part, OrderForm, order_to_json, salt, fill_royalties_payouts } from "./utils"
 import { invert_order } from "./invert-order"
 import { get_make_fee } from "./get-make-fee"
 import { add_fee } from "./add-fee"
@@ -89,6 +89,7 @@ export async function fill_order(
       origin_fees: request.origin_fees || [],
     },
   }
+  right = await fill_royalties_payouts(provider, right)
   if (up==undefined) {
     const arg_approve =
       (make.asset_type.asset_class != "XTZ")

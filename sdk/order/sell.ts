@@ -1,6 +1,6 @@
 import { Provider, XTZAssetType, FTAssetType } from "../common/base"
 import { ExtendedAssetType, check_asset_type } from "../common/check-asset-type"
-import { Part, OrderForm, salt } from "./utils"
+import { Part, OrderForm, salt, fill_royalties_payouts } from "./utils"
 import { upsert_order } from "./upsert-order"
 import BigNumber from "bignumber.js"
 
@@ -19,7 +19,7 @@ export async function sell(
   provider: Provider,
   request: SellRequest
 ) {
-  const order: OrderForm = {
+  let order: OrderForm = {
     maker: request.maker,
     maker_edpk: request.maker_edpk,
     make: {
@@ -38,5 +38,6 @@ export async function sell(
     },
     salt: salt()
   }
+  order = await fill_royalties_payouts(provider, order)
   return upsert_order(provider, order, false)
 }
