@@ -1393,16 +1393,16 @@ let make_tr ?entrypoint ?(fee= -1L) ?(gas_limit=Z.minus_one)
   }
 
 let forge_tr ?entrypoint ?fee ?gas_limit ?storage_limit ?counter
-    ?amount ?remove_failed ?local_forge ~base ~get_pk ~source ~contract p =
+    ?amount ?remove_failed ?forge_method ~base ~get_pk ~source ~contract p =
   let op = make_tr ?entrypoint ?fee ?gas_limit ?storage_limit
       ?counter ?amount ~source ~contract p in
-  Tzfunc.Node.forge_manager_operations ?remove_failed ?local_forge ~base
+  Tzfunc.Node.forge_manager_operations ?remove_failed ?forge_method ~base
     ~get_pk [ op ]
 
 let call ?entrypoint ?fee ?gas_limit ?storage_limit ?counter
-    ?amount ?remove_failed ?local_forge ~base ~get_pk ~source ~contract ~sign p =
+    ?amount ?remove_failed ?forge_method ~base ~get_pk ~source ~contract ~sign p =
   Lwt.bind (forge_tr ?entrypoint ?fee ?gas_limit ?storage_limit
-              ?counter ?amount ?remove_failed ?local_forge ~base ~get_pk ~source ~contract p) @@ function
+              ?counter ?amount ?remove_failed ?forge_method ~base ~get_pk ~source ~contract p) @@ function
   | Error e ->
     Printf.eprintf "forge_tr error %s" @@ Tzfunc.Rp.string_of_error e ;
     Lwt.return_error e
@@ -1437,7 +1437,6 @@ let match_orders ?amount ~source ~contract order_left order_right =
       let mich = prim `Pair ~args:[m_left; signature_left; m_right; signature_right] in
       call
         ?amount
-        ~local_forge:false
         ~entrypoint:"match_orders"
         ~base:(EzAPI.BASE !endpoint)
         ~get_pk:(fun () -> Lwt.return_ok source.edpk)
@@ -1451,7 +1450,6 @@ let cancel_order ~source ~contract order =
   | Error err -> Lwt.fail_with @@ Printf.sprintf "mich order %s" @@ string_of_error err
   | Ok m ->
     call
-      ~local_forge:false
       ~entrypoint:"cancel"
       ~base:(EzAPI.BASE !endpoint)
       ~get_pk:(fun () -> Lwt.return_ok source.edpk)

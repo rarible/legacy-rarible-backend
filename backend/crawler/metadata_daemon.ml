@@ -99,7 +99,7 @@ let () =
                match r#token_metadata_id with
                | None -> Lwt.return_ok ()
                | Some id ->
-                 let token_metadata_id = int_of_string id in
+                 let token_metadata_id = Z.of_string id in
                  let> metadata =
                    retrieve_token_metadata
                      ~source ~token_metadata_id ~token_id:(Z.of_string r#token_id) in
@@ -127,7 +127,7 @@ let () =
           match r#token_metadata_id with
           | None -> Lwt.return_ok ()
           | Some id ->
-            let token_metadata_id = int_of_string id in
+            let token_metadata_id = Z.of_string id in
             let> metadata =
               retrieve_token_metadata
                 ~source:!node ~token_metadata_id ~token_id:(Z.of_string r#token_id) in

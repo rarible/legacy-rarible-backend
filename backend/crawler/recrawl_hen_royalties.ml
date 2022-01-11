@@ -15,7 +15,7 @@ let spec = [
 
 let update_royalties ?dbh ~node ~id ~contract token_id =
   let> r = Tzfunc.Node.get_big_map_value ~base:(EzAPI.BASE node) ~typ:(Tzfunc.Node.prim `nat)
-      (Z.to_int id) (Mint token_id) in
+      id (Mint token_id) in
   match r with
   | Error e ->
     Format.eprintf "%s@." (Tzfunc.Rp.string_of_error e);
