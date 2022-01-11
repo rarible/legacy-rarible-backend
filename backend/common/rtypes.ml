@@ -35,41 +35,44 @@ module A = struct
     if ms then s ^ ".000Z" else s ^ "Z"
   let cal_of_str s =
     let open CalendarLib in
-    let s = String.trim s in
-    let n = String.length s in
-    try
-      let y = int_of_string (String.sub s 0 4) in
-      let mo, d, h, mi, se, tz_sign, tz_h, tz_m, tz_s =
-        ref 1, ref 1, ref 0, ref 0, ref 0, ref `null, ref 0, ref 0, ref 0 in
-      if n >= 7 then (
-        mo := int_of_string (String.sub s 5 2);
-        if n >= 10 then (
-          d := int_of_string (String.sub s 8 2);
-          if n >= 13 then (
-            h := int_of_string (String.sub s 11 2);
-            if n >= 16 then (
-              mi := int_of_string (String.sub s 14 2);
-              if n >= 19 then (
-                se := int_of_string (String.sub s 17 2);
-                if n >= 20 then (
-                  if String.get s 19 = '-' then tz_sign := `neg
-                  else if String.get s 19 = '+' then tz_sign := `pos;
-                  if n >= 22 then (
-                    tz_h := int_of_string (String.sub s 20 2);
-                    if n >= 25 then (
-                      tz_m := int_of_string (String.sub s 23 2);
-                      if n >= 28 then tz_s := int_of_string (String.sub s 26 2)
-                    ))))))));
-      let c = Calendar.make y !mo !d !h !mi !se in
-      match !tz_sign with
-      | `null -> c
-      | `neg ->
-        let tz = Calendar.Period.make 0 0 0 !tz_h !tz_m !tz_s in
-        Calendar.add c tz
-      | `pos ->
-        let tz = Calendar.Period.(opp @@ make 0 0 0 !tz_h !tz_m !tz_s) in
-        Calendar.add c tz
-    with _ -> failwith (Format.sprintf "Cannot parse date %s" s)
+    match float_of_string_opt s with
+    | Some f -> Calendar.from_unixfloat f
+    | None ->
+      let s = String.trim s in
+      let n = String.length s in
+      try
+        let y = int_of_string (String.sub s 0 4) in
+        let mo, d, h, mi, se, tz_sign, tz_h, tz_m, tz_s =
+          ref 1, ref 1, ref 0, ref 0, ref 0, ref `null, ref 0, ref 0, ref 0 in
+        if n >= 7 then (
+          mo := int_of_string (String.sub s 5 2);
+          if n >= 10 then (
+            d := int_of_string (String.sub s 8 2);
+            if n >= 13 then (
+              h := int_of_string (String.sub s 11 2);
+              if n >= 16 then (
+                mi := int_of_string (String.sub s 14 2);
+                if n >= 19 then (
+                  se := int_of_string (String.sub s 17 2);
+                  if n >= 20 then (
+                    if String.get s 19 = '-' then tz_sign := `neg
+                    else if String.get s 19 = '+' then tz_sign := `pos;
+                    if n >= 22 then (
+                      tz_h := int_of_string (String.sub s 20 2);
+                      if n >= 25 then (
+                        tz_m := int_of_string (String.sub s 23 2);
+                        if n >= 28 then tz_s := int_of_string (String.sub s 26 2)
+                      ))))))));
+        let c = Calendar.make y !mo !d !h !mi !se in
+        match !tz_sign with
+        | `null -> c
+        | `neg ->
+          let tz = Calendar.Period.make 0 0 0 !tz_h !tz_m !tz_s in
+          Calendar.add c tz
+        | `pos ->
+          let tz = Calendar.Period.(opp @@ make 0 0 0 !tz_h !tz_m !tz_s) in
+          Calendar.add c tz
+      with _ -> failwith (Format.sprintf "Cannot parse date %s" s)
 
   type timestamp =
     CalendarLib.Calendar.t [@encoding Json_encoding.conv cal_to_str cal_of_str Json_encoding.string]
