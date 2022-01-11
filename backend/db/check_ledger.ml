@@ -45,7 +45,7 @@ let main () =
         Lwt.return_ok ())
       else
         let> v = Node.get_big_map_value ~block:!block ~typ ~base:(EzAPI.BASE !node)
-            (int_of_string r#ledger_id) value in
+            (Z.of_string r#ledger_id) value in
         match Option.map (EzEncoding.destruct Rtypes.micheline_type_short_enc) r#ledger_value, v with
         | Some `nat, Ok (Micheline (Mint z)) ->
           if z = r#amount then Format.printf "\027[0;32mOk\027[0m@."
