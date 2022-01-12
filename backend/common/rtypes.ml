@@ -205,11 +205,6 @@ type nft_item_meta = {
   nft_item_meta_animation : string option; [@opt]
 } [@@deriving encoding {title="NftItemMeta"; def_title}]
 
-type nft_item_royalties = {
-  nft_item_roy_onchain: bool option;
-  nft_item_roy_list: part list;
-} [@@deriving encoding {title="NftItemRoyalties"; def_title}]
-
 type nft_item = {
   nft_item_id : string ;
   nft_item_contract : A.address;
@@ -218,12 +213,18 @@ type nft_item = {
   nft_item_supply : A.big_integer;
   nft_item_lazy_supply : A.big_integer;
   nft_item_owners : A.address list;
-  nft_item_royalties : nft_item_royalties;
+  nft_item_royalties : part list;
+  nft_item_onchain_royalties: bool option;
   nft_item_date : A.date;
   nft_item_minted_at : A.date;
   nft_item_deleted : bool;
   nft_item_meta : nft_item_meta option; [@opt]
 } [@@deriving encoding {camel; title="NftItem"; def_title}]
+
+type nft_item_royalties = {
+  nft_item_royalties_royalties : part list;
+  nft_item_royalties_onchain: bool option;
+} [@@deriving encoding {title="NftItemRoyalties"; def_title}]
 
 type nft_items = {
   nft_items_total : int64; [@encoding A.uint53]
