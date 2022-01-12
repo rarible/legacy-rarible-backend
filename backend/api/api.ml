@@ -628,6 +628,24 @@ let get_nft_item_by_id (req, item_id) () =
    name="items_by_id";
    section=items_section}]
 
+let get_nft_item_royalties (_req, item_id) () =
+  match parse_item_id item_id with
+  | Error err -> return @@ Error err
+  | Ok (contract, token_id) ->
+    Db.Get.get_nft_item_royalties contract token_id >>= function
+    | Error (`hook_error "item not found") ->
+      return (Error {code=`ITEM_NOT_FOUND; message=item_id})
+    | Error db_err ->
+      let message = Crawlori.Rp.string_of_error db_err in
+      return (Error {code=`UNEXPECTED_API_ERROR; message})
+    | Ok r -> return_ok r
+[@@get
+  {path="/v0.1/items/{item_id_arg}/royalties";
+   output=nft_item_royalties_enc;
+   errors=[bad_request_case;unexpected_case;entity_not_found_case];
+   name="item_royalties";
+   section=items_section}]
+
 let get_nft_items_by_owner req () =
   match get_required_owner_param req with
   | Error err -> return (Error err)

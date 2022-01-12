@@ -644,13 +644,11 @@ let mk_nft_item dbh ?include_meta obj =
     let>? meta = match include_meta with
       | Some true -> mk_nft_item_meta dbh ~contract ~token_id
       | _ -> Lwt.return_ok None in
-    let nft_item_royalties =
+    let nft_item_royalties, nft_item_onchain_royalties =
       match EzEncoding.destruct parts_enc obj#royalties, Option.map (EzEncoding.destruct parts_enc) obj#royalties_metadata with
-      | [], Some ((_ :: _) as nft_item_roy_list) -> { nft_item_roy_onchain = Some false; nft_item_roy_list }
-      | [], _ -> { nft_item_roy_onchain = None; nft_item_roy_list = [] }
-      | nft_item_roy_list, _ ->
-        let onchain = contract <> "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton" in
-        { nft_item_roy_onchain = Some onchain; nft_item_roy_list } in
+      | [], Some ((_ :: _) as nft_item_roy_list) -> nft_item_roy_list, Some false
+      | [], _ -> [], None
+      | nft_item_roy_list, _ -> nft_item_roy_list, Some (contract <> "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton") in
     Lwt.return_ok {
       nft_item_id = obj#id ;
       nft_item_contract = contract ;
@@ -660,6 +658,7 @@ let mk_nft_item dbh ?include_meta obj =
       nft_item_lazy_supply = Z.zero ;
       nft_item_owners = List.filter_map (fun x -> x) @@ Option.value ~default:[] obj#owners ;
       nft_item_royalties ;
+      nft_item_onchain_royalties ;
       nft_item_date = obj#last ;
       nft_item_minted_at = obj#tsp ;
       nft_item_deleted = supply = Z.zero ;
@@ -687,6 +686,28 @@ let get_nft_item_by_id ?dbh ?include_meta contract token_id =
   | obj :: _ ->
     let>? nft_item = mk_nft_item dbh ?include_meta obj in
     Lwt.return_ok nft_item
+  | [] -> Lwt.return_error (`hook_error "item not found")
+
+let get_nft_item_royalties ?dbh contract token_id =
+  Format.eprintf "get_nft_item_royalties %s %s@." contract (Z.to_string token_id);
+  use dbh @@ fun dbh ->
+  let>? l = [%pgsql.object dbh
+      "select royalties, royalties_metadata \
+       from token_info t \
+       where main and contract = $contract and token_id = ${Z.to_string token_id}"] in
+  match l with
+  | obj :: _ ->
+    begin match EzEncoding.destruct parts_enc obj#royalties,
+                Option.map (EzEncoding.destruct parts_enc) obj#royalties_metadata with
+    | [], Some ((_ :: _) as nft_item_royalties_royalties) ->
+      Lwt.return_ok {nft_item_royalties_royalties; nft_item_royalties_onchain = Some false}
+    | [], _ ->
+      Lwt.return_ok {nft_item_royalties_royalties=[]; nft_item_royalties_onchain = None}
+    | nft_item_royalties_royalties, _ ->
+      Lwt.return_ok {nft_item_royalties_royalties;
+                     nft_item_royalties_onchain =
+                       Some (contract <> "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton")}
+    end
   | [] -> Lwt.return_error (`hook_error "item not found")
 
 let mk_nft_collection_name_symbol r =

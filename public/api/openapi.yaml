@@ -286,6 +286,45 @@ paths:
               schema:
                 $ref: '#/components/schemas/NftItem'
       security: []
+  /v0.1/items/{itemId}/royalties:
+    description: Get NFT item broyalties
+    get:
+      tags:
+      - nft-item-controller
+      description: Get NFT item broyalties
+      operationId: getNftItemRoyalties
+      parameters:
+      - name: itemId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EntityNotFound'
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadRequest'
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NftItemRoyalties'
+      security: []
   /v0.1/items/byOwner:
     description: Get NFT items by owner
     get:
@@ -1924,7 +1963,11 @@ components:
           items:
             $ref: '#/components/schemas/Address'
         royalties:
-          $ref: '#/components/schemas/NftItemRoyalties'
+          type: array
+          items:
+            $ref: '#/components/schemas/Part'
+        onchainRoyalties:
+          type: boolean
         date:
           type: string
           format: date-time
@@ -2004,14 +2047,14 @@ components:
     NftItemRoyalties:
       type: object
       properties:
-        onchain:
-          type: boolean
-        list:
+        royalties:
           type: array
           items:
             $ref: '#/components/schemas/Part'
+        onchain:
+          type: boolean
       required:
-      - list
+      - royalties
       additionalProperties: false
     NftItems:
       type: object
