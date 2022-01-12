@@ -35,22 +35,21 @@ let retrieve_token_metadata ~source ~token_metadata_id ~token_id =
   | None -> Lwt.return None
   | Some hash ->
     let> r = Tzfunc.Node.(
-        get_big_map_value_raw ~base:(EzAPI.BASE source) token_metadata_id hash) in
+        get_bigmap_value_raw ~base:(EzAPI.BASE source) token_metadata_id hash) in
     match r with
     | Error e ->
       Format.eprintf "Cannot retrieve metadata:\n%s@." (Tzfunc.Rp.string_of_error e);
       Lwt.return None
-    | Ok (Bytes _) | Ok (Other _) ->
+    | Ok None | Ok (Some (Bytes _)) | Ok (Some (Other _)) ->
       Format.eprintf "Wrong token metadata format@.";
       Lwt.return None
-    | Ok (Micheline m) ->
-      begin match Typed_mich.parse_value Contract_spec.token_metadata_field.Rtypes.bmt_value m with
-        | Ok (`tuple [`nat _; `assoc l]) ->
-          Lwt.return (Some (Parameters.parse_metadata l))
-        | _ ->
-          Format.eprintf "Wrong token metadata type@.";
-          Lwt.return None
-      end
+    | Ok ((Some Micheline m)) ->
+      match Typed_mich.parse_value Contract_spec.token_metadata_field.Rtypes.bmt_value m with
+      | Ok (`tuple [`nat _; `assoc l]) ->
+        Lwt.return (Some (Parameters.parse_metadata l))
+      | _ ->
+        Format.eprintf "Wrong token metadata type@.";
+        Lwt.return None
 
 let split l sources f =
   Format.eprintf "split %d item(s) from %d source(s) @."

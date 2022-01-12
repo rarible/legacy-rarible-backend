@@ -44,14 +44,14 @@ let main () =
         Format.printf "\027[0;33mLedger type unknown\027[0m@.";
         Lwt.return_ok ())
       else
-        let> v = Node.get_big_map_value ~block:!block ~typ ~base:(EzAPI.BASE !node)
+        let> v = Node.get_bigmap_value ~block:!block ~typ ~base:(EzAPI.BASE !node)
             (Z.of_string r#ledger_id) value in
         match Option.map (EzEncoding.destruct Rtypes.micheline_type_short_enc) r#ledger_value, v with
-        | Some `nat, Ok (Micheline (Mint z)) ->
+        | Some `nat, Ok (Some (Micheline (Mint z))) ->
           if z = r#amount then Format.printf "\027[0;32mOk\027[0m@."
           else Format.printf "\027[0;31mWrong %s %s\027[0m@." (Z.to_string r#amount) (Z.to_string z);
           Lwt.return_ok ()
-        | Some `address, Ok (Micheline (Mstring s)) ->
+        | Some `address, Ok (Some (Micheline (Mstring s))) ->
           if r#amount = Z.zero && s <> r#owner then Format.printf "\027[0;32mOk\027[0m@."
           else if r#amount = Z.one && s = r#owner then Format.printf "\027[0;32mOk\027[0m@."
           else Format.printf "\027[0;31mWrong %s\027[0m@." s;
