@@ -14,13 +14,13 @@ let spec = [
 ]
 
 let update_royalties ?dbh ~node ~id ~contract token_id =
-  let> r = Tzfunc.Node.get_big_map_value ~base:(EzAPI.BASE node) ~typ:(Tzfunc.Node.prim `nat)
+  let> r = Tzfunc.Node.get_bigmap_value ~base:(EzAPI.BASE node) ~typ:(Tzfunc.Node.prim `nat)
       id (Mint token_id) in
   match r with
   | Error e ->
     Format.eprintf "%s@." (Tzfunc.Rp.string_of_error e);
     Lwt.return_ok ()
-  | Ok (Micheline (Mprim {prim = `Pair; args = [Mstring account; Mint value]; _})) ->
+  | Ok (Some (Micheline (Mprim {prim = `Pair; args = [Mstring account; Mint value]; _}))) ->
     Db.Utils.update_hen_royalties ?dbh ~contract ~token_id ~account ~value ()
   | _ ->
     Format.eprintf "return type not understood@.";
