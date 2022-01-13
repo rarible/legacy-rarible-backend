@@ -16,6 +16,7 @@ export interface FillOrderRequest {
   payouts?: Array<Part>;
   origin_fees?: Array<Part>;
   infinite?: boolean;
+  use_all?: boolean;
   edpk?: string
 }
 
@@ -93,7 +94,7 @@ export async function fill_order(
   if (up==undefined) {
     const arg_approve =
       (make.asset_type.asset_class != "XTZ")
-      ? await approve_arg(provider, await get_address(provider), make, request.infinite)
+      ? await approve_arg(provider, await get_address(provider), make, request.use_all, request.infinite)
       : undefined
     let args = (arg_approve) ? [ arg_approve ] : []
     const amount =
