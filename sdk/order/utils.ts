@@ -94,23 +94,17 @@ export async function fill_royalties_payouts(provider : Provider, order: OrderFo
     : (assett.asset_class=="NFT") ? provider.config.nft_public
     : provider.config.mt_public
   let id = contract + ':' + assett.token_id.toString()
-  const r = await fetch(provider.config.api + '/items/' + id)
+  const r = await fetch(provider.config.api + '/items/' + id + '/royalties')
   if (r.ok) {
     const json = await r.json()
-    if (json.royalties) {
-      if (json.royalties.onchain) return order
-      else {
-        let payouts = json.royalties.list.map(function(x : { account: string, value: number }) {
-          return {...x, value: new BigNumber(x.value)}
-        })
-        let total : BigNumber = payouts.reduce((acc : BigNumber, x : Part ) => acc.plus(x.value), new BigNumber(0))
-        if (total.comparedTo(10000) > 0) throw new Error('payouts sum above 10000: ' + total.toString())
-        payouts = payouts.concat({ account: order.maker, value: (new BigNumber(10000)).minus(total) })
-        let data = { ...order.data, payouts }
-        return { ...order, data }
-      }
-    } else {
-      throw new Error("cannot get royalties for " + id)
-    }
+    if (json.onchain) return order
+    let payouts = json.royalties.map(function(x : { account: string, value: number }) {
+      return {...x, value: new BigNumber(x.value)}
+    })
+    let total : BigNumber = payouts.reduce((acc : BigNumber, x : Part ) => acc.plus(x.value), new BigNumber(0))
+    if (total.comparedTo(10000) > 0) throw new Error('payouts sum above 10000: ' + total.toString())
+    payouts = payouts.concat({ account: order.maker, value: (new BigNumber(10000)).minus(total) })
+    let data = { ...order.data, payouts }
+    return { ...order, data }
   } else throw new Error("cannot get royalties for " + id)
 }

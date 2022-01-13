@@ -14,8 +14,8 @@ let docs = List.map (fun (n, t, d) -> (n, (t, d, None, None))) @@ [
     "items_by_id", "getNftItemById", "Get NFT item by id" ;
     "items_by_owner", "getNftItemsByOwner", "Get NFT items by owner" ;
     "items_by_creator", "getNftItemsByCreator", "Get NFT items by creator" ;
-    "items_by_collection", "getNftItemsByCollection", "items_by_collection" ;
-    "item_royalties", "getNftItemRoyalties", "Get NFT item broyalties" ;
+    "items_by_collection", "getNftItemsByCollection", "Get NFT items by collection" ;
+    "item_royalties", "getNftItemRoyalties", "Get NFT item royalties" ;
 
     (* NFT collection controller *)
     "collections_generate_id", "generateNftTokenId", "collections_generate_id" ;
