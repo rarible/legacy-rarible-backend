@@ -1,4 +1,4 @@
-import { Provider, transfer, mint, burn, deploy_nft_private, deploy_mt_private, upsert_order, bid, sell, Part, AssetType, OrderForm, SellRequest, BidRequest, ExtendedAssetType, XTZAssetType, FTAssetType, TokenAssetType, approve_token, fill_order, get_public_key, order_of_json, salt, pk_to_pkh, get_address, DeployResult, sign, TezosProvider } from "../main"
+import { Provider, transfer, mint, burn, deploy_nft_private, deploy_mt_private, upsert_order, bid, sell, Part, AssetType, OrderForm, SellRequest, BidRequest, ExtendedAssetType, XTZAssetType, FTAssetType, TokenAssetType, fill_order, get_public_key, order_of_json, salt, pk_to_pkh, DeployResult, sign, TezosProvider, approve } from "../main"
 import { beacon_provider } from '../providers/beacon/beacon_provider'
 import { temple_provider } from '../providers/temple/temple_provider'
 import { kukai_provider } from '../providers/kukai/kukai_provider'
@@ -383,7 +383,7 @@ export default new Vue({
         this.approve.result = "invalid asset type"
       } else {
         const owner = await this.provider.tezos.address()
-        const op = await approve_token(this.provider, owner, { asset_type, value: new BigNumber(this.approve.value) })
+        const op = await approve(this.provider, owner, { asset_type, value: new BigNumber(this.approve.value) })
         if (!op) {
           this.approve.status = 'warning'
           this.approve.result = "asset already approved"
