@@ -25,7 +25,7 @@ async function main() {
     transfer_proxy: {type: 'string', default: 'KT1Qypf9A7DHoAeesu5hj8v6iKwHsJb1RUR2'},
     transfer_manager: {type: 'string', default: 'KT1DyDkW16XBuFzpLkXKraD46SAxQDrha5gm'},
     fee_receiver: {type: 'string'},
-    protocol_fee: {type: 'number', default: 300},
+    protocol_fee: {type: 'number', default: 0},
     wrapper: {type: 'string', default: 'KT1LkKaeLBvTBo6knGeN5RsEunERCaqVcLr9'},
   }).argv
 
