@@ -285,13 +285,51 @@ let insert_update_operator_all ~dbh ~op ~contract lt =
            values(${op.bo_hash}, ${op.bo_index}, ${op.bo_block}, ${op.bo_level}, \
            ${op.bo_tsp}, $source, $operator, $add, $contract) on conflict do nothing"]) lt
 
-let insert_metadata ~dbh ~op ~contract ~key ~value =
-  [%pgsql dbh
-      "insert into contract_updates(transaction, index, block, level, tsp, \
-       contract, metadata_key, metadata_value) \
-       values(${op.bo_hash}, ${op.bo_index}, ${op.bo_block}, ${op.bo_level}, \
-       ${op.bo_tsp}, $contract, $key, $value) \
-       on conflict do nothing"]
+let metadata_update dbh ~main ~contract ~block ~level ~tsp ?value key =
+  let metadata_enc =
+    EzEncoding.ignore_enc @@ Json_encoding.(obj2 (req "name" string) (opt "symbol" string)) in
+  if main then
+    let name, symbol = match key, value with
+      | "", Some value ->
+        begin try
+            let name, symbol = EzEncoding.destruct metadata_enc value in
+            Some name, symbol
+          with _ -> None, None
+        end
+      | "name", _ -> value, None
+      | "symbol", _ -> None, value
+      | _ -> None, None in
+    let>? metadata =
+      let>? l = [%pgsql dbh "select metadata from contracts where address = $contract"] in
+      one l in
+
+    let metadata = match value with
+      | None ->
+        Ezjsonm.value_to_string @@
+        Json_query.(replace [`Field key] `Null (Ezjsonm.value_from_string metadata))
+      | Some value ->
+        Ezjsonm.value_to_string @@
+        Json_query.(replace [`Field key] (`String value) (Ezjsonm.value_from_string metadata)) in
+    let name_none = Option.is_none name in
+    let symbol_none = Option.is_none symbol in
+    [%pgsql dbh
+        "update contracts set metadata = $metadata, \
+         name = case when $name_none then name else $?name end, \
+         symbol = case when $symbol_none then symbol else $?symbol end, \
+         last_block = $block, last_level = $level, last = $tsp where address = $contract"]
+  else Lwt.return_ok ()
+
+let insert_metadata ?(forward=false) ~dbh ~op ~contract ?value key =
+  if not forward then
+    [%pgsql dbh
+        "insert into contract_updates(transaction, index, block, level, tsp, \
+         contract, metadata_key, metadata_value) \
+         values(${op.bo_hash}, ${op.bo_index}, ${op.bo_block}, ${op.bo_level}, \
+         ${op.bo_tsp}, $contract, $key, $?value) \
+         on conflict do nothing"]
+  else
+    metadata_update dbh ~main:true ~contract ~block:op.bo_block ~level:op.bo_level
+      ~tsp:op.bo_tsp ?value key
 
 let insert_minter ~dbh ~op ~contract ~add a =
   let a = EzEncoding.construct Json_encoding.(obj1 (req (if add then "add" else "remove") string)) a in
@@ -765,7 +803,7 @@ let insert_nft ~dbh ~meta ~op ~contract ~nft ~entrypoint ?(forward=false) param 
     | Ok (Mint_tokens m) -> insert_mint ~dbh ~op ~contract m
     | Ok (Burn_tokens b) -> insert_burn ~dbh ~op ~contract b
     | Ok (Transfers t) -> insert_transfer ~dbh ~op ~contract t
-    | Ok (Metadata (key, value)) -> insert_metadata ~dbh ~op ~contract ~key ~value
+    | Ok (Metadata (key, value)) -> insert_metadata ~dbh ~op ~contract ~value ~forward key
     | Ok (Add_minter a) -> insert_minter ~dbh ~op ~contract ~add:true a
     | Ok (Remove_minter a) -> insert_minter ~dbh ~op ~contract ~add:false a
     | Ok (Token_uri_pattern s) -> insert_uri_pattern ~dbh ~op ~contract s
@@ -779,13 +817,24 @@ let insert_nft ~dbh ~meta ~op ~contract ~nft ~entrypoint ?(forward=false) param 
     let bm = {bm_id; bm_types = Contract_spec.token_metadata_field} in
     let metadata = Storage_diff.get_big_map_updates bm meta.op_lazy_storage_diff in
     insert_metadatas ~dbh ~op ~contract ~forward metadata in
-  match nft.nft_royalties_id with
+  let>? () = match nft.nft_royalties_id with
+    | None -> Lwt.return_ok ()
+    | Some bm_id ->
+      let bm = { bm_id; bm_types = Contract_spec.royalties_field } in
+      let royalties = Storage_diff.get_big_map_updates bm meta.op_lazy_storage_diff in
+      insert_royalties_bms ~dbh ~op ~contract ~forward royalties in
+  match nft.nft_meta_id with
   | None -> Lwt.return_ok ()
   | Some bm_id ->
-    let bm = { bm_id; bm_types = Contract_spec.royalties_field } in
-    let royalties = Storage_diff.get_big_map_updates bm meta.op_lazy_storage_diff in
-    insert_royalties_bms ~dbh ~op ~contract ~forward royalties
-
+    let bm = {bm_id; bm_types = Contract_spec.metadata_field} in
+    let metadata = Storage_diff.get_big_map_updates bm meta.op_lazy_storage_diff in
+    iter_rp (function
+        | `string key, Some (`bytes h) ->
+          let value = (Tzfunc.Crypto.hex_to_raw h :> string) in
+          if Parameters.decode value then insert_metadata ~dbh ~op ~contract ~forward ~value key
+          else Lwt.return_ok ()
+        | `string key, None -> insert_metadata ~dbh ~op ~contract ~forward key
+        | _ -> Lwt.return_ok ()) metadata
 
 let insert_transaction ~config ~dbh ~op ?(forward=false) tr =
   let contract = tr.destination in
@@ -1061,35 +1110,6 @@ let contract_updates_base dbh ~main ~contract ~block ~level ~tsp ~burn
       "update tokens set amount = amount + ${Z.to_string factor}::numeric * ${Z.to_string amount}::numeric \
        where token_id = ${Z.to_string token_id} and contract = $contract and owner = $account"]
 
-let metadata_enc =
-  EzEncoding.ignore_enc @@ Json_encoding.(obj2 (req "name" string) (opt "symbol" string))
-
-let metadata_update dbh ~main ~contract ~block ~level ~tsp ~key ~value =
-  if main then
-    let name, symbol =
-      if key = "" then
-        try
-          let name, symbol = EzEncoding.destruct metadata_enc value in
-          Some name, symbol
-        with _ -> None, None
-      else if key = "name" then Some value, None
-      else if key = "symbol" then None, Some value
-      else None, None
-    in
-    let>? metadata =
-      let>? l = [%pgsql dbh "select metadata from contracts where address = $contract"] in
-      one l in
-    let metadata = Ezjsonm.value_to_string @@
-      Json_query.(replace [`Field key] (`String value) (Ezjsonm.value_from_string metadata)) in
-    let name_none = Option.is_none name in
-    let symbol_none = Option.is_none symbol in
-    [%pgsql dbh
-        "update contracts set metadata = $metadata, \
-         name = case when $name_none then name else $?name end, \
-         symbol = case when $symbol_none then symbol else $?symbol end, \
-         last_block = $block, last_level = $level, last = $tsp where address = $contract"]
-  else Lwt.return_ok ()
-
 let minter_update dbh ~main ~contract ~block ~level ~tsp minter =
   let enc = Json_encoding.(union [
       case (obj1 (req "add" string)) (function `add s -> Some s | _ -> None) (fun s -> `add s);
@@ -1154,7 +1174,7 @@ let contract_updates dbh main l =
           Lwt.return_ok @@
           (Produce.order_event_item dbh account contract token_id) :: events
         | _, _, Some key, Some value, _, _ ->
-          let>? () = metadata_update dbh ~main ~contract ~block ~level ~tsp ~key ~value in
+          let>? () = metadata_update dbh ~main ~contract ~block ~level ~tsp ~value key in
           Lwt.return_ok @@
           (Produce.update_collection_event dbh contract) :: events
         | _, _, _, _, Some minter, _ ->
