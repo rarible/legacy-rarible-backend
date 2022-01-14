@@ -1,5 +1,6 @@
 import { Provider, Asset, NFTAssetType, MultipleAssetType, asset_to_json, asset_of_json } from "../common/base"
 import BigNumber from "bignumber.js"
+import fetch from "node-fetch"
 const getRandomValues = require('get-random-values')
 
 export interface Part {
@@ -85,7 +86,6 @@ export function salt() : string {
 }
 
 export async function fill_royalties_payouts(provider : Provider, order: OrderForm) : Promise<OrderForm> {
-  if (order.data.payouts.length != 0) return order
   let assett : NFTAssetType | MultipleAssetType | undefined ;
   if ((order.make.asset_type.asset_class=="NFT" || order.make.asset_type.asset_class=="MT") && order.take.asset_type.asset_class!="NFT" && order.take.asset_type.asset_class!="MT") {
     assett = order.make.asset_type }
@@ -98,12 +98,25 @@ export async function fill_royalties_payouts(provider : Provider, order: OrderFo
   if (r.ok) {
     const json = await r.json()
     if (json.onchain) return order
-    let payouts = json.royalties.map(function(x : { account: string, value: number }) {
+    let royalties_payouts = json.royalties.map(function(x : { account: string, value: number }) {
       return {...x, value: new BigNumber(x.value)}
     })
-    let total : BigNumber = payouts.reduce((acc : BigNumber, x : Part ) => acc.plus(x.value), new BigNumber(0))
-    if (total.comparedTo(10000) > 0) throw new Error('payouts sum above 10000: ' + total.toString())
-    payouts = payouts.concat({ account: order.maker, value: (new BigNumber(10000)).minus(total) })
+    const royalties_total : BigNumber = royalties_payouts.reduce((acc : BigNumber, x : Part ) => acc.plus(x.value), new BigNumber(0))
+    if (royalties_total.comparedTo(10000) > 0) throw new Error('royalties sum above 10000: ' + royalties_total.toString())
+    const remaining = (new BigNumber(10000)).minus(royalties_total)
+    let new_payouts : Part[] = []
+    if (order.data.payouts.length == 0) {
+      new_payouts = [ { account: order.maker, value: remaining } ]
+    } else {
+      new_payouts = order.data.payouts.map(function(x : Part) {
+        return { ...x, value : x.value.times(remaining).div(10000).integerValue(BigNumber.ROUND_FLOOR) }
+      })
+      const remaining2 = new_payouts.reduce((acc : BigNumber, x : Part ) => acc.plus(x.value), new BigNumber(0))
+      if (!remaining2.eq(remaining)) {
+        new_payouts[0] = { ...new_payouts[0], value: new_payouts[0].value.plus(remaining.minus(remaining2)) }
+      }
+    }
+    const payouts = new_payouts.concat(royalties_payouts)
     let data = { ...order.data, payouts }
     return { ...order, data }
   } else throw new Error("cannot get royalties for " + id)

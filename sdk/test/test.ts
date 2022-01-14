@@ -1,4 +1,4 @@
-import { deploy_fa1, mint, make_permit, add_permit, send, sign, StorageFA2, of_hex, storage, hex_to_uint8array, b58enc, Provider, op_to_kt1 } from "../main"
+import { deploy_fa1, mint, make_permit, add_permit, send, sign, StorageFA2, of_hex, storage, hex_to_uint8array, b58enc, Provider, op_to_kt1, Asset, Part, OrderForm, OrderRaribleV2DataV1, fill_royalties_payouts } from "../main"
 import { in_memory_provider } from '../providers/in_memory/in_memory_provider'
 import BigNumber from "bignumber.js"
 import { MichelsonData, MichelsonType, packDataBytes } from "@taquito/michel-codec"
@@ -20,7 +20,7 @@ async function main() {
       fees: new BigNumber(0),
       nft_public: "",
       mt_public: "",
-      api: "https://rarible-api.functori.com/v0.1/",
+      api: "https://tezos-api.rarible.org/v0.1",
       api_permit: "http://localhost:8081/v0.1/",
       permit_whitelist: [],
       wrapper: 'KT1LkKaeLBvTBo6knGeN5RsEunERCaqVcLr9',
@@ -35,7 +35,7 @@ async function main() {
     }
 
   // await mint(provider, "KT1VYBd25dw5GjYqPM8T8My6b4g5c4cd4hwu", {tz1ibJRnL6hHjAfmEzM7QtGyTsS6ZtHdgE2S: 10000n}, 100n, 101n)
-    console.log(op_to_kt1('ooraPaZtEMbQAM885Mhpc2jPRVJCxGchu5ZPJ9ZS2eK5p4VcJxP'))
+    // console.log(op_to_kt1('ooraPaZtEMbQAM885Mhpc2jPRVJCxGchu5ZPJ9ZS2eK5p4VcJxP'))
 
   //   const st : StorageFA2 = await storage(provider, "KT1Rgf9RNW7gLj7JGn98yyVM34S4St9eudMC")
   //   let id = st.operators.toString()
@@ -71,21 +71,48 @@ async function main() {
 
     // const s = await sign(provider, "I would like to save like for itemId: 0xf5de760f2e916647fd766b4ad9e85ff943ce3a2b:16440")
     // console.log(s)
-    const op = await deploy_fa1(provider, await provider.tezos.address(), new BigNumber(1000), 2)
+    // const op = await deploy_fa1(provider, await provider.tezos.address(), new BigNumber(1000), 2)
 
     // const op = await send(provider, {
     //   destination: "KT1XZCojvmT858LXRmgAa7NFqAFkS35hs4fH",
     //   entrypoint: 'approve',
     //   parameter: [ {string: 'tz1iA1KggftRjKtAxQs9QbGra2YdsB5MZmgX' }, {int: "42"} ] })
 
-    console.log(op)
-    await op.confirmation()
+    // console.log(op)
+    // await op.confirmation()
 
     // const st : StorageFA1_2 = await provider.tezos.storage('KT1L5WyeKsBMTvseptzcX9Vtbn7Qw4naW98X')
     // const v : any = await st.token_metadata.get('0')
     // console.log(v)
     // console.log(v[Object.keys(v)[1]].get('decimals'))
     // console.log(of_hex(v[Object.keys(v)[1]].get('decimals')))
+
+    const make : Asset = {
+      asset_type: { asset_class: 'NFT', contract: "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton" , token_id: new BigNumber(441685) },
+      value: new BigNumber(1)
+    }
+
+    const take : Asset = {
+      asset_type: { asset_class: 'XTZ' },
+      value: new BigNumber(1)
+    }
+
+    const payouts : Part[] = [
+      { account: "tz1Mxsc66En4HsVHr6rppYZW82ZpLhpupToC", value: new BigNumber(7005) },
+      { account: "tz1iQ3DU476h5EUULD1e5yfuiYyk1JNR6HbY", value: new BigNumber(2995) }
+    ]
+    const data : OrderRaribleV2DataV1 = {
+      data_type: "V1", payouts, origin_fees: []
+    }
+    const order : OrderForm = {
+      type: "RARIBLE_V2",
+      maker: "tz1Mxsc66En4HsVHr6rppYZW82ZpLhpupToC",
+      maker_edpk: "edpkuaNBQd9rgqeDHUuCVpwRLFBK8DzneLVLLrFTKmam8A7BAyYir9",
+      make, take, salt: '', data
+    }
+    console.log(JSON.stringify(order, null, 2))
+    const order2 = await fill_royalties_payouts(provider, order)
+    console.log(JSON.stringify(order2, null, 2))
 
   } catch (e) {
     console.error(e)

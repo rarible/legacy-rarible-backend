@@ -287,11 +287,11 @@ paths:
                 $ref: '#/components/schemas/NftItem'
       security: []
   /v0.1/items/{itemId}/royalties:
-    description: Get NFT item broyalties
+    description: Get NFT item royalties
     get:
       tags:
       - nft-item-controller
-      description: Get NFT item broyalties
+      description: Get NFT item royalties
       operationId: getNftItemRoyalties
       parameters:
       - name: itemId
@@ -426,11 +426,11 @@ paths:
                 $ref: '#/components/schemas/NftItems'
       security: []
   /v0.1/items/byCollection:
-    description: items_by_collection
+    description: Get NFT items by collection
     get:
       tags:
       - nft-item-controller
-      description: items_by_collection
+      description: Get NFT items by collection
       operationId: getNftItemsByCollection
       parameters:
       - name: collection
