@@ -286,23 +286,10 @@ let insert_update_operator_all ~dbh ~op ~contract lt =
            ${op.bo_tsp}, $source, $operator, $add, $contract) on conflict do nothing"]) lt
 
 let metadata_update dbh ~main ~contract ~block ~level ~tsp ?value key =
-  let metadata_enc =
-    EzEncoding.ignore_enc @@ Json_encoding.(obj2 (req "name" string) (opt "symbol" string)) in
   if main then
-    let name, symbol = match key, value with
-      | "", Some value ->
-        begin try
-            let name, symbol = EzEncoding.destruct metadata_enc value in
-            Some name, symbol
-          with _ -> None, None
-        end
-      | "name", _ -> value, None
-      | "symbol", _ -> None, value
-      | _ -> None, None in
     let>? metadata =
       let>? l = [%pgsql dbh "select metadata from contracts where address = $contract"] in
       one l in
-
     let metadata = match value with
       | None ->
         Ezjsonm.value_to_string @@
@@ -310,12 +297,8 @@ let metadata_update dbh ~main ~contract ~block ~level ~tsp ?value key =
       | Some value ->
         Ezjsonm.value_to_string @@
         Json_query.(replace [`Field key] (`String value) (Ezjsonm.value_from_string metadata)) in
-    let name_none = Option.is_none name in
-    let symbol_none = Option.is_none symbol in
     [%pgsql dbh
         "update contracts set metadata = $metadata, \
-         name = case when $name_none then name else $?name end, \
-         symbol = case when $symbol_none then symbol else $?symbol end, \
          last_block = $block, last_level = $level, last = $tsp where address = $contract"]
   else Lwt.return_ok ()
 
@@ -968,20 +951,18 @@ let insert_origination ?(forward=false) config dbh op ori =
     let ledger_value = EzEncoding.construct micheline_type_short_enc nft.nft_ledger.bm_types.bmt_value in
     Format.printf "\027[0;93morigination %s (%s, %s)\027[0m@."
       (Utils.short kt1) kind (EzEncoding.construct nft_ledger_enc nft);
-    let name = List.assoc_opt "name" metadata in
-    let symbol = List.assoc_opt "symbol" metadata in
     let metadata = EzEncoding.construct Json_encoding.(assoc string) metadata in
     let>? () = [%pgsql dbh
         "insert into contracts(kind, address, owner, block, level, tsp, \
          last_block, last_level, last, ledger_id, ledger_key, ledger_value, \
          uri_pattern, token_metadata_id, metadata_id, royalties_id, \
-         metadata, name, symbol, main) \
+         metadata, main) \
          values($kind, $kt1, $?owner, ${op.bo_block}, ${op.bo_level}, \
          ${op.bo_tsp}, ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, \
          ${Z.to_string nft.nft_ledger.bm_id}, \
          $ledger_key, $ledger_value, $?uri, $?{Option.map Z.to_string nft.nft_token_meta_id}, \
          $?{Option.map Z.to_string nft.nft_meta_id}, $?{Option.map Z.to_string nft.nft_royalties_id}, \
-         $metadata, $?name, $?symbol, $forward) \
+         $metadata, $forward) \
          on conflict do nothing"] in
     let open Crawlori.Config in
     config.extra.contracts <- SMap.add kt1 nft config.extra.contracts;
@@ -1174,6 +1155,13 @@ let contract_updates dbh main l =
           Lwt.return_ok @@
           (Produce.order_event_item dbh account contract token_id) :: events
         | _, _, Some key, Some value, _, _ ->
+          begin if main then
+              match key with
+              | "" ->
+                Metadata.insert_tzip16_metadata ~dbh ~forward:main ~contract ~block ~level ~tsp value
+              | _ -> Lwt.return_ok ()
+            else Lwt.return_ok ()
+          end >>=? fun () ->
           let>? () = metadata_update dbh ~main ~contract ~block ~level ~tsp ~value key in
           Lwt.return_ok @@
           (Produce.update_collection_event dbh contract) :: events
@@ -1455,8 +1443,12 @@ let set_main _config ?(forward=false) dbh {Hooks.m_main; m_hash} =
     let>? () =
       [%pgsql dbh
           "update tzip21_creators set main = $m_main where block = $m_hash"] in
+    let>? collections_name =
+      [%pgsql dbh
+          "update tzip16_metadata set main = $m_main \
+           where block = $m_hash returning contract, name"] in
     Lwt.return_ok (fun () ->
-        let>? () = Produce.collection_events m_main collections in
+        let>? () = Produce.collection_events m_main collections collections_name in
         let>? () = Produce.cancel_events dbh m_main @@ sort cancels in
         let>? () = Produce.match_events dbh m_main @@ sort matches in
         let>? () = Produce.nft_activity_events m_main @@ sort nactivities in

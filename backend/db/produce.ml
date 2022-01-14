@@ -124,14 +124,18 @@ let nft_activity_events main l =
       else Lwt.return_ok ())
     l
 
-let collection_events main l =
+let collection_events main collections names =
   iter_rp (fun r ->
       if main then
-        match Get.mk_nft_collection r with
+        let name =
+          match List.assoc_opt r#address names with
+          | None | Some None -> None
+          | Some Some s -> Some s in
+        match Get.mk_nft_collection_with_name ?name r with
         | Ok c ->
           nft_collection_event c
         | Error err ->
           Printf.eprintf "couldn't produce collection event %S\n%!" @@ Crp.string_of_error err ;
           Lwt.return_ok ()
       else Lwt.return_ok ())
-    l
+    collections

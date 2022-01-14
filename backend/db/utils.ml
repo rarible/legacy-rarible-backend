@@ -12,12 +12,12 @@ let get_level ?dbh () =
   | Some level -> Lwt.return_ok @@ Int32.to_int level
   | None -> Lwt.return_error (`hook_error "no level")
 
-let is_op_included ?dbh hash =
+let is_transaction_included ?dbh hash =
   use dbh @@ fun dbh ->
   let>? t =
-    [%pgsql.object dbh "select hash from transactions where hash = $hash and main"] in
+    [%pgsql dbh "select transaction from contract_updates where transaction = $hash and main"] in
   let>? o =
-    [%pgsql.object dbh "select hash from originations where hash = $hash and main"] in
+    [%pgsql dbh "select transaction from token_updates where transaction = $hash and main"] in
   Lwt.return_ok (o <> [] || t <> [])
 
 let is_collection_crawled ?dbh hash =

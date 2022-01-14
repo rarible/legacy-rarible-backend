@@ -75,6 +75,43 @@ let get_json ?(source="https://rarible.mypinata.cloud/") ?(quiet=false) ?timeout
       end
     | Error (c, str) -> Lwt.return_error (c, str)
 
+let get_contract_metadata ?(source="https://rarible.mypinata.cloud/") ?(quiet=false) ?timeout raw =
+  if not quiet then Format.eprintf "get_contract_json %s@." raw ;
+  let msg = if not quiet then Some "get_contract_json" else None in
+  (* 3 ways to recovers metadata :directly json, ipfs link and http(s) link *)
+  try
+    Lwt.return_ok (EzEncoding.destruct tzip16_metadata_enc raw)
+  with _ ->
+    begin
+      let proto = try String.sub raw 0 6 with _ -> "" in
+      if proto = "https:" || proto = "http:/" then
+        let|>? json = get_or_timeout ?timeout (EzAPI.URL raw) in
+        json
+      else if proto = "ipfs:/" then
+        let url = try String.sub raw 7 ((String.length raw) - 7) with _ -> "" in
+        let fs, url = try
+            let may_fs = String.sub url 0 5 in
+            if may_fs = "ipfs/" then
+              "ipfs/", String.sub url 5 ((String.length raw) - 5)
+            else if may_fs = "ipns/" then
+              "ipns/", String.sub url 5 ((String.length raw) - 5)
+            else "ipfs/", url
+          with _ -> "", url in
+        let uri = Printf.sprintf "%s%s%s" source fs url in
+        let|>? json = get_or_timeout ?timeout ?msg (EzAPI.URL uri) in
+        json
+      else Lwt.return_error (0, Some (Printf.sprintf "unknow scheme %S" proto))
+    end >>= function
+    | Ok json ->
+      begin try
+          let metadata = EzEncoding.destruct tzip16_metadata_enc json in
+          Lwt.return_ok metadata
+        with exn ->
+          Format.eprintf "%s@." @@ Printexc.to_string exn ;
+          Lwt.return_error (-1, None)
+      end
+    | Error (c, str) -> Lwt.return_error (c, str)
+
 let insert_mint_metadata_creators dbh ?(forward=false) ~contract ~token_id ~block ~level ~tsp metadata =
   match metadata.tzip21_tm_creators with
   | Some (CParts l) ->
@@ -302,3 +339,52 @@ let insert_token_metadata ?forward ~dbh ~block ~level ~tsp ~contract (token_id, 
       let>? () = insert_mint_metadata dbh ?forward ~contract ~token_id ~block ~level ~tsp metadata in
       Lwt.return_ok metadata.tzip21_tm_royalties in
   Lwt.return_ok (json, uri, royalties)
+
+let insert_tzip16_metadata ?(forward=false) ~dbh ~block ~level ~tsp ~contract metadata =
+  let name = match metadata.tzip16_name with
+    | None -> None
+    | Some n -> if Parameters.decode n then Some n else None in
+  let description = match metadata.tzip16_description with
+    | None -> None
+    | Some n -> if Parameters.decode n then Some n else None in
+  let version = match metadata.tzip16_version with
+    | None -> None
+    | Some n -> if Parameters.decode n then Some n else None in
+  let license = Ezjsonm.value_to_string metadata.tzip16_license in
+  let authors = match metadata.tzip16_authors with
+    | None -> None
+    | Some l ->
+      Some (List.map (fun a -> if Parameters.decode a then Some a else None) l) in
+  let homepage = match metadata.tzip16_homepage with
+    | None -> None
+    | Some n -> if Parameters.decode n then Some n else None in
+  let source = Ezjsonm.value_to_string metadata.tzip16_license in
+  let interfaces = match metadata.tzip16_interfaces with
+    | None -> None
+    | Some l ->
+      Some (List.map (fun a -> if Parameters.decode a then Some a else None) l) in
+  let errors = Ezjsonm.value_to_string metadata.tzip16_license in
+  let views = Ezjsonm.value_to_string metadata.tzip16_license in
+  [%pgsql dbh
+      "insert into tzip16_metadata(contract,block,level,tsp,main,name,\
+       description,version,license,authors,homepage,source,interfaces,\
+       errors,views) \
+       values ($contract,$block,$level,$tsp,$forward,$?name,$?description, \
+       $?version, $license,$?authors,$?homepage,$source,$?interfaces,\
+       $errors,$views) \
+       on conflict (contract) do update set \
+       block=$block,level=$level,tsp=$tsp,main=$forward,name=$?name,\
+       description=$?description,version=$?version,\
+       license=$license,authors=$?authors,\
+       homepage=$?homepage,source=$source,\
+       interfaces=$?interfaces,errors=$errors,views=$views \
+       where tzip16_metadata.contract = $contract"]
+
+let insert_tzip16_metadata ?forward ~dbh ~block ~level ~tsp ~contract value =
+  get_contract_metadata value >>= function
+  | Ok metadata ->
+    insert_tzip16_metadata ~dbh ?forward ~contract ~block ~level ~tsp metadata
+  | Error (code, str) ->
+    Printf.eprintf "Cannot get metadata from url: %d %s\n%!"
+      code (match str with None -> "None" | Some s -> s);
+    Lwt.return_ok ()

@@ -614,9 +614,10 @@ let search_nft_collections_by_owner ?dbh ?continuation ?(size=50) owner =
   let no_continuation, collection =
     continuation = None, (match continuation with None -> "" | Some c -> c) in
   let>? l = [%pgsql.object dbh
-      "select address, owner, metadata, name, symbol, kind, ledger_key, \
-       ledger_value, minters from contracts where \
-       main and owner = $owner and \
+      "select address, owner, metadata, kind, ledger_key, m.name, \
+       ledger_value, minters from contracts c \
+       left join tzip16_metadata m on m.contract = c.address \
+       where c.main and owner = $owner and \
        ((ledger_key = '\"nat\"' and ledger_value = '\"address\"') \
        or (ledger_key = '[ \"address\", \"nat\"]' and ledger_value = '\"nat\"') \
        or (ledger_key = '[\"nat\", \"address\"]' and ledger_value = '\"nat\"')) and \
@@ -640,8 +641,10 @@ let get_nft_all_collections ?dbh ?continuation ?(size=50) () =
   let no_continuation, collection =
     continuation = None, (match continuation with None -> "" | Some c -> c) in
   let>? l = [%pgsql.object dbh
-      "select address, owner, metadata, name, symbol, kind, ledger_key, \
-       ledger_value, minters from contracts where main and \
+      "select address, owner, metadata, kind, ledger_key, m.name, \
+       ledger_value, minters from contracts c \
+       left join tzip16_metadata m on m.contract = c.address \
+       where c.main and \
        ((ledger_key = '\"nat\"' and ledger_value = '\"address\"') \
        or (ledger_key = '[ \"address\", \"nat\"]' and ledger_value = '\"nat\"') \
        or (ledger_key = '[\"nat\", \"address\"]' and ledger_value = '\"nat\"')) and \

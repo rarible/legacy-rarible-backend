@@ -1216,3 +1216,16 @@ type tezos_domain = {
   td_owner: A.address;
   td_token_id: A.big_integer;
 } [@@deriving encoding {title="TezosDomain"; def_title}]
+
+type tzip16_metadata = {
+  tzip16_name : (string [@encoding string_or_string_array_enc]) option ;
+  tzip16_description : string option ;
+  tzip16_version : string option ;
+  tzip16_license : Json_repr.ezjsonm [@dft `A []] ;
+  tzip16_authors : string list option ;
+  tzip16_homepage : string option ;
+  tzip16_source : Json_repr.ezjsonm [@dft `A []] ;
+  tzip16_interfaces : string list option ;
+  tzip16_errors : Json_repr.ezjsonm [@dft `A []] ;
+  tzip16_views : Json_repr.ezjsonm [@dft `A []] ;
+} [@@deriving encoding {camel; option="option"; ignore}]
