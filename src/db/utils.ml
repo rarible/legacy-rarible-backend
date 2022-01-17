@@ -365,13 +365,17 @@ let update_contract_metadata
               Format.eprintf "  can't find tezos-storage for metadata %s@." key ;
               Lwt.return_ok ()
             | Some m ->
-              let metadata_tzip = EzEncoding.destruct tzip16_metadata_enc m in
-              use dbh @@ fun dbh ->
-              let>? () =
-                Metadata.insert_tzip16_metadata_data
-                  ~dbh ~forward:true ~contract ~block ~level ~tsp metadata_tzip in
-              Format.eprintf "  OK@." ;
-              Lwt.return_ok ()
+              try
+                let metadata_tzip = EzEncoding.destruct tzip16_metadata_enc m in
+                use dbh @@ fun dbh ->
+                let>? () =
+                  Metadata.insert_tzip16_metadata_data
+                    ~dbh ~forward:true ~contract ~block ~level ~tsp metadata_tzip in
+                Format.eprintf "  OK@." ;
+                Lwt.return_ok ()
+              with _ ->
+                Format.eprintf "  can't parse tzip16 metadata in %s@." m ;
+                Lwt.return_ok ()
           end
         | _ ->
           let> re = Metadata.get_contract_metadata ~quiet:true uri in
