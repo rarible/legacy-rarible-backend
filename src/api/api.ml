@@ -73,7 +73,8 @@ let end_date_param = pint ~enc:A.uint53 "endDate"
 let source_param = pstring "source"
 let status_param = pstring ~enc:(Json_encoding.list order_status_enc) "status"
 let currency_param = pstring "currencyId"
-let sort_param = pstring ~enc:activity_sort_enc "sort"
+let activity_sort_param = pstring ~enc:activity_sort_enc "sort"
+let order_sort_param = pstring ~enc:order_sort_enc "sort"
 
 let hash_arg = EzAPI.Arg.string "hash"
 let item_id_arg = EzAPI.Arg.string "itemId"
@@ -433,14 +434,23 @@ let get_currency_param req =
         mk_invalid_argument currency_param "must be XTZ, ADDRESS or ADDRESS:TOKENID"
     end
 
-let get_sort_param req =
-  match EzAPI.Req.find_param sort_param req with
+let get_activity_sort_param req =
+  match EzAPI.Req.find_param activity_sort_param req with
   | None -> Ok None
   | Some str ->
     try
       Ok (Some (EzEncoding.destruct activity_sort_enc (Format.sprintf "%S" str)))
     with _ ->
-      mk_invalid_argument sort_param "must be LATEST_FIRST or EARLIEST_FIRST"
+      mk_invalid_argument activity_sort_param "must be LATEST_FIRST or EARLIEST_FIRST"
+
+let get_order_sort_param req =
+  match EzAPI.Req.find_param order_sort_param req with
+  | None -> Ok None
+  | Some str ->
+    try
+      Ok (Some (EzEncoding.destruct order_sort_enc (Format.sprintf "%S" str)))
+    with _ ->
+      mk_invalid_argument order_sort_param "must be LATEST_FIRST or EARLIEST_FIRST"
 
 (* (\* gateway-controller *\)
  * let create_gateway_pending_transactions _req _input =
@@ -483,7 +493,7 @@ let get_sort_param req =
 (* nft-activity-controller *)
 
 let get_nft_activities req input =
-  match get_sort_param req with
+  match get_activity_sort_param req with
   | Error err -> return @@ Error err
   | Ok sort ->
     match get_size_param req with
@@ -501,7 +511,7 @@ let get_nft_activities req input =
           return (Ok res)
 [@@post
   {path="/v0.1/nft/activities/search";
-   params=[sort_param;size_param;continuation_param];
+   params=[activity_sort_param;size_param;continuation_param];
    input=nft_activity_filter_enc;
    output=nft_activities_enc A.big_decimal_enc;
    errors=[bad_request_case; unexpected_case];
@@ -1001,7 +1011,7 @@ let get_orders_all req () =
   match get_origin_param req with
   | Error err -> return @@ Error err
   | Ok origin ->
-    match get_sort_param req with
+    match get_order_sort_param req with
     | Error err -> return @@ Error err
     | Ok sort ->
       match get_status_param req with
@@ -1022,7 +1032,7 @@ let get_orders_all req () =
               return_ok res
 [@@get
   {path="/v0.1/orders/all";
-   params=[origin_param;sort_param;status_param;size_param;continuation_param];
+   params=[origin_param;order_sort_param;status_param;size_param;continuation_param];
    output=orders_pagination_enc A.big_decimal_enc;
    errors=[bad_request_case;unexpected_case];
    name="orders_all";
@@ -1339,7 +1349,7 @@ let get_currencies_by_sell_orders_of_item req () =
 
 (* order-activity-controller *)
 let get_order_activities req input =
-  match get_sort_param req with
+  match get_activity_sort_param req with
   | Error err -> return @@ Error err
   | Ok sort ->
     match get_size_param req with
@@ -1356,7 +1366,7 @@ let get_order_activities req input =
           return_ok (Balance.dec_order_activities ~d res)
 [@@post
   {path="/v0.1/order/activities/search";
-   params=[sort_param;size_param;continuation_param];
+   params=[activity_sort_param;size_param;continuation_param];
    name="get_order_activities";
    input=order_activity_filter_enc;
    output=order_activities_enc A.big_decimal_enc;

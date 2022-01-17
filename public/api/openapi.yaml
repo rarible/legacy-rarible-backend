@@ -742,7 +742,7 @@ paths:
         in: query
         required: false
         schema:
-          $ref: '#/components/schemas/ActivitySort'
+          $ref: '#/components/schemas/OrderSort'
       - name: status
         in: query
         required: false
@@ -2708,6 +2708,11 @@ components:
       - payouts
       - dataType
       additionalProperties: false
+    OrderSort:
+      type: string
+      enum:
+      - LATEST_FIRST
+      - EARLIEST_FIRST
     OrderStatus:
       type: string
       enum:

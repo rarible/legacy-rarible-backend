@@ -1204,6 +1204,11 @@ type activity_sort =
   | EARLIEST_FIRST
 [@@deriving encoding {enum;title="ActivitySort"; def_title}]
 
+type order_sort =
+  | OLATEST_FIRST
+  | OEARLIEST_FIRST
+[@@deriving encoding {enum;title="OrderSort"; def_title}]
+
 type ids = { ids : string list } [@@deriving encoding {title="OrderIds"; def_title}]
 
 type tezos_domain = {
