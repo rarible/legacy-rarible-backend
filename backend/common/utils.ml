@@ -539,13 +539,13 @@ let rarible_meta_of_tzip21_meta meta =
       nft_item_meta_attributes =
         rarible_attributes_of_tzip21_attributes m.tzip21_tm_attributes ;
       nft_item_meta_image =
-        begin match m.tzip21_tm_display_uri with
+        begin match m.tzip21_tm_artifact_uri with
           | Some _ as uri -> uri
           | None ->
-            begin match m.tzip21_tm_thumbnail_uri with
+            begin match m.tzip21_tm_display_uri with
               | Some _ as uri -> uri
               | None ->
-                begin match m.tzip21_tm_artifact_uri with
+                begin match m.tzip21_tm_thumbnail_uri with
                   | Some _ as uri -> uri
                   | None -> None
                 end
