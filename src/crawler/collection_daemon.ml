@@ -53,10 +53,7 @@ let () =
       let>? metadata_uri =
         if not !retrieve then
           let l = EzEncoding.destruct Json_encoding.(assoc string) r#metadata in
-          Lwt.return_ok @@ begin match List.assoc_opt "" l with
-            | None -> None
-            | Some uri -> Some uri
-          end
+          Lwt.return_ok @@ List.assoc_opt "" l
         else
           match r#metadata_id with
           | None -> Lwt.return_ok None
