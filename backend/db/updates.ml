@@ -463,6 +463,25 @@ let upgrade_9_to_10 dbh version =
     ~downgrade:[ "drop index token_info_block_index" ] [
     "create index token_info_block_index on token_info(block)" ]
 
+let upgrade_10_to_11 dbh version =
+  EzPG.upgrade ~dbh ~version
+    ~downgrade:[
+      "drop table tzip16_metadata";
+      "alter table contracts add column name varchar";
+      "alter table contracts add column symbol varchar"] [
+    "create table tzip16_metadata(\
+     contract varchar primary key, \
+     block varchar not null, \
+     level int not null, \
+     tsp timestamp not null, \
+     main boolean not null default false, \
+     name varchar,description varchar,version varchar,license jsonb,\
+     authors varchar[],homepage varchar,source jsonb,interfaces varchar[],\
+     errors jsonb,views jsonb)";
+    "alter table contracts drop column name";
+    "alter table contracts drop column symbol";
+ ]
+
 let upgrades =
   let last_version = fst List.(hd @@ rev !Versions.upgrades) in
   !Versions.upgrades @ List.map (fun (i, f) -> last_version + i, f) [
@@ -475,4 +494,5 @@ let upgrades =
     7, upgrade_7_to_8;
     8, upgrade_8_to_9;
     9, upgrade_9_to_10;
+    10, upgrade_10_to_11;
   ]

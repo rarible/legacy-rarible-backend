@@ -102,6 +102,16 @@ let ipfs_metadatas_name = [
 ]
 let ipfs_metadatas_name_len = List.length ipfs_metadatas_name
 
+let ipfs_contract_metadatas = [
+  "ipfs://QmeXLneZJPiyK6hHRJKAa1Y5HLtRaEWyQ5vkbtDwbLWkEE" ;
+  "ipfs://QmNiXR82wxtWGf2jQbwu6PdVaYePAx5mCpEHL9F9yaMXe9" ;
+  "ipfs://QmdpaUh3DQzLeasE2SRM1d595DRHNwXNntdTjf8hqcTTwE" ;
+  "ipfs://Qme51JYtxy6pLvS2wtuoQH5t1EJw1BLsRTb7p2zy248XHw" ;
+  "ipfs://QmX1WpCQgtPsdn8hDf74n7oMHzyM2bK9b3ibth4KYEqbhJ" ;
+]
+let ipfs_contract_metadatas_len = List.length ipfs_contract_metadatas
+
+
 let exchange_contracts = [
 ]
 let exchange_contracts_len = List.length exchange_contracts
@@ -146,13 +156,13 @@ let wait_next_block () =
   | Ok level ->
     aux level
 
-let wait_op_included ?(timeout=180.) hash =
-  Format.eprintf "wait_op_included %s@." hash ;
+let wait_transaction_included ?(timeout=180.) hash =
+  Format.eprintf "wait_tr_included %s@." hash ;
   let rec aux () =
-    let>? b = Db.Utils.is_op_included hash in
+    let>? b = Db.Utils.is_transaction_included hash in
     if b then
       begin
-        Printf.eprintf "op %s crawled\n%!" hash ;
+        Printf.eprintf "tr %s crawled\n%!" hash ;
         Lwt.return_ok ()
       end
     else
@@ -330,6 +340,12 @@ let generate_ipfs_metadata ?metadata_link () =
     | None -> List.nth ipfs_metadatas (Random.int ipfs_metadatas_len)
     | Some link -> link in
   [ "", metadata_link ]
+
+let generate_ipfs_contract_metadata ?metadata_link () =
+  let metadata_link = match metadata_link with
+    | None -> List.nth ipfs_contract_metadatas (Random.int ipfs_contract_metadatas_len)
+    | Some link -> link in
+  metadata_link
 
 let mk_order_form
     maker maker_edpk taker taker_edpk make take salt start_date end_date signature data_type payouts origin_fees =
@@ -949,21 +965,13 @@ let deploy ?verbose ?(burn_cap=42.1) ~filename ~storage ~source alias =
     wait_next_block () >>= fun () ->
     Lwt.return_ok ()
 
-let create_collection ?(royalties=pick_royalties ()) ?alias ?(kind=`nft) ?(privacy=`priv) () =
+let create_collection ?metadata_link ?(royalties=pick_royalties ()) ?alias ?(kind=`nft) ?(privacy=`priv) () =
   let col_alias = generate_alias "collection" in
   let col_admin = match alias with None -> generate_address () | Some a -> by_alias a in
   may_import_key col_admin;
   let col_source = generate_address () in
   may_import_key col_source;
-  let name = Filename.basename @@ Filename.temp_file "collection" "name" in
-  let symbol =
-    if Random.bool () then None
-    else
-      Some (String.init 3 (fun _ -> Char.chr @@ Random.int 26 + 97)) in
-  let col_metadata =
-    EzEncoding.construct
-      Json_encoding.(obj2 (req "name" string) (opt "symbol" string))
-      (name, symbol) in
+  let col_metadata = generate_ipfs_contract_metadata ?metadata_link () in
   {col_admin; col_source; col_alias; col_royalties_contract=royalties;
    col_metadata; col_kt1=""; col_kind=kind; col_privacy=privacy}
 
@@ -1136,7 +1144,7 @@ let update_operators_for_all operator source contract =
     else
       get_op_hash out >>= function
       | Ok hash ->
-        wait_op_included hash
+        wait_transaction_included hash
       | Error err ->
         Printf.eprintf "update_operator_for_all error %s" @@ Tzfunc.Rp.string_of_error err ;
         Lwt.return_ok ()
@@ -1157,7 +1165,7 @@ let update_operators token_id owner operator source contract =
     else
       get_op_hash out >>= function
       | Ok hash ->
-        wait_op_included hash
+        wait_transaction_included hash
       | Error err ->
         Printf.eprintf "update_operators error %s" @@ Tzfunc.Rp.string_of_error err ;
         Lwt.return_ok ()
@@ -1178,7 +1186,7 @@ let mint_tokens c it =
       Printf.sprintf "mint failure (log %s err %s)\n%!" out err
     else
       let>? hash = get_op_hash out in
-      wait_op_included hash
+      wait_transaction_included hash
 
 let mint_ubi_tokens c it =
   if !js then
@@ -1206,7 +1214,7 @@ let burn_tokens it kind =
       Printf.eprintf "burn failure (log %s err %s)\n%!" out err
     else
       let>? hash = get_op_hash out in
-      wait_op_included hash
+      wait_transaction_included hash
 
 let transfer_tokens it amount new_owner =
   if !js then
@@ -1224,7 +1232,7 @@ let transfer_tokens it amount new_owner =
       Printf.eprintf "transfer failure (log %s err %s)\n%!" out err
     else
       let>? hash = get_op_hash out in
-      wait_op_included hash
+      wait_transaction_included hash
 
 let add_exchange ~admin ~exchange ~manager =
   if !js then
@@ -2515,7 +2523,7 @@ let match_orders_nft ?royalties ?(exchange=exchange) ?(transfer_proxy=transfer_p
           Printf.eprintf "match_orders error %s" @@ Tzfunc.Rp.string_of_error err ;
           Lwt.return_unit
         | Ok op_hash ->
-          wait_op_included op_hash >>= function
+          wait_transaction_included op_hash >>= function
           | Error err ->
             Printf.eprintf "match_orders error %s" @@ Crp.string_of_error err ;
             Lwt.return_unit
@@ -2555,7 +2563,7 @@ let match_orders_tezos_2 ?royalties ?(exchange=exchange) ?(transfer_proxy=transf
         Printf.eprintf "match_orders error %s" @@ Tzfunc.Rp.string_of_error err ;
         Lwt.return_unit
       | Ok op_hash ->
-        wait_op_included op_hash >>= function
+        wait_transaction_included op_hash >>= function
         | Error err ->
           Printf.eprintf "match_orders error %s" @@ Crp.string_of_error err ;
           Lwt.return_unit
@@ -2596,7 +2604,7 @@ let match_orders_tezos ?royalties ?(exchange=exchange) ?(transfer_proxy=transfer
         Printf.eprintf "match_orders error %s" @@ Tzfunc.Rp.string_of_error err ;
         Lwt.return_unit
       | Ok op_hash ->
-        wait_op_included op_hash >>= function
+        wait_transaction_included op_hash >>= function
         | Error err ->
           Printf.eprintf "match_orders error %s" @@ Crp.string_of_error err ;
           Lwt.return_unit
@@ -2643,7 +2651,7 @@ let match_orders_lugh ?royalties ?(exchange=exchange) ?(transfer_proxy=transfer_
           Printf.eprintf "match_orders error %s" @@ Tzfunc.Rp.string_of_error err ;
           Lwt.return_unit
         | Ok op_hash ->
-          wait_op_included op_hash >>= function
+          wait_transaction_included op_hash >>= function
           | Error err ->
             Printf.eprintf "match_orders error %s" @@ Crp.string_of_error err ;
             Lwt.return_unit
@@ -2719,7 +2727,7 @@ let cancel_order_list ?royalties ?(exchange=exchange) ~kind ~privacy () =
       Printf.eprintf "cancel_order error %s" @@ Tzfunc.Rp.string_of_error err ;
       Lwt.return_unit
     | Ok op_hash ->
-      wait_op_included op_hash >>= function
+      wait_transaction_included op_hash >>= function
       | Error err ->
         Printf.eprintf "match_orders error %s" @@ Crp.string_of_error err ;
         Lwt.return_unit
@@ -2746,7 +2754,7 @@ let cancel_order_bid ?royalties ?(exchange=exchange) ~kind ~privacy () =
       Printf.eprintf "cancel_order error %s" @@ Tzfunc.Rp.string_of_error err ;
       Lwt.return_unit
     | Ok op_hash ->
-      wait_op_included op_hash >>= function
+      wait_transaction_included op_hash >>= function
       | Error err ->
         Printf.eprintf "match_orders error %s" @@ Crp.string_of_error err ;
         Lwt.return_unit
@@ -2933,8 +2941,10 @@ let main () =
           let privacy = `pub in
           setup_test_env () >>= function
           | Ok (royalties, _exchange) ->
-            transfer_test ~royalties ~kind ~privacy () >>= fun _ ->
-            Lwt.return @@ clean_test_env ()
+            transfer_test ~royalties ~kind ~privacy () >>= begin function
+              | Ok _ -> Lwt.return @@ clean_test_env ()
+              | Error err -> Lwt.fail_with @@ Api.Errors.string_of_error err
+            end
           | Error _err -> Lwt.return @@ clean_test_env ())
         (fun exn ->
            Printf.eprintf "CATCH %S\n%!" @@ Printexc.to_string exn ;

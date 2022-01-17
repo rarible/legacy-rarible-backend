@@ -1,6 +1,8 @@
 module PGOCaml = Pg.PGOCaml
 
-let () = Pg.PG.Pool.init ()
+let () =
+  let database = Option.value ~default:Cconfig.database (Sys.getenv_opt "PGDATABASE") in
+  Pg.PG.Pool.init ~database ()
 
 let use dbh f = match dbh with
   | None -> Pg.PG.Pool.use f

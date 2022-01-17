@@ -710,13 +710,11 @@ let get_nft_item_royalties ?dbh contract token_id =
     end
   | [] -> Lwt.return_error (`hook_error "item not found")
 
-let mk_nft_collection_name_symbol r =
-  match r#name with
-  | None -> "Unnamed Collection", r#symbol
-  | Some n -> n, r#symbol
+let mk_nft_collection_name = function
+  | None -> "Unnamed Collection"
+  | Some n -> n
 
-let mk_nft_collection obj =
-  let name, symbol = mk_nft_collection_name_symbol obj in
+let mk_nft_col name obj =
   let$ nft_collection_type = match obj#ledger_key, obj#ledger_value with
     | None, _ | _, None -> Error (`hook_error "unknown_token_kind")
     | Some k, Some v -> match
@@ -742,19 +740,28 @@ let mk_nft_collection obj =
     nft_collection_owner = obj#owner ;
     nft_collection_type ;
     nft_collection_name = name ;
-    nft_collection_symbol = symbol ;
+    nft_collection_symbol = None ;
     nft_collection_features ;
     nft_collection_supports_lazy_mint = false ;
     nft_collection_minters
   }
 
+let mk_nft_collection_with_name ?name obj =
+  let name = mk_nft_collection_name name in
+  mk_nft_col name obj
+
+let mk_nft_collection obj =
+  let name = mk_nft_collection_name obj#name in
+  mk_nft_col name obj
+
 let get_nft_collection_by_id ?dbh collection =
   Format.eprintf "get_nft_collection_by_id %s@." collection ;
   use dbh @@ fun dbh ->
   let>? l = [%pgsql.object dbh
-      "select address, owner, metadata, name, symbol, kind, ledger_key, \
+      "select address, owner, metadata, kind, ledger_key, m.name, \
        ledger_value, minters \
-       from contracts where address = $collection and main and \
+       from contracts c left join tzip16_metadata m on m.contract = c.address \
+       where c.address = $collection and c.main and \
        ((ledger_key = '\"nat\"' and ledger_value = '\"address\"') \
        or (ledger_key = '[ \"address\", \"nat\"]' and ledger_value = '\"nat\"') \
        or (ledger_key = '[\"nat\", \"address\"]' and ledger_value = '\"nat\"'))"] in
