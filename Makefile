@@ -15,7 +15,8 @@ copy: build openapi
 	@cp -f _build/default/backend/crawler/crawler.exe _bin/crawler
 	@cp -f _build/default/backend/api/main_api.exe _bin/api
 	@cp -f _build/default/backend/script/api_script.exe _bin/tester
-	@cp -f _build/default/backend/crawler/recrawl_single.exe _bin/recrawl
+	@cp -f _build/default/backend/crawler/recrawl_ft.exe _bin/recrawl_ft
+	@cp -f _build/default/backend/crawler/recrawl_nft.exe _bin/recrawl_nft
 	@cp -f _build/default/backend/db/update.exe _bin/update_db
 	@cp -f _build/default/backend/db/extract_bigmap_id.exe _bin/extract_bigmap_id
 	@cp -f _build/default/backend/crawler/metadata_daemon.exe _bin/metadata_daemon
