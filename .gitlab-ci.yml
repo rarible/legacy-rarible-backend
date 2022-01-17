@@ -19,11 +19,6 @@ check:
     - eval $(opam env)
     - make deps
     - make
-    - sudo apt update
-    - sudo apt install -y npm
-    - sudo npm install -g typescript
-    - make ts-deps
-    - make ts
   only:
     - merge_requests
 

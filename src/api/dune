@@ -24,4 +24,4 @@
  (deps openapi.exe)
  (targets openapi.yaml)
  (action (with-stdout-to %{targets}
-          (run %{project_root}/backend/api/openapi.exe --title "Tezos Rarible API" --version "0.1" --yaml))))
+          (run %{project_root}/src/api/openapi.exe --title "Tezos Rarible API" --version "0.1" --yaml))))
