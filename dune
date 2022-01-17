@@ -1,1 +1,1 @@
-(dirs backend test contracts kafka)
+(dirs src test contracts kafka)

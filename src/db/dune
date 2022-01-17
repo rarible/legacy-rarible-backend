@@ -20,7 +20,7 @@ let no_update = true")))
 (rule
  (deps update.exe)
  (targets .rarible_witness)
- (action (with-stdout-to %{targets} (run %{project_root}/backend/db/update.exe))))
+ (action (with-stdout-to %{targets} (run %{project_root}/src/db/update.exe))))
 
 (library
  (name db)
