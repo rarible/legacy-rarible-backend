@@ -32,7 +32,7 @@ let handle_operation contract ft config () op =
     else Lwt.return_ok ()
 
 let main () =
-  Arg.parse spec (fun f -> filename := Some f) "recrawl_async.exe [options] config.json";
+  Arg.parse spec (fun f -> filename := Some f) "recrawl_ft.exe [options] config.json";
   let>? config = Lwt.return @@ Crawler_config.get !filename Rtypes.config_enc in
   match !ft_contract, !recrawl_start with
   | Some ft_contract, Some start ->

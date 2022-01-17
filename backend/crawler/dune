@@ -10,15 +10,18 @@
  (libraries crawler_config db updates ez_api.icurl_lwt))
 
 (executable
- (name recrawl_single)
- (modules recrawl_single)
- (preprocess (pps ppx_deriving_encoding))
+ (name recrawl_ft)
+ (modules recrawl_ft)
+ (libraries crawler_config db ez_api.icurl_lwt))
+
+(executable
+ (name recrawl_nft)
+ (modules recrawl_nft)
  (libraries crawler_config db ez_api.icurl_lwt))
 
 (executable
  (name metadata_daemon)
  (modules metadata_daemon)
- (preprocess (pps ppx_deriving_encoding))
  (libraries crawler_config db ez_api.icurl_lwt))
 
 (executable
