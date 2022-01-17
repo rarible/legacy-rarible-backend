@@ -355,19 +355,38 @@ let update_contract_metadata
       end
     | Some uri ->
       if uri <> "" then
-        let> re = Metadata.get_contract_metadata ~quiet:true uri in
-        match re with
-        | Ok metadata_tzip ->
-          use dbh @@ fun dbh ->
-          let>? () =
-            Metadata.insert_tzip16_metadata_data
-              ~dbh ~forward:true ~contract ~block ~level ~tsp metadata_tzip in
-          Format.eprintf "  OK@." ;
-          Lwt.return_ok ()
-        | Error (code, str) ->
-          (Format.eprintf "  fetch metadata error %d:%s@." code @@
-           Option.value ~default:"None" str);
-          Lwt.return_ok ()
+        let storage = try String.sub uri 0 14 with _ -> "" in
+        match storage with
+        | "tezos-storage:" ->
+          let key = String.sub uri 14 (String.length uri - 14) in
+          let l = EzEncoding.destruct Json_encoding.(assoc string) metadata in
+          begin match List.assoc_opt key l with
+            | None ->
+              Format.eprintf "  can't find tezos-storage for metadata %s@." key ;
+              Lwt.return_ok ()
+            | Some m ->
+              let metadata_tzip = EzEncoding.destruct tzip16_metadata_enc m in
+              use dbh @@ fun dbh ->
+              let>? () =
+                Metadata.insert_tzip16_metadata_data
+                  ~dbh ~forward:true ~contract ~block ~level ~tsp metadata_tzip in
+              Format.eprintf "  OK@." ;
+              Lwt.return_ok ()
+          end
+        | _ ->
+          let> re = Metadata.get_contract_metadata ~quiet:true uri in
+          match re with
+          | Ok metadata_tzip ->
+            use dbh @@ fun dbh ->
+            let>? () =
+              Metadata.insert_tzip16_metadata_data
+                ~dbh ~forward:true ~contract ~block ~level ~tsp metadata_tzip in
+            Format.eprintf "  OK@." ;
+            Lwt.return_ok ()
+          | Error (code, str) ->
+            (Format.eprintf "  fetch metadata error %d:%s@." code @@
+             Option.value ~default:"None" str);
+            Lwt.return_ok ()
       else
         begin
           Format.eprintf "  can't find uri for metadata %s@." metadata ;
