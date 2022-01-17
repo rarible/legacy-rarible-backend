@@ -1222,10 +1222,10 @@ type tzip16_metadata = {
   tzip16_description : string option ;
   tzip16_version : string option ;
   tzip16_license : Json_repr.ezjsonm [@dft `A []] ;
-  tzip16_authors : string list option ;
+  tzip16_authors : (string list [@encoding string_array_or_string_enc]) option ;
   tzip16_homepage : string option ;
   tzip16_source : Json_repr.ezjsonm [@dft `A []] ;
-  tzip16_interfaces : string list option ;
+  tzip16_interfaces : (string list [@encoding string_array_or_string_enc]) option ;
   tzip16_errors : Json_repr.ezjsonm [@dft `A []] ;
   tzip16_views : Json_repr.ezjsonm [@dft `A []] ;
 } [@@deriving encoding {camel; option="option"; ignore}]

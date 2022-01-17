@@ -20,6 +20,7 @@ copy: build openapi
 	@cp -f _build/default/backend/db/update.exe _bin/update_db
 	@cp -f _build/default/backend/db/extract_bigmap_id.exe _bin/extract_bigmap_id
 	@cp -f _build/default/backend/crawler/metadata_daemon.exe _bin/metadata_daemon
+	@cp -f _build/default/backend/crawler/collection_daemon.exe _bin/collection_daemon
 	@cp -f _build/default/backend/crawler/direct_crawl.exe _bin/direct_crawl
 	@cp -f _build/default/backend/db/check_ledger.exe _bin/check_ledger
 	@cp -f _build/default/backend/db/prefix_hash.exe _bin/prefix_hash

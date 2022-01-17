@@ -182,6 +182,14 @@ let contract_token_metadata ?dbh ?(royalties=false) contract =
        (not $royalties or \
        (royalties_metadata is null or royalties_metadata = '[]' or royalties_metadata = '{}'))"]
 
+let contract_metadata ?dbh ?(retrieve=false) () =
+  use dbh @@ fun dbh ->
+  [%pgsql.object dbh
+      "select address, c.block, c.level, c.tsp, c.metadata, c.metadata_id \
+       from contracts c left join tzip16_metadata m on c.address = m.contract \
+       where c.main and \
+       (metadata <> '{}' or $retrieve) and (m.contract is null or $retrieve)"]
+
 let update_metadata ?(set_metadata=false)
     ?metadata_uri ?dbh ~metadata ~contract ~token_id ~block ~level ~tsp () =
   Format.eprintf "%s[%s]@." contract token_id;
@@ -316,3 +324,52 @@ let clean_balance_updates ?level ?dbh () =
        delete from token_balance_updates t using t2 \
        where t2.contract = t.contract and t2.token_id = t.token_id and \
        t2.account = t.account and t2.block = t.block and t2.index = t.index"]
+
+let update_contract_metadata
+    ?(set_metadata=false) ?metadata_uri ?dbh ~metadata ~contract ~block ~level ~tsp () =
+  Format.eprintf "%s@." contract;
+  if set_metadata then
+    let metadata = match metadata_uri with
+      | None -> metadata
+      | Some value ->
+        Ezjsonm.value_to_string @@
+        Json_query.(replace [`Field ""] (`String value) (Ezjsonm.value_from_string metadata)) in
+    use dbh @@ fun dbh ->
+    [%pgsql dbh
+        "update contracts set metadata = $metadata where address = $contract"]
+  else
+    match metadata_uri with
+    | None ->
+      Format.eprintf "  can't find uri for metadata, try to decode@." ;
+      begin try
+          let metadata_tzip = EzEncoding.destruct tzip16_metadata_enc metadata in
+          use dbh @@ fun dbh ->
+          let>? () =
+            Metadata.insert_tzip16_metadata_data
+              ~dbh ~forward:true ~contract ~block ~level ~tsp metadata_tzip in
+          Format.eprintf "  OK@." ;
+          Lwt.return_ok ()
+        with _ ->
+          Format.eprintf "  can't find uri or metadata in %s@." metadata ;
+          Lwt.return_ok ()
+      end
+    | Some uri ->
+      if uri <> "" then
+        let> re = Metadata.get_contract_metadata ~quiet:true uri in
+        match re with
+        | Ok metadata_tzip ->
+          use dbh @@ fun dbh ->
+          let>? () =
+            Metadata.insert_tzip16_metadata_data
+              ~dbh ~forward:true ~contract ~block ~level ~tsp metadata_tzip in
+          Format.eprintf "  OK@." ;
+          Lwt.return_ok ()
+        | Error (code, str) ->
+          (Format.eprintf "  fetch metadata error %d:%s@." code @@
+           Option.value ~default:"None" str);
+          Lwt.return_ok ()
+      else
+        begin
+          Format.eprintf "  can't find uri for metadata %s@." metadata ;
+          Lwt.return_ok ()
+        end

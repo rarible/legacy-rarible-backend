@@ -340,7 +340,7 @@ let insert_token_metadata ?forward ~dbh ~block ~level ~tsp ~contract (token_id, 
       Lwt.return_ok metadata.tzip21_tm_royalties in
   Lwt.return_ok (json, uri, royalties)
 
-let insert_tzip16_metadata ?(forward=false) ~dbh ~block ~level ~tsp ~contract metadata =
+let insert_tzip16_metadata_data ?(forward=false) ~dbh ~block ~level ~tsp ~contract metadata =
   let name = match metadata.tzip16_name with
     | None -> None
     | Some n -> if Parameters.decode n then Some n else None in
@@ -383,7 +383,7 @@ let insert_tzip16_metadata ?(forward=false) ~dbh ~block ~level ~tsp ~contract me
 let insert_tzip16_metadata ?forward ~dbh ~block ~level ~tsp ~contract value =
   get_contract_metadata value >>= function
   | Ok metadata ->
-    insert_tzip16_metadata ~dbh ?forward ~contract ~block ~level ~tsp metadata
+    insert_tzip16_metadata_data ~dbh ?forward ~contract ~block ~level ~tsp metadata
   | Error (code, str) ->
     Printf.eprintf "Cannot get metadata from url: %d %s\n%!"
       code (match str with None -> "None" | Some s -> s);
