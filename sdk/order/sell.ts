@@ -1,6 +1,6 @@
 import { Provider, XTZAssetType, FTAssetType } from "../common/base"
 import { ExtendedAssetType, check_asset_type } from "../common/check-asset-type"
-import { Part, OrderForm, salt, fill_royalties_payouts } from "./utils"
+import { Part, OrderForm, salt, fill_offchain_royalties } from "./utils"
 import { upsert_order } from "./upsert-order"
 import BigNumber from "bignumber.js"
 
@@ -38,6 +38,6 @@ export async function sell(
     },
     salt: salt()
   }
-  order = await fill_royalties_payouts(provider, order)
+  order = await fill_offchain_royalties(provider, order)
   return upsert_order(provider, order, false)
 }

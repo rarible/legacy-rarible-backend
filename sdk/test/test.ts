@@ -1,4 +1,4 @@
-import { deploy_fa1, mint, make_permit, add_permit, send, sign, StorageFA2, of_hex, storage, hex_to_uint8array, b58enc, Provider, op_to_kt1, Asset, Part, OrderForm, OrderRaribleV2DataV1, fill_royalties_payouts } from "../main"
+import { deploy_fa1, mint, make_permit, add_permit, send, sign, StorageFA2, of_hex, storage, hex_to_uint8array, b58enc, Provider, op_to_kt1, Asset, Part, OrderForm, OrderRaribleV2DataV1, fill_offchain_royalties } from "../main"
 import { in_memory_provider } from '../providers/in_memory/in_memory_provider'
 import BigNumber from "bignumber.js"
 import { MichelsonData, MichelsonType, packDataBytes } from "@taquito/michel-codec"
@@ -111,7 +111,7 @@ async function main() {
       make, take, salt: '', data
     }
     console.log(JSON.stringify(order, null, 2))
-    const order2 = await fill_royalties_payouts(provider, order)
+    const order2 = await fill_offchain_royalties(provider, order)
     console.log(JSON.stringify(order2, null, 2))
 
   } catch (e) {
