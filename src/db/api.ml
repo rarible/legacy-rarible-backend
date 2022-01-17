@@ -683,7 +683,7 @@ let filter_orders ?origin ?statuses orders =
       | None -> true)
     orders
 
-let rec get_orders_all_aux ?dbh ?origin ?(sort=LATEST_FIRST) ?statuses ?continuation ~size acc =
+let rec get_orders_all_aux ?dbh ?origin ?(sort=OLATEST_FIRST) ?statuses ?continuation ~size acc =
   Format.eprintf "get_orders_all_aux %s %s %Ld %d@."
     (match origin with None -> "None" | Some s -> s)
     (match continuation with
@@ -699,7 +699,7 @@ let rec get_orders_all_aux ?dbh ?origin ?(sort=LATEST_FIRST) ?statuses ?continua
     use dbh @@ fun dbh ->
     let>? l =
       match sort with
-      | LATEST_FIRST ->
+      | OLATEST_FIRST ->
         [%pgsql.object dbh
             "select hash, last_update_at from orders \
              where \
@@ -709,7 +709,7 @@ let rec get_orders_all_aux ?dbh ?origin ?(sort=LATEST_FIRST) ?statuses ?continua
              hash < $h)) \
              order by last_update_at desc, hash desc \
              limit $size"]
-      | EARLIEST_FIRST ->
+      | OEARLIEST_FIRST ->
         [%pgsql.object dbh
             "select hash, last_update_at from orders \
              where \
