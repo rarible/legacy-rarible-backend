@@ -218,7 +218,7 @@ let get_nft_items_by_collection ?dbh ?include_meta ?continuation ?(size=50) cont
        inner join token_info i on i.id = t.tid \
        and i.id in (\
        select id from token_info where \
-       main and metadata <> '{}' and \
+       main and contract = $contract and \
        ($no_continuation or (last = $ts and id < $id) or (last < $ts)) \
        order by last desc, id desc limit $size64) \
        group by (i.id) \
