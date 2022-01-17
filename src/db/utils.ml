@@ -325,8 +325,40 @@ let clean_balance_updates ?level ?dbh () =
        where t2.contract = t.contract and t2.token_id = t.token_id and \
        t2.account = t.account and t2.block = t.block and t2.index = t.index"]
 
+let expr key =
+  let open Proto in
+  match Forge.(pack (prim `string) (Mstring key)) with
+  | Error _ -> None
+  | Ok b ->
+    Some Tzfunc.Crypto.(Base58.encode ~prefix:Prefix.script_expr_hash @@ Blake2b_32.hash [ b ])
+
+let retrieve_contract_metadata ~source ~metadata_id key =
+  let open Common in
+  let open Proto in
+  match expr key with
+  | None -> Lwt.return None
+  | Some hash ->
+    let> r = Tzfunc.Node.(
+        get_bigmap_value_raw ~base:(EzAPI.BASE source) metadata_id hash) in
+    match r with
+    | Error e ->
+      Format.eprintf "Cannot retrieve metadata:\n%s@." (Tzfunc.Rp.string_of_error e);
+      Lwt.return None
+    | Ok None | Ok (Some (Bytes _)) | Ok (Some (Other _)) ->
+      Format.eprintf "Wrong metadata format@.";
+      Lwt.return None
+    | Ok ((Some Micheline m)) ->
+      match Typed_mich.parse_value Contract_spec.metadata_field.Rtypes.bmt_value m with
+      | Ok (`bytes v) ->
+        let s = (Tzfunc.Crypto.hex_to_raw v :> string) in
+        if Parameters.decode s then Lwt.return @@ Some s
+        else Lwt.return None
+      | _ ->
+        Format.eprintf "Wrong metadata type@.";
+        Lwt.return None
+
 let update_contract_metadata
-    ?(set_metadata=false) ?metadata_uri ?dbh ~metadata ~contract ~block ~level ~tsp () =
+    ?(set_metadata=false) ?metadata_uri ?dbh ~source ?metadata_id ~metadata ~contract ~block ~level ~tsp () =
   Format.eprintf "%s@." contract;
   if set_metadata then
     let metadata = match metadata_uri with
@@ -362,8 +394,28 @@ let update_contract_metadata
           let l = EzEncoding.destruct Json_encoding.(assoc string) metadata in
           begin match List.assoc_opt key l with
             | None ->
-              Format.eprintf "  can't find tezos-storage for metadata %s@." key ;
-              Lwt.return_ok ()
+              let> v = match metadata_id with
+                | None -> Lwt.return None
+                | Some id ->
+                  let id = Z.of_string id in
+                  retrieve_contract_metadata ~source ~metadata_id:id key in
+              begin match v with
+                | None ->
+                  Format.eprintf "  can't find tezos-storage for metadata %s@." key ;
+                  Lwt.return_ok ()
+                | Some v ->
+                  try
+                    let metadata_tzip = EzEncoding.destruct tzip16_metadata_enc v in
+                    use dbh @@ fun dbh ->
+                    let>? () =
+                      Metadata.insert_tzip16_metadata_data
+                        ~dbh ~forward:true ~contract ~block ~level ~tsp metadata_tzip in
+                    Format.eprintf "  OK@." ;
+                    Lwt.return_ok ()
+                  with _ ->
+                    Format.eprintf "  can't parse tzip16 metadata in %s@." v ;
+                    Lwt.return_ok ()
+              end
             | Some m ->
               try
                 let metadata_tzip = EzEncoding.destruct tzip16_metadata_enc m in
