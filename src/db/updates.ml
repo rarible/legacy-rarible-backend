@@ -482,6 +482,15 @@ let upgrade_10_to_11 dbh version =
     "alter table contracts drop column symbol";
  ]
 
+let upgrade_11_to_12 dbh version =
+  EzPG.upgrade ~dbh ~version
+    ~downgrade:[
+      "alter table origin_fees drop column id";
+      "alter table payouts drop column id";
+    ] [
+    "alter table origin_fees add column id bigserial";
+    "alter table payouts add column id bigserial" ]
+
 let upgrades =
   let last_version = fst List.(hd @@ rev !Versions.upgrades) in
   !Versions.upgrades @ List.map (fun (i, f) -> last_version + i, f) [
@@ -495,4 +504,5 @@ let upgrades =
     8, upgrade_8_to_9;
     9, upgrade_9_to_10;
     10, upgrade_10_to_11;
+    11, upgrade_11_to_12;
   ]
