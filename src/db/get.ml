@@ -254,13 +254,13 @@ let mk_order_activity ~dbh obj =
 let get_order_origin_fees ?dbh hash_key =
   use dbh @@ fun dbh ->
   let|>? l = [%pgsql dbh
-      "select account, value from origin_fees where hash = $hash_key"] in
+      "select account, value from origin_fees where hash = $hash_key order by id"] in
   Utils.to_parts l
 
 let get_order_payouts ?dbh hash_key =
   use dbh @@ fun dbh ->
   let|>? l = [%pgsql dbh
-      "select account, value from payouts where hash = $hash_key"] in
+      "select account, value from payouts where hash = $hash_key order by id"] in
   Utils.to_parts l
 
 let get_fill hash rows =
