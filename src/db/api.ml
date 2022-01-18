@@ -972,7 +972,6 @@ let rec get_sell_orders_by_collection_aux ?dbh ?origin ?continuation ~size colle
       [%pgsql.object dbh
           "select hash, last_update_at from orders \
            where make_asset_type_contract = $collection and \
-           make_asset_type_class = 'FA_2' and \
            ($no_continuation or \
            (last_update_at < $ts) or \
            (last_update_at = $ts and \
