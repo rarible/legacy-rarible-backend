@@ -3,6 +3,8 @@ open Rtypes
 open Common
 open Misc
 
+let status = ref None
+
 let price left right =
   if left.asset_value > Z.zero then
     if Z.rem right.asset_value left.asset_value <> Z.zero then
@@ -735,12 +737,17 @@ let mk_nft_col name obj =
     | _ ->
       Format.eprintf "warning: can't get features for unknow kind %s@." obj#kind;
       [] in
+  let symbol =
+    try
+      let l = EzEncoding.destruct Json_encoding.(assoc string) obj#metadata in
+      List.assoc_opt "symbol" l
+    with _ -> None in
   Ok {
     nft_collection_id = obj#address ;
     nft_collection_owner = obj#owner ;
     nft_collection_type ;
     nft_collection_name = name ;
-    nft_collection_symbol = None ;
+    nft_collection_symbol = symbol ;
     nft_collection_features ;
     nft_collection_supports_lazy_mint = false ;
     nft_collection_minters
@@ -801,3 +808,42 @@ let mk_nft_activity obj =
     nft_act_source = "RARIBLE";
     nft_act_type = act ;
   }
+
+let status () =
+  let open Proto in
+  use None @@ fun dbh ->
+  let>? l =
+    [%pgsql dbh
+        "select max(level) from predecessors where main"] in
+  match l with
+  | [ Some level ] ->
+    begin match !status with
+      | None ->
+        let>? block =
+          Tzfunc.(
+            Node.get_enc_rpc
+              (block0_enc Encoding.unit).json
+              ("/chains/main/blocks/" ^ Int32.to_string level)) in
+        let st = {
+          status_level = level ;
+          status_timestamp = block.header.shell.timestamp ;
+          status_chain_id = block.chain_id
+        } in
+        status := Some st ;
+        Lwt.return_ok st
+      | Some st when st.status_level <> level ->
+        let>? block =
+          Tzfunc.(
+            Node.get_enc_rpc
+              (block0_enc Encoding.unit).json
+              ("/chains/main/blocks/" ^ Int32.to_string level)) in
+        let st = {
+          status_level = level ;
+          status_timestamp = block.header.shell.timestamp ;
+          status_chain_id = block.chain_id
+        } in
+        status := Some st ;
+        Lwt.return_ok st
+      | Some st -> Lwt.return_ok st
+    end
+  | _ -> Lwt.return_error (`hook_error "no predecessor level")

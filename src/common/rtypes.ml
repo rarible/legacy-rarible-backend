@@ -1234,3 +1234,9 @@ type tzip16_metadata = {
   tzip16_errors : Json_repr.ezjsonm [@dft `A []] ;
   tzip16_views : Json_repr.ezjsonm [@dft `A []] ;
 } [@@deriving encoding {camel; option="option"; ignore}]
+
+type status = {
+  status_level : int32 ;
+  status_timestamp : A.date ;
+  status_chain_id : string ;
+} [@@deriving encoding]
