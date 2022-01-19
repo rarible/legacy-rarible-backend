@@ -77,6 +77,7 @@ let status_param = pstring ~enc:(Json_encoding.list order_status_enc) "status"
 let currency_param = pstring "currencyId"
 let activity_sort_param = pstring ~enc:activity_sort_enc "sort"
 let order_sort_param = pstring ~enc:order_sort_enc "sort"
+let node_param = pstring ~required:true "node"
 
 let hash_arg = EzAPI.Arg.string "hash"
 let item_id_arg = EzAPI.Arg.string "itemId"
@@ -91,6 +92,11 @@ let return = function
 
 let mk_invalid_argument param msg =
   Error {code=`BAD_REQUEST; message=Printf.sprintf "%s %s" param.EzAPI.Param.param_id msg}
+
+let get_required_node_param req =
+  match EzAPI.Req.find_param node_param req with
+  | None -> mk_invalid_argument node_param "param is required"
+  | Some s -> Ok s
 
 let get_origin_param req =
   let open Tzfunc.Crypto in
@@ -1429,18 +1435,20 @@ let get_ft_balance ((req, contract), ft_owner) () =
    section=balance_section}]
 
 (* status-controller *)
-let get_status _req () =
-  let> r = Db.Get.status () in
-  match r with
-  | Error e ->
-    let message = Crawlori.Rp.string_of_error e in
-    return (Error {code=`UNEXPECTED_API_ERROR; message})
-  | Ok status ->
-    return_ok status
+let get_status req () =
+  match get_required_node_param req with
+  | Error err -> return @@ Error err
+  | Ok node ->
+    let> r = Db.Get.status node in
+    match r with
+    | Error e ->
+      let message = Crawlori.Rp.string_of_error e in
+      return (Error {code=`UNEXPECTED_API_ERROR; message})
+    | Ok status -> return_ok status
 [@@get
   {path="/v0.1/status";
    name="status";
-   params=[];
+   params=[node_param];
    output=status_enc;
-   errors=[unexpected_case];
+   errors=[unexpected_case;bad_request_case];
    section=status_section}]

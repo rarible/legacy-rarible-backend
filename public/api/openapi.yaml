@@ -1432,7 +1432,12 @@ paths:
       - status
       summary: status
       operationId: status
-      parameters: []
+      parameters:
+      - name: node
+        in: query
+        required: true
+        schema:
+          type: string
       responses:
         "500":
           description: Internal Server Error
@@ -1440,6 +1445,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ServerError'
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadRequest'
         "200":
           description: OK
           content:

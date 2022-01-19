@@ -809,8 +809,10 @@ let mk_nft_activity obj =
     nft_act_type = act ;
   }
 
-let status () =
+let status node =
+  Format.eprintf "get status %s@." node ;
   let open Proto in
+  let base = EzAPI.BASE node in
   use None @@ fun dbh ->
   let>? l =
     [%pgsql dbh
@@ -821,7 +823,7 @@ let status () =
       | None ->
         let>? block =
           Tzfunc.(
-            Node.get_enc_rpc
+            Node.get_enc_rpc ~base
               (block0_enc Encoding.unit).json
               ("/chains/main/blocks/" ^ Int32.to_string level)) in
         let st = {
@@ -834,7 +836,7 @@ let status () =
       | Some st when st.status_level <> level ->
         let>? block =
           Tzfunc.(
-            Node.get_enc_rpc
+            Node.get_enc_rpc ~base
               (block0_enc Encoding.unit).json
               ("/chains/main/blocks/" ^ Int32.to_string level)) in
         let st = {
