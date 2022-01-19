@@ -34,7 +34,11 @@ let rarible_contracts ?(db=dummy_extra) config =
     let extra = if extra.exchange = "" then { extra with exchange = db.exchange } else extra in
     let extra = if extra.royalties = "" then { extra with royalties = db.royalties } else extra in
     let extra = if extra.transfer_manager = "" then { extra with transfer_manager = db.transfer_manager } else extra in
-    let extra = { extra with ft_contracts = SMap.union (fun _ _ v -> Some v) extra.ft_contracts db.ft_contracts } in
+    let extra = { extra with ft_contracts = SMap.union (fun _ v_config v_db ->
+        let ft_crawled = match v_config.ft_crawled, v_db.ft_crawled with
+          | None, c | c, None -> c
+          | Some c_c, _ -> Some c_c in
+        Some {v_config with ft_crawled}) extra.ft_contracts db.ft_contracts } in
     let extra = { extra with contracts = SMap.union (fun _ v _ -> Some v) extra.contracts db.contracts } in
     let s = match config.accounts with
       | None -> SSet.empty
