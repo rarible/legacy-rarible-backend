@@ -380,6 +380,15 @@ let insert_tzip16_metadata_data ?(forward=false) ~dbh ~block ~level ~tsp ~contra
        interfaces=$?interfaces,errors=$errors,views=$views \
        where tzip16_metadata.contract = $contract"]
 
+let insert_tzip16_metadata_name ?(forward=false) ~dbh ~block ~level ~tsp ~contract name =
+  let name = if Parameters.decode name then Some name else None in
+  [%pgsql dbh
+      "insert into tzip16_metadata(contract,block,level,tsp,main,name) \
+       values ($contract,$block,$level,$tsp,$forward,$?name) \
+       on conflict (contract) do update set \
+       block=$block,level=$level,tsp=$tsp,main=$forward,name=$?name \
+       where tzip16_metadata.contract = $contract"]
+
 let insert_tzip16_metadata ?forward ~dbh ~block ~level ~tsp ~contract value =
   get_contract_metadata value >>= function
   | Ok metadata ->

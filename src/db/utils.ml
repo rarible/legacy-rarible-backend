@@ -186,6 +186,13 @@ let contract_metadata ?dbh ?(retrieve=false) () =
        where c.main and \
        (metadata <> '{}' or $retrieve) and (m.contract is null or $retrieve)"]
 
+let contract_metadata_no_name ?dbh () =
+  use dbh @@ fun dbh ->
+  [%pgsql.object dbh
+      "select address, c.block, c.level, c.tsp, c.metadata, c.metadata_id \
+       from contracts c left join tzip16_metadata m on c.address = m.contract \
+       where c.main and m.contract is null"]
+
 let update_metadata ?(set_metadata=false)
     ?metadata_uri ?dbh ~metadata ~contract ~token_id ~block ~level ~tsp () =
   Format.eprintf "%s[%s]@." contract token_id;
@@ -444,3 +451,15 @@ let update_contract_metadata
           Format.eprintf "  can't find uri for metadata %s@." metadata ;
           Lwt.return_ok ()
         end
+
+let update_contract_metadata_name ?dbh ~metadata ~contract ~block ~level ~tsp name =
+  Format.eprintf "%s@." contract;
+  let metadata =
+    Ezjsonm.value_to_string @@
+    Json_query.(replace [`Field ""] (`String name) (Ezjsonm.value_from_string metadata)) in
+  use dbh @@ fun dbh ->
+  let>? () =
+    [%pgsql dbh
+        "update contracts set metadata = $metadata where address = $contract"] in
+  Metadata.insert_tzip16_metadata_name
+    ~dbh ~forward:true ~contract ~block ~level ~tsp name

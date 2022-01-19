@@ -1166,7 +1166,11 @@ let contract_updates dbh main l =
           begin if main then
               match key with
               | "" ->
-                Metadata.insert_tzip16_metadata ~dbh ~forward:main ~contract ~block ~level ~tsp value
+                Metadata.insert_tzip16_metadata
+                  ~dbh ~forward:main ~contract ~block ~level ~tsp value
+              | "name" ->
+                Metadata.insert_tzip16_metadata_name
+                  ~dbh ~forward:main ~contract ~block ~level ~tsp value
               | _ -> Lwt.return_ok ()
             else Lwt.return_ok ()
           end >>=? fun () ->
