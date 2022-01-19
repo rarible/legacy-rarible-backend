@@ -816,5 +816,7 @@ let status () =
          where main order by level desc limit 1"] in
   match state with
   | [ r ] ->
-    Lwt.return_ok { status_level = r#level; status_timestamp = r#tsp; status_chain_id = r#chain_id }
+    Lwt.return_ok {
+      status_level = r#level; status_timestamp = CalendarLib.Calendar.now ();
+      status_chain_id = r#chain_id; status_chain_timestamp = r#tsp }
   | _ -> Lwt.return_error (`hook_error "no status information")

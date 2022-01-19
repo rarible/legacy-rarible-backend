@@ -1239,4 +1239,5 @@ type status = {
   status_level : int32 ;
   status_timestamp : A.date ;
   status_chain_id : string ;
+  status_chain_timestamp : A.date ;
 } [@@deriving encoding]
