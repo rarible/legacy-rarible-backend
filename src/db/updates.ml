@@ -491,6 +491,17 @@ let upgrade_11_to_12 dbh version =
     "alter table origin_fees add column id bigserial";
     "alter table payouts add column id bigserial" ]
 
+let upgrade_12_to_13 dbh version =
+  EzPG.upgrade ~dbh ~version
+    ~downgrade:[
+      "alter table state drop column level";
+      "alter table state drop column chain_id";
+      "alter table state drop column tsp";
+    ] [
+    "alter table state add column level int not null default 0";
+    "alter table state add column chain_id varchar not null default ''";
+    "alter table state add column tsp timestamp not null default now()" ]
+
 let upgrades =
   let last_version = fst List.(hd @@ rev !Versions.upgrades) in
   !Versions.upgrades @ List.map (fun (i, f) -> last_version + i, f) [
@@ -505,4 +516,5 @@ let upgrades =
     9, upgrade_9_to_10;
     10, upgrade_10_to_11;
     11, upgrade_11_to_12;
+    12, upgrade_12_to_13;
   ]
