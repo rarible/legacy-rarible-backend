@@ -375,45 +375,48 @@ let insert_order_activity ?(main=false)
        $?block, $?level, $date, $order_activity_type) \
        on conflict do nothing"]
 
+(* only produce listing events here, match and cancel events will be fired on set main *)
 let insert_order_activity ~decs dbh activity =
-  begin match activity.order_act_type with
-    | OrderActivityList act ->
-      let hash = Some act.order_activity_bid_hash in
-      insert_order_activity ~main:true
-        dbh activity.order_act_id None None hash None None None activity.order_act_date "list"
-    | OrderActivityBid act ->
-      let hash = Some act.order_activity_bid_hash in
-      insert_order_activity ~main:true
-        dbh activity.order_act_id None None hash None None None activity.order_act_date "bid"
-    | OrderActivityCancelList act ->
-      let hash = Some act.order_activity_cancel_bid_hash in
-      let transaction = Some act.order_activity_cancel_bid_transaction_hash in
-      let block = Some act.order_activity_cancel_bid_block_hash in
-      let level = Some (Int64.to_int32 act.order_activity_cancel_bid_block_number) in
-      insert_order_activity
-        dbh activity.order_act_id None None hash transaction block
-        level activity.order_act_date "cancel_l"
-    | OrderActivityCancelBid act ->
-      let hash = Some act.order_activity_cancel_bid_hash in
-      let transaction = Some act.order_activity_cancel_bid_transaction_hash in
-      let block = Some act.order_activity_cancel_bid_block_hash in
-      let level = Some (Int64.to_int32 act.order_activity_cancel_bid_block_number) in
-      insert_order_activity
-        dbh activity.order_act_id None None hash transaction block
-        level activity.order_act_date "cancel_b"
-    | OrderActivityMatch act ->
-      let left = Some act.order_activity_match_left.order_activity_match_side_hash in
-      let right = Some act.order_activity_match_right.order_activity_match_side_hash in
-      let transaction = Some act.order_activity_match_transaction_hash in
-      let block = Some act.order_activity_match_block_hash in
-      let level = Some (Int64.to_int32 act.order_activity_match_block_number) in
-      insert_order_activity
-        dbh activity.order_act_id left right left transaction block
-        level activity.order_act_date "match"
-  end >>=? fun () ->
-  let activity = { at_nft_type = None ; at_order_type = Some activity } in
-  Rarible_kafka.produce_activity ~decs activity >>= fun () ->
-  Lwt.return_ok ()
+  match activity.order_act_type with
+  | OrderActivityList act ->
+    let hash = Some act.order_activity_bid_hash in
+    let>? () = insert_order_activity ~main:true
+        dbh activity.order_act_id None None hash None None None activity.order_act_date "list" in
+    let activity = { at_nft_type = None ; at_order_type = Some activity } in
+    Rarible_kafka.produce_activity ~decs activity >>= fun () ->
+    Lwt.return_ok ()
+  | OrderActivityBid act ->
+    let hash = Some act.order_activity_bid_hash in
+    let>? () = insert_order_activity ~main:true
+        dbh activity.order_act_id None None hash None None None activity.order_act_date "bid" in
+    let activity = { at_nft_type = None ; at_order_type = Some activity } in
+    Rarible_kafka.produce_activity ~decs activity >>= fun () ->
+    Lwt.return_ok ()
+  | OrderActivityCancelList act ->
+    let hash = Some act.order_activity_cancel_bid_hash in
+    let transaction = Some act.order_activity_cancel_bid_transaction_hash in
+    let block = Some act.order_activity_cancel_bid_block_hash in
+    let level = Some (Int64.to_int32 act.order_activity_cancel_bid_block_number) in
+    insert_order_activity
+      dbh activity.order_act_id None None hash transaction block
+      level activity.order_act_date "cancel_l"
+  | OrderActivityCancelBid act ->
+    let hash = Some act.order_activity_cancel_bid_hash in
+    let transaction = Some act.order_activity_cancel_bid_transaction_hash in
+    let block = Some act.order_activity_cancel_bid_block_hash in
+    let level = Some (Int64.to_int32 act.order_activity_cancel_bid_block_number) in
+    insert_order_activity
+      dbh activity.order_act_id None None hash transaction block
+      level activity.order_act_date "cancel_b"
+  | OrderActivityMatch act ->
+    let left = Some act.order_activity_match_left.order_activity_match_side_hash in
+    let right = Some act.order_activity_match_right.order_activity_match_side_hash in
+    let transaction = Some act.order_activity_match_transaction_hash in
+    let block = Some act.order_activity_match_block_hash in
+    let level = Some (Int64.to_int32 act.order_activity_match_block_number) in
+    insert_order_activity
+      dbh activity.order_act_id left right left transaction block
+      level activity.order_act_date "match"
 
 let insert_order_activity_new ~decs dbh date order =
   let id = Hex.show @@ Hex.of_bigstring @@ Hacl.Rand.gen 128 in
@@ -1422,8 +1425,9 @@ let set_main _config ?(forward=false) dbh {Hooks.m_main; m_hash} =
     let>? nactivities =
       [%pgsql.object dbh
           "update nft_activities set main = $m_main where block = $m_hash returning *"] in
-    let>? () =
-      [%pgsql dbh "update order_activities set main = $m_main where block = $m_hash"] in
+    let>? oactivities =
+      [%pgsql.object dbh
+          "update order_activities set main = $m_main where block = $m_hash returning *"] in
     let>? t_updates =
       [%pgsql.object dbh
           "update token_updates set main = $m_main where block = $m_hash returning *"] in
@@ -1465,9 +1469,10 @@ let set_main _config ?(forward=false) dbh {Hooks.m_main; m_hash} =
         let>? () = Produce.collection_events m_main collections collections_name in
         let>? () = Produce.cancel_events dbh m_main @@ sort cancels in
         let>? () = Produce.match_events dbh m_main @@ sort matches in
-        let>? () = Produce.nft_activity_events m_main @@ sort nactivities in
         let>? () = iter_rp (fun ev -> ev ()) cevents in
         let tevents = List.fold_left (fun acc (_, ev) -> ev @ acc) [] tevents in
-        iter_rp (fun ev -> ev ()) tevents)
+        let>? () = iter_rp (fun ev -> ev ()) tevents in
+        let>? () = Produce.nft_activity_events m_main @@ sort nactivities in
+        Produce.order_activity_events dbh m_main oactivities)
   else
     Lwt.return_ok (fun () -> Lwt.return_ok ())
