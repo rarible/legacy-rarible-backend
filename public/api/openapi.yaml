@@ -1425,6 +1425,43 @@ paths:
               schema:
                 $ref: '#/components/schemas/FTBalance'
       security: []
+  /v0.1/status:
+    summary: status
+    get:
+      tags:
+      - status
+      summary: status
+      operationId: status
+      parameters: []
+      responses:
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  level:
+                    type: integer
+                    minimum: -2147483648
+                    maximum: 2147483647
+                  timestamp:
+                    type: string
+                    format: date-time
+                  chain_id:
+                    type: string
+                required:
+                - chain_id
+                - timestamp
+                - level
+                additionalProperties: false
+      security: []
   /kafka/item:
     summary: kafka_item
     get:
