@@ -737,12 +737,17 @@ let mk_nft_col name obj =
     | _ ->
       Format.eprintf "warning: can't get features for unknow kind %s@." obj#kind;
       [] in
+  let symbol =
+    try
+      let l = EzEncoding.destruct Json_encoding.(assoc string) obj#metadata in
+      List.assoc_opt "symbol" l
+    with _ -> None in
   Ok {
     nft_collection_id = obj#address ;
     nft_collection_owner = obj#owner ;
     nft_collection_type ;
     nft_collection_name = name ;
-    nft_collection_symbol = None ;
+    nft_collection_symbol = symbol ;
     nft_collection_features ;
     nft_collection_supports_lazy_mint = false ;
     nft_collection_minters

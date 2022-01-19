@@ -463,3 +463,12 @@ let update_contract_metadata_name ?dbh ~metadata ~contract ~block ~level ~tsp na
         "update contracts set metadata = $metadata where address = $contract"] in
   Metadata.insert_tzip16_metadata_name
     ~dbh ~forward:true ~contract ~block ~level ~tsp name
+
+let update_contract_metadata_symbol ?dbh ~metadata ~contract symbol =
+  Format.eprintf "%s@." contract;
+  let metadata =
+    Ezjsonm.value_to_string @@
+    Json_query.(replace [`Field ""] (`String symbol) (Ezjsonm.value_from_string metadata)) in
+  use dbh @@ fun dbh ->
+  [%pgsql dbh
+      "update contracts set metadata = $metadata where address = $contract"]

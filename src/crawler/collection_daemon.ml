@@ -9,8 +9,8 @@ let spec = [
   "Node to use to retrieve contract metadata from context";
   "--retrieve", Arg.Set retrieve,
   "Use the context to look for ipfs link";
-  "--name", Arg.Set name,
-  "Retrieve name field from metadata bigmap"
+  "--name-symbol", Arg.Set name,
+  "Retrieve name and symbol fields from metadata bigmap"
 ]
 
 let usage =
@@ -23,20 +23,27 @@ let () =
   if !name then
     let>? l = Db.Utils.contract_metadata_no_name () in
     iter_rp (fun r ->
-        let>? name =
+        let>? name, symbol =
           match r#metadata_id with
-          | None -> Lwt.return_ok None
+          | None -> Lwt.return_ok (None, None)
           | Some id ->
             let metadata_id = Z.of_string id in
             let> n =
               Db.Utils.retrieve_contract_metadata ~source:!node ~metadata_id:metadata_id "name" in
-            Lwt.return_ok n in
-        match name with
-        | None -> Lwt.return_ok ()
-        | Some n ->
-          Db.Utils.update_contract_metadata_name
-            ~contract:r#address ~block:r#block
-            ~level:r#level ~tsp:r#tsp ~metadata:r#metadata n) l
+            let> s =
+              Db.Utils.retrieve_contract_metadata ~source:!node ~metadata_id:metadata_id "symbol" in
+            Lwt.return_ok (n, s) in
+        let>? () = match name with
+          | None -> Lwt.return_ok ()
+          | Some n ->
+            Db.Utils.update_contract_metadata_name
+              ~contract:r#address ~block:r#block
+              ~level:r#level ~tsp:r#tsp ~metadata:r#metadata n in
+        match symbol with
+          | None -> Lwt.return_ok ()
+          | Some s ->
+            Db.Utils.update_contract_metadata_symbol
+              ~contract:r#address ~metadata:r#metadata s) l
   else
     let>? l = Db.Utils.contract_metadata ~retrieve:!retrieve () in
     iter_rp (fun r ->
