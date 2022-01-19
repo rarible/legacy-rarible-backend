@@ -1028,7 +1028,7 @@ type ft_ledger_kind =
 type ft_ledger = {
   ft_kind: ft_ledger_kind;
   ft_ledger_id: z;
-  ft_crawled: bool; [@dft false]
+  ft_crawled: bool option;
   ft_token_id: z option;
   ft_decimals: int32; [@dft 0l]
 } [@@deriving encoding]

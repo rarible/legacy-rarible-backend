@@ -32,10 +32,6 @@ let set_main_recrawl ?dbh hash =
       "update token_balance_updates set main = true where \
        block = $hash and (kind='ft' or kind='ft_multiple')"]
 
-let set_crawled ?dbh contract =
-  use dbh @@ fun dbh ->
-  [%pgsql dbh "update ft_contracts set crawled = true where address = $contract"]
-
 let get_ft_contract ?dbh contract =
   use dbh @@ fun dbh ->
   let>? l = [%pgsql.object dbh "select * from ft_contracts where address = $contract"] in

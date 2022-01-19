@@ -732,23 +732,25 @@ let insert_tezos_domains ~dbh ~op ?(forward=false) l =
     | _ -> Lwt.return_ok () in
   iter_rp f l
 
-let check_ft_status ~dbh ~config ~crawled contract =
-  if crawled then Lwt.return_ok true
-  else
+let check_ft_status ~dbh ~config ?crawled contract =
+  match crawled with
+  | Some true -> Lwt.return_ok true
+  | _ ->
     let>? l = [%pgsql dbh "select crawled from ft_contracts where address = $contract"] in
     match l with
     | [ c ] ->
-      let ft_contracts = SMap.update contract (function
-          | None -> None
-          | Some ft -> Some {ft with ft_crawled=true}) config.Crawlori.Config.extra.ft_contracts in
-      if c then config.Crawlori.Config.extra.ft_contracts <- ft_contracts;
-      Lwt.return_ok c
+      if c then (
+        let ft_contracts = SMap.update contract (function
+            | None -> None
+            | Some ft -> Some {ft with ft_crawled=Some true}) config.Crawlori.Config.extra.ft_contracts in
+        config.Crawlori.Config.extra.ft_contracts <- ft_contracts);
+        Lwt.return_ok c
     | _ -> Lwt.return_ok false
 
 let insert_ft ~dbh ~config ~op ~contract ?(forward=false) ft =
   Format.printf "\027[0;35mFT update %s %ld %s\027[0m@."
     (Utils.short op.bo_hash) op.bo_index (Utils.short contract);
-  let>? crawled = check_ft_status ~dbh ~config ~crawled:ft.ft_crawled contract in
+  let>? crawled = check_ft_status ~dbh ~config ?crawled:ft.ft_crawled contract in
   match crawled, op.bo_meta with
   | false, _ | _, None ->
     Lwt.return_ok ()
@@ -941,12 +943,18 @@ let filter_contracts op ori =
     end
   | _ -> None
 
+let set_crawled ?dbh contract =
+  use dbh @@ fun dbh ->
+  [%pgsql dbh "update ft_contracts set crawled = true where address = $contract"]
+
 let insert_origination ?(forward=false) config dbh op ori =
-  match filter_contracts op ori, op.bo_meta with
-  | None, _ | _, None ->
+  let kt1 = Tzfunc.Crypto.op_to_KT1 op.bo_hash in
+  match filter_contracts op ori, op.bo_meta, SMap.find_opt kt1 config.Crawlori.Config.extra.ft_contracts with
+  | _, _, Some _ ->
+    set_crawled ~dbh kt1
+  | None, _, _ | _, None, _ ->
     Lwt.return_ok ()
-  | Some (kind, nft, owner, uri, metadata), Some meta ->
-    let kt1 = Tzfunc.Crypto.op_to_KT1 op.bo_hash in
+  | Some (kind, nft, owner, uri, metadata), Some meta, _ ->
     let ledger_key = EzEncoding.construct micheline_type_short_enc nft.nft_ledger.bm_types.bmt_key in
     let ledger_value = EzEncoding.construct micheline_type_short_enc nft.nft_ledger.bm_types.bmt_value in
     Format.printf "\027[0;93morigination %s (%s, %s)\027[0m@."

@@ -33,7 +33,7 @@ let db_ft_contract r =
   | None -> None
   | Some ft_kind -> Some {
       ft_kind; ft_ledger_id = Z.of_string r#ledger_id; ft_decimals = r#decimals;
-      ft_crawled=r#crawled; ft_token_id = Option.map Z.of_string r#token_id}
+      ft_crawled=Some r#crawled; ft_token_id = Option.map Z.of_string r#token_id}
 
 let db_ft_contracts =
   List.fold_left (fun acc r ->
@@ -83,6 +83,9 @@ let update_extra_config ?dbh e =
   iter_rp (fun (address, lk) ->
       let id = Z.to_string lk.ft_ledger_id in
       let token_id = Option.map Z.to_string lk.ft_token_id in
+      let no_crawled, crawled = match lk.ft_crawled with
+        | None -> true, false
+        | Some b -> false, b in
       let kind, k, v = match lk.ft_kind with
         | Fa2_single -> "fa2_single", None, None
         | Fa2_multiple -> "fa2_multiple", None, None
@@ -94,6 +97,12 @@ let update_extra_config ?dbh e =
           Some (EzEncoding.construct micheline_type_short_enc bmt_key),
           Some (EzEncoding.construct micheline_type_short_enc bmt_value) in
       [%pgsql dbh
-          "insert into ft_contracts(address, kind, ledger_id, ledger_key, ledger_value, crawled, token_id, decimals) \
-           values($address, $kind, $id, $?k, $?v, ${lk.ft_crawled}, $?token_id, ${lk.ft_decimals}) on conflict do nothing"])
+          "insert into ft_contracts(address, kind, ledger_id, ledger_key, \
+           ledger_value, crawled, token_id, decimals) \
+           values($address, $kind, $id, $?k, $?v, $crawled, $?token_id, \
+           ${lk.ft_decimals}) on conflict (address) \
+           do update set kind = $kind, ledger_id = $id, ledger_key = $?k, \
+           ledger_value = $?v, \
+           crawled = case when $no_crawled then ft_contracts.crawled else $crawled end, \
+           token_id = $?token_id, decimals = ${lk.ft_decimals}"])
     (SMap.bindings e.ft_contracts)

@@ -29,7 +29,7 @@ let config = {
       lugh_contract
       { ft_kind = Lugh ;
         ft_ledger_id = Z.of_int 10373 ;
-        ft_crawled = true ;
+        ft_crawled = Some true ;
         ft_token_id = Some Z.zero ;
         ft_decimals = 6l ;
       }

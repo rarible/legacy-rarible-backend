@@ -27,7 +27,7 @@ let handle_operation contract ft config () op =
         else
           Db.Misc.use None (fun dbh ->
               Format.printf "Block %s (%ld)@." (Common.Utils.short op.bo_block) op.bo_level;
-              Db.Crawl.insert_ft ~dbh ~config ~op ~contract ~forward:true {ft with Rtypes.ft_crawled=true})
+              Db.Crawl.insert_ft ~dbh ~config ~op ~contract ~forward:true {ft with Rtypes.ft_crawled=Some true})
       | _ -> Lwt.return_ok ()
     else Lwt.return_ok ()
 
@@ -45,7 +45,7 @@ let main () =
         let>? _ = async_recrawl ~config ~start ?end_:!recrawl_end
             ~operation:(handle_operation ft_contract ft)
             ((), ()) in
-        Db.Utils.set_crawled ft_contract
+        Db.Crawl.set_crawled ft_contract
     end
   | _ ->
       Format.printf "Missing arguments: '--contract', '--kind', '--id', '--start' are required@.";
