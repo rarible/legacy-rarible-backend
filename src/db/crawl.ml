@@ -1050,7 +1050,9 @@ let insert_block config ?forward dbh b =
             else Lwt.return_ok index
         ) index op.op_contents
     ) 0l b.operations in
-  Lwt.return_ok ()
+  [%pgsql dbh
+      "update state set level = ${b.header.shell.level}, \
+       tsp = ${b.header.shell.timestamp}, chain_id = ${b.chain_id}"]
 
 let recalculate_creators ~main ~burn ~supply ~amount ~account ~creators =
   let main_s = if main then Z.one else Z.minus_one in

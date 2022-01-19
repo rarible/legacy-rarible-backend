@@ -3,8 +3,6 @@ open Rtypes
 open Common
 open Misc
 
-let status = ref None
-
 let price left right =
   if left.asset_value > Z.zero then
     if Z.rem right.asset_value left.asset_value <> Z.zero then
@@ -809,43 +807,14 @@ let mk_nft_activity obj =
     nft_act_type = act ;
   }
 
-let status node =
-  Format.eprintf "get status %s@." node ;
-  let open Proto in
-  let base = EzAPI.BASE node in
+let status () =
+  Format.eprintf "get status@.";
   use None @@ fun dbh ->
-  let>? l =
-    [%pgsql dbh
-        "select max(level) from predecessors where main"] in
-  match l with
-  | [ Some level ] ->
-    begin match !status with
-      | None ->
-        let>? block =
-          Tzfunc.(
-            Node.get_enc_rpc ~base
-              (block0_enc Encoding.unit).json
-              ("/chains/main/blocks/" ^ Int32.to_string level)) in
-        let st = {
-          status_level = level ;
-          status_timestamp = block.header.shell.timestamp ;
-          status_chain_id = block.chain_id
-        } in
-        status := Some st ;
-        Lwt.return_ok st
-      | Some st when st.status_level <> level ->
-        let>? block =
-          Tzfunc.(
-            Node.get_enc_rpc ~base
-              (block0_enc Encoding.unit).json
-              ("/chains/main/blocks/" ^ Int32.to_string level)) in
-        let st = {
-          status_level = level ;
-          status_timestamp = block.header.shell.timestamp ;
-          status_chain_id = block.chain_id
-        } in
-        status := Some st ;
-        Lwt.return_ok st
-      | Some st -> Lwt.return_ok st
-    end
-  | _ -> Lwt.return_error (`hook_error "no predecessor level")
+  let>? state =
+    [%pgsql.object dbh
+        "select p.level, tsp, chain_id from state, predecessors p \
+         where main order by level desc limit 1"] in
+  match state with
+  | [ r ] ->
+    Lwt.return_ok { status_level = r#level; status_timestamp = r#tsp; status_chain_id = r#chain_id }
+  | _ -> Lwt.return_error (`hook_error "no status information")

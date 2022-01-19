@@ -6,15 +6,6 @@ open Errors
 
 module Errors = Errors
 
-(* let _ =
- *   let s =
- *     Tzfunc.Crypto.Base58.encode
- *       Tzfunc.Crypto.Prefix.generic_signature
- *       (Hex.to_string @@
- *        `Hex
- *          "45461654b86e856686e7a2e9a9213b29f8dc32a731046e0c2f1aa01e4eaa991e41ebc67535fac14c333ad5b0d0d821ef518edc9ed08ad7efc0af572620c045ce1c") in
- *   Format.eprintf "XX %S\n%!" s *)
-
 let nft_section = EzAPI.Doc.{section_name = "nft-activity-controller"; section_docs = []}
 let ownerships_section = EzAPI.Doc.{section_name = "nft-ownership-controller"; section_docs = []}
 let items_section = EzAPI.Doc.{section_name = "nft-item-controller"; section_docs = []}
@@ -77,7 +68,6 @@ let status_param = pstring ~enc:(Json_encoding.list order_status_enc) "status"
 let currency_param = pstring "currencyId"
 let activity_sort_param = pstring ~enc:activity_sort_enc "sort"
 let order_sort_param = pstring ~enc:order_sort_enc "sort"
-let node_param = pstring ~required:true "node"
 
 let hash_arg = EzAPI.Arg.string "hash"
 let item_id_arg = EzAPI.Arg.string "itemId"
@@ -92,11 +82,6 @@ let return = function
 
 let mk_invalid_argument param msg =
   Error {code=`BAD_REQUEST; message=Printf.sprintf "%s %s" param.EzAPI.Param.param_id msg}
-
-let get_required_node_param req =
-  match EzAPI.Req.find_param node_param req with
-  | None -> mk_invalid_argument node_param "param is required"
-  | Some s -> Ok s
 
 let get_origin_param req =
   let open Tzfunc.Crypto in
@@ -1402,7 +1387,6 @@ let validate _req input =
                   ~bytes with
           | Ok b -> return_ok b
           | Error e -> return (Error {code=`BAD_REQUEST; message=Let.string_of_error e})
-
 [@@post
   {path="/v0.1/order/signature/validate";
    name="validate";
@@ -1435,20 +1419,16 @@ let get_ft_balance ((req, contract), ft_owner) () =
    section=balance_section}]
 
 (* status-controller *)
-let get_status req () =
-  match get_required_node_param req with
-  | Error err -> return @@ Error err
-  | Ok node ->
-    let> r = Db.Get.status node in
-    match r with
-    | Error e ->
-      let message = Crawlori.Rp.string_of_error e in
-      return (Error {code=`UNEXPECTED_API_ERROR; message})
-    | Ok status -> return_ok status
+let get_status _req () =
+  let> r = Db.Get.status () in
+  match r with
+  | Error e ->
+    let message = Crawlori.Rp.string_of_error e in
+    return (Error {code=`UNEXPECTED_API_ERROR; message})
+  | Ok status -> return_ok status
 [@@get
   {path="/v0.1/status";
    name="status";
-   params=[node_param];
    output=status_enc;
-   errors=[unexpected_case;bad_request_case];
+   errors=[unexpected_case];
    section=status_section}]
