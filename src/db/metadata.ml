@@ -28,7 +28,7 @@ let parse meta =
   with _ ->
     None, None, None, None, None
 
-let get_or_timeout ?(timeout=30.) ?msg url =
+let get_or_timeout ?(timeout=5.) ?msg url =
   let timeout = Lwt_unix.sleep timeout >>= fun () -> Lwt.return_error (-1, Some "timeout") in
   Lwt.pick [ timeout ; EzReq_lwt.get ?msg url ]
 
