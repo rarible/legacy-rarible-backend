@@ -124,6 +124,69 @@ let nft_activity_events main l =
       else Lwt.return_ok ())
     l
 
+let order_activity_events dbh main l =
+  if main then
+    let l =
+      List.filter (fun r ->
+          r#order_activity_type <> "list" && r#order_activity_type <> "bid") l in
+    let>? activities = map_rp (fun r ->
+        let>? res =
+          [%pgsql.object dbh
+              "select a.id as id, order_activity_type, \
+               o.make_asset_type_class, o.make_asset_type_contract, \
+               o.make_asset_type_token_id, o.make_asset_value, o.make_asset_decimals, \
+               o.take_asset_type_class, o.take_asset_type_contract, \
+               o.take_asset_type_token_id, o.take_asset_value, o.take_asset_decimals, \
+               o.maker, o.hash as o_hash, \
+               match_left, match_right, \
+               transaction, block, level, date, \
+               \
+               oleft.hash as oleft_hash, oleft.maker as oleft_maker, \
+               oleft.salt as oleft_salt, \
+               oleft.taker as oleft_taker, \
+               oleft.make_asset_type_class as oleft_make_asset_type_class, \
+               oleft.make_asset_type_contract as oleft_make_asset_type_contract, \
+               oleft.make_asset_type_token_id as oleft_make_asset_type_token_id, \
+               oleft.make_asset_value as oleft_make_asset_value, \
+               oleft.make_asset_decimals as oleft_make_asset_decimals, \
+               oleft.take_asset_type_class as oleft_take_asset_type_class, \
+               oleft.take_asset_type_contract as oleft_take_asset_type_contract, \
+               oleft.take_asset_type_token_id as oleft_take_asset_type_token_id, \
+               oleft.take_asset_value as oleft_take_asset_value, \
+               oleft.take_asset_decimals as oleft_take_asset_decimals, \
+               \
+               oright.hash as oright_hash, oright.maker as oright_maker, \
+               oright.salt as oright_salt, \
+               oright.taker as oright_taker, \
+               oright.make_asset_type_class as oright_make_asset_type_class, \
+               oright.make_asset_type_contract as oright_make_asset_type_contract, \
+               oright.make_asset_type_token_id as oright_make_asset_type_token_id, \
+               oright.make_asset_value as oright_make_asset_value, \
+               oright.make_asset_decimals as oright_make_asset_decimals, \
+               oright.take_asset_type_class as oright_take_asset_type_class, \
+               oright.take_asset_type_contract as oright_take_asset_type_contract, \
+               oright.take_asset_type_token_id as oright_take_asset_type_token_id, \
+               oright.take_asset_value as oright_take_asset_value, \
+               oright.take_asset_decimals as oright_take_asset_decimals \
+               \
+               from order_activities as a \
+               left join orders as o on o.hash = a.hash \
+               left join orders as oleft on oleft.hash = a.match_left \
+               left join orders as oright on oright.hash = a.match_right where \
+               a.id = ${r#id}"] in
+        match res with
+        | [ r ] ->
+          let>? a, decs = Get.mk_order_activity ~dbh r in
+          Lwt.return_ok @@ Some (a, decs)
+        | _ -> Lwt.return_ok None) l in
+    let activities = List.filter_map (fun x -> x) activities in
+    iter_rp (fun (act, decs) ->
+        let activity = { at_nft_type = None ; at_order_type = Some act } in
+        Rarible_kafka.produce_activity ~decs activity >>= fun () ->
+        Lwt.return_ok ())
+      activities
+  else Lwt.return_ok ()
+
 let collection_events main collections names =
   iter_rp (fun r ->
       if main then
