@@ -1456,7 +1456,11 @@ paths:
                     format: date-time
                   chain_id:
                     type: string
+                  chain_timestamp:
+                    type: string
+                    format: date-time
                 required:
+                - chain_timestamp
                 - chain_id
                 - timestamp
                 - level
