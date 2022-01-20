@@ -6,12 +6,8 @@ open Misc
 let to_4_decimals r =
   if r.royalties_decimals <> 4 then
     List.map (fun p ->
-        let db =
-          Common.Utils.decimal_balance
-            ~decimals:(Int32.of_int r.royalties_decimals)
-            (Z.of_int32 p.part_value) in
-        let ab = Common.Utils.absolute_balance ~decimals:4l db in
-        { p with part_value = Z.to_int32 ab })
+        let part_value = Z.(to_int32 @@ (of_int32 p.part_value) * (~$10 ** 4) / (~$10 ** r.royalties_decimals)) in
+        { p with part_value })
       r.royalties_shares
   else r.royalties_shares
 

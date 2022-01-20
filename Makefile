@@ -29,6 +29,7 @@ copy: build openapi
 	@cp -f _build/default/src/crawler/recrawl_hen_royalties.exe _bin/recrawl_hen_royalties
 	@cp -f _build/default/src/crawler/recrawl_objkt.exe _bin/recrawl_objkt
 	@cp -f _build/default/src/db/clean_balance_updates.exe _bin/clean_balance_updates
+	@cp -f _build/default/src/db/fetch_off_royalties.exe _bin/fetch_off_royalties
 
 clean:
 	@dune clean

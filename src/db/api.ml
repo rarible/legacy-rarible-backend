@@ -1993,3 +1993,17 @@ let get_order_activities ?dbh ?sort ?continuation ?size = function
     get_order_activities_by_user ?dbh ?sort ?continuation ?size filter
   | OrderActivityFilterAll types ->
     get_order_activities_all ?dbh ?sort ?continuation ?size types
+
+let status () =
+  Format.eprintf "get status@.";
+  use None @@ fun dbh ->
+  let>? state =
+    [%pgsql.object dbh
+        "select p.level, tsp, chain_id from state, predecessors p \
+         where main order by level desc limit 1"] in
+  match state with
+  | [ r ] ->
+    Lwt.return_ok {
+      status_level = r#level; status_timestamp = CalendarLib.Calendar.now ();
+      status_chain_id = r#chain_id; status_chain_timestamp = r#tsp }
+  | _ -> Lwt.return_error (`hook_error "no status information")

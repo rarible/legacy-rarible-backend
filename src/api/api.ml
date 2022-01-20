@@ -1420,7 +1420,7 @@ let get_ft_balance ((req, contract), ft_owner) () =
 
 (* status-controller *)
 let get_status _req () =
-  let> r = Db.Get.status () in
+  let> r = Db.Api.status () in
   match r with
   | Error e ->
     let message = Crawlori.Rp.string_of_error e in

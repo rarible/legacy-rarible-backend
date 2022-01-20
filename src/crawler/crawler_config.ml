@@ -22,7 +22,7 @@ let get file extra_enc =
 let dummy_extra = {
   exchange = ""; royalties = ""; transfer_manager = "";
   contracts = SMap.empty; ft_contracts = SMap.empty; hen_info = None;
-  tezos_domains = None;
+  tezos_domains = None; versum_info = None; fxhash_info = None;
 }
 
 let rarible_contracts ?(db=dummy_extra) config =

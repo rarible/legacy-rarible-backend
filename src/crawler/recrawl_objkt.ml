@@ -110,7 +110,7 @@ let main () =
   let config = { config with Config.extra = {
       Rtypes.exchange = ""; royalties = ""; transfer_manager = ""; hen_info = None;
       ft_contracts = Rtypes.SMap.empty; contracts = config.Config.extra.Rtypes.contracts;
-      tezos_domains = None } } in
+      tezos_domains = None; versum_info = None; fxhash_info = None } } in
   let s = match config.Config.accounts with
     | None -> SSet.empty
     | Some s -> s in

@@ -114,6 +114,34 @@ let token_metadata_field = { bmt_key = `nat; bmt_value = `tuple [ `nat; `map (`s
 let metadata_field = { bmt_key = `string; bmt_value = `bytes }
 let royalties_field = { bmt_key = `nat; bmt_value = `seq (`tuple [ `address; `nat ]) }
 let hen_royalties_field = { bmt_key = `nat; bmt_value = `tuple [ `address; `nat ] }
+let versum_royalties_field = {
+  bmt_key = `nat;
+  bmt_value =
+    `tuple [
+      `tuple [
+        `tuple [ `bool; `map (`string, `bytes) ];
+        `seq (`tuple [`address; `seq (`tuple [`nat; `nat])]);
+        `nat ];
+      `tuple [ `address (* minter *); `option `timestamp];
+      `bool;
+      `nat; (* royalty *)
+      `seq (`tuple [ `address; `nat]); (* splits *)
+    ]}
+let fxhash_issuer_field = {
+  bmt_key = `nat;
+  bmt_value =
+    `tuple [
+      `tuple [
+        `tuple [ `address (* author *); `nat ];
+        `bool; `nat; `bytes ];
+      `tuple [ `nat; `mutez ];
+      `nat (* royalties *); `nat; `timestamp
+    ]
+}
+let fxhash_data_field = {
+  bmt_key = `nat;
+  bmt_value = `tuple [ `tuple [ `bool; `nat (* issuer_id *) ]; `nat; `nat ];
+}
 
 let set_royalties_entry = `tuple [`address; `nat; `map (`address, `nat)]
 

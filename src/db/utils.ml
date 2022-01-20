@@ -472,3 +472,7 @@ let update_contract_metadata_symbol ?dbh ~metadata ~contract symbol =
   use dbh @@ fun dbh ->
   [%pgsql dbh
       "update contracts set metadata = $metadata where address = $contract"]
+
+let collection_items ?dbh contract =
+  use dbh @@ fun dbh ->
+  [%pgsql dbh "select token_id from token_info where contract = $contract and royalties = '{}' order by token_id::numeric"]

@@ -707,6 +707,41 @@ let insert_hen_royalties ~dbh ~op ?forward ~info l =
     | _ -> Lwt.return_ok () in
   iter_rp f l
 
+let insert_versum_royalties ~dbh ~op ?forward ~contract l =
+  let f = function
+    | `nat token_id, Some (
+        `tuple [ _; _; _; `nat royalty; `seq l ]) ->
+      insert_royalties ~dbh ~op ?forward {
+        roy_contract = contract; roy_token_id = Some token_id;
+        roy_royalties = List.filter_map (function
+            | `tuple [ `address part_account; `nat pct ] ->
+              Some {
+                part_account;
+                part_value = Z.(to_int32 @@ royalty * pct / ~$100) }
+            | _ -> None
+          ) l }
+    | _ -> Lwt.return_ok () in
+  iter_rp f l
+
+let insert_fxhash_royalties ~dbh ~op ?forward ~info ~config l =
+  let f = function
+    | `nat token_id, Some (`tuple [ `tuple [_; `nat issuer_id ]; _; _ ]) ->
+      let base = Option.map (fun s -> EzAPI.BASE s) @@ List.nth_opt config.Crawlori.Config.nodes 0 in
+      let> r = Tzfunc.Node.(get_bigmap_value ?base ~typ:(prim `nat) info.fxhash_issuer_id (Proto.Mint issuer_id)) in
+      begin match r with
+        | Ok (Some (Micheline m)) ->
+          begin match Mtyped.parse_value Contract_spec.fxhash_issuer_field.bmt_value m with
+            | Ok (`tuple [`tuple [ `tuple [ `address part_account; _ ]; _; _; _ ]; _; `nat royalties; _; _ ]) ->
+              insert_royalties ~dbh ~op ?forward {
+                roy_contract = info.fxhash_contract; roy_token_id = Some token_id;
+                roy_royalties = [ { part_account; part_value = Z.(to_int32 @@ royalties * ~$10) } ]}
+            | _ -> Lwt.return_ok ()
+          end
+        | _ -> Lwt.return_ok ()
+      end
+    | _ -> Lwt.return_ok () in
+  iter_rp f l
+
 let insert_tezos_domains ~dbh ~op ?(forward=false) l =
   let f = function
     | `bytes key, Some (
@@ -892,7 +927,21 @@ let insert_transaction ~config ~dbh ~op ?(forward=false) tr =
         Format.printf "\027[0;35mtezos_domains %s %ld\027[0m@." (Utils.short op.bo_hash) op.bo_index;
       insert_tezos_domains ~dbh ~op ~forward l
     | _, _, Some ft, _ -> insert_ft ~dbh ~config ~op ~contract ~forward ft
-    | _, _, _, Some nft -> insert_nft ~dbh ~meta ~op ~contract ~nft ~entrypoint ~forward m
+    | _, _, _, Some nft ->
+      let>? () = insert_nft ~dbh ~meta ~op ~contract ~nft ~entrypoint ~forward m in
+      let>? () = match config.Crawlori.Config.extra.versum_info with
+        | Some (c, bm_id) when c = contract ->
+          let bm = { bm_id; bm_types = Contract_spec.versum_royalties_field } in
+          let l = Storage_diff.get_big_map_updates bm meta.op_lazy_storage_diff in
+          insert_versum_royalties ~dbh ~op ~forward ~contract l
+        | _ -> Lwt.return_ok () in
+      let>? () = match config.Crawlori.Config.extra.fxhash_info with
+        | Some info when info.fxhash_contract = contract ->
+          let bm = { bm_id = info.fxhash_data_id; bm_types = Contract_spec.fxhash_data_field } in
+          let l = Storage_diff.get_big_map_updates bm meta.op_lazy_storage_diff in
+          insert_fxhash_royalties ~dbh ~op ~forward ~config ~info l
+        | _ -> Lwt.return_ok () in
+      Lwt.return_ok ()
     | _ -> Lwt.return_ok ()
 
 let ledger_kind types =

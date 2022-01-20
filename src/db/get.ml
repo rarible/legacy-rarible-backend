@@ -3,6 +3,12 @@ open Rtypes
 open Common
 open Misc
 
+let offchain_royalties_contracts = [
+  "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton"; (* hen *)
+  "KT1LjmAdYQCLBjwv4S2oFkEzyHVkomAf5MrW"; (* versum *)
+  "KT1KEa8z6vWXDJrVqtMrAeDVzsvxat3kHaCE"; (* fxhash *)
+]
+
 let price left right =
   if left.asset_value > Z.zero then
     if Z.rem right.asset_value left.asset_value <> Z.zero then
@@ -648,7 +654,9 @@ let mk_nft_item dbh ?include_meta obj =
       match EzEncoding.destruct parts_enc obj#royalties, Option.map (EzEncoding.destruct parts_enc) obj#royalties_metadata with
       | [], Some ((_ :: _) as nft_item_roy_list) -> nft_item_roy_list, Some false
       | [], _ -> [], None
-      | nft_item_roy_list, _ -> nft_item_roy_list, Some (contract <> "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton") in
+      | nft_item_roy_list, _ ->
+        nft_item_roy_list,
+        Some (not (List.mem contract offchain_royalties_contracts)) in
     Lwt.return_ok {
       nft_item_id = obj#id ;
       nft_item_contract = contract ;
@@ -704,9 +712,10 @@ let get_nft_item_royalties ?dbh contract token_id =
     | [], _ ->
       Lwt.return_ok {nft_item_royalties_royalties=[]; nft_item_royalties_onchain = None}
     | nft_item_royalties_royalties, _ ->
-      Lwt.return_ok {nft_item_royalties_royalties;
-                     nft_item_royalties_onchain =
-                       Some (contract <> "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton")}
+      Lwt.return_ok {
+        nft_item_royalties_royalties;
+        nft_item_royalties_onchain =
+          Some (not (List.mem contract offchain_royalties_contracts))}
     end
   | [] -> Lwt.return_error (`hook_error "item not found")
 
@@ -806,17 +815,3 @@ let mk_nft_activity obj =
     nft_act_source = "RARIBLE";
     nft_act_type = act ;
   }
-
-let status () =
-  Format.eprintf "get status@.";
-  use None @@ fun dbh ->
-  let>? state =
-    [%pgsql.object dbh
-        "select p.level, tsp, chain_id from state, predecessors p \
-         where main order by level desc limit 1"] in
-  match state with
-  | [ r ] ->
-    Lwt.return_ok {
-      status_level = r#level; status_timestamp = CalendarLib.Calendar.now ();
-      status_chain_id = r#chain_id; status_chain_timestamp = r#tsp }
-  | _ -> Lwt.return_error (`hook_error "no status information")

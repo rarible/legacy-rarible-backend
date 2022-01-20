@@ -1039,11 +1039,20 @@ type hen_info = {
   hen_minter_id: z;
 } [@@deriving encoding]
 
+type fxhash_info = {
+  fxhash_contract: string;
+  fxhash_issuer: string;
+  fxhash_issuer_id: z;
+  fxhash_data_id: z;
+} [@@deriving encoding]
+
 type config = {
   exchange: string; [@dft ""]
   royalties: string; [@dft ""]
   transfer_manager: string; [@dft ""]
   hen_info: hen_info option;
+  versum_info: ((string [@key "contract"]) * (z [@key "id"]) [@object]) option;
+  fxhash_info: fxhash_info option;
   tezos_domains: (((string [@key "contract"]) * (z [@key "id"])) [@object]) option;
   mutable ft_contracts: ft_ledger SMap.t; [@map] [@dft SMap.empty]
   mutable contracts: nft_ledger SMap.t; [@map] [@dft SMap.empty]
