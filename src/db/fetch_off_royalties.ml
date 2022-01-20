@@ -24,7 +24,7 @@ let versum () =
   let typ = Common.Contract_spec.versum_royalties_field.bmt_value in
   let>? ids = Db.Utils.collection_items !collection in
   iter_rp (fun id ->
-      Format.printf "%s %s@." !issuer id;
+      Format.printf "%s %s@." !collection id;
       let> r = Node.(get_bigmap_value ~typ:(prim `nat) !bigmap (Proto.Mint (Z.of_string id))) in
       match r with
       | Ok (Some (Micheline m)) ->
@@ -89,8 +89,8 @@ let fxhash () =
 let () =
   Arg.parse spec (fun _ -> ()) "fetch_off_royalties.exe [OPTIONS]";
   Node.set_node !node;
-  if !collection = "" || !issuer = "" || !bigmap = Z.zero || !kind = "" then (
-    Format.printf "Missing collection or collection-bigmap argument@.";
+  if !collection = "" || !bigmap = Z.zero || !kind = "" then (
+    Format.printf "Missing collection or collection-bigmap or kind argument@.";
     exit 1);
   let main () =
     if !kind = "versum" then versum ()
