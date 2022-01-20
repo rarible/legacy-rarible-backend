@@ -174,12 +174,11 @@ let get_nft_items_by_creator ?dbh ?include_meta ?continuation ?(size=50) creator
     (match continuation with None -> CalendarLib.Calendar.now (), "" | Some (ts, h) -> (ts, h)) in
   let>? l = [%pgsql.object dbh
       "select i.id, \
-       last, metadata, i.tsp, creators, royalties, royalties_metadata, \
+       last, metadata, i.tsp, i.creators, royalties, royalties_metadata, \
        array_agg(case when balance is not null and balance <> 0 or amount <> 0 then owner end) as owners, \
        sum(case when t.balance is not null then t.balance else t.amount end) as supply \
-       from tokens as t, token_info i, unnest(i.creators) as c \
-       where c->>'account' = $creator and \
-       t.tid = i.id and \
+       from tokens as t, token_info as i, creators as c \
+       where c.account = $creator and t.tid = i.id and c.id = i.id and \
        i.main and metadata <> '{}' and (balance is not null and balance > 0 or amount > 0) and \
        ($no_continuation or (last = $ts and i.id < $id) or (last < $ts)) \
        group by (i.id) \

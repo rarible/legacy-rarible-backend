@@ -179,6 +179,14 @@ let insert_transfer ~dbh ~op ~contract lt =
         ) transfer_index tr_txs) 0l lt in
   ()
 
+let insert_creators ~dbh ~contract ~token_id creators =
+  let token_id = Z.to_string token_id in
+  let id = contract ^ ":" ^ token_id in
+  iter_rp (fun {part_account; part_value} ->
+      [%pgsql dbh
+         "insert into creators(id, contract, token_id, account, value) \
+          values($id, $contract, $token_id, $part_account, $part_value)"]) creators
+
 let insert_token_balances ~dbh ~op ~contract ?(ft=false) ?token_id ?(forward=false) balances =
   iter_rp (fun (k, v) ->
       let r = match k, v, ft with
@@ -239,18 +247,17 @@ let insert_token_balances ~dbh ~op ~contract ?(ft=false) ?token_id ?(forward=fal
         | Some a, _, true ->
           let>? () =
             if balance <> Z.zero then
-              let creators = [
-                Some (EzEncoding.construct part_enc {
-                    part_account=a; part_value = 10000l })
-              ] in
+              let creator = { part_account=a; part_value = 10000l } in
+              let creators = [ Some (EzEncoding.construct part_enc creator) ] in
               let id = Printf.sprintf "%s:%s" contract (Z.to_string token_id) in
-              [%pgsql dbh
+              let>? () = [%pgsql dbh
                   "insert into token_info(id, contract, token_id, transaction, block, \
                    level, tsp, main, last_block, last_level, last, creators, supply) \
                    values($id, $contract, ${Z.to_string token_id}, ${op.bo_hash}, \
                    ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, true, \
                    ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, $creators, $balance) \
-                   on conflict do nothing"]
+                   on conflict do nothing"] in
+              insert_creators ~dbh ~contract ~token_id [ creator ]
             else Lwt.return_ok () in
           let>? () =
             if kind = "nft" then
@@ -1092,31 +1099,41 @@ let recalculate_creators ~main ~burn ~supply ~amount ~account ~creators =
       | Some v -> (List.remove_assoc account creator_values_old) @ [ account, max Z.(sub v (mul amount (of_int 10000))) Z.zero ] in
   let creators =
     if new_supply = Z.zero then []
-    else
-      List.map (fun (part_account, v) ->
-          Some (EzEncoding.construct part_enc {
-              part_account;
-              part_value = Z.(to_int32 @@ div v new_supply)})) creator_values_new in
+    else List.map (fun (part_account, v) ->
+        { part_account; part_value = Z.(to_int32 @@ div v new_supply)}
+      ) creator_values_new in
   creators, new_supply, factor
+
+let creators_update ~dbh ~contract ~token_id ~id creators =
+  let token_id = Z.to_string token_id in
+  iter_rp (fun {part_account; part_value} ->
+      [%pgsql dbh
+          "insert into creators(id, contract, token_id, account, value) \
+           values($id, $contract, $token_id, $part_account, $part_value) \
+           on conflict (id, account) do update set value = $part_value where creators.id = $id"])
+    creators
 
 let contract_updates_base dbh ~main ~contract ~block ~level ~tsp ~burn
     ~account ~token_id ~amount =
+  let tid = contract ^ ":" ^ Z.to_string token_id in
   let>? old_supply, creators =
     let>? l = [%pgsql dbh
-        "select supply, creators from token_info where contract = $contract and \
-         token_id = ${Z.to_string token_id} limit 1"] in
+        "select supply, creators from token_info where id = $tid limit 1"] in
     one l in
   let creators, new_supply, factor =
     recalculate_creators ~main ~burn ~supply:old_supply ~amount ~account ~creators in
+  let creators_json = List.map (fun p -> Some (EzEncoding.construct part_enc p)) creators in
   let>? () = [%pgsql dbh
-      "update token_info set supply = $new_supply, creators = $creators, \
+      "update token_info set supply = $new_supply, creators = $creators_json, \
        last_block = case when $main then $block else last_block end, \
        last_level = case when $main then $level else last_level end, \
        last = case when $main then $tsp else last end \
-       where token_id = ${Z.to_string token_id} and contract = $contract"] in
+       where id = $tid"] in
+  let>? () = creators_update ~dbh ~id:tid ~contract ~token_id creators in
+  let oid = tid ^ ":" ^ account in
   [%pgsql dbh
       "update tokens set amount = amount + ${Z.to_string factor}::numeric * ${Z.to_string amount}::numeric \
-       where token_id = ${Z.to_string token_id} and contract = $contract and owner = $account"]
+       where oid = $oid"]
 
 let minter_update dbh ~main ~contract ~block ~level ~tsp minter =
   let enc = Json_encoding.(union [

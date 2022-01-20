@@ -502,6 +502,24 @@ let upgrade_12_to_13 dbh version =
     "alter table state add column chain_id varchar not null default ''";
     "alter table state add column tsp timestamp not null default now()" ]
 
+let upgrade_13_to_14 dbh version =
+  EzPG.upgrade ~dbh ~version
+    ~downgrade:[
+      "drop table creators"
+    ] [
+    "create table creators(\
+     id varchar not null, \
+     contract varchar not null, \
+     token_id varchar not null, \
+     account varchar not null, \
+     value int not null, \
+     unique (id, account))";
+    "create index creators_id_index on creators(id)";
+    "create index creators_account_index on creators(account)";
+    "insert into creators(id, contract, token_id, account, value) \
+     (select id, contract, token_id, c->>'account', (c->>'value')::int \
+     from token_info, unnest(creators) c)" ]
+
 let upgrades =
   let last_version = fst List.(hd @@ rev !Versions.upgrades) in
   !Versions.upgrades @ List.map (fun (i, f) -> last_version + i, f) [
@@ -517,4 +535,5 @@ let upgrades =
     10, upgrade_10_to_11;
     11, upgrade_11_to_12;
     12, upgrade_12_to_13;
+    13, upgrade_13_to_14;
   ]
