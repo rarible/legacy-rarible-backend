@@ -340,7 +340,7 @@ let insert_uri_pattern ~dbh ~op ~contract s =
        ${op.bo_tsp}, $contract, $s) \
        on conflict do nothing"]
 
-let insert_royalties ~dbh ~op ?(forward=false) ~update_index roy =
+let insert_royalties ~dbh ~op ?(forward=false) ?(update_index=0l) roy =
   let royalties = EzEncoding.construct parts_enc roy.roy_royalties in
   let source = op.bo_op.source in
   if not forward then
@@ -703,14 +703,14 @@ let insert_do_transfers ~dbh ~op
     left left_maker left_make_asset left_salt
     right right_maker right_make_asset right_salt
 
-let insert_hen_royalties ~dbh ~op ?forward ~info ~update_index l =
+let insert_hen_royalties ~dbh ~op ?forward ~info l =
   let f update_index = function
     | `nat token_id, Some (`tuple [ `address part_account; `nat v ]) ->
       insert_royalties ~dbh ~op ?forward ~update_index {
         roy_contract = info.hen_contract; roy_token_id = Some token_id;
         roy_royalties = [ { part_account; part_value = Z.to_int32 v } ]}
     | _ -> Lwt.return_ok update_index in
-  fold_rp f update_index l
+  fold_rp f 0l l
 
 let insert_versum_royalties ~dbh ~op ?forward ~contract ~update_index l =
   let f update_index = function
@@ -886,7 +886,7 @@ let insert_transaction ~config ~dbh ~op ?(forward=false) tr =
       match Parameters.parse_royalties entrypoint m with
       | Ok roy ->
         Format.printf "\027[0;35mset royalties %s %ld\027[0m@." (Utils.short op.bo_hash) op.bo_index;
-        let|>? _ = insert_royalties ~dbh ~op ~forward ~update_index:0l roy in
+        let|>? _ = insert_royalties ~dbh ~op ~forward roy in
         ()
       | _ -> Lwt.return_ok ()
     else if contract = config.Crawlori.Config.extra.exchange then (* exchange *)
@@ -931,7 +931,7 @@ let insert_transaction ~config ~dbh ~op ?(forward=false) tr =
       let royalties = Storage_diff.get_big_map_updates bm meta.op_lazy_storage_diff in
       if royalties <> [] then
         Format.printf "\027[0;35mhen_royalties %s %ld\027[0m@." (Utils.short op.bo_hash) op.bo_index;
-      let|>? _ = insert_hen_royalties ~dbh ~forward ~op ~info ~update_index:0l royalties in
+      let|>? _ = insert_hen_royalties ~dbh ~forward ~op ~info royalties in
       ()
     | _, Some (c, bm_id), _, _ when c = contract ->
       let bm = { bm_id; bm_types = Contract_spec.tezos_domains_field } in
