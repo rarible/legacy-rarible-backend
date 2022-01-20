@@ -28,7 +28,8 @@ let operation config () op =
           | Some {entrypoint; value = Micheline m }, Some nft ->
             Db.Misc.use None (fun dbh ->
                 Format.printf "Block %s (%ld)@." (Common.Utils.short op.bo_block) op.bo_level;
-                Db.Crawl.insert_nft ~dbh ~meta ~op ~contract:tr.destination ~forward:true ~entrypoint ~nft m)
+                let|>? _ = Db.Crawl.insert_nft ~dbh ~meta ~op ~contract:tr.destination ~forward:true ~entrypoint ~nft m in
+                ())
           | _ -> Lwt.return_ok ()
         end
       | Origination ori ->
