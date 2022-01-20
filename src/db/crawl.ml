@@ -962,14 +962,20 @@ let insert_origination ?(forward=false) config dbh op ori =
     let ledger_value = EzEncoding.construct micheline_type_short_enc nft.nft_ledger.bm_types.bmt_value in
     Format.printf "\027[0;93morigination %s (%s, %s)\027[0m@."
       (Utils.short kt1) kind (EzEncoding.construct nft_ledger_enc nft);
-    let metadata = EzEncoding.construct Json_encoding.(assoc string) metadata in
+    let metadata_assoc = EzEncoding.construct Json_encoding.(assoc string) metadata in
     let>? () =
       try
-        let tzip16_metadata = EzEncoding.destruct tzip16_metadata_enc metadata in
+        let tzip16_metadata = EzEncoding.destruct tzip16_metadata_enc metadata_assoc in
         Metadata.insert_tzip16_metadata_data
           ~dbh ~forward ~contract:kt1 ~block:op.bo_block
           ~level:op.bo_level ~tsp:op.bo_tsp tzip16_metadata
-      with _ -> Lwt.return_ok ()
+      with _ ->
+        match List.assoc_opt "" metadata with
+        | None -> Lwt.return_ok ()
+        | Some uri ->
+          Metadata.insert_tzip16_metadata
+            ~dbh ~forward ~contract:kt1 ~block:op.bo_block
+            ~level:op.bo_level ~tsp:op.bo_tsp uri
     in
     let>? () = [%pgsql dbh
         "insert into contracts(kind, address, owner, block, level, tsp, \
@@ -981,7 +987,7 @@ let insert_origination ?(forward=false) config dbh op ori =
          ${Z.to_string nft.nft_ledger.bm_id}, \
          $ledger_key, $ledger_value, $?uri, $?{Option.map Z.to_string nft.nft_token_meta_id}, \
          $?{Option.map Z.to_string nft.nft_meta_id}, $?{Option.map Z.to_string nft.nft_royalties_id}, \
-         $metadata, $forward) \
+         $metadata_assoc, $forward) \
          on conflict do nothing"] in
     let open Crawlori.Config in
     config.extra.contracts <- SMap.add kt1 nft config.extra.contracts;
