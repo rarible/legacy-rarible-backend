@@ -62,23 +62,24 @@ let insert_nft_activity_transfer dbh op kt1 from owner token_id amount =
   insert_nft_activity dbh op.bo_index op.bo_tsp nft_activity_type
 
 
-let insert_metadata_update ~dbh ~op ~contract ~token_id ?(forward=false) l =
+let insert_metadata_update ~dbh ~op ~contract ~token_id ?(update_index=0l) ?(forward=false) l =
   let token_meta = EzEncoding.construct Json_encoding.(assoc string) l in
   if not forward then
-    [%pgsql dbh
+    let|>? () = [%pgsql dbh
         "insert into token_updates(transaction, index, block, level, tsp, \
-         source, contract, token_id, metadata) \
+         source, contract, token_id, metadata, transfer_index) \
          values(${op.bo_hash}, ${op.bo_index}, ${op.bo_block}, ${op.bo_level}, \
          ${op.bo_tsp}, ${op.bo_op.source}, $contract, \
-         ${Z.to_string token_id}, $token_meta) \
-         on conflict do nothing"]
+         ${Z.to_string token_id}, $token_meta, $update_index) \
+         on conflict do nothing"] in
+    Int32.succ update_index
   else
     let block, level, tsp, transaction = op.bo_block, op.bo_level, op.bo_tsp, op.bo_hash in
     let id = Printf.sprintf "%s:%s" contract (Z.to_string token_id) in
     let uri = match List.assoc_opt "" l with
       | None -> None
       | Some s -> Metadata.parse_uri s in
-    [%pgsql dbh
+    let|>? () = [%pgsql dbh
         "insert into token_info(id, contract, token_id, block, level, tsp, \
          last_block, last_level, last, transaction, metadata, metadata_uri, main) \
          values($id, $contract, ${Z.to_string token_id}, $block, $level, $tsp, \
@@ -88,26 +89,27 @@ let insert_metadata_update ~dbh ~op ~contract ~token_id ?(forward=false) l =
          last_block = $block, \
          last_level = $level, last = $tsp \
          where token_info.contract = $contract and \
-         token_info.token_id = ${Z.to_string token_id}"]
+         token_info.token_id = ${Z.to_string token_id}"] in
+    update_index
 
 let insert_mint ~dbh ~op ~contract m =
   let block = op.bo_block in
   let level = op.bo_level in
   let tsp = op.bo_tsp in
-  let>? token_id, owner, amount, royalties = match m with
+  let>? token_id, owner, amount, royalties, update_index = match m with
     | NFTMint m ->
-      Lwt.return_ok (m.fa2m_token_id, m.fa2m_owner, Z.one, m.fa2m_royalties)
+      Lwt.return_ok (m.fa2m_token_id, m.fa2m_owner, Z.one, m.fa2m_royalties, 0l)
     | MTMint m ->
-      Lwt.return_ok (m.fa2m_token_id, m.fa2m_owner, m.fa2m_amount, m.fa2m_royalties)
+      Lwt.return_ok (m.fa2m_token_id, m.fa2m_owner, m.fa2m_amount, m.fa2m_royalties, 0l)
     | UbiMint m ->
       let>? pattern = Metadata.get_uri_pattern ~dbh contract in
       let meta = Option.fold ~none:[] ~some:(fun pattern -> ["", Utils.replace_token_id ~pattern (Z.to_string m.ubim_token_id)]) pattern in
-      let|>? () = insert_metadata_update ~dbh ~op ~contract ~token_id:m.ubim_token_id meta in
-      m.ubim_token_id, m.ubim_owner, Z.one, []
+      let|>? update_index = insert_metadata_update ~dbh ~op ~contract ~token_id:m.ubim_token_id meta in
+      m.ubim_token_id, m.ubim_owner, Z.one, [], update_index
     | UbiMint2 m ->
-      Lwt.return_ok (m.ubi2m_token_id, m.ubi2m_owner, m.ubi2m_amount, [])
+      Lwt.return_ok (m.ubi2m_token_id, m.ubi2m_owner, m.ubi2m_amount, [], 0l)
     | HENMint m ->
-      Lwt.return_ok (m.fa2m_token_id, m.fa2m_owner, m.fa2m_amount, m.fa2m_royalties) in
+      Lwt.return_ok (m.fa2m_token_id, m.fa2m_owner, m.fa2m_amount, m.fa2m_royalties, 0l) in
   let royalties = EzEncoding.construct parts_enc royalties in
   let id = Printf.sprintf "%s:%s" contract (Z.to_string token_id) in
   let>? () =
@@ -125,10 +127,11 @@ let insert_mint ~dbh ~op ~contract m =
          values(${op.bo_hash}, ${op.bo_index}, ${op.bo_block}, ${op.bo_level}, \
          ${op.bo_tsp}, $contract, $mint) \
          on conflict do nothing"] in
-  insert_nft_activity_mint dbh op contract token_id owner amount
+  let|>? () = insert_nft_activity_mint dbh op contract token_id owner amount in
+  update_index
 
-let insert_metadatas ~dbh ~op ~contract ?(forward=false) l =
-  iter_rp (function
+let insert_metadatas ~dbh ~op ~contract ?(forward=false) ~update_index l =
+  fold_rp (fun update_index m -> match m with
       | `nat token_id, Some (`tuple [`nat _; `assoc l]) ->
         let meta = List.filter_map (function
             | `string k, `bytes v ->
@@ -136,8 +139,8 @@ let insert_metadatas ~dbh ~op ~contract ?(forward=false) l =
               if Parameters.decode s then Some (k, s)
               else None
             | _ -> None) l in
-        insert_metadata_update ~dbh ~op ~contract ~token_id ~forward meta
-      | _ -> Lwt.return_ok ()) l
+        insert_metadata_update ~dbh ~op ~contract ~token_id ~forward ~update_index meta
+      | _ -> Lwt.return_ok update_index) update_index l
 
 let insert_burn ~dbh ~op ~contract m =
   let burn = EzEncoding.construct Json_encoding.(tup2 burn_enc string) (m, op.bo_op.source) in
@@ -153,7 +156,7 @@ let insert_burn ~dbh ~op ~contract m =
   insert_nft_activity_burn dbh op contract token_id owner amount
 
 let insert_transfer ~dbh ~op ~contract lt =
-  let|>? _ = fold_rp (fun transfer_index {tr_source; tr_txs} ->
+  fold_rp (fun transfer_index {tr_source; tr_txs} ->
       fold_rp (fun transfer_index {tr_destination; tr_token_id; tr_amount} ->
           let tid = Printf.sprintf "%s:%s" contract (Z.to_string tr_token_id) in
           let sid = Printf.sprintf "%s:%s:%s" contract (Z.to_string tr_token_id) tr_source in
@@ -176,8 +179,7 @@ let insert_transfer ~dbh ~op ~contract lt =
           let|>? () = insert_nft_activity_transfer
               dbh op contract tr_source tr_destination tr_token_id tr_amount in
           Int32.succ transfer_index
-        ) transfer_index tr_txs) 0l lt in
-  ()
+        ) transfer_index tr_txs) 0l lt
 
 let insert_creators ~dbh ~contract ~token_id creators =
   let token_id = Z.to_string token_id in
@@ -274,23 +276,23 @@ let insert_token_balances ~dbh ~op ~contract ?(ft=false) ?token_id ?(forward=fal
         | _ -> Lwt.return_ok ()
     ) balances
 
-let insert_update_operator ~dbh ~op ~contract lt =
-  iter_rp (fun {op_owner; op_operator; op_token_id; op_add} ->
-      [%pgsql dbh
-          "insert into token_updates(transaction, index, block, level, tsp, \
-           source, operator, add, contract, token_id) \
-           values(${op.bo_hash}, ${op.bo_index}, ${op.bo_block}, ${op.bo_level}, \
-           ${op.bo_tsp}, $op_owner, $op_operator, $op_add, \
-           $contract, ${Z.to_string op_token_id}) on conflict do nothing"]) lt
-
-let insert_update_operator_all ~dbh ~op ~contract lt =
-  let source = op.bo_op.source in
-  iter_rp (fun (operator, add) ->
-      [%pgsql dbh
-          "insert into token_updates(transaction, index, block, level, tsp, \
-           source, operator, add, contract) \
-           values(${op.bo_hash}, ${op.bo_index}, ${op.bo_block}, ${op.bo_level}, \
-           ${op.bo_tsp}, $source, $operator, $add, $contract) on conflict do nothing"]) lt
+(* let insert_update_operator ~dbh ~op ~contract lt =
+ *   iter_rp (fun {op_owner; op_operator; op_token_id; op_add} ->
+ *       [%pgsql dbh
+ *           "insert into token_updates(transaction, index, block, level, tsp, \
+ *            source, operator, add, contract, token_id) \
+ *            values(${op.bo_hash}, ${op.bo_index}, ${op.bo_block}, ${op.bo_level}, \
+ *            ${op.bo_tsp}, $op_owner, $op_operator, $op_add, \
+ *            $contract, ${Z.to_string op_token_id}) on conflict do nothing"]) lt
+ *
+ * let insert_update_operator_all ~dbh ~op ~contract lt =
+ *   let source = op.bo_op.source in
+ *   iter_rp (fun (operator, add) ->
+ *       [%pgsql dbh
+ *           "insert into token_updates(transaction, index, block, level, tsp, \
+ *            source, operator, add, contract) \
+ *            values(${op.bo_hash}, ${op.bo_index}, ${op.bo_block}, ${op.bo_level}, \
+ *            ${op.bo_tsp}, $source, $operator, $add, $contract) on conflict do nothing"]) lt *)
 
 let metadata_update dbh ~main ~contract ~block ~level ~tsp ?value key =
   if main then
@@ -338,27 +340,30 @@ let insert_uri_pattern ~dbh ~op ~contract s =
        ${op.bo_tsp}, $contract, $s) \
        on conflict do nothing"]
 
-let insert_royalties ~dbh ~op ?(forward=false) roy =
+let insert_royalties ~dbh ~op ?(forward=false) ~update_index roy =
   let royalties = EzEncoding.construct parts_enc roy.roy_royalties in
   let source = op.bo_op.source in
   if not forward then
-    [%pgsql dbh
+    let|>? () = [%pgsql dbh
         "insert into token_updates(transaction, index, block, level, tsp, \
-         source, token_id, contract, royalties) \
+         source, token_id, contract, royalties, transfer_index) \
          values(${op.bo_hash}, ${op.bo_index}, ${op.bo_block}, ${op.bo_level}, \
-         ${op.bo_tsp}, $source, $?{Option.map Z.to_string roy.roy_token_id}, ${roy.roy_contract}, $royalties) \
-         on conflict do nothing"]
+         ${op.bo_tsp}, $source, $?{Option.map Z.to_string roy.roy_token_id}, \
+         ${roy.roy_contract}, $royalties, $update_index) \
+         on conflict do nothing"] in
+    Int32.succ update_index
   else
     let no_token_id = Option.is_none roy.roy_token_id in
-    [%pgsql dbh
+    let|>? () = [%pgsql dbh
         "update token_info set royalties = $royalties, \
          last_block = ${op.bo_block},
          last_level = ${op.bo_level}, \
          last = ${op.bo_tsp} \
          where contract = ${roy.roy_contract} and \
-         ($no_token_id or token_id = $?{Option.map Z.to_string roy.roy_token_id})"]
+         ($no_token_id or token_id = $?{Option.map Z.to_string roy.roy_token_id})"] in
+    update_index
 
-let insert_royalties_bms ~dbh ~op ~contract ?forward royalties =
+let insert_royalties_bms ~dbh ~op ~contract ?forward ~update_index royalties =
   let royalties = List.filter_map (function
       | `nat token_id, Some (`seq l) ->
         let roy_royalties = List.filter_map (function
@@ -371,7 +376,7 @@ let insert_royalties_bms ~dbh ~op ~contract ?forward royalties =
         Some { roy_contract = contract; roy_token_id = Some token_id;
                roy_royalties = [] }
       | _ -> None) royalties in
-  iter_rp (insert_royalties ~dbh ~op ?forward) royalties
+  fold_rp (fun update_index -> insert_royalties ~dbh ~op ?forward ~update_index) update_index royalties
 
 let insert_order_activity ?(main=false)
     dbh id match_left match_right hash transaction block level date order_activity_type =
@@ -698,20 +703,20 @@ let insert_do_transfers ~dbh ~op
     left left_maker left_make_asset left_salt
     right right_maker right_make_asset right_salt
 
-let insert_hen_royalties ~dbh ~op ?forward ~info l =
-  let f = function
+let insert_hen_royalties ~dbh ~op ?forward ~info ~update_index l =
+  let f update_index = function
     | `nat token_id, Some (`tuple [ `address part_account; `nat v ]) ->
-      insert_royalties ~dbh ~op ?forward {
+      insert_royalties ~dbh ~op ?forward ~update_index {
         roy_contract = info.hen_contract; roy_token_id = Some token_id;
         roy_royalties = [ { part_account; part_value = Z.to_int32 v } ]}
-    | _ -> Lwt.return_ok () in
-  iter_rp f l
+    | _ -> Lwt.return_ok update_index in
+  fold_rp f update_index l
 
-let insert_versum_royalties ~dbh ~op ?forward ~contract l =
-  let f = function
+let insert_versum_royalties ~dbh ~op ?forward ~contract ~update_index l =
+  let f update_index = function
     | `nat token_id, Some (
         `tuple [ _; _; _; `nat royalty; `seq l ]) ->
-      insert_royalties ~dbh ~op ?forward {
+      insert_royalties ~dbh ~op ?forward ~update_index {
         roy_contract = contract; roy_token_id = Some token_id;
         roy_royalties = List.filter_map (function
             | `tuple [ `address part_account; `nat pct ] ->
@@ -720,11 +725,11 @@ let insert_versum_royalties ~dbh ~op ?forward ~contract l =
                 part_value = Z.(to_int32 @@ royalty * pct / ~$100) }
             | _ -> None
           ) l }
-    | _ -> Lwt.return_ok () in
-  iter_rp f l
+    | _ -> Lwt.return_ok update_index in
+  fold_rp f update_index l
 
-let insert_fxhash_royalties ~dbh ~op ?forward ~info ~config l =
-  let f = function
+let insert_fxhash_royalties ~dbh ~op ?forward ~info ~config ~update_index l =
+  let f update_index = function
     | `nat token_id, Some (`tuple [ `tuple [_; `nat issuer_id ]; _; _ ]) ->
       let base = Option.map (fun s -> EzAPI.BASE s) @@ List.nth_opt config.Crawlori.Config.nodes 0 in
       let> r = Tzfunc.Node.(get_bigmap_value ?base ~typ:(prim `nat) info.fxhash_issuer_id (Proto.Mint issuer_id)) in
@@ -732,15 +737,15 @@ let insert_fxhash_royalties ~dbh ~op ?forward ~info ~config l =
         | Ok (Some (Micheline m)) ->
           begin match Mtyped.parse_value Contract_spec.fxhash_issuer_field.bmt_value m with
             | Ok (`tuple [`tuple [ `tuple [ `address part_account; _ ]; _; _; _ ]; _; `nat royalties; _; _ ]) ->
-              insert_royalties ~dbh ~op ?forward {
+              insert_royalties ~dbh ~op ?forward ~update_index {
                 roy_contract = info.fxhash_contract; roy_token_id = Some token_id;
                 roy_royalties = [ { part_account; part_value = Z.(to_int32 @@ royalties * ~$10) } ]}
-            | _ -> Lwt.return_ok ()
+            | _ -> Lwt.return_ok update_index
           end
-        | _ -> Lwt.return_ok ()
+        | _ -> Lwt.return_ok update_index
       end
-    | _ -> Lwt.return_ok () in
-  iter_rp f l
+    | _ -> Lwt.return_ok update_index in
+  fold_rp f update_index l
 
 let insert_tezos_domains ~dbh ~op ?(forward=false) l =
   let f = function
@@ -827,44 +832,50 @@ let insert_nft ~dbh ~meta ~op ~contract ~nft ~entrypoint ?(forward=false) param 
   if List.mem entrypoint crawled_entrypoints then
     Format.printf "\027[0;35mNFT %s %s[%ld] %s\027[0m@."
       (string_of_entrypoint entrypoint) (Utils.short op.bo_hash) op.bo_index (Utils.short contract);
-  let>? () =
-    if forward then Lwt.return_ok ()
+  let>? update_index =
+    if forward then Lwt.return_ok 0l
     else match Parameters.parse_fa2 entrypoint param with
     | Ok (Mint_tokens m) -> insert_mint ~dbh ~op ~contract m
-    | Ok (Burn_tokens b) -> insert_burn ~dbh ~op ~contract b
+    | Ok (Burn_tokens b) ->
+      let|>? () = insert_burn ~dbh ~op ~contract b in 0l
     | Ok (Transfers t) -> insert_transfer ~dbh ~op ~contract t
-    | Ok (Metadata (key, value)) -> insert_metadata ~dbh ~op ~contract ~value ~forward key
-    | Ok (Add_minter a) -> insert_minter ~dbh ~op ~contract ~add:true a
-    | Ok (Remove_minter a) -> insert_minter ~dbh ~op ~contract ~add:false a
-    | Ok (Token_uri_pattern s) -> insert_uri_pattern ~dbh ~op ~contract s
-    | _ -> Lwt.return_ok () in
+    | Ok (Metadata (key, value)) ->
+      let|>? () = insert_metadata ~dbh ~op ~contract ~value ~forward key in 0l
+    | Ok (Add_minter a) ->
+      let|>? () = insert_minter ~dbh ~op ~contract ~add:true a in 0l
+    | Ok (Remove_minter a) ->
+      let|>? () = insert_minter ~dbh ~op ~contract ~add:false a in 0l
+    | Ok (Token_uri_pattern s) ->
+      let|>? () = insert_uri_pattern ~dbh ~op ~contract s in 0l
+    | _ -> Lwt.return_ok 0l in
   let balances = Storage_diff.get_big_map_updates nft.nft_ledger
       meta.op_lazy_storage_diff in
   let>? () = insert_token_balances ~dbh ~op ~contract ~forward balances in
-  let>? () = match nft.nft_token_meta_id with
-  | None -> Lwt.return_ok ()
+  let>? update_index = match nft.nft_token_meta_id with
+  | None -> Lwt.return_ok update_index
   | Some bm_id ->
     let bm = {bm_id; bm_types = Contract_spec.token_metadata_field} in
     let metadata = Storage_diff.get_big_map_updates bm meta.op_lazy_storage_diff in
-    insert_metadatas ~dbh ~op ~contract ~forward metadata in
-  let>? () = match nft.nft_royalties_id with
-    | None -> Lwt.return_ok ()
+    insert_metadatas ~dbh ~op ~contract ~forward ~update_index metadata in
+  let>? update_index = match nft.nft_royalties_id with
+    | None -> Lwt.return_ok update_index
     | Some bm_id ->
       let bm = { bm_id; bm_types = Contract_spec.royalties_field } in
       let royalties = Storage_diff.get_big_map_updates bm meta.op_lazy_storage_diff in
-      insert_royalties_bms ~dbh ~op ~contract ~forward royalties in
+      insert_royalties_bms ~dbh ~op ~contract ~forward ~update_index royalties in
   match nft.nft_meta_id with
-  | None -> Lwt.return_ok ()
+  | None -> Lwt.return_ok update_index
   | Some bm_id ->
     let bm = {bm_id; bm_types = Contract_spec.metadata_field} in
     let metadata = Storage_diff.get_big_map_updates bm meta.op_lazy_storage_diff in
-    iter_rp (function
+    let|>? () = iter_rp (function
         | `string key, Some (`bytes h) ->
           let value = (Tzfunc.Crypto.hex_to_raw h :> string) in
           if Parameters.decode value then insert_metadata ~dbh ~op ~contract ~forward ~value key
           else Lwt.return_ok ()
         | `string key, None -> insert_metadata ~dbh ~op ~contract ~forward key
-        | _ -> Lwt.return_ok ()) metadata
+        | _ -> Lwt.return_ok ()) metadata in
+    update_index
 
 let insert_transaction ~config ~dbh ~op ?(forward=false) tr =
   let contract = tr.destination in
@@ -875,7 +886,8 @@ let insert_transaction ~config ~dbh ~op ?(forward=false) tr =
       match Parameters.parse_royalties entrypoint m with
       | Ok roy ->
         Format.printf "\027[0;35mset royalties %s %ld\027[0m@." (Utils.short op.bo_hash) op.bo_index;
-        insert_royalties ~dbh ~op ~forward roy
+        let|>? _ = insert_royalties ~dbh ~op ~forward ~update_index:0l roy in
+        ()
       | _ -> Lwt.return_ok ()
     else if contract = config.Crawlori.Config.extra.exchange then (* exchange *)
       begin match Parameters.parse_cancel entrypoint m with
@@ -919,7 +931,8 @@ let insert_transaction ~config ~dbh ~op ?(forward=false) tr =
       let royalties = Storage_diff.get_big_map_updates bm meta.op_lazy_storage_diff in
       if royalties <> [] then
         Format.printf "\027[0;35mhen_royalties %s %ld\027[0m@." (Utils.short op.bo_hash) op.bo_index;
-      insert_hen_royalties ~dbh ~forward ~op ~info royalties
+      let|>? _ = insert_hen_royalties ~dbh ~forward ~op ~info ~update_index:0l royalties in
+      ()
     | _, Some (c, bm_id), _, _ when c = contract ->
       let bm = { bm_id; bm_types = Contract_spec.tezos_domains_field } in
       let l = Storage_diff.get_big_map_updates bm meta.op_lazy_storage_diff in
@@ -928,19 +941,19 @@ let insert_transaction ~config ~dbh ~op ?(forward=false) tr =
       insert_tezos_domains ~dbh ~op ~forward l
     | _, _, Some ft, _ -> insert_ft ~dbh ~config ~op ~contract ~forward ft
     | _, _, _, Some nft ->
-      let>? () = insert_nft ~dbh ~meta ~op ~contract ~nft ~entrypoint ~forward m in
-      let>? () = match config.Crawlori.Config.extra.versum_info with
+      let>? update_index = insert_nft ~dbh ~meta ~op ~contract ~nft ~entrypoint ~forward m in
+      let>? update_index = match config.Crawlori.Config.extra.versum_info with
         | Some (c, bm_id) when c = contract ->
           let bm = { bm_id; bm_types = Contract_spec.versum_royalties_field } in
           let l = Storage_diff.get_big_map_updates bm meta.op_lazy_storage_diff in
-          insert_versum_royalties ~dbh ~op ~forward ~contract l
-        | _ -> Lwt.return_ok () in
-      let>? () = match config.Crawlori.Config.extra.fxhash_info with
+          insert_versum_royalties ~dbh ~op ~forward ~contract ~update_index l
+        | _ -> Lwt.return_ok update_index in
+      let>? _ = match config.Crawlori.Config.extra.fxhash_info with
         | Some info when info.fxhash_contract = contract ->
           let bm = { bm_id = info.fxhash_data_id; bm_types = Contract_spec.fxhash_data_field } in
           let l = Storage_diff.get_big_map_updates bm meta.op_lazy_storage_diff in
-          insert_fxhash_royalties ~dbh ~op ~forward ~config ~info l
-        | _ -> Lwt.return_ok () in
+          insert_fxhash_royalties ~dbh ~op ~forward ~config ~info ~update_index l
+        | _ -> Lwt.return_ok update_index in
       Lwt.return_ok ()
     | _ -> Lwt.return_ok ()
 
@@ -1052,18 +1065,19 @@ let insert_origination ?(forward=false) config dbh op ori =
       | Some accs -> config.accounts <- Some (SSet.add kt1 accs) in
     let balances = Storage_diff.get_big_map_updates nft.nft_ledger meta.op_lazy_storage_diff in
     let>? () = insert_token_balances ~dbh ~op ~contract:kt1 ~forward balances in
-    let>? () = match nft.nft_token_meta_id with
-      | None -> Lwt.return_ok ()
+    let>? update_index = match nft.nft_token_meta_id with
+      | None -> Lwt.return_ok 0l
       | Some bm_id ->
         let bm = { bm_id; bm_types = Contract_spec.token_metadata_field } in
         let metadata = Storage_diff.get_big_map_updates bm meta.op_lazy_storage_diff in
-        insert_metadatas ~dbh ~op ~contract:kt1 ~forward metadata in
+        insert_metadatas ~dbh ~op ~contract:kt1 ~forward ~update_index:0l metadata in
     match nft.nft_royalties_id with
     | None -> Lwt.return_ok ()
     | Some bm_id ->
       let bm = { bm_id; bm_types = Contract_spec.royalties_field } in
       let royalties = Storage_diff.get_big_map_updates bm meta.op_lazy_storage_diff in
-      insert_royalties_bms ~dbh ~op ~contract:kt1 ~forward royalties
+      let|>? _ = insert_royalties_bms ~dbh ~op ~contract:kt1 ~forward ~update_index royalties in
+      ()
 
 let insert_operation config ?forward dbh op =
   let open Hooks in
