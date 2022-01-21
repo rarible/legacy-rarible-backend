@@ -473,6 +473,24 @@ let update_contract_metadata_symbol ?dbh ~metadata ~contract symbol =
   [%pgsql dbh
       "update contracts set metadata = $metadata where address = $contract"]
 
-let collection_items ?dbh contract =
+let collection_items ?dbh ?offset ?limit contract =
   use dbh @@ fun dbh ->
-  [%pgsql dbh "select token_id from token_info where contract = $contract and royalties = '{}' order by token_id::numeric"]
+  match offset, limit with
+  | Some offset, Some limit ->
+    [%pgsql dbh
+        "select token_id from token_info where contract = $contract and royalties = '{}' \
+         order by token_id::numeric limit $limit offset $offset"]
+  | _ ->
+    [%pgsql dbh
+        "select token_id from token_info where contract = $contract and royalties = '{}' \
+         order by token_id::numeric"]
+
+
+let collection_items_count ?dbh contract =
+  use dbh @@ fun dbh ->
+  let|>? l = [%pgsql dbh
+      "select count(token_id) from token_info \
+       where contract = $contract and royalties = '{}'"] in
+  match l with
+  | [ Some n ] -> n
+  | _ -> 0L
