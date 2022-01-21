@@ -797,7 +797,7 @@ let check_ft_status ~dbh ~config ?crawled contract =
             | None -> None
             | Some ft -> Some {ft with ft_crawled=Some true}) config.Crawlori.Config.extra.ft_contracts in
         config.Crawlori.Config.extra.ft_contracts <- ft_contracts);
-        Lwt.return_ok c
+      Lwt.return_ok c
     | _ -> Lwt.return_ok false
 
 let insert_ft ~dbh ~config ~op ~contract ?(forward=false) ft =
@@ -819,6 +819,21 @@ let insert_ft ~dbh ~config ~op ~contract ?(forward=false) ft =
     let balances = Storage_diff.get_big_map_updates {bm_id; bm_types} meta.op_lazy_storage_diff in
     insert_token_balances ~dbh ~op ~contract ~ft:true ?token_id:ft.ft_token_id ~forward balances
 
+let check_nft_status ~dbh ~config ?crawled contract =
+  match crawled with
+  | Some true -> Lwt.return_ok true
+  | _ ->
+    let>? l = [%pgsql dbh "select crawled from contracts where address = $contract"] in
+    match l with
+    | [ c ] ->
+      if c then (
+        let contracts = SMap.update contract (function
+            | None -> None
+            | Some nft -> Some {nft with nft_crawled=Some true}) config.Crawlori.Config.extra.contracts in
+        config.Crawlori.Config.extra.contracts <- contracts);
+      Lwt.return_ok c
+    | _ -> Lwt.return_ok false
+
 let crawled_entrypoints = List.map (fun s -> EPnamed s) [
     "mint"; "burn"; "transfer"; "set_metadata"; "add_minter"; "remove_minter";
     "set_token_metadata_uri" ]
@@ -831,54 +846,69 @@ let string_of_entrypoint = function
   | EPremove -> "remove"
   | EPnamed s -> s
 
-let insert_nft ~dbh ~meta ~op ~contract ~nft ~entrypoint ?(forward=false) param =
+let insert_nft ~dbh ~config ~meta ~op ~contract ~nft ~entrypoint ?(forward=false) param =
   if List.mem entrypoint crawled_entrypoints then
     Format.printf "\027[0;35mNFT %s %s[%ld] %s\027[0m@."
       (string_of_entrypoint entrypoint) (Utils.short op.bo_hash) op.bo_index (Utils.short contract);
-  let>? update_index =
-    if forward then Lwt.return_ok 0l
-    else match Parameters.parse_fa2 entrypoint param with
-    | Ok (Mint_tokens m) -> insert_mint ~dbh ~op ~contract m
-    | Ok (Burn_tokens b) ->
-      let|>? () = insert_burn ~dbh ~op ~contract b in 0l
-    | Ok (Transfers t) -> insert_transfer ~dbh ~op ~contract t
-    | Ok (Metadata (key, value)) ->
-      let|>? () = insert_metadata ~dbh ~op ~contract ~value ~forward key in 0l
-    | Ok (Add_minter a) ->
-      let|>? () = insert_minter ~dbh ~op ~contract ~add:true a in 0l
-    | Ok (Remove_minter a) ->
-      let|>? () = insert_minter ~dbh ~op ~contract ~add:false a in 0l
-    | Ok (Token_uri_pattern s) ->
-      let|>? () = insert_uri_pattern ~dbh ~op ~contract s in 0l
-    | _ -> Lwt.return_ok 0l in
-  let balances = Storage_diff.get_big_map_updates nft.nft_ledger
-      meta.op_lazy_storage_diff in
-  let>? () = insert_token_balances ~dbh ~op ~contract ~forward balances in
-  let>? update_index = match nft.nft_token_meta_id with
-  | None -> Lwt.return_ok update_index
-  | Some bm_id ->
-    let bm = {bm_id; bm_types = Contract_spec.token_metadata_field} in
-    let metadata = Storage_diff.get_big_map_updates bm meta.op_lazy_storage_diff in
-    insert_metadatas ~dbh ~op ~contract ~forward ~update_index metadata in
-  let>? update_index = match nft.nft_royalties_id with
-    | None -> Lwt.return_ok update_index
-    | Some bm_id ->
-      let bm = { bm_id; bm_types = Contract_spec.royalties_field } in
-      let royalties = Storage_diff.get_big_map_updates bm meta.op_lazy_storage_diff in
-      insert_royalties_bms ~dbh ~op ~contract ~forward ~update_index royalties in
-  match nft.nft_meta_id with
-  | None -> Lwt.return_ok update_index
-  | Some bm_id ->
-    let bm = {bm_id; bm_types = Contract_spec.metadata_field} in
-    let metadata = Storage_diff.get_big_map_updates bm meta.op_lazy_storage_diff in
-    let|>? () = iter_rp (function
-        | `string key, Some (`bytes h) ->
-          let value = (Tzfunc.Crypto.hex_to_raw h :> string) in
-          if Parameters.decode value then insert_metadata ~dbh ~op ~contract ~forward ~value key
-          else Lwt.return_ok ()
-        | `string key, None -> insert_metadata ~dbh ~op ~contract ~forward key
-        | _ -> Lwt.return_ok ()) metadata in
-    update_index
+  let>? crawled = check_nft_status ~dbh ~config ?crawled:nft.nft_crawled contract in
+  if not crawled then Lwt.return_ok ()
+  else
+    let>? update_index =
+      if forward then Lwt.return_ok 0l
+      else match Parameters.parse_fa2 entrypoint param with
+        | Ok (Mint_tokens m) -> insert_mint ~dbh ~op ~contract m
+        | Ok (Burn_tokens b) ->
+          let|>? () = insert_burn ~dbh ~op ~contract b in 0l
+        | Ok (Transfers t) -> insert_transfer ~dbh ~op ~contract t
+        | Ok (Metadata (key, value)) ->
+          let|>? () = insert_metadata ~dbh ~op ~contract ~value ~forward key in 0l
+        | Ok (Add_minter a) ->
+          let|>? () = insert_minter ~dbh ~op ~contract ~add:true a in 0l
+        | Ok (Remove_minter a) ->
+          let|>? () = insert_minter ~dbh ~op ~contract ~add:false a in 0l
+        | Ok (Token_uri_pattern s) ->
+          let|>? () = insert_uri_pattern ~dbh ~op ~contract s in 0l
+        | _ -> Lwt.return_ok 0l in
+    let balances = Storage_diff.get_big_map_updates nft.nft_ledger
+        meta.op_lazy_storage_diff in
+    let>? () = insert_token_balances ~dbh ~op ~contract ~forward balances in
+    let>? update_index = match nft.nft_token_meta_id with
+      | None -> Lwt.return_ok update_index
+      | Some bm_id ->
+        let bm = {bm_id; bm_types = Contract_spec.token_metadata_field} in
+        let metadata = Storage_diff.get_big_map_updates bm meta.op_lazy_storage_diff in
+        insert_metadatas ~dbh ~op ~contract ~forward ~update_index metadata in
+    let>? update_index = match nft.nft_royalties_id with
+      | None -> Lwt.return_ok update_index
+      | Some bm_id ->
+        let bm = { bm_id; bm_types = Contract_spec.royalties_field } in
+        let royalties = Storage_diff.get_big_map_updates bm meta.op_lazy_storage_diff in
+        insert_royalties_bms ~dbh ~op ~contract ~forward ~update_index royalties in
+    let>? () = match nft.nft_meta_id with
+      | None -> Lwt.return_ok ()
+      | Some bm_id ->
+        let bm = {bm_id; bm_types = Contract_spec.metadata_field} in
+        let metadata = Storage_diff.get_big_map_updates bm meta.op_lazy_storage_diff in
+        iter_rp (function
+            | `string key, Some (`bytes h) ->
+              let value = (Tzfunc.Crypto.hex_to_raw h :> string) in
+              if Parameters.decode value then insert_metadata ~dbh ~op ~contract ~forward ~value key
+              else Lwt.return_ok ()
+            | `string key, None -> insert_metadata ~dbh ~op ~contract ~forward key
+            | _ -> Lwt.return_ok ()) metadata in
+    let>? update_index = match config.Crawlori.Config.extra.versum_info with
+      | Some (c, bm_id) when c = contract ->
+        let bm = { bm_id; bm_types = Contract_spec.versum_royalties_field } in
+        let l = Storage_diff.get_big_map_updates bm meta.op_lazy_storage_diff in
+        insert_versum_royalties ~dbh ~op ~forward ~contract ~update_index l
+      | _ -> Lwt.return_ok update_index in
+    let>? _ = match config.Crawlori.Config.extra.fxhash_info with
+      | Some info when info.fxhash_contract = contract ->
+        let bm = { bm_id = info.fxhash_data_id; bm_types = Contract_spec.fxhash_data_field } in
+        let l = Storage_diff.get_big_map_updates bm meta.op_lazy_storage_diff in
+        insert_fxhash_royalties ~dbh ~op ~forward ~config ~info ~update_index l
+      | _ -> Lwt.return_ok update_index in
+    Lwt.return_ok ()
 
 let insert_transaction ~config ~dbh ~op ?(forward=false) tr =
   let contract = tr.destination in
@@ -944,20 +974,7 @@ let insert_transaction ~config ~dbh ~op ?(forward=false) tr =
       insert_tezos_domains ~dbh ~op ~forward l
     | _, _, Some ft, _ -> insert_ft ~dbh ~config ~op ~contract ~forward ft
     | _, _, _, Some nft ->
-      let>? update_index = insert_nft ~dbh ~meta ~op ~contract ~nft ~entrypoint ~forward m in
-      let>? update_index = match config.Crawlori.Config.extra.versum_info with
-        | Some (c, bm_id) when c = contract ->
-          let bm = { bm_id; bm_types = Contract_spec.versum_royalties_field } in
-          let l = Storage_diff.get_big_map_updates bm meta.op_lazy_storage_diff in
-          insert_versum_royalties ~dbh ~op ~forward ~contract ~update_index l
-        | _ -> Lwt.return_ok update_index in
-      let>? _ = match config.Crawlori.Config.extra.fxhash_info with
-        | Some info when info.fxhash_contract = contract ->
-          let bm = { bm_id = info.fxhash_data_id; bm_types = Contract_spec.fxhash_data_field } in
-          let l = Storage_diff.get_big_map_updates bm meta.op_lazy_storage_diff in
-          insert_fxhash_royalties ~dbh ~op ~forward ~config ~info ~update_index l
-        | _ -> Lwt.return_ok update_index in
-      Lwt.return_ok ()
+      insert_nft ~dbh ~config ~meta ~op ~contract ~nft ~entrypoint ~forward m
     | _ -> Lwt.return_ok ()
 
 let ledger_kind types =
@@ -998,7 +1015,7 @@ let filter_contracts op ori =
             begin match ledger_kind bm_types with
               | `nft | `multiple ->
                 let nft = { nft_ledger; nft_token_meta_id;
-                            nft_meta_id; nft_royalties_id } in
+                            nft_meta_id; nft_royalties_id; nft_crawled = Some true } in
                 let kind = "fa2" in
                 let owner, uri_pattern, kind = match f_admin, f_uri_pattern with
                   | (Some (`address owner), _), (Some (`string uri), _) ->
@@ -1018,15 +1035,19 @@ let filter_contracts op ori =
     end
   | _ -> None
 
-let set_crawled ?dbh contract =
+let set_crawled_ft ?dbh contract =
   use dbh @@ fun dbh ->
   [%pgsql dbh "update ft_contracts set crawled = true where address = $contract"]
 
-let insert_origination ?(forward=false) config dbh op ori =
+let set_crawled_nft ?dbh contract =
+  use dbh @@ fun dbh ->
+  [%pgsql dbh "update contracts set crawled = true where address = $contract"]
+
+let insert_origination ?(forward=false) ?(crawled=true) config dbh op ori =
   let kt1 = Tzfunc.Crypto.op_to_KT1 op.bo_hash in
   match filter_contracts op ori, op.bo_meta, SMap.find_opt kt1 config.Crawlori.Config.extra.ft_contracts with
   | _, _, Some _ ->
-    set_crawled ~dbh kt1
+    set_crawled_ft ~dbh kt1
   | None, _, _ | _, None, _ ->
     Lwt.return_ok ()
   | Some (kind, nft, owner, uri, metadata), Some meta, _ ->
@@ -1053,13 +1074,13 @@ let insert_origination ?(forward=false) config dbh op ori =
         "insert into contracts(kind, address, owner, block, level, tsp, \
          last_block, last_level, last, ledger_id, ledger_key, ledger_value, \
          uri_pattern, token_metadata_id, metadata_id, royalties_id, \
-         metadata, main) \
+         metadata, main, crawled) \
          values($kind, $kt1, $?owner, ${op.bo_block}, ${op.bo_level}, \
          ${op.bo_tsp}, ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, \
          ${Z.to_string nft.nft_ledger.bm_id}, \
          $ledger_key, $ledger_value, $?uri, $?{Option.map Z.to_string nft.nft_token_meta_id}, \
          $?{Option.map Z.to_string nft.nft_meta_id}, $?{Option.map Z.to_string nft.nft_royalties_id}, \
-         $metadata_assoc, $forward) \
+         $metadata_assoc, $forward, $crawled) \
          on conflict do nothing"] in
     let open Crawlori.Config in
     config.extra.contracts <- SMap.add kt1 nft config.extra.contracts;
