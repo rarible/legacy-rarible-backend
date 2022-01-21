@@ -61,7 +61,6 @@ let insert_nft_activity_transfer dbh op kt1 from owner token_id amount =
   let nft_activity_type = NftActivityTransfer {from; elt} in
   insert_nft_activity dbh op.bo_index op.bo_tsp nft_activity_type
 
-
 let insert_metadata_update ~dbh ~op ~contract ~token_id ?(update_index=0l) ?(forward=false) l =
   let token_meta = EzEncoding.construct Json_encoding.(assoc string) l in
   if not forward then
