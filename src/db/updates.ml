@@ -520,6 +520,11 @@ let upgrade_13_to_14 dbh version =
      (select id, contract, token_id, c->>'account', (c->>'value')::int \
      from token_info, unnest(creators) c)" ]
 
+let upgrade_14_to_15 dbh version =
+  EzPG.upgrade ~dbh ~version
+    ~downgrade:[ "alter table contracts drop column crawled" ] [
+    "alter table contracts add column crawled boolean not null default true" ]
+
 let upgrades =
   let last_version = fst List.(hd @@ rev !Versions.upgrades) in
   !Versions.upgrades @ List.map (fun (i, f) -> last_version + i, f) [
@@ -536,4 +541,5 @@ let upgrades =
     11, upgrade_11_to_12;
     12, upgrade_12_to_13;
     13, upgrade_13_to_14;
+    14, upgrade_14_to_15;
   ]

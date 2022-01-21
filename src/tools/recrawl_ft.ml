@@ -45,7 +45,7 @@ let main () =
         let>? _ = async_recrawl ~config ~start ?end_:!recrawl_end
             ~operation:(handle_operation ft_contract ft)
             ((), ()) in
-        Db.Crawl.set_crawled ft_contract
+        Db.Crawl.set_crawled_ft ft_contract
     end
   | _ ->
       Format.printf "Missing arguments: '--contract', '--kind', '--id', '--start' are required@.";

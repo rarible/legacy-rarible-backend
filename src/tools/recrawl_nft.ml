@@ -28,7 +28,7 @@ let operation config () op =
           | Some {entrypoint; value = Micheline m }, Some nft ->
             Db.Misc.use None (fun dbh ->
                 Format.printf "Block %s (%ld)@." (Common.Utils.short op.bo_block) op.bo_level;
-                let|>? _ = Db.Crawl.insert_nft ~dbh ~meta ~op ~contract:tr.destination ~forward:true ~entrypoint ~nft m in
+                let|>? _ = Db.Crawl.insert_nft ~dbh ~config ~meta ~op ~contract:tr.destination ~forward:true ~entrypoint ~nft m in
                 ())
           | _ -> Lwt.return_ok ()
         end
@@ -36,7 +36,7 @@ let operation config () op =
         let contract = Tzfunc.Crypto.op_to_KT1 op.bo_hash in
         if List.mem contract !contracts then
           Db.Misc.use None (fun dbh ->
-              Db.Crawl.insert_origination ~forward:true config dbh op ori)
+              Db.Crawl.insert_origination ~forward:true ~crawled:false config dbh op ori)
         else Lwt.return_ok ()
       | _ -> Lwt.return_ok ()
     else Lwt.return_ok ()
@@ -47,7 +47,7 @@ let main () =
   match !recrawl_start with
   | Some start ->
     let>? _ = async_recrawl ~config ~start ?end_:!recrawl_end ~operation ((), ()) in
-    Lwt.return_ok ()
+    iter_rp (fun contract -> Db.Crawl.set_crawled_nft contract) !contracts
   | _ ->
     Format.printf "Missing arguments: '--start', '--contracts' are required@.";
     Lwt.return_ok ()

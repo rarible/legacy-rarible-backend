@@ -1014,6 +1014,7 @@ type nft_ledger = {
   nft_token_meta_id: z option;
   nft_meta_id: z option;
   nft_royalties_id: z option;
+  nft_crawled: bool option;
 } [@@deriving encoding]
 
 type ft_ledger_kind =
