@@ -187,7 +187,8 @@ let insert_creators ~dbh ~contract ~token_id creators =
   iter_rp (fun {part_account; part_value} ->
       [%pgsql dbh
          "insert into creators(id, contract, token_id, account, value) \
-          values($id, $contract, $token_id, $part_account, $part_value)"]) creators
+          values($id, $contract, $token_id, $part_account, $part_value) \
+          on conflict do nothing"]) creators
 
 let insert_token_balances ~dbh ~op ~contract ?(ft=false) ?token_id ?(forward=false) balances =
   iter_rp (fun (k, v) ->
@@ -252,14 +253,16 @@ let insert_token_balances ~dbh ~op ~contract ?(ft=false) ?token_id ?(forward=fal
               let creator = { part_account=a; part_value = 10000l } in
               let creators = [ Some (EzEncoding.construct part_enc creator) ] in
               let id = Printf.sprintf "%s:%s" contract (Z.to_string token_id) in
-              let>? () = [%pgsql dbh
+              let>? l = [%pgsql dbh
                   "insert into token_info(id, contract, token_id, transaction, block, \
                    level, tsp, main, last_block, last_level, last, creators, supply) \
                    values($id, $contract, ${Z.to_string token_id}, ${op.bo_hash}, \
                    ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, true, \
                    ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, $creators, $balance) \
-                   on conflict do nothing"] in
-              insert_creators ~dbh ~contract ~token_id [ creator ]
+                   on conflict do nothing returning id"] in
+              match l with
+              | [ _ ] -> insert_creators ~dbh ~contract ~token_id [ creator ]
+              | _ -> Lwt.return_ok ()
             else Lwt.return_ok () in
           let>? () =
             if kind = "nft" then
