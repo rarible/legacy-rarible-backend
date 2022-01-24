@@ -503,3 +503,11 @@ let collection_items_count ?dbh contract =
   match l with
   | [ Some n ] -> n
   | _ -> 0L
+
+let get_contracts ?dbh contracts =
+  let contracts = List.map Option.some contracts in
+  use dbh @@ fun dbh ->
+  [%pgsql.object dbh
+      "select address, ledger_id, ledger_key, ledger_value, metadata_id, \
+       token_metadata_id, royalties_id, crawled \
+       from contracts where main and address = any($contracts)"]
