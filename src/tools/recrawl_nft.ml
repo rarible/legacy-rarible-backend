@@ -19,7 +19,8 @@ let spec = [
 let operation config () op =
   Format.printf "Block %s (%ld)\r@?" (Common.Utils.short op.bo_block) op.bo_level;
   match op.bo_meta with
-  | None -> Lwt.return_ok ()
+  | None -> Lwt.return_error @@
+    `generic ("no_metadata", Format.sprintf "no metadata found for operation %s" op.bo_hash)
   | Some meta ->
     if meta.op_status = `applied then
       match op.bo_op.kind with
