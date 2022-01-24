@@ -142,8 +142,9 @@ let () =
               Db.Utils.update_metadata ~contract:r#contract ~token_id:r#token_id ~block:r#block
                 ~level:r#level ~tsp:r#tsp ~metadata ~set_metadata:true ()) l
     else
-      let>? l = match !force, !contract with
-        | true, Some contract -> Db.Utils.contract_token_metadata ~royalties:!royalties contract
+      let>? l = match !force, !contract, !decimals with
+        | true, Some contract, _ -> Db.Utils.contract_token_metadata ~royalties:!royalties contract
+        | true, _, true -> Db.Utils.decimals_0_token_metadata ()
         | _ -> Db.Utils.unknown_token_metadata ?contract:!contract () in
       iter_rp (fun r ->
           Db.Utils.update_metadata ~contract:r#contract ~token_id:r#token_id ~block:r#block
