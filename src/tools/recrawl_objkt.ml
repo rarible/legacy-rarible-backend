@@ -126,7 +126,7 @@ let main () =
     Lwt.return_ok ((), ())
 
 let () =
-  Sys.(set_signal sigint (Signal_handle (fun _ -> print_config_r ())));
+  Sys.(set_signal sigint (Signal_handle (fun _ -> print_config_r (); exit 1)));
   EzLwtSys.run @@ fun () ->
   Lwt.map (function
       | Error e -> Rp.print_error e
