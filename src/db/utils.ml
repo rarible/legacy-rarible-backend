@@ -159,6 +159,15 @@ let empty_token_metadata ?dbh ?contract () =
        where t.main and metadata_uri is null and t.metadata = '{}' \
        and ($no_contract or contract = $?contract) and token_metadata_id is not null"]
 
+let decimals_0_token_metadata ?dbh () =
+  use dbh @@ fun dbh ->
+  [%pgsql.object dbh
+      "select distinct contract, token_id, tmp.block, tmp.level, tmp.tsp, tmp.metadata, \
+       tmp.metadata_uri, null as token_metadata_id from \
+       (select contract, token_id, block, level, tsp, \
+       metadata, metadata_uri, r::jsonb->'value' as v from token_info t, \
+       jsonb_array_elements_text(royalties_metadata) r) as tmp where tmp.v::int = 0"]
+
 let unknown_token_metadata ?dbh ?contract () =
   let no_contract = Option.is_none contract in
   use dbh @@ fun dbh ->

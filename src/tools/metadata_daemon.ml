@@ -7,7 +7,8 @@ let contract = ref None
 let retrieve  = ref false
 let node = ref "https://tz.functori.com"
 let force = ref false
-let royalties= ref false
+let royalties = ref false
+let decimals = ref false
 
 let spec = [
   "--retrieve-context", Arg.Set retrieve,
@@ -22,6 +23,8 @@ let spec = [
   "Force reset of metadata";
   "--royalties", Arg.Set royalties,
   "Fetch metadata for missing royalties items";
+  "--decimals", Arg.Set decimals,
+  "Fetch metadata for items with 0 decimals royalties";
 ]
 
 let expr token_id =
@@ -112,9 +115,11 @@ let () =
         config.daemon_ipfs_sources,
         Db.Utils.fetch_metadata_from_source ~verbose:0 ~timeout:(float_of_int config.daemon_timeout) in
     let>? l =
-      match !force, !contract, !retrieve with
-      | true, Some contract, _ -> Db.Utils.contract_token_metadata ~royalties:!royalties contract
-      | _, _, true -> Db.Utils.empty_token_metadata ?contract:!contract ()
+      match !force, !contract, !retrieve, !decimals with
+      | true, Some contract, _, _ ->
+        Db.Utils.contract_token_metadata ~royalties:!royalties contract
+      | _, _, true, _ -> Db.Utils.empty_token_metadata ?contract:!contract ()
+      | true, _, _, true -> Db.Utils.decimals_0_token_metadata ()
       | _ -> Db.Utils.unknown_token_metadata ?contract:!contract () in
     split l sources f
   | None ->
