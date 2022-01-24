@@ -113,13 +113,17 @@ let () =
                      ~level:r#level ~tsp:r#tsp ~metadata ~set_metadata:true ()) l)
       else
         config.daemon_ipfs_sources,
-        Db.Utils.fetch_metadata_from_source ~verbose:0 ~timeout:(float_of_int config.daemon_timeout) in
+        Db.Utils.fetch_metadata_from_source
+          ~verbose:0 ~timeout:(float_of_int config.daemon_timeout) in
     let>? l =
       match !force, !contract, !retrieve, !decimals with
       | true, Some contract, _, _ ->
         Db.Utils.contract_token_metadata ~royalties:!royalties contract
       | _, _, true, _ -> Db.Utils.empty_token_metadata ?contract:!contract ()
       | true, _, _, true -> Db.Utils.decimals_0_token_metadata ()
+      | true, None, false, false ->
+        if !royalties then Db.Utils.no_royalties_token_metadata ()
+        else Lwt.return_ok []
       | _ -> Db.Utils.unknown_token_metadata ?contract:!contract () in
     split l sources f
   | None ->
@@ -145,6 +149,9 @@ let () =
       let>? l = match !force, !contract, !decimals with
         | true, Some contract, _ -> Db.Utils.contract_token_metadata ~royalties:!royalties contract
         | true, _, true -> Db.Utils.decimals_0_token_metadata ()
+        | true, None, false ->
+          if !royalties then Db.Utils.no_royalties_token_metadata ()
+          else Lwt.return_ok []
         | _ -> Db.Utils.unknown_token_metadata ?contract:!contract () in
       iter_rp (fun r ->
           Db.Utils.update_metadata ~contract:r#contract ~token_id:r#token_id ~block:r#block

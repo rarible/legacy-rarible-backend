@@ -187,6 +187,15 @@ let contract_token_metadata ?dbh ?(royalties=false) contract =
        (not $royalties or \
        (royalties_metadata is null or royalties_metadata = '[]' or royalties_metadata = '{}'))"]
 
+let no_royalties_token_metadata ?dbh () =
+  use dbh @@ fun dbh ->
+  [%pgsql.object dbh
+      "select contract, token_id, block, level, tsp, metadata, \
+       metadata_uri, null as token_metadata_id \
+       from token_info i \
+       where main and metadata <> '{}' and \
+       royalties_metadata is null and royalties = '{}'"]
+
 let contract_metadata ?dbh ?(retrieve=false) () =
   use dbh @@ fun dbh ->
   [%pgsql.object dbh
