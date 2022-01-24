@@ -25,7 +25,9 @@ let handle_result config = function
 
 let ext ~config bop =
   match bop.bo_meta with
-  | None -> Lwt.return_ok ()
+  | None ->
+    Lwt.return_error @@
+    `generic ("no_metadata", Format.sprintf "no metadata found for operation %s" bop.bo_hash)
   | Some meta ->
     if meta.op_status = `applied then
       match bop.bo_op.kind with
@@ -40,7 +42,9 @@ let config_r = ref None
 
 let int ~config bop =
   match bop.bo_meta with
-  | None -> Lwt.return_ok ()
+  | None ->
+    Lwt.return_error @@
+    `generic ("no_metadata", Format.sprintf "no metadata found for operation %s" bop.bo_hash)
   | Some meta ->
     if meta.op_status = `applied then
       match bop.bo_op.kind with
