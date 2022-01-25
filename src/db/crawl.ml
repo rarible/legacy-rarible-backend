@@ -1054,26 +1054,45 @@ let insert_origination ?(forward=false) ?(crawled=true) config dbh op ori =
     set_crawled_ft ~dbh kt1
   | None, _, _ | _, None, _ ->
     Lwt.return_ok ()
-  | Some (kind, nft, owner, uri, metadata), Some meta, _ ->
+  | Some (kind, nft, owner, uri, _metadata), Some meta, _ ->
     let ledger_key = EzEncoding.construct micheline_type_short_enc nft.nft_ledger.bm_types.bmt_key in
     let ledger_value = EzEncoding.construct micheline_type_short_enc nft.nft_ledger.bm_types.bmt_value in
     Format.printf "\027[0;93morigination %s (%s, %s)\027[0m@."
       (Utils.short kt1) kind (EzEncoding.construct nft_ledger_enc nft);
-    let metadata_assoc = EzEncoding.construct Json_encoding.(assoc string) metadata in
+    let>? metadata_assoc = match nft.nft_meta_id with
+      | None -> Lwt.return_ok "{}"
+      | Some bm_id ->
+        let bm = { bm_id; bm_types = Contract_spec.metadata_field } in
+        let cmetadata = Storage_diff.get_big_map_updates bm meta.op_lazy_storage_diff in
+        let cmetadata = List.filter_map (function
+            | `string k, Some `bytes v ->
+              let s = (Tzfunc.Crypto.hex_to_raw v :> string) in
+              if Parameters.decode s then Some (k, s)
+              else None
+            | _ -> None) cmetadata in
+        let massoc =
+          List.fold_left (fun m (k, v) ->
+              Ezjsonm.value_to_string @@
+              Json_query.(replace [`Field k] (`String v) (Ezjsonm.value_from_string m))
+            ) "{}" cmetadata in
+        Lwt.return_ok massoc in
     let>? () =
-      try
-        let tzip16_metadata = EzEncoding.destruct tzip16_metadata_enc metadata_assoc in
-        Metadata.insert_tzip16_metadata_data
-          ~dbh ~forward ~contract:kt1 ~block:op.bo_block
-          ~level:op.bo_level ~tsp:op.bo_tsp tzip16_metadata
-      with _ ->
-        match List.assoc_opt "" metadata with
-        | None -> Lwt.return_ok ()
+      if metadata_assoc = "{}" then Lwt.return_ok ()
+      else
+        let l = EzEncoding.destruct Json_encoding.(assoc string) metadata_assoc in
+        match List.assoc_opt "" l with
+        | None ->
+          begin try
+              let tzip16_metadata = EzEncoding.destruct tzip16_metadata_enc metadata_assoc in
+              Metadata.insert_tzip16_metadata_data
+                ~dbh ~forward ~contract:kt1 ~block:op.bo_block
+                ~level:op.bo_level ~tsp:op.bo_tsp tzip16_metadata
+            with _ -> Lwt.return_ok ()
+          end
         | Some uri ->
           Metadata.insert_tzip16_metadata
             ~dbh ~forward ~contract:kt1 ~block:op.bo_block
-            ~level:op.bo_level ~tsp:op.bo_tsp uri
-    in
+            ~level:op.bo_level ~tsp:op.bo_tsp uri in
     let>? () = [%pgsql dbh
         "insert into contracts(kind, address, owner, block, level, tsp, \
          last_block, last_level, last, ledger_id, ledger_key, ledger_value, \

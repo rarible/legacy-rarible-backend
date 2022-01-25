@@ -14,7 +14,7 @@ let spec = [
 ]
 
 let usage =
-  "usage: " ^ Sys.argv.(0) ^ " [--force]"
+  "usage: " ^ Sys.argv.(0) ^ " [options]"
 
 let () =
   Arg.parse spec (fun _ -> ()) usage;
