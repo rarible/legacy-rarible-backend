@@ -1195,12 +1195,12 @@ let recalculate_creators ~main ~burn ~supply ~amount ~account ~creators =
       ) creator_values_new in
   creators, new_supply, factor
 
-let creators_update ~dbh ~contract ~token_id ~id creators =
+let creators_update ~dbh ~contract ~token_id ~id ~block creators =
   let token_id = Z.to_string token_id in
   iter_rp (fun {part_account; part_value} ->
       [%pgsql dbh
-          "insert into creators(id, contract, token_id, account, value) \
-           values($id, $contract, $token_id, $part_account, $part_value) \
+          "insert into creators(id, contract, token_id, account, value, block, main) \
+           values($id, $contract, $token_id, $part_account, $part_value, $block, true) \
            on conflict (id, account) do update set value = $part_value \
            where creators.id = $id and creators.value <> $part_value"])
     creators
@@ -1221,7 +1221,7 @@ let contract_updates_base dbh ~main ~contract ~block ~level ~tsp ~burn
        last_level = case when $main then $level else last_level end, \
        last = case when $main then $tsp else last end \
        where id = $tid"] in
-  let>? () = creators_update ~dbh ~id:tid ~contract ~token_id creators in
+  let>? () = creators_update ~dbh ~id:tid ~contract ~token_id ~block creators in
   let oid = tid ^ ":" ^ account in
   [%pgsql dbh
       "update tokens set amount = amount + ${Z.to_string factor}::numeric * ${Z.to_string amount}::numeric \
