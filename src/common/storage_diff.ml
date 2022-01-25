@@ -30,18 +30,26 @@ let get_big_map_id ~allocs bm_index k v =
   aux 0 allocs
 
 let get_big_map_updates bm l =
+  let f l =
+    List.filter_map (fun {bm_key; bm_value; _} ->
+        match Typed_mich.parse_value bm.bm_types.bmt_key bm_key with
+        | Error _ -> None
+        | Ok k ->
+          match bm_value with
+          | None -> Some (k, None)
+          | Some value ->
+            match Typed_mich.parse_value bm.bm_types.bmt_value value with
+            | Error _ -> None
+            | Ok v -> Some (k, Some v)) l in
   List.flatten @@
   List.filter_map (function
       | Big_map { id; diff = SDUpdate l }
       | Big_map { id; diff = SDAlloc {updates=l; _} } when id = bm.bm_id ->
-        Some (List.filter_map (fun {bm_key; bm_value; _} ->
-            match Typed_mich.parse_value bm.bm_types.bmt_key bm_key with
-            | Error _ -> None
-            | Ok k ->
-              match bm_value with
-              | None -> Some (k, None)
-              | Some value ->
-                match Typed_mich.parse_value bm.bm_types.bmt_value value with
-                | Error _ -> None
-                | Ok v -> Some (k, Some v)) l)
+        if id < Z.zero then None
+        else Some (f l)
+      | Big_map { id; diff = SDCopy {source; _} } when id = bm.bm_id ->
+        List.find_map (function
+            | Big_map { id = idc; diff = SDAlloc {updates=l; _} } when source = Z.to_string idc ->
+              Some (f l)
+            | _ -> None) l
       | _ -> None) l
