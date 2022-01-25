@@ -180,13 +180,13 @@ let insert_transfer ~dbh ~op ~contract lt =
           Int32.succ transfer_index
         ) transfer_index tr_txs) 0l lt
 
-let insert_creators ~dbh ~contract ~token_id creators =
+let insert_creators ~dbh ~contract ~token_id ~block ?(forward=false) creators =
   let token_id = Z.to_string token_id in
   let id = contract ^ ":" ^ token_id in
   iter_rp (fun {part_account; part_value} ->
       [%pgsql dbh
-         "insert into creators(id, contract, token_id, account, value) \
-          values($id, $contract, $token_id, $part_account, $part_value) \
+         "insert into creators(id, contract, token_id, account, value, block, main) \
+          values($id, $contract, $token_id, $part_account, $part_value, $block, $forward) \
           on conflict do nothing"]) creators
 
 let insert_token_balances ~dbh ~op ~contract ?(ft=false) ?token_id ?(forward=false) balances =
@@ -242,10 +242,15 @@ let insert_token_balances ~dbh ~op ~contract ?(ft=false) ?token_id ?(forward=fal
                where contract = $contract and token_id = ${Z.to_string token_id}"]
         | Some a, _, false ->
           let oid = Printf.sprintf "%s:%s:%s" contract (Z.to_string token_id) a in
-          [%pgsql dbh
+          let>? l = [%pgsql dbh
               "insert into tokens(tid, oid, contract, token_id, owner, amount) \
                values($tid, $oid, $contract, ${Z.to_string token_id}, $a, 0) \
-               on conflict do nothing"]
+               on conflict do nothing returning tid"] in
+          begin match l with
+            | [] -> Lwt.return_ok ()
+            | _ -> insert_creators ~dbh ~contract ~token_id ~forward ~block:op.bo_block
+                     [ {part_account=a; part_value=10000l} ]
+          end
         | Some a, _, true ->
           let>? () =
             if balance <> Z.zero then
@@ -260,7 +265,7 @@ let insert_token_balances ~dbh ~op ~contract ?(ft=false) ?token_id ?(forward=fal
                    ${op.bo_block}, ${op.bo_level}, ${op.bo_tsp}, $creators, $balance) \
                    on conflict do nothing returning id"] in
               match l with
-              | [ _ ] -> insert_creators ~dbh ~contract ~token_id [ creator ]
+              | [ _ ] -> insert_creators ~dbh ~contract ~token_id ~forward ~block:op.bo_block [ creator ]
               | _ -> Lwt.return_ok ()
             else Lwt.return_ok () in
           let>? () =
@@ -1196,7 +1201,8 @@ let creators_update ~dbh ~contract ~token_id ~id creators =
       [%pgsql dbh
           "insert into creators(id, contract, token_id, account, value) \
            values($id, $contract, $token_id, $part_account, $part_value) \
-           on conflict (id, account) do update set value = $part_value where creators.id = $id"])
+           on conflict (id, account) do update set value = $part_value \
+           where creators.id = $id and creators.value <> $part_value"])
     creators
 
 let contract_updates_base dbh ~main ~contract ~block ~level ~tsp ~burn
@@ -1560,6 +1566,8 @@ let set_main _config ?(forward=false) dbh {Hooks.m_main; m_hash} =
     let>? tb_updates =
       [%pgsql.object dbh
           "update token_balance_updates set main = $m_main where block = $m_hash returning *"] in
+    let>? () =
+      [%pgsql dbh "update creators set main = true where block = $m_hash"] in
     let>? td_updates =
       [%pgsql.object dbh "select * from tezos_domains where block = $m_hash"] in
     let>? cevents = contract_updates dbh m_main @@ sort c_updates in
