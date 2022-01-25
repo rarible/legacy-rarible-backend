@@ -49,6 +49,9 @@ let operation contracts _ tokens op =
                   begin match TIMap.find_opt (tr.destination, id) tokens with
                     | None | Some true -> Lwt.return_ok tokens
                     | _ ->
+                      Format.printf "Block %s (%ld)@." (Common.Utils.short op.bo_block) op.bo_level;
+                      Format.printf "\027[0;35mUpdate creators %s %s %s\027[0m@."
+                        tr.destination (Z.to_string id) account;
                       let|>? () = update_creators ~contract:tr.destination ~id ~account in
                       TIMap.update (tr.destination, id) (fun _ -> Some true) tokens
                   end
