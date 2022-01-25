@@ -525,6 +525,15 @@ let upgrade_14_to_15 dbh version =
     ~downgrade:[ "alter table contracts drop column crawled" ] [
     "alter table contracts add column crawled boolean not null default true" ]
 
+let upgrade_15_to_16 dbh version =
+  EzPG.upgrade ~dbh ~version
+    ~downgrade:[ "alter table creators drop column main" ] [
+    "alter table creators add column main boolean not null default true";
+    "alter table creators add column block varchar not null default ''";
+    "alter table creators alter column main set default false";
+    "alter table creators alter column block drop default"
+  ]
+
 let upgrades =
   let last_version = fst List.(hd @@ rev !Versions.upgrades) in
   !Versions.upgrades @ List.map (fun (i, f) -> last_version + i, f) [
@@ -542,4 +551,5 @@ let upgrades =
     12, upgrade_12_to_13;
     13, upgrade_13_to_14;
     14, upgrade_14_to_15;
+    15, upgrade_15_to_16;
   ]
