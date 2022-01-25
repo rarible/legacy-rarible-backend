@@ -2227,6 +2227,7 @@ let make_config ~exchange ~royalties ~transfer_manager ~contracts ~ft_contracts
       step_forward = 30 ;
       accounts = None ;
       sleep = 5. ;
+      no_forward = true ;
       forward = None ;
       confirmations_needed = 5l ;
       verbose = 0 ;
