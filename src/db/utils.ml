@@ -503,7 +503,6 @@ let collection_items ?dbh ?offset ?limit contract =
         "select token_id from token_info where contract = $contract and royalties = '{}' \
          order by token_id::numeric"]
 
-
 let collection_items_count ?dbh contract =
   use dbh @@ fun dbh ->
   let|>? l = [%pgsql dbh
@@ -520,3 +519,9 @@ let get_contracts ?dbh contracts =
       "select address, ledger_id, ledger_key, ledger_value, metadata_id, \
        token_metadata_id, royalties_id, crawled \
        from contracts where main and address = any($contracts)"]
+
+let tokens_without_creators ?dbh () =
+  use dbh @@ fun dbh ->
+  let|>? l = [%pgsql dbh
+      "select contract, token_id from token_info where creators = '{}'"] in
+  List.fold_left (fun acc (c, id) -> TIMap.add (c, Z.of_string id) false acc) TIMap.empty l

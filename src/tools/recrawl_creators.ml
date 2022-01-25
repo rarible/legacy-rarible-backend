@@ -1,0 +1,79 @@
+open Hooks
+open Crawlori
+open Make(Pg)(struct type extra = Rtypes.config end)
+open Proto
+open Let
+open Rtypes
+open Db.Misc
+
+module SSet = Set.Make(String)
+
+let filename = ref None
+let recrawl_start = ref None
+let recrawl_end = ref None
+
+let spec = [
+  "--start", Arg.Int (fun i -> recrawl_start := Some (Int32.of_int i)), "Start level for recrawl";
+  "--end", Arg.Int (fun i -> recrawl_end := Some (Int32.of_int i)), "Optional end level for recrawl";
+]
+
+let update_creators ~contract ~id ~account =
+  let id = Z.to_string id in
+  let tid = contract ^ ":" ^ id  in
+  let creators = [ Some (EzEncoding.construct part_enc {
+      part_account=account; part_value = 10000l }) ] in
+  use None @@ fun dbh ->
+  let>? () = [%pgsql dbh "update token_info set creators = $creators where id = $tid"] in
+  [%pgsql dbh
+      "insert into creators(id, contract, token_id, account, value, block, main) \
+       values($tid, $contract, $id, $account, 10000, '', true) on conflict do nothing"]
+
+let operation contracts _ tokens op =
+  Format.printf "Block %s (%ld)\r@?" (Common.Utils.short op.bo_block) op.bo_level;
+  match op.bo_meta with
+  | None -> Lwt.return_error @@
+    `generic ("no_metadata", Format.sprintf "no metadata found for operation %s" op.bo_hash)
+  | Some meta ->
+    if meta.op_status = `applied then
+      match op.bo_op.kind with
+      | Transaction tr ->
+        begin match Rtypes.SMap.find_opt tr.destination contracts with
+          | None -> Lwt.return_ok tokens
+          | Some nft ->
+            let balances = Common.Storage_diff.get_big_map_updates nft.nft_ledger
+                meta.op_lazy_storage_diff in
+            fold_rp (fun tokens -> function
+                | `nat id, Some (`address account)
+                | `tuple [`nat id; `address account], Some _
+                | `tuple [`address account; `nat id], Some _ ->
+                  begin match TIMap.find_opt (tr.destination, id) tokens with
+                    | None | Some true -> Lwt.return_ok tokens
+                    | _ ->
+                      let|>? () = update_creators ~contract:tr.destination ~id ~account in
+                      TIMap.update (tr.destination, id) (fun _ -> Some true) tokens
+                  end
+                | _ -> Lwt.return_ok tokens
+              ) tokens balances
+        end
+      | _ -> Lwt.return_ok tokens
+    else Lwt.return_ok tokens
+
+let main () =
+  Arg.parse spec (fun f -> filename := Some f) "recrawl_creators.exe [options] config.json";
+  let>? config = Lwt.return @@ Crawler_config.get !filename Rtypes.config_enc in
+  let>? tokens = Db.Utils.tokens_without_creators () in
+  let contracts_set = Rtypes.TIMap.fold (fun (c, _) _ acc -> SSet.add c acc) tokens SSet.empty in
+  let contracts = SSet.elements contracts_set in
+  let>? db_contracts = Db.Utils.get_contracts contracts in
+  let contracts = Db.Config.db_contracts db_contracts in
+  match !recrawl_start with
+  | Some start ->
+    let|>? _ = async_recrawl ~config ~start ?end_:!recrawl_end ~operation:(operation contracts) ((), tokens) in
+    ()
+  | _ ->
+    Format.printf "Missing arguments: '--start' is required@.";
+    Lwt.return_ok ()
+
+let () =
+  EzLwtSys.run @@ fun () ->
+  Lwt.map (Result.iter_error Rp.print_error) (main ())
