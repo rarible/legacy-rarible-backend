@@ -297,14 +297,16 @@ let random_tokens ?dbh ?contract ?token_id ?owner ?(number=100L) () =
        ledger_value is not null \
        order by random() limit $number"]
 
-let find_hash ?dbh h =
+let find_hash ?dbh ?(collection=true) h =
   let h = h ^ "%s" in
   use dbh @@ fun dbh ->
-  match String.get h 0 with
-  | 'B' -> [%pgsql dbh "select hash from predecessors where hash like $h"]
-  | 'o' -> [%pgsql dbh "select transaction from token_balance_updates where transaction like $h"]
-  | 't' | 'K' ->
+  match String.get h 0, collection with
+  | 'B', _ -> [%pgsql dbh "select hash from predecessors where hash like $h"]
+  | 'o', _ -> [%pgsql dbh "select transaction from token_balance_updates where transaction like $h"]
+  | 't', _ | 'K', false ->
     [%pgsql dbh "select contract from token_balance_updates where contract like $h"]
+  | 'K', true ->
+    [%pgsql dbh "select address from contracts where address like $h"]
   | _ -> Lwt.return_ok []
 
 let hen_token_ids ?dbh ?(limit=10000L) ?(offset=0L) contract =
