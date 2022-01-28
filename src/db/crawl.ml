@@ -1265,8 +1265,7 @@ let uri_pattern_update dbh ~main ~contract ~block ~level ~tsp uri =
 let contract_updates dbh main l =
   let>? contracts, events = fold_rp (fun (acc, events) r ->
       let contract, block, level, tsp = r#contract, r#block, r#level, r#tsp in
-      let acc = SSet.add contract acc in
-      let>? events =
+      let>? events, token_id =
         match r#mint, r#burn, r#metadata_key, r#metadata_value, r#minter, r#uri_pattern with
         | Some json, _, _, _, _, _ ->
           let m = EzEncoding.destruct mint_enc json in
@@ -1293,7 +1292,7 @@ let contract_updates dbh main l =
               (Produce.nft_item_event dbh contract token_id) :: events
             else events in
           Lwt.return_ok @@
-          (Produce.nft_ownership_event dbh contract token_id owner) :: events
+          ((Produce.nft_ownership_event dbh contract token_id owner) :: events, Some token_id)
         | _, Some json, _, _, _, _ ->
           let b, account = EzEncoding.destruct Json_encoding.(tup2 burn_enc string) json in
           let token_id, amount = match b with
@@ -1305,7 +1304,7 @@ let contract_updates dbh main l =
           let events = (Produce.nft_item_event dbh contract token_id) :: events in
           let events = (Produce.nft_ownership_event dbh contract token_id account) :: events in
           Lwt.return_ok @@
-          (Produce.order_event_item dbh account contract token_id) :: events
+          ((Produce.order_event_item dbh account contract token_id) :: events, Some token_id)
         | _, _, Some key, Some value, _, _ ->
           begin if main then
               match key with
@@ -1320,31 +1319,28 @@ let contract_updates dbh main l =
           end >>=? fun () ->
           let>? () = metadata_update dbh ~main ~contract ~block ~level ~tsp ~value key in
           Lwt.return_ok @@
-          (Produce.update_collection_event dbh contract) :: events
+          ((Produce.update_collection_event dbh contract) :: events, None)
         | _, _, _, _, Some minter, _ ->
           let>? () = minter_update dbh ~main ~contract ~block ~level ~tsp minter in
           Lwt.return_ok @@
-          (Produce.update_collection_event dbh contract) :: events
+          ((Produce.update_collection_event dbh contract) :: events, None)
         | _, _, _, _, _, Some uri_pattern ->
           let>? () = uri_pattern_update dbh ~main ~contract ~block ~level ~tsp uri_pattern in
           Lwt.return_ok @@
-          (Produce.update_collection_event dbh contract) :: events
-        | _ -> Lwt.return_ok events in
-      Lwt.return_ok (SSet.add contract acc, events)) (SSet.empty, []) l in
+          ((Produce.update_collection_event dbh contract) :: events, None)
+        | _ -> Lwt.return_ok (events, None) in
+      let acc = match token_id with
+        | None -> acc
+        | Some id -> SMap.update contract (function None -> Some id | Some tid -> Some (Z.max id tid)) acc in
+      Lwt.return_ok (acc, events)) (SMap.empty, []) l in
   (* update contracts *)
   let>? () =
-    iter_rp (fun c ->
-        let>? l =
-          [%pgsql dbh
-              "select max(token_id::numeric) from tokens where contract = $c"] in
-        let last_token_id = match l with
-          | [] | _ :: _ :: _ -> Z.zero
-          | [ last_token_id ] ->
-            Option.fold ~none:Z.zero ~some:Z.of_string last_token_id in
-        [%pgsql dbh
-            "update contracts set \
-             last_token_id = $last_token_id \
-             where address = $c"]) (SSet.elements contracts) in
+    iter_rp (fun (c, mid) ->
+        let>? l = [%pgsql dbh "select last_token_id from contracts where address = $c"] in
+        match l with
+        | [ mid2 ] when mid > mid2 ->
+          [%pgsql dbh "update contracts set last_token_id = $mid where address = $c"]
+        | _ -> Lwt.return_ok ()) (SMap.bindings contracts) in
   Lwt.return_ok @@ List.rev events
 
 let transfer_updates dbh main ~contract ~token_id ~source amount destination =
