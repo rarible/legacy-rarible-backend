@@ -527,3 +527,16 @@ let tokens_without_creators ?dbh () =
   let|>? l = [%pgsql dbh
       "select contract, token_id from token_info where creators = '{}'"] in
   List.fold_left (fun acc (c, id) -> TIMap.add (c, Z.of_string id) false acc) TIMap.empty l
+
+let update_token ?dbh ~contract ~token_id ~account balance =
+  let oid = Format.sprintf "%s:%s:%s" contract token_id account in
+  use dbh @@ fun dbh ->
+  [%pgsql dbh
+      "update tokens set amount = $balance, balance = $balance where oid = $oid"]
+
+let get_alt_token_balance_updates ?dbh () =
+  use dbh @@ fun dbh ->
+  [%pgsql.object dbh
+      "select contract, ledger_id, ledger_key, ledger_value, token_id, account, balance \
+       from token_balance_updates t \
+       inner join contracts on contract = address where not t.main"]
