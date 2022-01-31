@@ -540,3 +540,42 @@ let get_alt_token_balance_updates ?dbh () =
       "select contract, ledger_id, ledger_key, ledger_value, token_id, account, balance \
        from token_balance_updates t \
        inner join contracts on contract = address where not t.main"]
+
+let clear_contract ?dbh contract =
+  use dbh @@ fun dbh ->
+  let>? () = [%pgsql dbh "delete from contracts where address = $contract"] in
+  let>? () = [%pgsql dbh "delete from tokens where contract = $contract"] in
+  let>? () = [%pgsql dbh "delete from token_info where contract = $contract"] in
+  let>? () = [%pgsql dbh "delete from token_balance_updates where contract = $contract"] in
+  let>? () = [%pgsql dbh "delete from token_updates where contract = $contract"] in
+  let>? () = [%pgsql dbh "delete from contract_updates where contract = $contract"] in
+  [%pgsql dbh "delete from creators where contract = $contract"]
+
+let clear_contracts ?dbh contracts =
+  let contracts2 = List.map Option.some contracts in
+  use dbh @@ fun dbh ->
+  Format.printf "clearing contracts@.";
+  let>? () = [%pgsql dbh "delete from contracts where address = any($contracts2)"] in
+  Format.printf "clearing tokens@.";
+  let>? () = [%pgsql dbh "delete from tokens where contract = any($contracts2)"] in
+  Format.printf "clearing token_info@.";
+  let>? () = [%pgsql dbh "delete from token_info where contract = any($contracts2)"] in
+  Format.printf "clearing contract_updates@.";
+  let>? () = [%pgsql dbh "create index contract_updates_contract_index on contract_updates(contract)"] in
+  let>? () = [%pgsql dbh "delete from contract_updates where contract = any($contracts2)"] in
+  let>? () = [%pgsql dbh "drop index contract_updates_contract_index"] in
+  Format.printf "clearing creators@.";
+  let>? () = [%pgsql dbh "create index creators_contract_index on creators(contract)"] in
+  let>? () = [%pgsql dbh "delete from creators where contract = any($contracts2)"] in
+  let>? () = [%pgsql dbh "drop index creators_contract_index"] in
+  let>? () = [%pgsql dbh "create index token_updates_contract_index on token_updates(contract)"] in
+  let>? () = [%pgsql dbh "create index token_balance_updates_contract_index on token_balance_updates(contract)"] in
+  Format.printf "clearing token_balance_updates %d@." @@ List.length contracts;
+  let>? _ = fold_rp (fun i c ->
+      Format.printf "%d %s\r@?" i c;
+      let>? () = [%pgsql dbh "delete from token_updates where contract = $c"] in
+      let|>? () = [%pgsql dbh "delete from token_balance_updates where contract = $c"] in
+      i + 1) 0 contracts in
+  let>? () = [%pgsql dbh "drop index token_updates_contract_index"] in
+  let|>? () = [%pgsql dbh "drop index token_balance_updates_contract_index"] in
+  ()
