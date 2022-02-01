@@ -669,8 +669,13 @@ let rec get_orders_all_aux ?dbh ?origin ?(sort=OLATEST_FIRST) ?statuses ?continu
       match sort with
       | OLATEST_FIRST ->
         [%pgsql.object dbh
-            "select hash, last_update_at from orders \
-             where \
+            "select maker, taker, maker_edpk, taker_edpk, \
+             make_asset_type_class, make_asset_type_contract, make_asset_type_token_id, \
+             make_asset_value, make_asset_decimals, \
+             take_asset_type_class, take_asset_type_contract, take_asset_type_token_id, \
+             take_asset_value, take_asset_decimals, \
+             start_date, end_date, salt, signature, created_at, hash, last_update_at \
+             from orders where \
              ($no_continuation or \
              (last_update_at < $ts) or \
              (last_update_at = $ts and \
@@ -679,8 +684,13 @@ let rec get_orders_all_aux ?dbh ?origin ?(sort=OLATEST_FIRST) ?statuses ?continu
              limit $size"]
       | OEARLIEST_FIRST ->
         [%pgsql.object dbh
-            "select hash, last_update_at from orders \
-             where \
+            "select maker, taker, maker_edpk, taker_edpk, \
+             make_asset_type_class, make_asset_type_contract, make_asset_type_token_id, \
+             make_asset_value, make_asset_decimals, \
+             take_asset_type_class, take_asset_type_contract, take_asset_type_token_id, \
+             take_asset_value, take_asset_decimals, \
+             start_date, end_date, salt, signature, created_at, hash, last_update_at \
+             from orders where \
              ($no_continuation or \
              (last_update_at > $ts) or \
              (last_update_at = $ts and \
@@ -690,11 +700,10 @@ let rec get_orders_all_aux ?dbh ?origin ?(sort=OLATEST_FIRST) ?statuses ?continu
     let continuation = match List.rev l with
       | [] -> None
       | hd :: _ -> Some (hd#last_update_at, hd#hash) in
-    map_rp (fun r -> Get.get_order ~dbh r#hash) l >>=? fun orders ->
+    map_rp (fun r -> Get.mk_order ~dbh r) l >>=? fun orders ->
     match orders with
     | [] -> Lwt.return_ok acc
     | _ ->
-      let orders = List.filter_map (fun x -> x) orders in
       let orders = filter_orders ?origin ?statuses orders in
       get_orders_all_aux ~dbh ?origin ~sort ?statuses ?continuation ~size (acc @ orders)
   else
