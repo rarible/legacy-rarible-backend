@@ -2,6 +2,8 @@ open Let
 open Tzfunc
 open Proto
 
+let kafka_config_file = ref ""
+
 let get_balance ~block ~ledger_id ~key ~value ~token_id ~account =
   let x = match EzEncoding.destruct Mtyped.stype_enc.json key with
     | `nat -> Some (Node.prim `nat, Mint (Z.of_string token_id))
@@ -23,6 +25,7 @@ let get_balance ~block ~ledger_id ~key ~value ~token_id ~account =
     | _ -> None
 
 let main () =
+  let>? () = Db.Rarible_kafka.may_set_kafka_config !kafka_config_file in
   let>? (block, _) = Pg.head None in
   let>? l = Db.Utils.get_alt_token_balance_updates () in
   let>? l =
@@ -53,7 +56,8 @@ let main () =
     ) [] (List.filter_map (fun x -> x) l)
 
 let specs = [
-  "--node", Arg.String (fun s -> Node.set_node s), "set node address" ]
+  "--node", Arg.String (fun s -> Node.set_node s), "set node address";
+  "--kafka-config", Arg.Set_string kafka_config_file, "set kafka configuration" ]
 
 let () =
   Arg.parse specs (fun _ -> ()) "fix_bug_crawlori [options]";
