@@ -25,20 +25,32 @@ let get_balance ~block ~ledger_id ~key ~value ~token_id ~account =
 let main () =
   let>? (block, _) = Pg.head None in
   let>? l = Db.Utils.get_alt_token_balance_updates () in
-  iter_rp (fun r ->
-      match r#account, r#ledger_key, r#ledger_value with
-      | Some account, Some key, Some value ->
-        Format.printf "Handle %s %s %s@." r#contract r#token_id account;
-        let> b = get_balance ~block ~ledger_id:(Z.of_string r#ledger_id) ~key
-            ~value ~token_id:r#token_id ~account in
-        begin match b, r#balance with
-          | Some b, Some b0 when b0 <> b ->
-            Format.printf "Found different balances (db: %s, node: %s)@."
-              (Z.to_string b0) (Z.to_string b);
-            Db.Utils.update_token ~contract:r#contract ~token_id:r#token_id ~account b
-          | _ -> Lwt.return_ok ()
+  let>? l =
+    map_rp (fun r ->
+        match r#account, r#ledger_key, r#ledger_value with
+        | Some account, Some key, Some value ->
+          Format.printf "Handle %s %s %s@." r#contract r#token_id account;
+          let> b = get_balance ~block ~ledger_id:(Z.of_string r#ledger_id) ~key
+              ~value ~token_id:r#token_id ~account in
+          begin match b with
+            | Some b ->
+              let>? () =
+                Db.Utils.update_token ~contract:r#contract ~token_id:r#token_id ~account b in
+              Lwt.return_ok @@ Some (r#contract, r#token_id, account)
+            | _ -> Lwt.return_ok None
+          end
+        | _ -> Lwt.return_ok None) l in
+  Db.Misc.use None @@ fun dbh ->
+  fold_rp (fun acc (c, tid, account) ->
+      let tid = Z.of_string tid in
+      let>? () = Db.Produce.nft_ownership_event dbh c tid account () in
+      if List.exists (fun (c0, tid0) -> c0 = c && tid0 = tid) acc then Lwt.return_ok acc
+      else
+        begin
+          let>? () = Db.Produce.nft_item_event dbh c tid () in
+          Lwt.return_ok @@ (c, tid) :: acc
         end
-      | _ -> Lwt.return_ok ()) l
+    ) [] (List.filter_map (fun x -> x) l)
 
 let specs = [
   "--node", Arg.String (fun s -> Node.set_node s), "set node address" ]
