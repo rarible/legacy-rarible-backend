@@ -168,14 +168,26 @@ let decimals_0_token_metadata ?dbh () =
        metadata, metadata_uri, r::jsonb->'value' as v from token_info t, \
        jsonb_array_elements_text(royalties_metadata) r) as tmp where tmp.v::int = 0"]
 
-let unknown_token_metadata ?dbh ?contract () =
+let unknown_token_metadata ?dbh ?contract ?levels () =
   let no_contract = Option.is_none contract in
   use dbh @@ fun dbh ->
-  [%pgsql.object dbh
-      "select i.contract, i.token_id, i.block, i.level, i.tsp, metadata, \
-       metadata_uri, null as token_metadata_id \
-       from token_info i left join tzip21_metadata t on i.id = t.id \
-       where i.main and t.contract is null and ($no_contract or i.contract = $?contract)"]
+  match levels with
+  | None ->
+    [%pgsql.object dbh
+        "select i.contract, i.token_id, i.block, i.level, i.tsp, metadata, \
+         metadata_uri, null as token_metadata_id \
+         from token_info i left join tzip21_metadata t on i.id = t.id \
+         where i.main and t.contract is null and ($no_contract or i.contract = $?contract)"]
+  | Some levels ->
+    let levels = Int32.of_int levels in
+    let>? _, level = Pg.head (Some dbh) in
+    [%pgsql.object dbh
+        "select i.contract, i.token_id, i.block, i.level, i.tsp, metadata, \
+         metadata_uri, null as token_metadata_id \
+         from token_info i left join tzip21_metadata t on i.id = t.id \
+         where i.main and t.contract is null and ($no_contract or i.contract = $?contract) \
+         and i.level > $level::int - $levels::int"]
+
 
 let contract_token_metadata ?dbh ?(royalties=false) contract =
   use dbh @@ fun dbh ->
@@ -219,54 +231,57 @@ let update_metadata ?(set_metadata=false)
     [%pgsql dbh "update token_info set metadata = $metadata \
                  where contract = $contract and token_id = ${token_id}"]
   else
-  let metadata_uri = match metadata_uri with
-    | None ->
-      let l = EzEncoding.destruct Json_encoding.(assoc string) metadata in
-      List.assoc_opt "" l
-    | Some uri -> Some uri in
-  match metadata_uri with
-  | None ->
-    Format.eprintf "  can't find uri for metadata, try to decode@." ;
-    begin try
-        let metadata_tzip = EzEncoding.destruct tzip21_token_metadata_enc metadata in
-        let token_id = Z.of_string token_id in
-        use dbh @@ fun dbh ->
-        let>? () =
-          Metadata.insert_mint_metadata dbh ~forward:true ~contract ~token_id ~block ~level ~tsp metadata_tzip in
-        let>? () =
-          match metadata_tzip.tzip21_tm_royalties with
-          | None -> Lwt.return_ok ()
-          | Some r -> update_royalties dbh ~contract ~token_id r in
-        Format.eprintf "  OK@." ;
-        Lwt.return_ok ()
-      with _ ->
-        Format.eprintf "  can't find uri or metadata in %s@." metadata ;
-        Lwt.return_ok ()
-    end
-  | Some uri ->
-    if uri <> "" then
-      let> re = Metadata.get_json ~quiet:true uri in
-      match re with
-      | Ok (_json, metadata_tzip, _uri) ->
-        let token_id = Z.of_string token_id in
-        use dbh @@ fun dbh ->
-        let>? () =
-          Metadata.insert_mint_metadata dbh ~forward:true ~contract ~token_id ~block ~level ~tsp metadata_tzip in
-        let>? () =
-          match metadata_tzip.tzip21_tm_royalties with
-          | None -> Lwt.return_ok ()
-          | Some r -> update_royalties dbh ~contract ~token_id r in
-        Format.eprintf "  OK@." ;
-        Lwt.return_ok ()
-      | Error (code, str) ->
-        (Format.eprintf "  fetch metadata error %d:%s@." code @@
-         Option.value ~default:"None" str);
-        Lwt.return_ok ()
-    else
-      begin
-        Format.eprintf "  can't find uri for metadata %s@." metadata ;
-        Lwt.return_ok ()
-      end
+    let metadata_uri = match metadata_uri with
+      | None ->
+        let l = EzEncoding.destruct Json_encoding.(assoc string) metadata in
+        List.assoc_opt "" l
+      | Some uri -> Some uri in
+    let>? success = match metadata_uri with
+      | None ->
+        Format.eprintf "  can't find uri for metadata, try to decode@." ;
+        begin try
+            let metadata_tzip = EzEncoding.destruct tzip21_token_metadata_enc metadata in
+            let token_id = Z.of_string token_id in
+            use dbh @@ fun dbh ->
+            let>? () =
+              Metadata.insert_mint_metadata dbh ~forward:true ~contract ~token_id ~block ~level ~tsp metadata_tzip in
+            let>? () =
+              match metadata_tzip.tzip21_tm_royalties with
+              | None -> Lwt.return_ok ()
+              | Some r -> update_royalties dbh ~contract ~token_id r in
+            Format.eprintf "  OK@." ;
+            Lwt.return_ok true
+          with _ ->
+            Format.eprintf "  can't find uri or metadata in %s@." metadata ;
+            Lwt.return_ok false
+        end
+      | Some uri ->
+        if uri <> "" then
+          let> re = Metadata.get_json ~quiet:true uri in
+          match re with
+          | Ok (_json, metadata_tzip, _uri) ->
+            let token_id = Z.of_string token_id in
+            use dbh @@ fun dbh ->
+            let>? () =
+              Metadata.insert_mint_metadata dbh ~forward:true ~contract ~token_id ~block ~level ~tsp metadata_tzip in
+            let>? () =
+              match metadata_tzip.tzip21_tm_royalties with
+              | None -> Lwt.return_ok ()
+              | Some r -> update_royalties dbh ~contract ~token_id r in
+            Format.eprintf "  OK@." ;
+            Lwt.return_ok true
+          | Error (code, str) ->
+            (Format.eprintf "  fetch metadata error %d:%s@." code @@
+             Option.value ~default:"None" str);
+            Lwt.return_ok false
+        else
+          begin
+            Format.eprintf "  can't find uri for metadata %s@." metadata ;
+            Lwt.return_ok false
+          end in
+    if success then
+      use None @@ fun dbh -> Produce.nft_item_event dbh contract (Z.of_string token_id) ()
+    else Lwt.return_ok ()
 
 let update_supply ?dbh () =
   use dbh @@ fun dbh ->

@@ -9,6 +9,9 @@ let node = ref "https://tz.functori.com"
 let force = ref false
 let royalties = ref false
 let decimals = ref false
+let fast = ref false
+let fast_levels = ref 10
+let kafka_config_file = ref ""
 
 let spec = [
   "--retrieve-context", Arg.Set retrieve,
@@ -25,6 +28,11 @@ let spec = [
   "Fetch metadata for missing royalties items";
   "--decimals", Arg.Set decimals,
   "Fetch metadata for items with 0 decimals royalties";
+  "--fast", Arg.Set fast,
+  "Only fetch latest missing metadata";
+  "--fast-levels", Arg.Set_int fast_levels,
+  "Set the number of metadata handled by fast argument";
+  "--kafka-config", Arg.Set_string kafka_config_file, "set kafka configuration"
 ]
 
 let expr token_id =
@@ -86,6 +94,7 @@ let () =
   Arg.parse spec (fun _ -> ()) usage;
   EzCurl_common.set_timeout (Some 3);
   Lwt_main.run @@ Lwt.map (Result.iter_error Crp.print_error) @@
+  let>? () = Db.Rarible_kafka.may_set_kafka_config !kafka_config_file in
   match !config with
   | Some c ->
     let open Rtypes in
@@ -152,7 +161,9 @@ let () =
         | true, None, false ->
           if !royalties then Db.Utils.no_royalties_token_metadata ()
           else Lwt.return_ok []
-        | _ -> Db.Utils.unknown_token_metadata ?contract:!contract () in
+        | _ ->
+          let levels = if !fast then Some !fast_levels else None in
+          Db.Utils.unknown_token_metadata ?contract:!contract ?levels () in
       iter_rp (fun r ->
           Db.Utils.update_metadata ~contract:r#contract ~token_id:r#token_id ~block:r#block
             ~level:r#level ~tsp:r#tsp ~metadata:r#metadata ?metadata_uri:r#metadata_uri ()) l
