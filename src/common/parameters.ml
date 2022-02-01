@@ -37,9 +37,11 @@ let decode s =
 
 let get_string_bytes (h : hex) =
   let b = Tzfunc.Crypto.hex_to_raw h in
-  let s = match Tzfunc.Read.(unpack (prim `string) b) with
-    | Ok (Mstring s) -> s
-    | _ -> (b :> string) in
+  let s =
+    try match Tzfunc.Read.(unpack (prim `string) b) with
+      | Ok (Mstring s) -> s
+      | _ -> (b :> string)
+    with _ -> (b :> string) in
   if decode s then Some s
   else None
 
