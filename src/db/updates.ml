@@ -569,6 +569,32 @@ let upgrade_16_to_17 dbh version =
     "create unique index tokens_oid_index on tokens(oid)";
   ]
 
+let upgrade_17_to_18 dbh version =
+  EzPG.upgrade ~dbh ~version
+    ~downgrade:[
+      "alter table order_price_history drop index order_price_histoy_hash_index";
+      "alter table origin_fees drop index origin_fees_hash_index";
+      "alter table origin_fees drop index origin_fees_id_index ";
+      "alter table payouts drop index payouts_hash_index";
+      "alter table payouts drop index payouts_id_index ";
+      "alter table order_cancel drop index order_cancel_cancel_index ";
+      "alter table order_cancel drop index order_cancel_tsp_index";
+      "alter table order_match drop index order_match_hash_left_index";
+      "alter table order_match drop index order_match_hash_right_index ";
+      "alter table order_match drop index order_match_tsp_index ";
+    ] [
+    "create index order_price_histoy_hash_index on order_price_history(hash)";
+    "create index origin_fees_hash_index on origin_fees(hash)";
+    "create index origin_fees_id_index on origin_fees(id)";
+    "create index payouts_hash_index on payouts(hash)";
+    "create index payouts_id_index on payouts(id)";
+    "create index if not exists order_cancel_cancel_index on order_cancel(cancel)";
+    "create index order_cancel_tsp_index on order_cancel(tsp)";
+    "create index order_match_hash_left_index on order_match(hash_left)";
+    "create index order_match_hash_right_index on order_match(hash_right)";
+    "create index order_match_tsp_index on order_match(tsp)";
+  ]
+
 let upgrades =
   let last_version = fst List.(hd @@ rev !Versions.upgrades) in
   !Versions.upgrades @ List.map (fun (i, f) -> last_version + i, f) [
@@ -588,4 +614,5 @@ let upgrades =
     14, upgrade_14_to_15;
     15, upgrade_15_to_16;
     16, upgrade_16_to_17;
+    17, upgrade_17_to_18;
   ]
