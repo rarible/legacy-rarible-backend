@@ -9,6 +9,8 @@ let node = ref "https://tz.functori.com"
 let force = ref false
 let royalties = ref false
 let decimals = ref false
+let fast = ref false
+let fast_levels = ref 10
 
 let spec = [
   "--retrieve-context", Arg.Set retrieve,
@@ -25,6 +27,10 @@ let spec = [
   "Fetch metadata for missing royalties items";
   "--decimals", Arg.Set decimals,
   "Fetch metadata for items with 0 decimals royalties";
+  "--fast", Arg.Set fast,
+  "Only fetch latest missing metadata";
+  "--fast-levels", Arg.Set_int fast_levels,
+  "Set the number of metadata handled by fast argument";
 ]
 
 let expr token_id =
@@ -152,7 +158,9 @@ let () =
         | true, None, false ->
           if !royalties then Db.Utils.no_royalties_token_metadata ()
           else Lwt.return_ok []
-        | _ -> Db.Utils.unknown_token_metadata ?contract:!contract () in
+        | _ ->
+          let levels = if !fast then Some !fast_levels else None in
+          Db.Utils.unknown_token_metadata ?contract:!contract ?levels () in
       iter_rp (fun r ->
           Db.Utils.update_metadata ~contract:r#contract ~token_id:r#token_id ~block:r#block
             ~level:r#level ~tsp:r#tsp ~metadata:r#metadata ?metadata_uri:r#metadata_uri ()) l

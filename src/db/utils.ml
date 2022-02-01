@@ -168,14 +168,26 @@ let decimals_0_token_metadata ?dbh () =
        metadata, metadata_uri, r::jsonb->'value' as v from token_info t, \
        jsonb_array_elements_text(royalties_metadata) r) as tmp where tmp.v::int = 0"]
 
-let unknown_token_metadata ?dbh ?contract () =
+let unknown_token_metadata ?dbh ?contract ?levels () =
   let no_contract = Option.is_none contract in
   use dbh @@ fun dbh ->
-  [%pgsql.object dbh
-      "select i.contract, i.token_id, i.block, i.level, i.tsp, metadata, \
-       metadata_uri, null as token_metadata_id \
-       from token_info i left join tzip21_metadata t on i.id = t.id \
-       where i.main and t.contract is null and ($no_contract or i.contract = $?contract)"]
+  match levels with
+  | None ->
+    [%pgsql.object dbh
+        "select i.contract, i.token_id, i.block, i.level, i.tsp, metadata, \
+         metadata_uri, null as token_metadata_id \
+         from token_info i left join tzip21_metadata t on i.id = t.id \
+         where i.main and t.contract is null and ($no_contract or i.contract = $?contract)"]
+  | Some levels ->
+    let levels = Int32.of_int levels in
+    let>? _, level = Pg.head (Some dbh) in
+    [%pgsql.object dbh
+        "select i.contract, i.token_id, i.block, i.level, i.tsp, metadata, \
+         metadata_uri, null as token_metadata_id \
+         from token_info i left join tzip21_metadata t on i.id = t.id \
+         where i.main and t.contract is null and ($no_contract or i.contract = $?contract) \
+         and i.level > $level::int - $levels::int"]
+
 
 let contract_token_metadata ?dbh ?(royalties=false) contract =
   use dbh @@ fun dbh ->
