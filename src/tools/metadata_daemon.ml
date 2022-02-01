@@ -11,6 +11,7 @@ let royalties = ref false
 let decimals = ref false
 let fast = ref false
 let fast_levels = ref 10
+let kafka_config_file = ref ""
 
 let spec = [
   "--retrieve-context", Arg.Set retrieve,
@@ -31,6 +32,7 @@ let spec = [
   "Only fetch latest missing metadata";
   "--fast-levels", Arg.Set_int fast_levels,
   "Set the number of metadata handled by fast argument";
+  "--kafka-config", Arg.Set_string kafka_config_file, "set kafka configuration"
 ]
 
 let expr token_id =
@@ -92,6 +94,7 @@ let () =
   Arg.parse spec (fun _ -> ()) usage;
   EzCurl_common.set_timeout (Some 3);
   Lwt_main.run @@ Lwt.map (Result.iter_error Crp.print_error) @@
+  let>? () = Db.Rarible_kafka.may_set_kafka_config !kafka_config_file in
   match !config with
   | Some c ->
     let open Rtypes in
