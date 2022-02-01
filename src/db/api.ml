@@ -4,90 +4,60 @@ open Common
 open Misc
 
 let get_balance ?dbh ~contract ~owner token_id =
+  let oid = Utils.oid ~contract ~token_id ~owner in
   use dbh @@ fun dbh ->
   let|>? l =
     [%pgsql dbh
         "select case when balance is not null then balance else amount end \
-         from tokens where contract = $contract and \
-         owner = $owner and token_id = $token_id"] in
+         from tokens where oid = $oid"] in
   match l with
   | [ amount ] -> amount
   | _ -> None
 
 let reset_mint_metadata_creators  dbh ~contract ~token_id ~metadata =
-  match metadata.tzip21_tm_creators with
-  | Some (CParts l) ->
-    iter_rp (fun p ->
-        try
-          ignore @@
-          Tzfunc.Crypto.(Base58.decode ~prefix:Prefix.contract_public_key_hash p.part_account) ;
-          [%pgsql dbh
-              "update tzip21_creators set \
-               account = ${p.part_account}, \
-               value = ${p.part_value} \
-               where contract = $contract and token_id = $token_id"]
-        with _ -> Lwt.return_ok ())
-      l
-  | Some (CAssoc l) ->
-    iter_rp (fun (part_account, part_value) ->
-        try
-          ignore @@
-          Tzfunc.Crypto.(Base58.decode ~prefix:Prefix.contract_public_key_hash part_account) ;
-          [%pgsql dbh
-              "update tzip21_creators set \
-               account = $part_account, \
-               value = $part_value \
-               where contract = $contract and token_id = $token_id"]
-        with _ -> Lwt.return_ok ())
-      l
-  | Some (CTZIP12 l) ->
-    let len = List.length l in
-    if len > 0 then
-      let value = Int32.of_int (10000 / len) in
-      iter_rp (fun part_account ->
-          try
-            ignore @@
-            Tzfunc.Crypto.(Base58.decode ~prefix:Prefix.contract_public_key_hash part_account) ;
-            [%pgsql dbh
-                "update tzip21_creators set \
-                 account = $part_account, \
-                 value = $value \
-                 where contract = $contract and token_id = $token_id"]
-          with _ -> Lwt.return_ok ())
-        l
-    else Lwt.return_ok ()
-  | Some (CNull l) ->
-    let l = List.filter_map (fun x -> x) l in
-    let len = List.length l in
-    if len > 0 then
-      let value = Int32.of_int (10000 / len) in
-      iter_rp (fun part_account ->
-          try
-            ignore @@
-            Tzfunc.Crypto.(Base58.decode ~prefix:Prefix.contract_public_key_hash part_account) ;
-            [%pgsql dbh
-                "update tzip21_creators set \
-                 account = $part_account, \
-                 value = $value \
-                 where contract = $contract and token_id = $token_id"]
-          with _ -> Lwt.return_ok ())
-        l
-    else Lwt.return_ok ()
-  | None -> Lwt.return_ok ()
+  let tid = Utils.tid ~contract ~token_id in
+  let l = match metadata.tzip21_tm_creators with
+    | Some (CParts l) ->
+      List.map (fun p -> p.part_account, p.part_value) l
+    | Some (CAssoc l) -> l
+    | Some (CTZIP12 l) ->
+      let len = List.length l in
+      if len > 0 then
+        let value = Int32.of_int (10000 / len) in
+        List.map (fun account -> account, value) l
+      else []
+    | Some (CNull l) ->
+      let l = List.filter_map (fun x -> x) l in
+      let len = List.length l in
+      if len > 0 then
+        let value = Int32.of_int (10000 / len) in
+        List.map (fun account -> account, value) l
+      else []
+    | None -> [] in
+  iter_rp (fun (account, value) ->
+      try
+        ignore @@
+        Tzfunc.Crypto.(Base58.decode ~prefix:Prefix.contract_public_key_hash account) ;
+        [%pgsql dbh
+            "update tzip21_creators set \
+             account = $account, value = $value \
+             where id = $tid"]
+      with _ -> Lwt.return_ok ()) l
 
 let reset_nft_item_meta_by_id ?dbh contract token_id =
-  Printf.eprintf "reset_nft_item_meta_by_id %s %s\n%!" contract (Z.to_string token_id) ;
+  let tid = Utils.tid ~contract ~token_id in
+  Format.eprintf "reset_nft_item_meta_by_id %s@." tid ;
   let update_royalties dbh royalties = match royalties with
     | Some r ->
       let royalties = EzEncoding.construct parts_enc @@ Metadata.to_4_decimals r in
       [%pgsql dbh
           "update token_info set royalties_metadata = $royalties \
-           where contract = $contract and token_id = ${Z.to_string token_id}"]
+           where id = $tid"]
     | _ -> Lwt.return_ok () in
   use dbh @@ fun dbh ->
   let>? l = [%pgsql dbh
       "select last_block, last_level, last, metadata, metadata_uri from token_info where \
-       main and contract = $contract and token_id = ${Z.to_string token_id}"] in
+       id = $tid and main"] in
   match l with
   | [] -> Lwt.return_ok ()
   | [ block, level, tsp, metadata, None ] ->
@@ -232,7 +202,8 @@ let get_nft_items_by_collection ?dbh ?include_meta ?continuation ?(size=50) cont
     { nft_items_items ; nft_items_continuation ; nft_items_total = 0L }
 
 let get_nft_item_meta_by_id ?dbh contract token_id =
-  Format.eprintf "get_nft_meta_by_id %s %s@." contract (Z.to_string token_id) ;
+  let tid = Utils.tid ~contract ~token_id in
+  Format.eprintf "get_nft_meta_by_id %s@." tid;
   use dbh @@ fun dbh ->
   let>? meta = Get.mk_nft_item_meta dbh ~contract ~token_id in
   match Utils.rarible_meta_of_tzip21_meta meta with
@@ -528,9 +499,8 @@ let mk_nft_ownerships_continuation nft_ownership =
     nft_ownership.nft_ownership_id
 
 let get_nft_ownerships_by_item ?dbh ?continuation ?(size=50) contract token_id =
-  Format.eprintf "get_nft_ownerships_by_item %s %s %s %d@."
-    contract
-    (Z.to_string token_id)
+  let tid = Common.Utils.tid ~contract ~token_id in
+  Format.eprintf "get_nft_ownerships_by_item %s %s %d@." tid
     (match continuation with
      | None -> "None"
      | Some (ts, s) -> (Tzfunc.Proto.A.cal_to_str ts) ^ "_" ^ s)
@@ -543,8 +513,7 @@ let get_nft_ownerships_by_item ?dbh ?continuation ?(size=50) contract token_id =
   let>? l = [%pgsql.object dbh
       "select oid as id, tsp, last, amount, balance, metadata, creators \
        from tokens t inner join token_info i on t.tid = i.id \
-       where main and i.contract = $contract and i.token_id = ${Z.to_string token_id} \
-       and (balance is not null and balance > 0 or amount > 0) and \
+       where i.id = $tid and main and (balance is not null and balance > 0 or amount > 0) and \
        ($no_continuation or \
        (last = $ts and oid < $id) or \
        (last < $ts)) \

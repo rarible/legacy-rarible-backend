@@ -1,6 +1,5 @@
 open Let
 open Rtypes
-open Common
 open Misc
 
 let offchain_royalties_contracts = [
@@ -261,13 +260,13 @@ let get_order_origin_fees ?dbh hash_key =
   use dbh @@ fun dbh ->
   let|>? l = [%pgsql dbh
       "select account, value from origin_fees where hash = $hash_key order by id"] in
-  Utils.to_parts l
+  Common.Utils.to_parts l
 
 let get_order_payouts ?dbh hash_key =
   use dbh @@ fun dbh ->
   let|>? l = [%pgsql dbh
       "select account, value from payouts where hash = $hash_key order by id"] in
-  Utils.to_parts l
+  Common.Utils.to_parts l
 
 let get_fill hash rows =
   List.fold_left (fun acc_fill r ->
@@ -301,14 +300,14 @@ let db_from_asset ?dbh asset =
   let>? decimals = get_decimals ?dbh asset.asset_type in
   match asset.asset_type with
   | ATXTZ ->
-    Lwt.return_ok (Utils.string_of_asset_type asset.asset_type, None, None,
+    Lwt.return_ok (Common.Utils.string_of_asset_type asset.asset_type, None, None,
                    asset.asset_value, decimals)
   | ATFT {contract; token_id} ->
     Lwt.return_ok
-      (Utils.string_of_asset_type asset.asset_type, Some contract, token_id,
+      (Common.Utils.string_of_asset_type asset.asset_type, Some contract, token_id,
        asset.asset_value, decimals)
   | ATNFT fa2 | ATMT fa2 ->
-    Lwt.return_ok (Utils.string_of_asset_type asset.asset_type, Some fa2.asset_contract,
+    Lwt.return_ok (Common.Utils.string_of_asset_type asset.asset_type, Some fa2.asset_contract,
                    Some fa2.asset_token_id, asset.asset_value, None)
 
 let get_ft_balance ?dbh ?token_id ?(do_error=false) ~contract account =
@@ -330,21 +329,19 @@ let get_make_balance ?dbh make owner = match make.asset_type with
     b
   | ATNFT { asset_contract ; asset_token_id } | ATMT { asset_contract ; asset_token_id } ->
     use dbh @@ fun dbh ->
+    let oid = Common.Utils.oid ~contract:asset_contract ~token_id:asset_token_id ~owner in
     let|>? l = [%pgsql.object dbh
         "select case when balance is not null then balance else amount end from tokens where \
-         contract = $asset_contract and token_id = ${Z.to_string asset_token_id} and \
-         owner = $owner"] in
+         oid = $oid"] in
     match l with
     | [ r ] -> Option.value ~default:Z.zero r#amount
     | _ -> Z.zero
 
-
-
 let calculate_make_stock make take data fill make_balance cancelled =
   (* TODO : protocol commission *)
   let protocol_commission = Z.zero in
-  let fee_side = Utils.get_fee_side make take in
-  Utils.calculate_make_stock
+  let fee_side = Common.Utils.get_fee_side make take in
+  Common.Utils.calculate_make_stock
     make.asset_value take.asset_value fill data make_balance
     protocol_commission fee_side cancelled
 
@@ -443,21 +440,21 @@ let get_order ?dbh hash_key =
     Lwt.return_ok @@ Some (order, decs)
 
 let filter_creators =
-  List.filter (fun {part_account; _} -> Utils.check_address part_account)
+  List.filter (fun {part_account; _} -> Common.Utils.check_address part_account)
 
 let get_nft_item_creators dbh ~contract ~token_id =
+  let tid = Common.Utils.tid ~contract ~token_id in
   let|>? r =
     [%pgsql.object dbh
-        "select account, value FROM tzip21_creators where main and \
-         contract = $contract and token_id = ${Z.to_string token_id}"] in
+        "select account, value FROM tzip21_creators where main and id = $tid"] in
   filter_creators @@
   List.map (fun r -> { part_account = r#account ; part_value = r#value} ) r
 
 let get_nft_item_owners dbh ~contract ~token_id =
+  let tid = Common.Utils.tid ~contract ~token_id in
   [%pgsql dbh
       "select owner FROM tokens where \
-       (balance is not null and balance > 0 or amount > 0) and \
-       contract = $contract and token_id = ${Z.to_string token_id}"]
+       tid = $tid and (balance is not null and balance > 0 or amount > 0)"]
 
 let mk_nft_ownership obj =
   match String.split_on_char ':' obj#id with
@@ -481,14 +478,13 @@ let mk_nft_ownership obj =
     Lwt.return_error (`hook_error "can't split id")
 
 let get_nft_ownership_by_id ?dbh ?(old=false) contract token_id owner =
-  (* TODO : OWNERSHIP NOT FOUND *)
-  Format.eprintf "get_nft_ownership_by_id %s %s %s@." contract (Z.to_string token_id) owner ;
+  let oid = Common.Utils.oid ~contract ~token_id ~owner in
+  Format.eprintf "get_nft_ownership_by_id %s@." oid;
   use dbh @@ fun dbh ->
   let>? l = [%pgsql.object dbh
       "select oid as id, last, tsp, amount, balance, metadata, creators \
        from tokens t inner join token_info i on i.id = t.tid \
-       where main and i.contract = $contract and i.token_id = ${Z.to_string token_id} and \
-       owner = $owner and (balance is not null and balance > 0 or amount > 0 or $old)"] in
+       where oid = $oid and main and (balance is not null and balance > 0 or amount > 0 or $old)"] in
   match l with
   | [] -> Lwt.return_error (`hook_error "ownership not found")
   | _ ->
@@ -551,12 +547,12 @@ let mk_tzip21_format r =
     format_data_rate = data_rate }
 
 let get_metadata_formats dbh ~contract ~token_id =
+  let tid = Common.Utils.tid ~contract ~token_id in
   let>? l =
     [%pgsql.object dbh
         "select uri, hash, mime_type, file_size, file_name, duration, \
          dimensions_value, dimensions_unit, data_rate_value, data_rate_unit \
-         from tzip21_formats where \
-         contract = $contract and token_id = ${Z.to_string token_id} and main"] in
+         from tzip21_formats where id = $tid and main"] in
   match l with
   | [] -> Lwt.return_ok None
   | _ ->
@@ -571,10 +567,11 @@ let mk_tzip21_attribute r =
   }
 
 let get_metadata_attributes dbh ~contract ~token_id =
+  let tid = Common.Utils.tid ~contract ~token_id in
   let>? l =
     [%pgsql.object dbh
         "select name, value, type as typ from tzip21_attributes where \
-         contract = $contract and token_id = ${Z.to_string token_id} and main"] in
+         id = $tid and main"] in
   match l with
   | [] -> Lwt.return_ok None
   | _ ->
@@ -670,16 +667,14 @@ let mk_nft_item dbh ?include_meta obj =
       nft_item_date = obj#last ;
       nft_item_minted_at = obj#tsp ;
       nft_item_deleted = supply = Z.zero ;
-      nft_item_meta = Utils.rarible_meta_of_tzip21_meta meta ;
+      nft_item_meta = Common.Utils.rarible_meta_of_tzip21_meta meta ;
     }
   | _ ->
     Lwt.return_error (`hook_error "can't split id")
 
 let get_nft_item_by_id ?dbh ?include_meta contract token_id =
-  Format.eprintf "get_nft_item_by_id %s %s %s@."
-    contract
-    (Z.to_string token_id)
-    (match include_meta with None -> "None" | Some s -> string_of_bool s) ;
+  let tid = Common.Utils.tid ~contract ~token_id in
+  Format.eprintf "get_nft_item_by_id %s(%s)@." tid (match include_meta with None -> "None" | Some s -> string_of_bool s) ;
   use dbh @@ fun dbh ->
   let>? l = [%pgsql.object dbh
       "select i.id, i.contract, i.token_id, \
@@ -688,8 +683,7 @@ let get_nft_item_by_id ?dbh ?include_meta contract token_id =
        array_agg(case when (balance is not null and balance <> 0 or amount <> 0) then owner end) as owners \
        from tokens t \
        inner join token_info i on i.id = t.tid \
-       where main and i.contract = $contract and i.token_id = ${Z.to_string token_id} \
-       group by i.id"] in
+       where i.id = $tid and main group by i.id"] in
   match l with
   | obj :: _ ->
     let>? nft_item = mk_nft_item dbh ?include_meta obj in
@@ -697,12 +691,11 @@ let get_nft_item_by_id ?dbh ?include_meta contract token_id =
   | [] -> Lwt.return_error (`hook_error "item not found")
 
 let get_nft_item_royalties ?dbh contract token_id =
-  Format.eprintf "get_nft_item_royalties %s %s@." contract (Z.to_string token_id);
+  let tid = Common.Utils.tid ~contract ~token_id in
+  Format.eprintf "get_nft_item_royalties %s@." tid;
   use dbh @@ fun dbh ->
   let>? l = [%pgsql.object dbh
-      "select royalties, royalties_metadata \
-       from token_info t \
-       where main and contract = $contract and token_id = ${Z.to_string token_id}"] in
+      "select royalties, royalties_metadata from token_info where id = $tid and main"] in
   match l with
   | obj :: _ ->
     begin match EzEncoding.destruct parts_enc obj#royalties,

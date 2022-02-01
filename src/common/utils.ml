@@ -572,3 +572,9 @@ let check_address a =
       let _ = Tzfunc.Crypto.(Base58.decode ~prefix:Prefix.contract_public_key_hash a) in
       true
     with _ -> false
+
+let tid ~contract ~token_id =
+  Format.sprintf "%s:%s" contract (Z.to_string token_id)
+
+let oid ~contract ~token_id ~owner =
+  Format.sprintf "%s:%s" (tid ~contract ~token_id) owner

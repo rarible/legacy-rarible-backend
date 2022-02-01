@@ -528,16 +528,27 @@ let tokens_without_creators ?dbh () =
       "select contract, token_id from token_info where creators = '{}'"] in
   List.fold_left (fun acc (c, id) -> TIMap.add (c, Z.of_string id) false acc) TIMap.empty l
 
-let update_token ?dbh ~contract ~token_id ~account balance =
-  let oid = Format.sprintf "%s:%s:%s" contract token_id account in
+let update_token ?dbh ~contract ~token_id ~account ~block ~level ~tsp ~transaction balance =
+  let tid = Common.Utils.tid ~contract ~token_id in
+  let oid = Common.Utils.oid ~contract ~token_id ~owner:account in
   use dbh @@ fun dbh ->
+  let creator = { part_account = account; part_value = 10000l } in
+  let creators = [ Some (EzEncoding.construct Rtypes.part_enc creator) ] in
+  let>? () = [%pgsql dbh
+      "insert into token_info(id, contract, token_id, transaction, block, \
+       level, tsp, main, last_block, last_level, last, creators, supply) \
+       values($tid, $contract, ${Z.to_string token_id}, $transaction, $block, \
+       $level, $tsp, true, $block, $level, $tsp, $creators, $balance) \
+       on conflict do nothing"] in
+  let>? () = Crawl.insert_creators ~dbh ~contract ~token_id ~forward:true ~block [ creator ] in
   [%pgsql dbh
       "update tokens set amount = $balance, balance = $balance where oid = $oid"]
 
 let get_alt_token_balance_updates ?dbh () =
   use dbh @@ fun dbh ->
   [%pgsql.object dbh
-      "select contract, ledger_id, ledger_key, ledger_value, token_id, account, balance \
+      "select contract, ledger_id, ledger_key, ledger_value, token_id, account, balance, \
+       t.tsp, t.block, transaction, t.level \
        from token_balance_updates t \
        inner join contracts on contract = address where not t.main"]
 

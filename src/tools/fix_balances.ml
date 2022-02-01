@@ -38,7 +38,9 @@ let main () =
           begin match b with
             | Some b ->
               let>? () =
-                Db.Utils.update_token ~contract:r#contract ~token_id:r#token_id ~account b in
+                Db.Utils.update_token ~contract:r#contract
+                  ~token_id:(Z.of_string r#token_id) ~block:r#block ~level:r#level
+                  ~tsp:r#tsp ~transaction:r#transaction ~account b in
               Lwt.return_ok @@ Some (r#contract, r#token_id, account)
             | _ -> Lwt.return_ok None
           end
