@@ -534,6 +534,38 @@ let upgrade_15_to_16 dbh version =
     "alter table creators alter column block drop default"
   ]
 
+let upgrade_16_to_17 dbh version =
+  EzPG.upgrade ~dbh ~version
+    ~downgrade:[
+      "alter table tzip21_creators drop column id";
+      "alter table tzip21_creators drop index tzip21_creators_id_index";
+      "alter table tzip21_formats drop column id";
+      "alter table tzip21_formats drop index tzip21_formats_id_index";
+      "alter table tzip21_attributes drop column id";
+      "alter table tzip21_attributes drop index tzip21_attributes_id_index";
+    ] [
+    "alter table tzip21_creators add column id varchar not null default ''";
+    "update tzip21_creators set id = concat(contract, ':', token_id)";
+    "alter table tzip21_creators alter column id drop default";
+    "create index tzip21_creators_id_index on tzip21_creators(id)";
+    "alter table tzip21_creators drop constraint tzip21_creators_pkey";
+    "alter table tzip21_creators add constraint tzip21_creators_unique unique (id, account)";
+
+    "alter table tzip21_formats add column id varchar not null default ''";
+    "update tzip21_formats set id = concat(contract, ':', token_id)";
+    "alter table tzip21_formats alter column id drop default";
+    "create index tzip21_formats_id_index on tzip21_formats(id)";
+    "alter table tzip21_formats drop constraint tzip21_formats_pkey";
+    "alter table tzip21_formats add constraint tzip21_formats_unique unique (id, uri)";
+
+    "alter table tzip21_attributes add column id varchar not null default ''";
+    "update tzip21_attributes set id = concat(contract, ':', token_id)";
+    "alter table tzip21_attributes alter column id drop default";
+    "create index tzip21_attributes_id_index on tzip21_attributes(id)";
+    "alter table tzip21_attributes drop constraint tzip21_attributes_pkey";
+    "alter table tzip21_attributes add constraint tzip21_attributes_unique unique (id, name)";
+  ]
+
 let upgrades =
   let last_version = fst List.(hd @@ rev !Versions.upgrades) in
   !Versions.upgrades @ List.map (fun (i, f) -> last_version + i, f) [
@@ -552,4 +584,5 @@ let upgrades =
     13, upgrade_13_to_14;
     14, upgrade_14_to_15;
     15, upgrade_15_to_16;
+    16, upgrade_16_to_17;
   ]

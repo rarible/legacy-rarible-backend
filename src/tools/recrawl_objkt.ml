@@ -3,135 +3,107 @@ open Crawlori
 open Make(Pg)(struct type extra = Rtypes.config end)
 open Proto
 open Let
+open Rtypes
 module SSet = Set.Make(String)
 
 let filename = ref None
 let objkt_contract = ref "KT1Aq4wWmVanpQhq4TTfjZXB5AjFpx15iQMM"
 let recrawl_start = ref None
 let recrawl_end = ref None
+let reset = ref false
 
 let spec = [
   "--contract", Arg.String (fun s -> objkt_contract := s), "OBJKT contract";
   "--start", Arg.Int (fun i -> recrawl_start := Some (Int32.of_int i)), "Start level for recrawl";
   "--end", Arg.Int (fun i -> recrawl_end := Some (Int32.of_int i)), "Optional end level for recrawl";
+  "--reset", Arg.Set reset, "clear all objkt contracts";
 ]
 
-let handle_result config = function
-  | Error e ->
-    Format.printf "OBJKT originated contracts:\n%s@." @@
-    EzEncoding.construct (Config.enc Rtypes.config_enc) config;
-    Lwt.return_error e
-  | Ok _ -> Lwt.return_ok ()
-
-let ext ~config bop =
-  match bop.bo_meta with
+let operation config ext_diff op =
+  match op.bo_meta with
   | None ->
     Lwt.return_error @@
-    `generic ("no_metadata", Format.sprintf "no metadata found for operation %s" bop.bo_hash)
+    `generic ("no_metadata", Format.sprintf "no metadata found for operation %s" op.bo_hash)
   | Some meta ->
     if meta.op_status = `applied then
-      match bop.bo_op.kind with
-      | Transaction tr ->
-        let> r = Db.Misc.use None (fun dbh ->
-            Db.Crawl.insert_transaction ~forward:true ~config ~dbh ~op:bop tr) in
-        handle_result config r
-      | _ -> Lwt.return_ok ()
-    else Lwt.return_ok ()
+      let ext_diff = if op.bo_index = 0l then meta.op_lazy_storage_diff else ext_diff in
+      let op_lazy_storage_diff =
+        if op.bo_index = 0l then meta.op_lazy_storage_diff
+        else ext_diff @ meta.op_lazy_storage_diff in
+      let meta = {meta with op_lazy_storage_diff} in
+      let op = { op with bo_meta = Some meta } in
+      let>? () = match op.bo_op.kind with
+        | Transaction tr ->
+          Db.Misc.use None (fun dbh ->
+              Db.Crawl.insert_transaction ~forward:true ~config ~dbh ~op tr)
+        | Origination ori ->
+          if op.bo_op.source = !objkt_contract then
+            Db.Misc.use None (fun dbh ->
+                Db.Crawl.insert_origination ~forward:true ~crawled:false config dbh op ori)
+          else Lwt.return_ok ()
+        | _ -> Lwt.return_ok () in
+      Lwt.return_ok ext_diff
+    else Lwt.return_ok ext_diff
 
-let config_r = ref None
-
-let int ~config bop =
-  match bop.bo_meta with
-  | None ->
-    Lwt.return_error @@
-    `generic ("no_metadata", Format.sprintf "no metadata found for operation %s" bop.bo_hash)
-  | Some meta ->
-    if meta.op_status = `applied then
-      match bop.bo_op.kind with
-      | Transaction tr ->
-        let> r = Db.Misc.use None (fun dbh ->
-            Db.Crawl.insert_transaction ~forward:true ~config ~dbh ~op:bop tr) in
-        handle_result config r
-      | Origination ori ->
-        if bop.bo_op.source = !objkt_contract then
-          let> r = Db.Misc.use None (fun dbh ->
-              let>? () = Db.Crawl.insert_origination ~forward:true ~crawled:false config dbh bop ori in
-              config_r := Some config;
-              Lwt.return_ok ()
-            ) in
-          handle_result config r
-        else Lwt.return_ok ()
-      | _ -> Lwt.return_ok ()
-    else Lwt.return_ok ()
-
-let operation ~config (index, ()) b o =
-  fold_rp (fun (index, ()) m ->
-      let bo_meta = Option.bind m.man_metadata (fun x -> Some x.man_operation_result) in
-      let bop = {
-        bo_block = b.hash; bo_level = b.header.shell.level;
-        bo_tsp = b.header.shell.timestamp; bo_hash = o.op_hash;
-        bo_op = m.man_info; bo_meta; bo_numbers = None;
-        bo_nonce = None; bo_counter = m.man_numbers.counter;
-        bo_index = index } in
-      let>? () = ext ~config bop in
-      let internals = match m.man_metadata with
-        | None -> []
-        | Some meta -> meta.man_internal_operation_results in
-      let|>? (next_index, ()) = fold_rp (fun (index, ()) iop ->
-          let bo_meta = Some {
-              iop.in_result with
-              op_lazy_storage_diff =
-                iop.in_result.op_lazy_storage_diff @
-                (Option.fold ~none:[] ~some:(fun m -> m.man_operation_result.op_lazy_storage_diff)
-                   m.man_metadata) } in
-          let bop = {
-              bo_block = b.hash; bo_level = b.header.shell.level;
-              bo_tsp = b.header.shell.timestamp; bo_hash = o.op_hash;
-              bo_op = iop.in_content; bo_meta; bo_numbers = None;
-              bo_nonce = Some iop.in_nonce; bo_counter = m.man_numbers.counter;
-              bo_index = index } in
-          let|>? acc = int ~config bop in
-          (Int32.succ index, acc)) (index, ()) internals in
-      (next_index, ())) (index, ()) o.op_contents
-
-let block config () b =
+let block _config () b =
   Format.printf "Block %s (%ld)@." (Common.Utils.short b.hash) b.header.shell.level;
-  let|>? _, acc =
-    fold_rp (fun (index, ()) o -> operation ~config (index, ()) b o)
-      (0l, ()) b.operations in
-  acc
+  Lwt.return_ok ()
 
-let print_config_r () =
-  match !config_r with
-  | None -> ()
-  | Some c ->
-    Format.printf "OBJKT originated contracts:\n%s@." @@
-    EzEncoding.construct (Config.enc Rtypes.config_enc) c
+let objkt_contracts_list () =
+  Format.printf "Fetching objkt contracts@.";
+  let enc = Json_encoding.(list @@ EzEncoding.ignore_enc @@ obj1 (req "address" string)) in
+  let> r1 = EzReq_lwt.get (EzAPI.URL (Format.sprintf "https://staging.api.tzkt.io/v1/accounts/%s/contracts?offset=0&limit=10000" !objkt_contract)) in
+  let|> r2 = EzReq_lwt.get (EzAPI.URL (Format.sprintf "https://staging.api.tzkt.io/v1/accounts/%s/contracts?offset=10000&limit=10000" !objkt_contract)) in
+  match r1, r2 with
+  | Error _, _ | _, Error _ -> Error (`generic ("tzkt_api_error", ""))
+  | Ok s1, Ok s2 ->
+    Ok (EzEncoding.destruct enc s1 @ EzEncoding.destruct enc s2)
+
+let objkt_contracts () =
+  let>? contracts = objkt_contracts_list () in
+  Format.printf "Searching for objkt contracts in DB@.";
+  let|>? contracts = Db.Utils.get_contracts contracts in
+  Format.printf "Loading %d objkt contracts@." @@ List.length contracts;
+  let map = Db.Config.db_contracts contracts in
+  SMap.fold (fun c v acc ->
+      SMap.update c (fun _ ->
+          match v.nft_crawled with
+          | Some true -> None
+          | _ -> Some {v with nft_crawled = Some true}) acc) map map
+
+let reset_contracts contracts =
+  Format.printf "Resetting %d@." @@ List.length contracts;
+  Db.Utils.clear_contracts contracts
 
 let main () =
   Arg.parse spec (fun f -> filename := Some f) "recrawl_objkt.exe [options] config.json";
-  let>? config = Lwt.return @@ Crawler_config.get !filename Rtypes.config_enc in
-  let config = { config with Config.extra = {
-      Rtypes.exchange = ""; royalties = ""; transfer_manager = ""; hen_info = None;
-      ft_contracts = Rtypes.SMap.empty; contracts = config.Config.extra.Rtypes.contracts;
-      tezos_domains = None; versum_info = None; fxhash_info = None } } in
-  let s = match config.Config.accounts with
-    | None -> SSet.empty
-    | Some s -> s in
-  let s = Rtypes.SMap.fold (fun a _ acc -> SSet.add a acc) config.Config.extra.Rtypes.contracts s in
-  let config = { config with Config.accounts = Some s } in
-  match !recrawl_start with
-  | Some start ->
-    let> r = async_recrawl ~config ~start ?end_:!recrawl_end ~block ((), ()) in
-    print_config_r ();
-    Lwt.return r
-  | _ ->
-    Format.printf "Missing arguments: '--start' is required@.";
-    Lwt.return_ok ((), ())
+  if !reset then
+    let>? contracts = objkt_contracts_list () in
+    reset_contracts contracts
+  else
+    let>? contracts = objkt_contracts () in
+    let>? config = Lwt.return @@ Crawler_config.get !filename Rtypes.config_enc in
+    let config = { config with Config.extra = {
+        Rtypes.exchange = ""; royalties = ""; transfer_manager = ""; hen_info = None;
+        ft_contracts = Rtypes.SMap.empty; contracts;
+        tezos_domains = None; versum_info = None; fxhash_info = None } } in
+    let s = match config.Config.accounts with
+      | None -> SSet.empty
+      | Some s -> s in
+    let s = Rtypes.SMap.fold (fun a _ acc -> SSet.add a acc) config.Config.extra.Rtypes.contracts s in
+    let config = { config with Config.accounts = Some s } in
+    match !recrawl_start with
+    | Some start ->
+      Format.printf "Recrawling@.";
+      let|> r = async_recrawl ~config ~start ?end_:!recrawl_end ~block ((), ()) in
+      begin match r with
+        | Ok _ -> Ok ()
+        | Error e -> Error e
+      end
+    | _ ->
+      Format.printf "Missing arguments: '--start' is required@.";
+      exit 1
 
 let () =
-  Sys.(set_signal sigint (Signal_handle (fun _ -> print_config_r (); exit 1)));
   EzLwtSys.run @@ fun () ->
-  Lwt.map (function
-      | Error e -> Rp.print_error e
-      | Ok _ -> ()) (main ())
+  Lwt.map (Result.iter_error Rp.print_error) (main ())

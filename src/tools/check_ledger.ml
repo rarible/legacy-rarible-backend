@@ -8,7 +8,7 @@ let contract = ref None
 let token_id = ref None
 let owner = ref None
 let number = ref None
-let block = ref "head"
+let block = ref None
 
 let spec = [
   "--contract", Arg.String (fun s -> contract := Some s),
@@ -16,7 +16,7 @@ let spec = [
   "--node", Arg.Set_string node, "Node address";
   "--token_id", Arg.String (fun s -> token_id := Some (Z.of_string s)), "Token ID to check";
   "--owner", Arg.String (fun s -> owner := Some s), "Owner to check";
-  "--block", Arg.Set_string block, "Block at which to check";
+  "--block", Arg.String (fun s -> block := Some s), "Block at which to check";
   "--number", Arg.Int (fun i -> number := Some (Int64.of_int i)), "Number of token to check";
 ]
 
@@ -27,6 +27,11 @@ let expr ~typ value =
     Some Tzfunc.Crypto.(Base58.encode ~prefix:Prefix.script_expr_hash @@ Blake2b_32.hash [ b ])
 
 let main () =
+  let>? block = match !block with
+    | Some b -> Lwt.return_ok b
+    | None ->
+      let|>? b, _ = Pg.head None in
+      b in
   let>? l =
     Db.Utils.random_tokens ?contract:!contract ?token_id:!token_id ?owner:!owner
       ?number:!number () in
@@ -44,7 +49,7 @@ let main () =
         Format.printf "\027[0;33mLedger type unknown\027[0m@.";
         Lwt.return_ok ())
       else
-        let> v = Node.get_bigmap_value ~block:!block ~typ ~base:(EzAPI.BASE !node)
+        let> v = Node.get_bigmap_value ~block ~typ ~base:(EzAPI.BASE !node)
             (Z.of_string r#ledger_id) value in
         match Option.map (EzEncoding.destruct Rtypes.micheline_type_short_enc) r#ledger_value, v with
         | Some `nat, Ok (Some (Micheline (Mint z))) ->

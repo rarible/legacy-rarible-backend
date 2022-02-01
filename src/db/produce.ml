@@ -1,6 +1,5 @@
 open Let
 open Rtypes
-open Common
 open Misc
 
 let order_event_hash dbh hash () =
@@ -11,7 +10,7 @@ let order_event_hash dbh hash () =
     begin
       match order with
       | Some (order, decs) ->
-        Rarible_kafka.produce_order_event ~decs (Utils.mk_order_event order)
+        Rarible_kafka.produce_order_event ~decs (Common.Utils.mk_order_event order)
       | None -> Lwt.return ()
     end >>= fun () ->
     Lwt.return_ok ()
@@ -33,7 +32,7 @@ let order_event_item dbh old_owner contract token_id () =
         | Some (order, decs) ->
           match order.order_elt.order_elt_status with
           | OINACTIVE | OACTIVE ->
-            Rarible_kafka.produce_order_event ~decs (Utils.mk_order_event order) >>= fun () ->
+            Rarible_kafka.produce_order_event ~decs (Common.Utils.mk_order_event order) >>= fun () ->
             Lwt.return_ok ()
           | _ -> Lwt.return_ok ())
       l
@@ -46,11 +45,11 @@ let nft_item_event dbh contract token_id () =
     match item with
     | Ok item ->
       if item.nft_item_supply = Z.zero then
-        Rarible_kafka.produce_item_event (Utils.mk_delete_item_event item)
+        Rarible_kafka.produce_item_event (Common.Utils.mk_delete_item_event item)
         >>= fun () ->
         Lwt.return_ok ()
       else
-        Rarible_kafka.produce_item_event (Utils.mk_update_item_event item)
+        Rarible_kafka.produce_item_event (Common.Utils.mk_update_item_event item)
         >>= fun () ->
         Lwt.return_ok ()
     | Error err ->
@@ -61,7 +60,7 @@ let nft_collection_event c =
   match !Rarible_kafka.kafka_config with
   | None -> Lwt.return_ok ()
   | Some _ ->
-    Rarible_kafka.produce_collection_event (Utils.mk_nft_collection_event c)
+    Rarible_kafka.produce_collection_event (Common.Utils.mk_nft_collection_event c)
     >>= fun () ->
     Lwt.return_ok ()
 
@@ -78,9 +77,9 @@ let update_collection_event dbh contract () =
 
 let nft_ownership_update_event os =
   if os.nft_ownership_value = Z.zero then
-    Rarible_kafka.produce_ownership_event (Utils.mk_delete_ownership_event os)
+    Rarible_kafka.produce_ownership_event (Common.Utils.mk_delete_ownership_event os)
   else
-    Rarible_kafka.produce_ownership_event (Utils.mk_update_ownership_event os)
+    Rarible_kafka.produce_ownership_event (Common.Utils.mk_update_ownership_event os)
 
 let nft_ownership_event dbh contract token_id owner () =
   match !Rarible_kafka.kafka_config with

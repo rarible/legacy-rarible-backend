@@ -69,3 +69,9 @@
  (preprocessor_deps (env_var "PGDATABASE") ../db/.rarible_witness)
  (preprocess (pps pgocaml_ppx))
  (libraries crawler_config db ez_api.icurl_lwt))
+
+(executable
+ (name fix_balances)
+ (modules fix_balances)
+ (preprocess (pps pgocaml_ppx))
+ (libraries db ez_api.icurl_lwt))

@@ -7,6 +7,8 @@ open Misc
 
 module SSet = Set.Make(String)
 
+let short = Common.Utils.short
+
 let insert_nft_activity dbh index timestamp nft_activity =
   let act_type, act_from, elt =  match nft_activity with
     | NftActivityMint elt -> "mint", None, elt
@@ -86,9 +88,7 @@ let insert_metadata_update ~dbh ~op ~contract ~token_id ?(update_index=0l) ?(for
          on conflict (id) do update \
          set metadata = $token_meta, metadata_uri = $?uri, \
          last_block = $block, \
-         last_level = $level, last = $tsp \
-         where token_info.contract = $contract and \
-         token_info.token_id = ${Z.to_string token_id}"] in
+         last_level = $level, last = $tsp"] in
     update_index
 
 let insert_mint ~dbh ~op ~contract m =
@@ -102,7 +102,7 @@ let insert_mint ~dbh ~op ~contract m =
       Lwt.return_ok (m.fa2m_token_id, m.fa2m_owner, m.fa2m_amount, m.fa2m_royalties, 0l)
     | UbiMint m ->
       let>? pattern = Metadata.get_uri_pattern ~dbh contract in
-      let meta = Option.fold ~none:[] ~some:(fun pattern -> ["", Utils.replace_token_id ~pattern (Z.to_string m.ubim_token_id)]) pattern in
+      let meta = Option.fold ~none:[] ~some:(fun pattern -> ["", Common.Utils.replace_token_id ~pattern (Z.to_string m.ubim_token_id)]) pattern in
       let|>? update_index = insert_metadata_update ~dbh ~op ~contract ~token_id:m.ubim_token_id meta in
       m.ubim_token_id, m.ubim_owner, Z.one, [], update_index
     | UbiMint2 m ->
@@ -251,7 +251,7 @@ let insert_token_balances ~dbh ~op ~contract ?(ft=false) ?token_id ?(forward=fal
                values($tid, $oid, $contract, ${Z.to_string token_id}, $a, 0) \
                on conflict do nothing"] in
           insert_creators ~dbh ~contract ~token_id ~forward ~block:op.bo_block
-                     [ {part_account=a; part_value=10000l} ]
+            [ {part_account=a; part_value=10000l} ]
         | Some a, _, true ->
           let>? () =
             if balance <> Z.zero then
@@ -803,7 +803,7 @@ let check_ft_status ~dbh ~config ?crawled contract =
 
 let insert_ft ~dbh ~config ~op ~contract ?(forward=false) ft =
   Format.printf "\027[0;35mFT update %s %ld %s\027[0m@."
-    (Utils.short op.bo_hash) op.bo_index (Utils.short contract);
+    (short op.bo_hash) op.bo_index (short contract);
   let>? crawled = check_ft_status ~dbh ~config ?crawled:ft.ft_crawled contract in
   match crawled, op.bo_meta with
   | false, _ | _, None ->
@@ -850,7 +850,7 @@ let string_of_entrypoint = function
 let insert_nft ~dbh ~config ~meta ~op ~contract ~nft ~entrypoint ?(forward=false) param =
   if List.mem entrypoint crawled_entrypoints then
     Format.printf "\027[0;35mNFT %s %s[%ld] %s\027[0m@."
-      (string_of_entrypoint entrypoint) (Utils.short op.bo_hash) op.bo_index (Utils.short contract);
+      (string_of_entrypoint entrypoint) (short op.bo_hash) op.bo_index (short contract);
   let>? crawled = check_nft_status ~dbh ~config ?crawled:nft.nft_crawled contract in
   if not crawled then Lwt.return_ok ()
   else
@@ -919,7 +919,7 @@ let insert_transaction ~config ~dbh ~op ?(forward=false) tr =
     if contract = config.Crawlori.Config.extra.royalties then (* royalties *)
       match Parameters.parse_royalties entrypoint m with
       | Ok roy ->
-        Format.printf "\027[0;35mset royalties %s %ld\027[0m@." (Utils.short op.bo_hash) op.bo_index;
+        Format.printf "\027[0;35mset royalties %s %ld\027[0m@." (short op.bo_hash) op.bo_index;
         let|>? _ = insert_royalties ~dbh ~op ~forward roy in
         ()
       | _ -> Lwt.return_ok ()
@@ -927,7 +927,7 @@ let insert_transaction ~config ~dbh ~op ?(forward=false) tr =
       begin match Parameters.parse_cancel entrypoint m with
         | Ok { cc_hash; cc_maker_edpk; cc_maker; cc_make ; cc_take; cc_salt } ->
           Format.printf "\027[0;35mcancel order %s %ld %s\027[0m@."
-            (Utils.short op.bo_hash) op.bo_index (Utils.short (cc_hash :> string));
+            (short op.bo_hash) op.bo_index (short (cc_hash :> string));
           if not forward then insert_cancel ~dbh ~op ~maker_edpk:cc_maker_edpk ~maker:cc_maker
               ~make:cc_make ~take:cc_take ~salt:cc_salt cc_hash
           else Lwt.return_ok ()
@@ -941,7 +941,7 @@ let insert_transaction ~config ~dbh ~op ?(forward=false) tr =
               dt_right_take_asset; dt_right_salt;
               dt_fill_make_value; dt_fill_take_value} ->
           Format.printf "\027[0;35mdo transfers %s %ld %s %s\027[0m@."
-            (Utils.short op.bo_hash) op.bo_index (Utils.short (dt_left :> string)) (Utils.short (dt_right :> string));
+            (short op.bo_hash) op.bo_index (short (dt_left :> string)) (short (dt_right :> string));
           if not forward then insert_do_transfers
               ~dbh ~op
               ~left:dt_left ~left_maker_edpk:dt_left_maker_edpk
@@ -964,14 +964,14 @@ let insert_transaction ~config ~dbh ~op ?(forward=false) tr =
                  bm_types = Contract_spec.hen_royalties_field } in
       let royalties = Storage_diff.get_big_map_updates bm meta.op_lazy_storage_diff in
       if royalties <> [] then
-        Format.printf "\027[0;35mhen_royalties %s %ld\027[0m@." (Utils.short op.bo_hash) op.bo_index;
+        Format.printf "\027[0;35mhen_royalties %s %ld\027[0m@." (short op.bo_hash) op.bo_index;
       let|>? _ = insert_hen_royalties ~dbh ~forward ~op ~info royalties in
       ()
     | _, Some (c, bm_id), _, _ when c = contract ->
       let bm = { bm_id; bm_types = Contract_spec.tezos_domains_field } in
       let l = Storage_diff.get_big_map_updates bm meta.op_lazy_storage_diff in
       if l <> [] then
-        Format.printf "\027[0;35mtezos_domains %s %ld\027[0m@." (Utils.short op.bo_hash) op.bo_index;
+        Format.printf "\027[0;35mtezos_domains %s %ld\027[0m@." (short op.bo_hash) op.bo_index;
       insert_tezos_domains ~dbh ~op ~forward l
     | _, _, Some ft, _ -> insert_ft ~dbh ~config ~op ~contract ~forward ft
     | _, _, _, Some nft ->
@@ -1055,7 +1055,7 @@ let insert_origination ?(forward=false) ?(crawled=true) config dbh op ori =
     let ledger_key = EzEncoding.construct micheline_type_short_enc nft.nft_ledger.bm_types.bmt_key in
     let ledger_value = EzEncoding.construct micheline_type_short_enc nft.nft_ledger.bm_types.bmt_value in
     Format.printf "\027[0;93morigination %s (%s, %s)\027[0m@."
-      (Utils.short kt1) kind (EzEncoding.construct nft_ledger_enc nft);
+      (short kt1) kind (EzEncoding.construct nft_ledger_enc nft);
     let>? metadata_assoc = match nft.nft_meta_id with
       | None -> Lwt.return_ok "{}"
       | Some bm_id ->
@@ -1344,16 +1344,16 @@ let contract_updates dbh main l =
   Lwt.return_ok @@ List.rev events
 
 let transfer_updates dbh main ~contract ~token_id ~source amount destination =
+  let oid_source = Common.Utils.oid ~contract ~token_id ~owner:source in
+  let oid_destination = Common.Utils.oid ~contract ~token_id ~owner:destination in
   let amount = if main then amount else Z.neg amount in
   let>? () = [%pgsql dbh
       "update tokens set amount = amount - ${Z.to_string amount}::numeric \
-       where token_id = ${Z.to_string token_id} and \
-       owner = $source and contract = $contract"] in
+       where oid = $oid_source"] in
   let>? () =
     [%pgsql dbh
         "update tokens set amount = amount + ${Z.to_string amount}::numeric \
-         where token_id = ${Z.to_string token_id} and \
-         owner = $destination and contract = $contract"] in
+         where oid = $oid_destination"] in
   if main then
     let ev1 = Produce.nft_item_event dbh contract token_id in
     let ev2 = Produce.nft_ownership_event dbh contract token_id source in
@@ -1363,17 +1363,23 @@ let transfer_updates dbh main ~contract ~token_id ~source amount destination =
   else Lwt.return_ok None
 
 let royalties_updates ~dbh ~main ~contract ~block ~level ~tsp ?token_id royalties =
-  let no_token_id = Option.is_none token_id in
-  (* todo set royalties for later tokens if token_id = None *)
-  if main then
+  match main, token_id with
+  | true, None ->
     [%pgsql dbh
         "update token_info set royalties = $royalties, \
          last_block = case when $main then $block else last_block end, \
          last_level = case when $main then $level else last_level end, \
          last = case when $main then $tsp else last end \
-         where contract = $contract and \
-         ($no_token_id or token_id = $?{Option.map Z.to_string token_id})"]
-  else Lwt.return_ok ()
+         where contract = $contract"]
+  | true, Some token_id ->
+    let tid = Common.Utils.tid ~contract ~token_id in
+    [%pgsql dbh
+        "update token_info set royalties = $royalties, \
+         last_block = case when $main then $block else last_block end, \
+         last_level = case when $main then $level else last_level end, \
+         last = case when $main then $tsp else last end \
+         where id = $tid"]
+  | _ -> Lwt.return_ok ()
 
 let token_metadata_updates ~dbh ~main ~contract ~block ~level ~tsp ~token_id ~transaction meta =
   let id = Printf.sprintf "%s:%s" contract (Z.to_string token_id) in
@@ -1394,8 +1400,7 @@ let token_metadata_updates ~dbh ~main ~contract ~block ~level ~tsp ~token_id ~tr
        set metadata = $meta, metadata_uri = $?uri, royalties_metadata = $?royalties, \
        last_block = case when $main then $block else token_info.last_block end, \
        last_level = case when $main then $level else token_info.last_level end, \
-       last = case when $main then $tsp else token_info.last end \
-       where token_info.contract = $contract and token_info.token_id = ${Z.to_string token_id}"]
+       last = case when $main then $tsp else token_info.last end"]
 
 let token_updates dbh main l =
   fold_rp (fun acc r ->
@@ -1433,8 +1438,8 @@ let token_balance_updates dbh main l =
   let agg =
     List.fold_left (fun acc r -> match r#account with
         | None -> ("", r) :: acc
-        | Some a ->
-          let oid = Printf.sprintf "%s:%s:%s" r#contract r#token_id a in
+        | Some owner ->
+          let oid = Common.Utils.oid ~contract:r#contract ~token_id:(Z.of_string r#token_id) ~owner in
           (oid, r) :: List.remove_assoc oid acc)
       [] l in
   let _, l = List.split agg in
@@ -1455,7 +1460,7 @@ let token_balance_updates dbh main l =
           let balance = if main then Some Z.zero else Some Z.one in
           Some (None, balance, None)
         | _ -> None in
-      let tid = r#contract ^ ":" ^ r#token_id in
+      let tid = Common.Utils.tid ~contract:r#contract ~token_id:(Z.of_string r#token_id) in
       let>? l = match info with
         | None -> Lwt.return_ok []
         | Some (account, balance, other) ->
@@ -1465,13 +1470,13 @@ let token_balance_updates dbh main l =
                 "update tokens set balance = $?balance where tokens.tid = $tid \
                  returning owner, amount, balance"]
           | Some account ->
-            let oid = Printf.sprintf "%s:%s" tid account in
+            let oid = Common.Utils.oid ~contract:r#contract ~token_id:(Z.of_string r#token_id) ~owner:account in
             let amount = Option.value ~default:Z.zero balance in
             let>? l = [%pgsql dbh
                 "insert into tokens(tid, oid, contract, token_id, owner, amount, balance) \
                  values($tid, $oid, ${r#contract}, ${r#token_id}, $account, $amount, $?balance) \
                  on conflict (contract, token_id, owner) \
-                 do update set balance = $?balance where tokens.oid = $oid \
+                 do update set balance = $?balance \
                  returning owner, amount, balance"] in
             match other, main with
             | None, _ -> Lwt.return_ok l
@@ -1496,7 +1501,7 @@ let token_balance_updates dbh main l =
     ) TMap.empty l in
   let>? m = fold_rp (fun acc ((contract, token_id, owner), (amount, balance, r)) ->
       Format.printf "\027[0;33mupdate amount for %s[%s][%s]: %s -> %s\027[0m@."
-        (Utils.short contract) (Z.to_string token_id) (Utils.short owner) (Z.to_string amount) (Z.to_string balance);
+        (short contract) (Z.to_string token_id) (short owner) (Z.to_string amount) (Z.to_string balance);
       let oid = Format.sprintf "%s:%s:%s" contract (Z.to_string token_id) owner in
       let>? () = [%pgsql dbh "update tokens set amount = $balance where oid = $oid"] in
       let diff = Z.sub balance amount in
@@ -1510,8 +1515,8 @@ let token_balance_updates dbh main l =
       else
         begin
           Format.printf "\027[0;33mupdate supply for %s[%s]: %s\027[0m@."
-            (Utils.short contract) (Z.to_string token_id) (Z.to_string supply_diff);
-          let id = contract ^ ":" ^ Z.to_string token_id in
+            (short contract) (Z.to_string token_id) (Z.to_string supply_diff);
+          let id = Common.Utils.tid ~contract ~token_id in
           [%pgsql dbh
               "insert into token_info(id, contract, token_id, block, level, tsp, \
                last_block, last_level, last, transaction, supply, main) \
@@ -1521,8 +1526,7 @@ let token_balance_updates dbh main l =
                set supply = token_info.supply + ${Z.to_string supply_diff}, \
                last_block = case when $main then ${r#block} else token_info.last_block end, \
                last_level = case when $main then ${r#level} else token_info.last_level end, \
-               last = case when $main then ${r#tsp} else token_info.last end \
-               where token_info.id = $id"]
+               last = case when $main then ${r#tsp} else token_info.last end"]
         end) @@
   TIMap.bindings m
 

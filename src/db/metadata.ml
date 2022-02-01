@@ -109,71 +109,38 @@ let get_contract_metadata ?(source="https://rarible.mypinata.cloud/") ?(quiet=fa
     | Error (c, str) -> Lwt.return_error (c, str)
 
 let insert_mint_metadata_creators dbh ?(forward=false) ~contract ~token_id ~block ~level ~tsp metadata =
-  match metadata.tzip21_tm_creators with
-  | Some (CParts l) ->
-    iter_rp (fun p ->
-        try
-          ignore @@
-          Tzfunc.Crypto.(Base58.decode ~prefix:Prefix.contract_public_key_hash p.part_account) ;
-          [%pgsql dbh
-              "insert into tzip21_creators(contract, token_id, block, level, \
-               tsp, account, value, main) \
-               values($contract, ${Z.to_string token_id}, $block, $level, $tsp, \
-               ${p.part_account}, ${p.part_value}, $forward) \
-               on conflict do nothing"]
-        with _ -> Lwt.return_ok ())
-      l
-  | Some (CAssoc l) ->
-    iter_rp (fun (part_account, part_value) ->
-        try
-          ignore @@
-          Tzfunc.Crypto.(Base58.decode ~prefix:Prefix.contract_public_key_hash part_account) ;
-          [%pgsql dbh
-              "insert into tzip21_creators(contract, token_id, block, level, \
-               tsp, account, value, main) \
-               values($contract, ${Z.to_string token_id}, $block, $level, $tsp, $part_account, \
-               $part_value, $forward) \
-               on conflict do nothing"]
-        with _ -> Lwt.return_ok ())
-      l
-  | Some (CTZIP12 l) ->
-    let len = List.length l in
-    if len > 0 then
-      let value = Int32.of_int (10000 / len) in
-      iter_rp (fun part_account ->
-          try
-            ignore @@
-            Tzfunc.Crypto.(Base58.decode ~prefix:Prefix.contract_public_key_hash part_account) ;
-            [%pgsql dbh
-                "insert into tzip21_creators(contract, token_id, block, level, \
-                 tsp, account, value, main) \
-                 values($contract, ${Z.to_string token_id}, $block, $level, $tsp, \
-                 $part_account, $value, $forward) \
-                 on conflict do nothing"]
-          with _ -> Lwt.return_ok ())
-        l
-    else Lwt.return_ok ()
-  | Some (CNull l) ->
-    let l = List.filter_map (fun x -> x) l in
-    let len = List.length l in
-    if len > 0 then
-      let value = Int32.of_int (10000 / len) in
-      iter_rp (fun part_account ->
-          try
-            ignore @@
-            Tzfunc.Crypto.(Base58.decode ~prefix:Prefix.contract_public_key_hash part_account) ;
-            [%pgsql dbh
-                "insert into tzip21_creators(contract, token_id, block, level, \
-                 tsp, account, value, main) \
-                 values($contract, ${Z.to_string token_id}, $block, $level, $tsp, \
-                 $part_account, $value, $forward) \
-                 on conflict do nothing"]
-          with _ -> Lwt.return_ok ())
-        l
-    else Lwt.return_ok ()
-  | None -> Lwt.return_ok ()
+  let tid = Common.Utils.tid ~contract ~token_id in
+  let l = match metadata.tzip21_tm_creators with
+    | Some (CParts l) ->
+      List.map (fun p -> p.part_account, p.part_value) l
+    | Some (CAssoc l) -> l
+    | Some (CTZIP12 l) ->
+      let len = List.length l in
+      if len > 0 then
+        let value = Int32.of_int (10000 / len) in
+        List.map (fun account -> account, value) l
+      else []
+    | Some (CNull l) ->
+      let l = List.filter_map (fun x -> x) l in
+      let len = List.length l in
+      if len > 0 then
+        let value = Int32.of_int (10000 / len) in
+        List.map (fun account -> account, value) l
+      else []
+    | None -> [] in
+  iter_rp (fun (account, value) ->
+      try
+        ignore @@  Tzfunc.Crypto.(Base58.decode ~prefix:Prefix.contract_public_key_hash account) ;
+        [%pgsql dbh
+            "insert into tzip21_creators(id, contract, token_id, block, level, \
+             tsp, account, value, main) \
+             values($tid, $contract, ${Z.to_string token_id}, $block, $level, $tsp, \
+             $account, $value, $forward) \
+             on conflict do nothing"]
+      with _ -> Lwt.return_ok ()) l
 
 let insert_mint_metadata_formats dbh ?(forward=false) ~contract ~token_id ~block ~level ~tsp metadata =
+  let tid = Common.Utils.tid ~contract ~token_id in
   match metadata.tzip21_tm_formats with
   | Some formats ->
   iter_rp (fun f ->
@@ -187,14 +154,14 @@ let insert_mint_metadata_formats dbh ?(forward=false) ~contract ~token_id ~block
         | None -> None, None
         | Some d -> Some d.format_dim_value, Some d.format_dim_unit in
       [%pgsql dbh
-          "insert into tzip21_formats(contract, token_id, block, level, \
+          "insert into tzip21_formats(id, contract, token_id, block, level, \
            tsp, uri, hash, mime_type, file_size, file_name, duration, \
            dimensions_value, dimensions_unit, data_rate_value, data_rate_unit, main) \
-           values($contract, ${Z.to_string token_id}, $block, $level, $tsp, ${f.format_uri}, \
+           values($tid, $contract, ${Z.to_string token_id}, $block, $level, $tsp, ${f.format_uri}, \
            $?{f.format_hash}, $?{f.format_mime_type}, $?size, \
            $?{f.format_file_name}, $?{f.format_duration}, $?dim_value, \
            $?dim_unit, $?dr_value, $?dr_unit, $forward) \
-           on conflict (uri, contract, token_id) do update set \
+           on conflict (id, uri) do update set \
            uri = ${f.format_uri}, hash = $?{f.format_hash}, \
            mime_type = $?{f.format_mime_type}, file_size = $?size, \
            file_name = $?{f.format_file_name}, \
@@ -211,16 +178,17 @@ let insert_mint_metadata_formats dbh ?(forward=false) ~contract ~token_id ~block
   | None -> Lwt.return_ok ()
 
 let insert_mint_metadata_attributes dbh ?(forward=false) ~contract ~token_id ~block ~level ~tsp metadata =
+  let tid = Common.Utils.tid ~contract ~token_id in
   match metadata.tzip21_tm_attributes with
   | Some attributes ->
     iter_rp (fun a ->
         let value = Ezjsonm.value_to_string a.attribute_value in
         [%pgsql dbh
-            "insert into tzip21_attributes(contract, token_id, block, level, \
+            "insert into tzip21_attributes(id, contract, token_id, block, level, \
              tsp, name, value, type, main) \
-             values($contract, ${Z.to_string token_id}, $block, $level, $tsp, \
+             values($tid, $contract, ${Z.to_string token_id}, $block, $level, $tsp, \
              ${a.attribute_name}, $value, $?{a.attribute_type}, $forward) \
-             on conflict (name, contract, token_id) do update set \
+             on conflict (id, name) do update set \
              value = $value, \
              type = $?{a.attribute_type}, \
              main = $forward \

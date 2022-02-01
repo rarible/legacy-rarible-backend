@@ -32,6 +32,7 @@ copy: build openapi
 	@cp -f _build/default/src/tools/clean_balance_updates.exe _bin/clean_balance_updates
 	@cp -f _build/default/src/tools/fetch_off_royalties.exe _bin/fetch_off_royalties
 	@cp -f _build/default/src/tools/recrawl_creators.exe _bin/recrawl_creators
+	@cp -f _build/default/src/tools/fix_balances.exe _bin/fix_balances
 
 clean:
 	@dune clean
