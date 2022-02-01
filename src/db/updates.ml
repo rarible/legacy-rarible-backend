@@ -564,6 +564,9 @@ let upgrade_16_to_17 dbh version =
     "create index tzip21_attributes_id_index on tzip21_attributes(id)";
     "alter table tzip21_attributes drop constraint tzip21_attributes_pkey";
     "alter table tzip21_attributes add constraint tzip21_attributes_unique unique (id, name)";
+
+    "drop index tokens_oid_index";
+    "create unique index tokens_oid_index on tokens(oid)";
   ]
 
 let upgrades =

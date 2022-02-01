@@ -43,6 +43,9 @@ let main () =
         | Some (`tuple [ `address; `nat ]) ->
           true, prim `pair ~args:[ prim `address; prim `nat ],
           prim `Pair ~args:[ Mstring r#owner; Mint (Z.of_string r#token_id) ]
+        | Some (`tuple [ `nat; `address ]) ->
+          true, prim `pair ~args:[ prim `nat; prim `address ],
+          prim `Pair ~args:[ Mint (Z.of_string r#token_id); Mstring r#owner ]
         | Some `nat -> true, prim `nat, Mint (Z.of_string r#token_id)
         | _ -> false, prim `unit, prim `Unit in
       if not ok then (
