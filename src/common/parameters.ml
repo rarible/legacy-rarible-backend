@@ -35,12 +35,17 @@ let decode s =
     | `Await -> false in
   aux decoder
 
+let get_string_bytes (h : hex) =
+  let b = Tzfunc.Crypto.hex_to_raw h in
+  let s = match Tzfunc.Read.(unpack (prim `string) b) with
+    | Ok (Mstring s) -> s
+    | _ -> (b :> string) in
+  if decode s then Some s
+  else None
+
 let parse_metadata l =
   List.filter_map (function
-      | (`string k, `bytes v) ->
-        let s = (Tzfunc.Crypto.hex_to_raw v :> string) in
-        if decode s then Some (k, s)
-        else None
+      | (`string k, `bytes v) -> Option.map (fun s -> k, s) @@ get_string_bytes v
       | _ -> None) l
 
 let parse_royalties l =
@@ -101,9 +106,8 @@ let parse_burn m =
 let parse_metadata_uri m =
   match Typed_mich.parse_value (`tuple [`string; `bytes]) m with
   | Ok (`tuple [ `string k; `bytes h ]) ->
-    let s = (Tzfunc.Crypto.hex_to_raw h :> string) in
-    if decode s then Ok (Metadata (k, s))
-    else unexpected_michelson
+    Option.fold ~none:unexpected_michelson ~some:(fun s -> Ok (Metadata (k, s))) @@
+    get_string_bytes h
   | _ -> unexpected_michelson
 
 let parse_add_minter m =

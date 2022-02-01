@@ -134,9 +134,7 @@ let insert_metadatas ~dbh ~op ~contract ?(forward=false) ~update_index l =
       | `nat token_id, Some (`tuple [`nat _; `assoc l]) ->
         let meta = List.filter_map (function
             | `string k, `bytes v ->
-              let s = (Tzfunc.Crypto.hex_to_raw v :> string) in
-              if Parameters.decode s then Some (k, s)
-              else None
+              Option.map (fun s -> k, s) @@ Parameters.get_string_bytes v
             | _ -> None) l in
         insert_metadata_update ~dbh ~op ~contract ~token_id ~forward ~update_index meta
       | _ -> Lwt.return_ok update_index) update_index l
@@ -891,9 +889,10 @@ let insert_nft ~dbh ~config ~meta ~op ~contract ~nft ~entrypoint ?(forward=false
         let metadata = Storage_diff.get_big_map_updates bm meta.op_lazy_storage_diff in
         iter_rp (function
             | `string key, Some (`bytes h) ->
-              let value = (Tzfunc.Crypto.hex_to_raw h :> string) in
-              if Parameters.decode value then insert_metadata ~dbh ~op ~contract ~forward ~value key
-              else Lwt.return_ok ()
+              begin match Parameters.get_string_bytes h with
+                | None -> Lwt.return_ok ()
+                | Some value -> insert_metadata ~dbh ~op ~contract ~forward ~value key
+              end
             | `string key, None -> insert_metadata ~dbh ~op ~contract ~forward key
             | _ -> Lwt.return_ok ()) metadata in
     let>? update_index = match config.Crawlori.Config.extra.versum_info with
@@ -1003,9 +1002,7 @@ let filter_contracts op ori =
           | (Some (`assoc l), _) ->
             List.filter_map (function
                 | (`string k, `bytes v) ->
-                  let s = (Tzfunc.Crypto.hex_to_raw v :> string) in
-                  if Parameters.decode s then Some (k, s)
-                  else None
+                  Option.map (fun s -> k, s) @@ Parameters.get_string_bytes v
                 | _ -> None) l
           | _ -> [] in
         begin match b_balance && b_update && b_transfer, f_ledger with
@@ -1060,9 +1057,7 @@ let insert_origination ?(forward=false) ?(crawled=true) config dbh op ori =
         let cmetadata = Storage_diff.get_big_map_updates bm meta.op_lazy_storage_diff in
         let cmetadata = List.filter_map (function
             | `string k, Some `bytes v ->
-              let s = (Tzfunc.Crypto.hex_to_raw v :> string) in
-              if Parameters.decode s then Some (k, s)
-              else None
+              Option.map (fun s -> k, s) @@ Parameters.get_string_bytes v
             | _ -> None) cmetadata in
         let massoc =
           List.fold_left (fun m (k, v) ->
