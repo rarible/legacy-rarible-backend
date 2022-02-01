@@ -547,10 +547,14 @@ let update_token_info ?dbh ~contract ~token_id ~account ~block ~level ~tsp ~tran
   | _ -> Lwt.return_ok ()
 
 let update_token ?dbh ~contract ~token_id ~account balance =
+  let tid = Common.Utils.tid ~contract ~token_id in
   let oid = Common.Utils.oid ~contract ~token_id ~owner:account in
   use dbh @@ fun dbh ->
   [%pgsql dbh
-      "update tokens set amount = $balance, balance = $balance where oid = $oid"]
+      "insert into tokens(tid, oid, contract, token_id, owner, balance, amount) \
+       values($tid, $oid, $contract, ${Z.to_string token_id}, \
+       $account, $balance, $balance) on conflict (contract, token_id, owner) \
+       do update set amount = $balance, balance = $balance"]
 
 let get_alt_token_balance_updates ?dbh () =
   use dbh @@ fun dbh ->
