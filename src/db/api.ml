@@ -181,15 +181,11 @@ let get_nft_items_by_collection ?dbh ?include_meta ?continuation ?(size=50) cont
        array_agg(case when t.balance is not null and t.balance <> 0 or \
        t.amount <> 0 then t.owner end) as owners, \
        sum(case when t.balance is not null then t.balance else t.amount end) as supply \
-       from (select tid, amount, balance, owner from tokens where \
-       contract = $contract and
-       ((balance is not null and balance > 0 or amount > 0))) t \
+       from tokens t \
        inner join token_info i on i.id = t.tid \
-       and i.id in (\
-       select id from token_info where \
-       main and contract = $contract and \
+       where \
+       main and i.contract = $contract and \
        ($no_continuation or (last = $ts and id < $id) or (last < $ts)) \
-       order by last desc, id desc limit $size64) \
        group by (i.id) \
        order by i.last desc, i.id desc limit $size64"] in
   let>? nft_items_items = map_rp (fun r -> Get.mk_nft_item dbh ?include_meta r) l in
