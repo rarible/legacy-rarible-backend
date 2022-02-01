@@ -28,8 +28,17 @@ let main () =
   let>? () = Db.Rarible_kafka.may_set_kafka_config !kafka_config_file in
   let>? (block, _) = Pg.head None in
   let>? l = Db.Utils.get_alt_token_balance_updates () in
+  let tm = List.fold_left (fun tm r ->
+      match r#account with
+      | Some account ->
+        let k = r#contract, Z.of_string r#token_id, account in
+        Rtypes.TMap.update k (function None -> Some r | Some x -> Some x) tm
+      | _ -> tm) Rtypes.TMap.empty l in
+  let tim = Rtypes.TMap.fold (fun (contract, token_id, _) r tim ->
+      let k = contract, token_id in
+      Rtypes.TIMap.update k (function None -> Some r | Some x -> Some x) tim) tm Rtypes.TIMap.empty in
   let>? l =
-    map_rp (fun r ->
+    map_rp (fun (_, r) ->
         match r#account, r#ledger_key, r#ledger_value with
         | Some account, Some key, Some value ->
           Format.printf "Handle %s %s %s@." r#contract r#token_id account;
@@ -39,12 +48,18 @@ let main () =
             | Some b ->
               let>? () =
                 Db.Utils.update_token ~contract:r#contract
-                  ~token_id:(Z.of_string r#token_id) ~block:r#block ~level:r#level
-                  ~tsp:r#tsp ~transaction:r#transaction ~account b in
+                  ~token_id:(Z.of_string r#token_id) ~account b in
               Lwt.return_ok @@ Some (r#contract, r#token_id, account)
             | _ -> Lwt.return_ok None
           end
-        | _ -> Lwt.return_ok None) l in
+        | _ -> Lwt.return_ok None) (Rtypes.TMap.bindings tm) in
+  let>? () = iter_rp (fun (_, r) ->
+      match r#account with
+      | Some account ->
+        Db.Utils.update_token_info ~contract:r#contract ~account
+          ~token_id:(Z.of_string r#token_id) ~block:r#block ~level:r#level
+          ~tsp:r#tsp ~transaction:r#transaction ()
+      | _ -> Lwt.return_ok ()) (Rtypes.TIMap.bindings tim) in
   Db.Misc.use None @@ fun dbh ->
   fold_rp (fun acc (c, tid, account) ->
       let tid = Z.of_string tid in
