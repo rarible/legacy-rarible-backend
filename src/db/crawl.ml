@@ -392,7 +392,7 @@ let insert_order_activity ?(main=false)
        on conflict do nothing"]
 
 (* only produce listing events here, match and cancel events will be fired on set main *)
-let insert_order_activity ~decs dbh activity =
+let insert_order_activity ~decs ?main dbh activity =
   match activity.order_act_type with
   | OrderActivityList act ->
     let hash = Some act.order_activity_bid_hash in
@@ -413,7 +413,7 @@ let insert_order_activity ~decs dbh activity =
     let transaction = Some act.order_activity_cancel_bid_transaction_hash in
     let block = Some act.order_activity_cancel_bid_block_hash in
     let level = Some (Int64.to_int32 act.order_activity_cancel_bid_block_number) in
-    insert_order_activity
+    insert_order_activity ?main
       dbh activity.order_act_id None None hash transaction block
       level activity.order_act_date "cancel_l"
   | OrderActivityCancelBid act ->
@@ -421,7 +421,7 @@ let insert_order_activity ~decs dbh activity =
     let transaction = Some act.order_activity_cancel_bid_transaction_hash in
     let block = Some act.order_activity_cancel_bid_block_hash in
     let level = Some (Int64.to_int32 act.order_activity_cancel_bid_block_number) in
-    insert_order_activity
+    insert_order_activity ?main
       dbh activity.order_act_id None None hash transaction block
       level activity.order_act_date "cancel_b"
   | OrderActivityMatch act ->
@@ -430,7 +430,7 @@ let insert_order_activity ~decs dbh activity =
     let transaction = Some act.order_activity_match_transaction_hash in
     let block = Some act.order_activity_match_block_hash in
     let level = Some (Int64.to_int32 act.order_activity_match_block_number) in
-    insert_order_activity
+    insert_order_activity ?main
       dbh activity.order_act_id left right left transaction block
       level activity.order_act_date "match"
 
@@ -459,7 +459,7 @@ let insert_order_activity_new ~decs dbh date order =
   } in
   insert_order_activity ~decs dbh order_act
 
-let insert_order_activity_cancel dbh transaction block index level date hash =
+let insert_order_activity_cancel dbh ?main transaction block index level date hash =
   let>? order = Get.get_order ~dbh hash in
   let id = Printf.sprintf "%s_%ld" block index in
   match order with
@@ -485,12 +485,12 @@ let insert_order_activity_cancel dbh transaction block index level date hash =
       order_act_source = "RARIBLE" ;
       order_act_type = order_activity_type ;
     } in
-    insert_order_activity ~decs dbh order_act
+    insert_order_activity ~decs ?main dbh order_act
   | None ->
     Lwt.return_ok ()
 
 let insert_order_activity_match
-    dbh transaction block index level date
+    dbh ?main transaction block index level date
     hash_left left_maker left_asset left_salt
     hash_right right_maker right_asset right_salt =
   let id = Printf.sprintf "%s_%ld" block index in
@@ -537,9 +537,9 @@ let insert_order_activity_match
   } in
   let>? maked = Get.get_decimals left_asset.asset_type in
   let>? taked = Get.get_decimals right_asset.asset_type in
-  insert_order_activity ~decs:(maked, taked) dbh order_act
+  insert_order_activity ~decs:(maked, taked) ?main dbh order_act
 
-let insert_cancel ~dbh ~op ~maker_edpk ~maker ~make ~take ~salt (hash : Tzfunc.H.t) =
+let insert_cancel ~dbh ~op ~maker_edpk ~maker ~make ~take ~salt ?(forward=false) (hash : Tzfunc.H.t) =
   let hash = ( hash :> string ) in
   let source = op.bo_op.source in
   let>? () =
@@ -567,19 +567,19 @@ let insert_cancel ~dbh ~op ~maker_edpk ~maker ~make ~take ~salt (hash : Tzfunc.H
            ${Z.to_string salt}, $signature, $created_at, $created_at, $hash) \
            on conflict do nothing"] in
   [%pgsql dbh
-      "insert into order_cancel(transaction, index, block, level, tsp, source, cancel) \
+      "insert into order_cancel(transaction, index, block, level, tsp, source, cancel, main) \
        values(${op.bo_hash}, ${op.bo_index}, ${op.bo_block}, ${op.bo_level}, \
-       ${op.bo_tsp}, $source, $hash) \
+       ${op.bo_tsp}, $source, $hash, $forward) \
        on conflict do nothing"] >>=? fun () ->
-  insert_order_activity_cancel
+  insert_order_activity_cancel ~main:forward
     dbh op.bo_hash op.bo_block op.bo_index op.bo_level op.bo_tsp hash
 
-let insert_do_transfers ~dbh ~op
+let insert_do_transfers ~dbh ~op ?(forward=false)
     ~(left : Tzfunc.H.t) ~left_maker_edpk ~left_maker ~left_make_asset
     ~left_take_asset ~left_salt
     ~(right : Tzfunc.H.t) ~right_maker_edpk ~right_maker ~right_make_asset
     ~right_take_asset ~right_salt
-    ~fill_make_value ~fill_take_value =
+    ~fill_make_value ~fill_take_value () =
   let left = ( left :> string ) in
   let right = ( right :> string ) in
   let source = op.bo_op.source in
@@ -587,7 +587,6 @@ let insert_do_transfers ~dbh ~op
   let>? right_order_opt = Get.get_order ~dbh right in
   let created_at = CalendarLib.Calendar.now () in
   let signature = "NO_SIGNATURE" in
-
   let>? () =
     match left_order_opt, right_order_opt with
     | Some _, Some _ -> Lwt.return_ok ()
@@ -702,7 +701,7 @@ let insert_do_transfers ~dbh ~op
        ${op.bo_tsp}, $source, $left, $right, \
        $fill_make_value, $fill_take_value) \
        on conflict do nothing"] >>=? fun () ->
-  insert_order_activity_match
+  insert_order_activity_match ~main:forward
     dbh op.bo_hash op.bo_block op.bo_index op.bo_level op.bo_tsp
     left left_maker left_make_asset left_salt
     right right_maker right_make_asset right_salt
@@ -928,9 +927,8 @@ let insert_transaction ~config ~dbh ~op ?(forward=false) tr =
         | Ok { cc_hash; cc_maker_edpk; cc_maker; cc_make ; cc_take; cc_salt } ->
           Format.printf "\027[0;35mcancel order %s %ld %s\027[0m@."
             (short op.bo_hash) op.bo_index (short (cc_hash :> string));
-          if not forward then insert_cancel ~dbh ~op ~maker_edpk:cc_maker_edpk ~maker:cc_maker
-              ~make:cc_make ~take:cc_take ~salt:cc_salt cc_hash
-          else Lwt.return_ok ()
+          insert_cancel ~dbh ~op ~maker_edpk:cc_maker_edpk ~maker:cc_maker
+            ~make:cc_make ~take:cc_take ~salt:cc_salt ~forward cc_hash
         | _ -> Lwt.return_ok ()
       end
     else if contract = config.Crawlori.Config.extra.transfer_manager then (* transfer_manager *)
@@ -942,16 +940,15 @@ let insert_transaction ~config ~dbh ~op ?(forward=false) tr =
               dt_fill_make_value; dt_fill_take_value} ->
           Format.printf "\027[0;35mdo transfers %s %ld %s %s\027[0m@."
             (short op.bo_hash) op.bo_index (short (dt_left :> string)) (short (dt_right :> string));
-          if not forward then insert_do_transfers
-              ~dbh ~op
-              ~left:dt_left ~left_maker_edpk:dt_left_maker_edpk
-              ~left_maker:dt_left_maker ~left_make_asset:dt_left_make_asset
-              ~left_take_asset:dt_left_take_asset ~left_salt:dt_left_salt
-              ~right:dt_right ~right_maker_edpk:dt_right_maker_edpk
-              ~right_maker:dt_right_maker ~right_make_asset:dt_right_make_asset
-              ~right_take_asset:dt_right_take_asset ~right_salt:dt_right_salt
-              ~fill_make_value:dt_fill_make_value ~fill_take_value:dt_fill_take_value
-          else Lwt.return_ok ()
+          insert_do_transfers ~forward
+            ~dbh ~op
+            ~left:dt_left ~left_maker_edpk:dt_left_maker_edpk
+            ~left_maker:dt_left_maker ~left_make_asset:dt_left_make_asset
+            ~left_take_asset:dt_left_take_asset ~left_salt:dt_left_salt
+            ~right:dt_right ~right_maker_edpk:dt_right_maker_edpk
+            ~right_maker:dt_right_maker ~right_make_asset:dt_right_make_asset
+            ~right_take_asset:dt_right_take_asset ~right_salt:dt_right_salt
+            ~fill_make_value:dt_fill_make_value ~fill_take_value:dt_fill_take_value ()
         | _ -> Lwt.return_ok ()
       end
     else match

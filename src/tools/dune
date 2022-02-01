@@ -75,3 +75,8 @@
  (modules fix_balances)
  (preprocess (pps pgocaml_ppx))
  (libraries db ez_api.icurl_lwt))
+
+(executable
+ (name recrawl_exchange)
+ (modules recrawl_exchange)
+ (libraries crawler_config db ez_api.icurl_lwt))
