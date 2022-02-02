@@ -617,3 +617,11 @@ let clear_contracts ?dbh contracts =
   let>? () = [%pgsql dbh "drop index token_updates_contract_index"] in
   let|>? () = [%pgsql dbh "drop index token_balance_updates_contract_index"] in
   ()
+
+let refresh_objkt_royalties ?dbh contracts =
+  let contracts = List.map Option.some contracts in
+  use dbh @@ fun dbh ->
+  [%pgsql dbh
+    "update token_info set royalties_metadata = tz.royalties from tzip21_metadata tz \
+     where token_info.contract = any($contracts) and tz.id = token_info.id and royalties_metadata is null \
+     and tz.royalties is not null"]
