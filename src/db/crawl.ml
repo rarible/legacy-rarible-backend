@@ -1415,7 +1415,7 @@ let token_balance_updates dbh main l =
       [] l in
   let _, l = List.split agg in
   let l = List.rev l in
-  let>? m = fold_rp (fun acc r ->
+  let>? unseen = fold_rp (fun acc r ->
       let info = match r#kind, r#account, r#balance with
         | "mt", Some account, Some balance ->
           let balance = if main then Some balance else None in
@@ -1479,27 +1479,29 @@ let token_balance_updates dbh main l =
       Lwt.return_ok @@ match TIMap.find_opt (contract, token_id) acc with
       | None -> TIMap.add (contract, token_id) (diff, r) acc
       | Some (s, _) -> TIMap.add (contract, token_id) (Z.(add s diff), r) acc
-    ) TIMap.empty (TMap.bindings m) in
-  iter_rp (fun ((contract, token_id), (supply_diff, r)) ->
-      if supply_diff = Z.zero then
-        Lwt.return_ok ()
-      else
-        begin
-          Format.printf "\027[0;33mupdate supply for %s[%s]: %s\027[0m@."
-            (short contract) (Z.to_string token_id) (Z.to_string supply_diff);
-          let id = Common.Utils.tid ~contract ~token_id in
-          [%pgsql dbh
-              "insert into token_info(id, contract, token_id, block, level, tsp, \
-               last_block, last_level, last, transaction, supply, main) \
-               values($id, $contract, ${Z.to_string token_id}, ${r#block}, ${r#level}, ${r#tsp}, \
-               ${r#block}, ${r#level}, ${r#tsp}, ${r#transaction}, $supply_diff, true) \
-               on conflict (id) do update \
-               set supply = token_info.supply + ${Z.to_string supply_diff}, \
-               last_block = case when $main then ${r#block} else token_info.last_block end, \
-               last_level = case when $main then ${r#level} else token_info.last_level end, \
-               last = case when $main then ${r#tsp} else token_info.last end"]
-        end) @@
-  TIMap.bindings m
+    ) TIMap.empty (TMap.bindings unseen) in
+  let>? () =
+    iter_rp (fun ((contract, token_id), (supply_diff, r)) ->
+        if supply_diff = Z.zero then
+          Lwt.return_ok ()
+        else
+          begin
+            Format.printf "\027[0;33mupdate supply for %s[%s]: %s\027[0m@."
+              (short contract) (Z.to_string token_id) (Z.to_string supply_diff);
+            let id = Common.Utils.tid ~contract ~token_id in
+            [%pgsql dbh
+                "insert into token_info(id, contract, token_id, block, level, tsp, \
+                 last_block, last_level, last, transaction, supply, main) \
+                 values($id, $contract, ${Z.to_string token_id}, ${r#block}, ${r#level}, ${r#tsp}, \
+                 ${r#block}, ${r#level}, ${r#tsp}, ${r#transaction}, $supply_diff, true) \
+                 on conflict (id) do update \
+                 set supply = token_info.supply + ${Z.to_string supply_diff}, \
+                 last_block = case when $main then ${r#block} else token_info.last_block end, \
+                 last_level = case when $main then ${r#level} else token_info.last_level end, \
+                 last = case when $main then ${r#tsp} else token_info.last end"]
+          end) @@
+    TIMap.bindings m in
+  Lwt.return_ok unseen
 
 let tezos_domain_updates dbh main l =
   iter_rp (fun r ->
@@ -1559,7 +1561,7 @@ let set_main _config ?(forward=false) dbh {Hooks.m_main; m_hash} =
       [%pgsql.object dbh "select * from tezos_domains where block = $m_hash"] in
     let>? cevents = contract_updates dbh m_main @@ sort c_updates in
     let>? tevents = token_updates dbh m_main @@ sort t_updates in
-    let>? () = token_balance_updates dbh m_main @@ sort tb_updates in
+    let>? unseen = token_balance_updates dbh m_main @@ sort tb_updates in
     let>? () = tezos_domain_updates dbh m_main @@ sort td_updates in
     let>? () =
       [%pgsql dbh
@@ -1581,6 +1583,10 @@ let set_main _config ?(forward=false) dbh {Hooks.m_main; m_hash} =
         let>? () = Produce.collection_events m_main collections collections_name in
         let>? () = Produce.cancel_events dbh m_main @@ sort cancels in
         let>? () = Produce.match_events dbh m_main @@ sort matches in
+        let unseen =
+          List.map (fun ((contract, token_id, owner), _) -> (contract, Some token_id, [ owner ]))
+            (TMap.bindings unseen)
+        in
         let contracts, items =
           List.fold_left (fun (contracts, items) (contract, token_id, owners) ->
               SSet.add contract contracts,
@@ -1594,7 +1600,7 @@ let set_main _config ?(forward=false) dbh {Hooks.m_main; m_hash} =
                       let o = List.fold_left (fun acc ow -> SSet.add ow acc) old owners in
                       Some o)
                   items)
-            (SSet.empty, SMap.empty) (cevents @ tevents) in
+            (SSet.empty, SMap.empty) (cevents @ tevents @ unseen) in
         let>? () =
           iter_rp (fun c ->
               Produce.update_collection_event dbh c ())
