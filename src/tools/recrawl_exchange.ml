@@ -84,7 +84,7 @@ let main () =
   let>? config = Lwt.return @@ Crawler_config.get !filename Rtypes.config_enc in
   match !recrawl_start with
   | Some start ->
-    let|>? _ = async_recrawl ~config ~start ?end_:!recrawl_end ~operation ((), ()) in
+    let|>? _ = async_recrawl ~config ~start ?end_:!recrawl_end ~operation ~block ((), ()) in
     ()
   | _ ->
     Format.printf "Missing arguments: '--start', '--contracts' are required@.";
