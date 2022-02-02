@@ -557,7 +557,7 @@ let update_token_info ?dbh ~contract ~token_id ~account ~block ~level ~tsp ~tran
          level, tsp, main, last_block, last_level, last, creators, supply) \
          values($tid, $contract, ${Z.to_string token_id}, $transaction, $block, \
          $level, $tsp, true, $block, $level, $tsp, $creators, $supply) \
-         on conflict (id) do update set supply = $supply"] in
+         on conflict (id) do update set supply = $supply, main = true"] in
     Crawl.insert_creators ~dbh ~contract ~token_id ~forward:true ~block [ creator ]
   | _ -> Lwt.return_ok ()
 
