@@ -25,10 +25,11 @@ let operation config ext_diff op =
     Lwt.return_error @@
     `generic ("no_metadata", Format.sprintf "no metadata found for operation %s" op.bo_hash)
   | Some meta ->
+    let _, _, oindex2 = op.bo_indexes in
     if meta.op_status = `applied then
-      let ext_diff = if op.bo_index = 0l then meta.op_lazy_storage_diff else ext_diff in
+      let ext_diff = if oindex2 = 0l then meta.op_lazy_storage_diff else ext_diff in
       let op_lazy_storage_diff =
-        if op.bo_index = 0l then meta.op_lazy_storage_diff
+        if oindex2 = 0l then meta.op_lazy_storage_diff
         else ext_diff @ meta.op_lazy_storage_diff in
       let meta = {meta with op_lazy_storage_diff} in
       let op = { op with bo_meta = Some meta } in
@@ -37,9 +38,9 @@ let operation config ext_diff op =
           Db.Misc.use None (fun dbh ->
               Db.Crawl.insert_transaction ~forward:true ~config ~dbh ~op tr)
         | Origination ori ->
-          if op.bo_op.source = !objkt_contract then
+          if op.bo_op.source = !objkt_contract then (
             Db.Misc.use None (fun dbh ->
-                Db.Crawl.insert_origination ~forward:true ~crawled:false config dbh op ori)
+                Db.Crawl.insert_origination ~forward:true ~crawled:false config dbh op ori))
           else Lwt.return_ok ()
         | _ -> Lwt.return_ok () in
       Lwt.return_ok ext_diff
@@ -95,7 +96,7 @@ let main () =
     match !recrawl_start with
     | Some start ->
       Format.printf "Recrawling@.";
-      let|> r = async_recrawl ~config ~start ?end_:!recrawl_end ~block ((), ()) in
+      let|> r = async_recrawl ~config ~start ?end_:!recrawl_end ~block ~operation ((), []) in
       begin match r with
         | Ok _ -> Ok ()
         | Error e -> Error e

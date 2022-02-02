@@ -52,13 +52,6 @@
  (libraries crawler_config db ez_api.icurl_lwt))
 
 (executable
- (name direct_crawl)
- (modules direct_crawl)
- (preprocessor_deps (env_var "PGDATABASE") ../db/.rarible_witness)
- (preprocess (pps pgocaml_ppx))
- (libraries crawler_config ez_api.icurl_lwt))
-
-(executable
  (name recrawl_objkt)
  (modules recrawl_objkt)
  (libraries crawler_config db ez_api.icurl_lwt))

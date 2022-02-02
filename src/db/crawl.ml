@@ -1041,10 +1041,8 @@ let set_crawled_nft ?dbh contract =
 let insert_origination ?(forward=false) ?(crawled=true) config dbh op ori =
   let kt1 = Tzfunc.Crypto.op_to_KT1 op.bo_hash in
   match filter_contracts op ori, op.bo_meta, SMap.find_opt kt1 config.Crawlori.Config.extra.ft_contracts with
-  | _, _, Some _ ->
-    set_crawled_ft ~dbh kt1
-  | None, _, _ | _, None, _ ->
-    Lwt.return_ok ()
+  | _, _, Some _ -> set_crawled_ft ~dbh kt1
+  | None, _, _ | _, None, _ -> Lwt.return_ok ()
   | Some (kind, nft, owner, uri, _metadata), Some meta, _ ->
     let ledger_key = EzEncoding.construct micheline_type_short_enc nft.nft_ledger.bm_types.bmt_key in
     let ledger_value = EzEncoding.construct micheline_type_short_enc nft.nft_ledger.bm_types.bmt_value in
@@ -1141,7 +1139,7 @@ let insert_block config ?forward dbh b =
                   let op = {
                     Hooks.bo_block = b.hash; bo_level = b.header.shell.level;
                     bo_tsp = b.header.shell.timestamp; bo_hash = op.op_hash;
-                    bo_op = c.man_info; bo_index = index;
+                    bo_op = c.man_info; bo_index = index; bo_indexes = (0l, 0l, 0l);
                     bo_meta = Option.map (fun m -> m.man_operation_result) c.man_metadata;
                     bo_numbers = Some c.man_numbers; bo_nonce = None;
                     bo_counter = c.man_numbers.counter } in
@@ -1161,7 +1159,7 @@ let insert_block config ?forward dbh b =
                       let op = {
                         Hooks.bo_block = b.hash; bo_level = b.header.shell.level;
                         bo_tsp = b.header.shell.timestamp; bo_hash = op.op_hash;
-                        bo_op = iop.in_content; bo_index = index; bo_meta;
+                        bo_op = iop.in_content; bo_index = index; bo_indexes = (0l, 0l, 0l); bo_meta;
                         bo_numbers = Some c.man_numbers; bo_nonce = Some iop.in_nonce;
                         bo_counter = c.man_numbers.counter } in
                       let|>? () = insert_origination ?forward config dbh op ori in
