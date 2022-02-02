@@ -585,6 +585,16 @@ let get_alt_token_balance_updates ?dbh () =
        from token_balance_updates t \
        inner join contracts on contract = address where not t.main order by t.tsp"]
 
+let get_missing_token_info ?dbh () =
+  use dbh @@ fun dbh ->
+  [%pgsql.object dbh
+      "select t.contract, ledger_id, ledger_key, ledger_value, t.token_id, account, balance, \
+       t.tsp, t.block, t.transaction, t.level \
+       from token_balance_updates t \
+       left join token_info i on i.contract = t.contract and i.token_id = t.token_id
+       inner join contracts on t.contract = address \
+       where i.contract is null and i.token_id is null order by t.tsp"]
+
 let clear_contract ?dbh contract =
   use dbh @@ fun dbh ->
   let>? () = [%pgsql dbh "delete from contracts where address = $contract"] in
