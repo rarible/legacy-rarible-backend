@@ -240,6 +240,12 @@ let update_metadata ?(set_metadata=false)
       | None ->
         Format.eprintf "  can't find uri for metadata, try to decode@." ;
         begin try
+            if metadata = "{}" then
+              begin
+                Format.eprintf "  metadata is %S@." metadata ;
+                Lwt.return_ok false
+              end
+            else
             let metadata_tzip = EzEncoding.destruct tzip21_token_metadata_enc metadata in
             let token_id = Z.of_string token_id in
             use dbh @@ fun dbh ->
