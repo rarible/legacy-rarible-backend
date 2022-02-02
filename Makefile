@@ -24,7 +24,6 @@ copy: build openapi
 	@cp -f _build/default/src/tools/extract_bigmap_id.exe _bin/extract_bigmap_id
 	@cp -f _build/default/src/tools/metadata_daemon.exe _bin/metadata_daemon
 	@cp -f _build/default/src/tools/collection_daemon.exe _bin/collection_daemon
-	@cp -f _build/default/src/tools/direct_crawl.exe _bin/direct_crawl
 	@cp -f _build/default/src/tools/check_ledger.exe _bin/check_ledger
 	@cp -f _build/default/src/tools/prefix_hash.exe _bin/prefix_hash
 	@cp -f _build/default/src/tools/update_supply.exe _bin/update_supply

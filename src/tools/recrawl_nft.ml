@@ -17,15 +17,15 @@ let spec = [
 ]
 
 let operation config ext_diff op =
-  Format.printf "Block %s (%ld)\r@?" (Common.Utils.short op.bo_block) op.bo_level;
   match op.bo_meta with
   | None -> Lwt.return_error @@
     `generic ("no_metadata", Format.sprintf "no metadata found for operation %s" op.bo_hash)
   | Some meta ->
     if meta.op_status = `applied then
-      let ext_diff = if op.bo_index = 0l then meta.op_lazy_storage_diff else ext_diff in
+      let _, _, oindex2 = op.bo_indexes in
+      let ext_diff = if oindex2 = 0l then meta.op_lazy_storage_diff else ext_diff in
       let op_lazy_storage_diff =
-        if op.bo_index = 0l then meta.op_lazy_storage_diff
+        if oindex2 = 0l then meta.op_lazy_storage_diff
         else ext_diff @ meta.op_lazy_storage_diff in
       let meta = {meta with op_lazy_storage_diff} in
       let op = { op with bo_meta = Some meta } in
@@ -50,6 +50,10 @@ let operation config ext_diff op =
       | _ -> Lwt.return_ok ext_diff
     else Lwt.return_ok ext_diff
 
+let block _config () b =
+  Format.printf "Block %s (%ld)\r@?" (Common.Utils.short b.hash) b.header.shell.level;
+  Lwt.return_ok ()
+
 let main () =
   Arg.parse spec (fun f -> filename := Some f) "recrawl_nft.exe [options] config.json";
   let>? config = Lwt.return @@ Crawler_config.get !filename Rtypes.config_enc in
@@ -58,7 +62,7 @@ let main () =
   config.Cconfig.extra.Rtypes.contracts <- nft_contracts;
   match !recrawl_start with
   | Some start ->
-    let>? _ = async_recrawl ~config ~start ?end_:!recrawl_end ~operation ((), []) in
+    let>? _ = async_recrawl ~config ~start ?end_:!recrawl_end ~operation ~block ((), []) in
     iter_rp (fun contract -> Db.Crawl.set_crawled_nft contract) !contracts
   | _ ->
     Format.printf "Missing arguments: '--start', '--contracts' are required@.";

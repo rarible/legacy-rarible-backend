@@ -34,7 +34,8 @@ let operation contracts _ (tokens, ext_diff) op =
   | None -> Lwt.return_error @@
     `generic ("no_metadata", Format.sprintf "no metadata found for operation %s" op.bo_hash)
   | Some meta ->
-    let ext_diff = if op.bo_index = 0l then meta.op_lazy_storage_diff else ext_diff in
+    let _, _, oindex2 = op.bo_indexes in
+    let ext_diff = if oindex2 = 0l then meta.op_lazy_storage_diff else ext_diff in
     if meta.op_status = `applied then
       let contract = match op.bo_op.kind with
         | Transaction tr -> Some tr.destination
@@ -47,7 +48,7 @@ let operation contracts _ (tokens, ext_diff) op =
         | None -> Lwt.return_ok (tokens, ext_diff)
         | Some nft ->
           let balances = Common.Storage_diff.get_big_map_updates nft.nft_ledger
-              (if op.bo_index = 0l then meta.op_lazy_storage_diff
+              (if oindex2 = 0l then meta.op_lazy_storage_diff
                else ext_diff @ meta.op_lazy_storage_diff) in
           let|>? tokens = fold_rp (fun tokens -> function
               | `nat id, Some (`address account)
