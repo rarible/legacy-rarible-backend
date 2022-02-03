@@ -496,9 +496,9 @@ let replace_token_id ~pattern token_id =
   let regexp = Str.regexp "{tokenId}" in
   Str.global_replace regexp token_id pattern
 
-let is_video_format mime_type =
+let is_animation_format mime_type =
   match String.split_on_char '/' mime_type with
-  | "video" :: _ -> true
+  | "video" :: _ | "audio" :: _ -> true
   | _ -> false
 
 let rarible_attributes_of_tzip21_attributes = function
@@ -507,23 +507,23 @@ let rarible_attributes_of_tzip21_attributes = function
     Option.some @@
     List.filter_map tzip21_attribute_to_rarible_attribute attr
 
-let find_video_asset m =
+let find_animation_asset m =
   begin
     match Filename.extension @@
       Option.value ~default:"" m.tzip21_tm_artifact_uri with
-    | ".mp4" -> m.tzip21_tm_artifact_uri
+    | ".mp4" | ".mp3" -> m.tzip21_tm_artifact_uri
     | _ ->
       begin
         match
           Filename.extension @@
           Option.value ~default:"" m.tzip21_tm_display_uri with
-        | ".mp4" -> m.tzip21_tm_display_uri
+        | ".mp4" | ".mp3" -> m.tzip21_tm_display_uri
         | _ ->
           begin
             match
               Filename.extension @@
               Option.value ~default:"" m.tzip21_tm_thumbnail_uri with
-            | ".mp4" -> m.tzip21_tm_thumbnail_uri
+            | ".mp4" | ".mp3" -> m.tzip21_tm_thumbnail_uri
             | _ -> None
           end
       end
@@ -533,35 +533,35 @@ let rarible_meta_of_tzip21_meta meta =
   match meta with
   | None -> None
   | Some m ->
+    let nft_item_meta_animation =
+      match m.tzip21_tm_artifact_uri, m.tzip21_tm_formats with
+      | None, _ -> None
+      | Some _, None -> find_animation_asset m
+      | Some uri, Some formats ->
+        if List.exists (fun f -> match f.format_mime_type with
+            | None -> false
+            | Some mt -> f.format_uri = uri && is_animation_format mt)
+            formats then Some uri
+        else find_animation_asset m in
     Some {
       nft_item_meta_name = Option.value ~default:"Unnamed item" m.tzip21_tm_name ;
       nft_item_meta_description = m.tzip21_tm_description ;
       nft_item_meta_attributes =
         rarible_attributes_of_tzip21_attributes m.tzip21_tm_attributes ;
+      nft_item_meta_animation ;
       nft_item_meta_image =
         begin match m.tzip21_tm_artifact_uri with
-          | Some _ as uri -> uri
-          | None ->
+          | Some _ as uri when uri <> nft_item_meta_animation -> uri
+          | _ ->
             begin match m.tzip21_tm_display_uri with
               | Some _ as uri -> uri
               | None ->
                 begin match m.tzip21_tm_thumbnail_uri with
                   | Some _ as uri -> uri
-                  | None -> None
+                  | None -> m.tzip21_tm_artifact_uri
                 end
             end
         end ;
-      nft_item_meta_animation =
-        match m.tzip21_tm_artifact_uri, m.tzip21_tm_formats with
-        | None, _ -> None
-        | Some _, None -> find_video_asset m
-        | Some uri, Some formats ->
-          if List.exists (fun f -> match f.format_mime_type with
-              | None -> false
-              | Some mt -> f.format_uri = uri && is_video_format mt)
-              formats then
-            Some uri
-          else find_video_asset m
     }
 
 let check_address a =
