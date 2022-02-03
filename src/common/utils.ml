@@ -578,3 +578,14 @@ let tid ~contract ~token_id =
 
 let oid ~contract ~token_id ~owner =
   Format.sprintf "%s:%s" (tid ~contract ~token_id) owner
+
+let nft_kind_to_string = function
+  | `rarible -> "rarible"
+  | `ubi -> "ubi"
+  | `fa2 -> "fa2"
+
+let nft_kind_of_string = function
+  | "rarible" -> `rarible
+  | "ubi" -> `ubi
+  | "fa2" -> `fa2
+  | s -> failwith ("unknown nft kind " ^ s)

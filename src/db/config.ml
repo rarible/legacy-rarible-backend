@@ -13,7 +13,7 @@ let db_contracts =
           nft_meta_id=Option.map Z.of_string r#metadata_id;
           nft_token_meta_id=Option.map Z.of_string r#token_metadata_id;
           nft_royalties_id=Option.map Z.of_string r#royalties_id;
-          nft_crawled=Some r#crawled;
+          nft_crawled=Some r#crawled; nft_kind = Common.Utils.nft_kind_of_string r#kind
         } in
         SMap.add r#address v acc
       | _ -> acc) SMap.empty
@@ -46,7 +46,7 @@ let get_extra_config ?dbh () =
   use dbh @@ fun dbh ->
   let>? contracts =
     [%pgsql.object dbh
-        "select address, ledger_id, ledger_key, ledger_value, metadata_id, \
+        "select kind, address, ledger_id, ledger_key, ledger_value, metadata_id, \
          token_metadata_id, royalties_id, crawled \
          from contracts where main"] in
   let>? ft_contracts =
