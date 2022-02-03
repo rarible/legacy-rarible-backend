@@ -1081,6 +1081,17 @@ let insert_origination ?(forward=false) ?(crawled=true) config dbh op ori =
             with _ -> Lwt.return_ok ()
           end
         | Some uri ->
+          let uri =
+            let storage = try String.sub uri 0 14 with _ -> "" in
+            match storage with
+            | "tezos-storage:" ->
+              let key = String.sub uri 14 (String.length uri - 14) in
+              let l = EzEncoding.destruct Json_encoding.(assoc string) metadata_assoc in
+              begin match List.assoc_opt key l with
+                | None -> uri
+                | Some m -> m
+              end
+            | _ -> uri in
           Metadata.insert_tzip16_metadata
             ~dbh ~forward ~contract:kt1 ~block:op.bo_block
             ~level:op.bo_level ~tsp:op.bo_tsp uri in
