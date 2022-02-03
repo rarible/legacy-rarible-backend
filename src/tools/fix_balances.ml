@@ -2,6 +2,7 @@ open Let
 open Tzfunc
 open Proto
 
+let missing = ref false
 let kafka_config_file = ref ""
 
 let get_balance ~block ~ledger_id ~key ~value ~token_id ~account =
@@ -28,7 +29,9 @@ let get_balance ~block ~ledger_id ~key ~value ~token_id ~account =
 let main () =
   let>? () = Db.Rarible_kafka.may_set_kafka_config !kafka_config_file in
   let>? (block, _) = Pg.head None in
-  let>? l = Db.Utils.get_alt_token_balance_updates () in
+  let>? l =
+    if !missing then Db.Utils.get_missing_token_info ()
+    else Db.Utils.get_alt_token_balance_updates () in
   let tm = List.fold_left (fun tm r ->
       match r#account with
       | Some account ->
@@ -75,6 +78,7 @@ let main () =
 
 let specs = [
   "--node", Arg.String (fun s -> Node.set_node s), "set node address";
+  "--missing-ti", Arg.Set missing, "set mode to rebuild token_info";
   "--kafka-config", Arg.Set_string kafka_config_file, "set kafka configuration" ]
 
 let () =
