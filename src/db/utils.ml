@@ -263,23 +263,52 @@ let update_metadata ?(set_metadata=false)
         end
       | Some uri ->
         if uri <> "" then
-          let> re = Metadata.get_json ~quiet:true uri in
-          match re with
-          | Ok (_json, metadata_tzip, _uri) ->
-            let token_id = Z.of_string token_id in
-            use dbh @@ fun dbh ->
-            let>? () =
-              Metadata.insert_mint_metadata dbh ~forward:true ~contract ~token_id ~block ~level ~tsp metadata_tzip in
+          let storage = try String.sub uri 0 14 with _ -> "" in
+          match storage with
+          | "tezos-storage:" ->
+            let key = String.sub uri 14 (String.length uri - 14) in
+            let l = EzEncoding.destruct Json_encoding.(assoc string) metadata in
+            begin match List.assoc_opt key l with
+              | None ->
+                Format.eprintf "  can't find tezos-storage for metadata %s@." key ;
+                Lwt.return_ok false
+              | Some m ->
+                try
+                  let metadata_tzip = EzEncoding.destruct tzip21_token_metadata_enc m in
+                  let token_id = Z.of_string token_id in
+                  use dbh @@ fun dbh ->
+                  let>? () =
+                    Metadata.insert_mint_metadata
+                      dbh ~forward:true ~contract ~token_id ~block ~level ~tsp metadata_tzip in
             let>? () =
               match metadata_tzip.tzip21_tm_royalties with
               | None -> Lwt.return_ok ()
               | Some r -> update_royalties dbh ~contract ~token_id r in
-            Format.eprintf "  OK@." ;
-            Lwt.return_ok true
-          | Error (code, str) ->
-            (Format.eprintf "  fetch metadata error %d:%s@." code @@
-             Option.value ~default:"None" str);
-            Lwt.return_ok false
+                  Format.eprintf "  OK@." ;
+                  Lwt.return_ok true
+                with _ ->
+                  Format.eprintf "  can't parse tzip21 metadata in %s@." m ;
+                  Lwt.return_ok false
+            end
+          | _ ->
+            let> re = Metadata.get_json ~quiet:true uri in
+            match re with
+            | Ok (_json, metadata_tzip, _uri) ->
+              let token_id = Z.of_string token_id in
+              use dbh @@ fun dbh ->
+              let>? () =
+                Metadata.insert_mint_metadata
+                  dbh ~forward:true ~contract ~token_id ~block ~level ~tsp metadata_tzip in
+              let>? () =
+                match metadata_tzip.tzip21_tm_royalties with
+                | None -> Lwt.return_ok ()
+                | Some r -> update_royalties dbh ~contract ~token_id r in
+              Format.eprintf "  OK@." ;
+              Lwt.return_ok true
+            | Error (code, str) ->
+              (Format.eprintf "  fetch metadata error %d:%s@." code @@
+               Option.value ~default:"None" str);
+              Lwt.return_ok false
         else
           begin
             Format.eprintf "  can't find uri for metadata %s@." metadata ;
