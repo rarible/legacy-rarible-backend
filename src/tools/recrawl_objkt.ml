@@ -97,7 +97,7 @@ let main () =
       Format.printf "Recrawling@.";
       let>? _ = async_recrawl ~config ~start ?end_:!recrawl_end ~block ~operation ((), []) in
       let contracts = List.map fst @@ SMap.bindings contracts in
-      let>? () = iter_rp (fun c -> Db.Utils.set_main_recrawl c) contracts in
+      let>? () = iter_rp (fun c -> Db.Crawl.set_crawled_nft c) contracts in
       Db.Utils.refresh_objkt_royalties contracts
     | _ ->
       Format.printf "Missing arguments: '--start' is required@.";
