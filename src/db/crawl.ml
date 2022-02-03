@@ -92,43 +92,47 @@ let insert_metadata_update ~dbh ~op ~contract ~token_id ?(update_index=0l) ?(for
          last_level = $level, last = $tsp"] in
     update_index
 
-let insert_mint ~dbh ~op ~contract m =
+let insert_mint ~dbh ~op ~nft ~contract m =
   let block = op.bo_block in
   let level = op.bo_level in
   let tsp = op.bo_tsp in
-  let>? token_id, owner, amount, royalties, update_index = match m with
-    | NFTMint m ->
-      Lwt.return_ok (m.fa2m_token_id, m.fa2m_owner, Z.one, m.fa2m_royalties, 0l)
-    | MTMint m ->
-      Lwt.return_ok (m.fa2m_token_id, m.fa2m_owner, m.fa2m_amount, m.fa2m_royalties, 0l)
-    | UbiMint m ->
+  let>? r = match nft.nft_kind, m with
+    | `rarible, NFTMint m ->
+      Lwt.return_ok @@ Some (m.fa2m_token_id, m.fa2m_owner, Z.one, m.fa2m_royalties, 0l)
+    | `rarible, MTMint m ->
+      Lwt.return_ok @@ Some (m.fa2m_token_id, m.fa2m_owner, m.fa2m_amount, m.fa2m_royalties, 0l)
+    | `ubi, UbiMint m ->
       let>? pattern = Metadata.get_uri_pattern ~dbh contract in
       let meta = Option.fold ~none:[] ~some:(fun pattern -> ["", Common.Utils.replace_token_id ~pattern (Z.to_string m.ubim_token_id)]) pattern in
       let|>? update_index = insert_metadata_update ~dbh ~op ~contract ~token_id:m.ubim_token_id meta in
-      m.ubim_token_id, m.ubim_owner, Z.one, [], update_index
-    | UbiMint2 m ->
-      Lwt.return_ok (m.ubi2m_token_id, m.ubi2m_owner, m.ubi2m_amount, [], 0l)
-    | HENMint m ->
-      Lwt.return_ok (m.fa2m_token_id, m.fa2m_owner, m.fa2m_amount, m.fa2m_royalties, 0l) in
-  let royalties = EzEncoding.construct parts_enc royalties in
-  let id = Printf.sprintf "%s:%s" contract (Z.to_string token_id) in
-  let>? () =
-    [%pgsql dbh
-        "insert into token_info(id, contract, token_id, block, level, tsp, \
-         last_block, last_level, last, transaction, royalties) \
-         values($id, $contract, ${Z.to_string token_id}, $block, $level, $tsp, $block, $level, \
-         $tsp, ${op.bo_hash}, $royalties) \
-         on conflict do nothing"] in
-  let mint = EzEncoding.construct mint_enc m in
-  let>? () =
-    [%pgsql dbh
-        "insert into contract_updates(transaction, index, block, level, tsp, \
-         contract, mint) \
-         values(${op.bo_hash}, ${op.bo_index}, ${op.bo_block}, ${op.bo_level}, \
-         ${op.bo_tsp}, $contract, $mint) \
-         on conflict do nothing"] in
-  let|>? () = insert_nft_activity_mint dbh op contract token_id owner amount in
-  update_index
+      Some (m.ubim_token_id, m.ubim_owner, Z.one, [], update_index)
+    | `ubi, UbiMint2 m ->
+      Lwt.return_ok @@ Some (m.ubi2m_token_id, m.ubi2m_owner, m.ubi2m_amount, [], 0l)
+    | `fa2, HENMint m ->
+      Lwt.return_ok @@ Some (m.fa2m_token_id, m.fa2m_owner, m.fa2m_amount, m.fa2m_royalties, 0l)
+    | _ -> Lwt.return_ok None in
+  match r with
+  | None -> Lwt.return_ok 0l
+  | Some (token_id, owner, amount, royalties, update_index) ->
+    let royalties = EzEncoding.construct parts_enc royalties in
+    let id = Printf.sprintf "%s:%s" contract (Z.to_string token_id) in
+    let>? () =
+      [%pgsql dbh
+          "insert into token_info(id, contract, token_id, block, level, tsp, \
+           last_block, last_level, last, transaction, royalties) \
+           values($id, $contract, ${Z.to_string token_id}, $block, $level, $tsp, $block, $level, \
+           $tsp, ${op.bo_hash}, $royalties) \
+           on conflict do nothing"] in
+    let mint = EzEncoding.construct mint_enc m in
+    let>? () =
+      [%pgsql dbh
+          "insert into contract_updates(transaction, index, block, level, tsp, \
+           contract, mint) \
+           values(${op.bo_hash}, ${op.bo_index}, ${op.bo_block}, ${op.bo_level}, \
+           ${op.bo_tsp}, $contract, $mint) \
+           on conflict do nothing"] in
+    let|>? () = insert_nft_activity_mint dbh op contract token_id owner amount in
+    update_index
 
 let insert_metadatas ~dbh ~op ~contract ?(forward=false) ~update_index l =
   fold_rp (fun update_index m -> match m with
@@ -855,7 +859,7 @@ let insert_nft ~dbh ~config ~meta ~op ~contract ~nft ~entrypoint ?(forward=false
     let>? update_index =
       if forward then Lwt.return_ok 0l
       else match Parameters.parse_fa2 entrypoint param with
-        | Ok (Mint_tokens m) -> insert_mint ~dbh ~op ~contract m
+        | Ok (Mint_tokens m) -> insert_mint ~dbh ~op ~contract ~nft m
         | Ok (Burn_tokens b) ->
           let|>? () = insert_burn ~dbh ~op ~contract b in 0l
         | Ok (Transfers t) -> insert_transfer ~dbh ~op ~contract t
@@ -1010,19 +1014,18 @@ let filter_contracts op ori =
           | true, (_, Some ({bm_types; _} as nft_ledger)) ->
             begin match ledger_kind bm_types with
               | `nft | `multiple ->
-                let nft = { nft_ledger; nft_token_meta_id;
+                let nft = { nft_ledger; nft_token_meta_id; nft_kind = `fa2;
                             nft_meta_id; nft_royalties_id; nft_crawled = Some true } in
-                let kind = "fa2" in
-                let owner, uri_pattern, kind = match f_admin, f_uri_pattern with
+                let owner, uri_pattern, nft = match f_admin, f_uri_pattern with
                   | (Some (`address owner), _), (Some (`string uri), _) ->
-                    Some owner, Some uri, "ubi"
-                  | _ -> None, None, kind in
-                let owner, kind =
-                  match b_update_all && (b_mint_nft || b_mint_mt) && (b_burn_nft || b_burn_mt), f_owner, kind with
-                  | _, _, "ubi" -> owner, kind
-                  | true, (Some (`address owner), _), _ -> Some owner, "rarible"
-                  | _ -> None, kind in
-                Some (kind, nft, owner, uri_pattern, metadata)
+                    Some owner, Some uri, { nft with nft_kind = `ubi }
+                  | _ -> None, None, nft in
+                let owner, nft =
+                  match b_update_all && (b_mint_nft || b_mint_mt) && (b_burn_nft || b_burn_mt), f_owner, nft.nft_kind with
+                  | _, _, `ubi -> owner, nft
+                  | true, (Some (`address owner), _), _ -> Some owner, { nft with nft_kind = `rarible }
+                  | _ -> None, nft in
+                Some (nft, owner, uri_pattern, metadata)
               | _ -> None
             end
           | _ -> None
@@ -1044,11 +1047,11 @@ let insert_origination ?(forward=false) ?(crawled=true) config dbh op ori =
   match filter_contracts op ori, op.bo_meta, SMap.find_opt kt1 config.Crawlori.Config.extra.ft_contracts with
   | _, _, Some _ -> set_crawled_ft ~dbh kt1
   | None, _, _ | _, None, _ -> Lwt.return_ok ()
-  | Some (kind, nft, owner, uri, _metadata), Some meta, _ ->
+  | Some (nft, owner, uri, _metadata), Some meta, _ ->
     let ledger_key = EzEncoding.construct micheline_type_short_enc nft.nft_ledger.bm_types.bmt_key in
     let ledger_value = EzEncoding.construct micheline_type_short_enc nft.nft_ledger.bm_types.bmt_value in
-    Format.printf "\027[0;93morigination %s (%s, %s)\027[0m@."
-      (short kt1) kind (EzEncoding.construct nft_ledger_enc nft);
+    Format.printf "\027[0;93morigination %s %s\027[0m@."
+      (short kt1) (EzEncoding.construct nft_ledger_enc nft);
     let>? metadata_assoc = match nft.nft_meta_id with
       | None -> Lwt.return_ok "{}"
       | Some bm_id ->
@@ -1081,6 +1084,7 @@ let insert_origination ?(forward=false) ?(crawled=true) config dbh op ori =
           Metadata.insert_tzip16_metadata
             ~dbh ~forward ~contract:kt1 ~block:op.bo_block
             ~level:op.bo_level ~tsp:op.bo_tsp uri in
+    let kind = Common.Utils.nft_kind_to_string nft.nft_kind in
     let>? () = [%pgsql dbh
         "insert into contracts(kind, address, owner, block, level, tsp, \
          last_block, last_level, last, ledger_id, ledger_key, ledger_value, \

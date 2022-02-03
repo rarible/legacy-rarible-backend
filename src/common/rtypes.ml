@@ -1009,7 +1009,10 @@ type bigmap_info = {
   bm_types: bigmap_types
 } [@@deriving encoding]
 
+type nft_kind = [ `ubi | `rarible | `fa2 ] [@@deriving encoding]
+
 type nft_ledger = {
+  nft_kind: nft_kind;
   nft_ledger: bigmap_info;
   nft_token_meta_id: z option;
   nft_meta_id: z option;
