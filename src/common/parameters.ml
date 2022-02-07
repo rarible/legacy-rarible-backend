@@ -38,7 +38,7 @@ let decode s =
 let get_string_bytes (h : hex) =
   let b = Tzfunc.Crypto.hex_to_raw h in
   let s =
-    try match Tzfunc.Read.(unpack (prim `string) b) with
+    try match Tzfunc.Read.(unpack ~typ:(prim `string) b) with
       | Ok (Mstring s) -> s
       | _ -> (b :> string)
     with _ -> (b :> string) in
@@ -164,13 +164,13 @@ let parse_asset_type (mclass : micheline_value) (mdata : micheline_value) =
   | `left `unit, _ -> Ok ATXTZ
   | `right (`left `unit), `bytes h ->
     begin match
-        Tzfunc.Read.unpack (Forge.prim `address) (Tzfunc.Crypto.hex_to_raw h) with
+        Tzfunc.Read.unpack ~typ:(Forge.prim `address) (Tzfunc.Crypto.hex_to_raw h) with
     | Ok (Mstring contract) -> Ok (ATFT {contract; token_id=None})
     | _ -> unexpected_michelson
     end
   | `right (`right (`left (`int z))), `bytes h ->
     begin match
-        Tzfunc.Read.unpack (Forge.prim `pair ~args:[ Forge.prim `address; Forge.prim `nat ])
+        Tzfunc.Read.unpack ~typ:(Forge.prim `pair ~args:[ Forge.prim `address; Forge.prim `nat ])
           (Tzfunc.Crypto.hex_to_raw h) with
     | Ok (Mprim { prim = `Pair; args = [ Mstring asset_contract; Mint asset_token_id ]; _}) ->
       if z = Z.zero then
