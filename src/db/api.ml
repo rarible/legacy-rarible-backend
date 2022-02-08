@@ -72,7 +72,7 @@ let reset_nft_item_meta_by_id ?dbh contract token_id =
     begin
       try
         Metadata.get_json uri >>= function
-        | Ok (_json, metadata, _uri) ->
+        | Ok (metadata, _uri) ->
           let>? () =
             Metadata.insert_mint_metadata dbh ~forward:true ~contract ~token_id ~block ~level ~tsp metadata in
           update_royalties dbh metadata.tzip21_tm_royalties

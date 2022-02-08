@@ -35,19 +35,48 @@ let decode s =
     | `Await -> false in
   aux decoder
 
-let get_string_bytes (h : hex) =
+let parse_attributes (l : micheline list) : Json_repr.ezjsonm option =
+  let rec aux acc = function
+    | [] -> Some (List.rev acc)
+    | Mprim {prim=`Elt; args=[ Mstring k; Mprim {prim=`Pair; args=[fmt; v]; _} ]; _} :: q ->
+      let fmt = match fmt with
+        | Mprim {prim=`Some; args=[Mstring fmt]; _} -> [ "type", `String fmt ]
+        | _ -> [] in
+      let value_s = match v with
+        | Mstring s -> Some s
+        | Mbytes h ->
+          let b = Tzfunc.Crypto.hex_to_raw h in
+          if decode (b:> string) then Some (b :> string)
+          else Some (h :> string)
+        | _ -> None in
+      begin match value_s with
+        | None -> None
+        | Some s ->
+          let value =
+            try EzEncoding.destruct Json_encoding.any_ezjson_value s
+            with _ -> `String s in
+          aux ((`O (("name", `String k) :: ("value", value) :: fmt)) :: acc) q
+      end
+    | _ -> None in
+  Option.map (fun l -> `A l) @@ aux [] l
+
+let get_string_bytes ?key (h : hex) : Json_repr.ezjsonm option =
   let b = Tzfunc.Crypto.hex_to_raw h in
-  let s =
-    try match Tzfunc.Read.(unpack ~typ:(prim `string) b) with
-      | Ok (Mstring s) -> s
-      | _ -> (b :> string)
-    with _ -> (b :> string) in
-  if decode s then Some s
-  else None
+  try match Tzfunc.Read.(unpack ~typ:(prim `string) b), key with
+    | Ok (Mstring s), _ -> (* packed string *)
+      if decode s then Some (`String s) else None
+    | Ok (Mseq l), Some "attributes" -> (* dogami attributes *)
+      parse_attributes l
+    | _ ->
+      let s = (b :> string) in
+      if decode s then Some (`String s) else None
+  with _ ->
+    let s = (b :> string) in
+    if decode s then Some (`String s) else None
 
 let parse_metadata l =
   List.filter_map (function
-      | (`string k, `bytes v) -> Option.map (fun s -> k, s) @@ get_string_bytes v
+      | (`string key, `bytes v) -> Option.map (fun s -> key, s) @@ get_string_bytes ~key v
       | _ -> None) l
 
 let parse_royalties l =
@@ -107,9 +136,9 @@ let parse_burn m =
 
 let parse_metadata_uri m =
   match Typed_mich.parse_value (`tuple [`string; `bytes]) m with
-  | Ok (`tuple [ `string k; `bytes h ]) ->
-    Option.fold ~none:unexpected_michelson ~some:(fun s -> Ok (Metadata (k, s))) @@
-    get_string_bytes h
+  | Ok (`tuple [ `string key; `bytes h ]) ->
+    Option.fold ~none:unexpected_michelson ~some:(fun s -> Ok (Metadata (key, s))) @@
+    get_string_bytes ~key h
   | _ -> unexpected_michelson
 
 let parse_add_minter m =

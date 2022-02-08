@@ -120,7 +120,7 @@ let fetch_metadata_from_source ?(verbose=0) ~timeout ~source l =
         if uri <> "" then
           let> re = Metadata.get_json ~quiet:true ~source ~timeout uri in
           match re with
-          | Ok (_json, metadata, _uri) ->
+          | Ok (metadata, _uri) ->
             let block, level, tsp, contract, token_id =
               r#block, r#level, r#tsp, r#contract, Z.of_string r#token_id in
             let>? () = Metadata.insert_mint_metadata dbh ~forward:true ~contract ~token_id ~block ~level ~tsp metadata in
@@ -293,7 +293,7 @@ let update_metadata ?(set_metadata=false)
           | _ ->
             let> re = Metadata.get_json ~quiet:true uri in
             match re with
-            | Ok (_json, metadata_tzip, _uri) ->
+            | Ok (metadata_tzip, _uri) ->
               let token_id = Z.of_string token_id in
               use dbh @@ fun dbh ->
               let>? () =

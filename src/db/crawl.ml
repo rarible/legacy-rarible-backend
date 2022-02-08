@@ -65,7 +65,7 @@ let insert_nft_activity_transfer dbh op kt1 from owner token_id amount =
   insert_nft_activity dbh op.bo_index op.bo_tsp nft_activity_type
 
 let insert_metadata_update ~dbh ~op ~contract ~token_id ?(update_index=0l) ?(forward=false) l =
-  let token_meta = EzEncoding.construct Json_encoding.(assoc string) l in
+  let token_meta = Ezjsonm.value_to_string (`O l) in
   if not forward then
     let|>? () = [%pgsql dbh
         "insert into token_updates(transaction, index, block, level, tsp, \
@@ -80,7 +80,8 @@ let insert_metadata_update ~dbh ~op ~contract ~token_id ?(update_index=0l) ?(for
     let id = Printf.sprintf "%s:%s" contract (Z.to_string token_id) in
     let uri = match List.assoc_opt "" l with
       | None -> None
-      | Some s -> Metadata.parse_uri s in
+      | Some (`String s) -> Metadata.parse_uri s
+      | Some _json -> None (* todo insert tzip21 metadata *) in
     let|>? () = [%pgsql dbh
         "insert into token_info(id, contract, token_id, block, level, tsp, \
          last_block, last_level, last, transaction, metadata, metadata_uri, main) \
@@ -103,7 +104,7 @@ let insert_mint ~dbh ~op ~nft ~contract m =
       Lwt.return_ok @@ Some (m.fa2m_token_id, m.fa2m_owner, m.fa2m_amount, m.fa2m_royalties, 0l)
     | `ubi, UbiMint m ->
       let>? pattern = Metadata.get_uri_pattern ~dbh contract in
-      let meta = Option.fold ~none:[] ~some:(fun pattern -> ["", Common.Utils.replace_token_id ~pattern (Z.to_string m.ubim_token_id)]) pattern in
+      let meta = Option.fold ~none:[] ~some:(fun pattern -> ["", `String (Common.Utils.replace_token_id ~pattern (Z.to_string m.ubim_token_id))]) pattern in
       let|>? update_index = insert_metadata_update ~dbh ~op ~contract ~token_id:m.ubim_token_id meta in
       Some (m.ubim_token_id, m.ubim_owner, Z.one, [], update_index)
     | `ubi, UbiMint2 m ->
@@ -137,10 +138,7 @@ let insert_mint ~dbh ~op ~nft ~contract m =
 let insert_metadatas ~dbh ~op ~contract ?(forward=false) ~update_index l =
   fold_rp (fun update_index m -> match m with
       | `nat token_id, Some (`tuple [`nat _; `assoc l]) ->
-        let meta = List.filter_map (function
-            | `string k, `bytes v ->
-              Option.map (fun s -> k, s) @@ Parameters.get_string_bytes v
-            | _ -> None) l in
+        let meta = Parameters.parse_metadata l in
         insert_metadata_update ~dbh ~op ~contract ~token_id ~forward ~update_index meta
       | _ -> Lwt.return_ok update_index) update_index l
 
@@ -312,7 +310,7 @@ let metadata_update dbh ~main ~contract ~block ~level ~tsp ?value key =
         Json_query.(replace [`Field key] `Null (Ezjsonm.value_from_string metadata))
       | Some value ->
         Ezjsonm.value_to_string @@
-        Json_query.(replace [`Field key] (`String value) (Ezjsonm.value_from_string metadata)) in
+        Json_query.(replace [`Field key] value (Ezjsonm.value_from_string metadata)) in
     [%pgsql dbh
         "update contracts set metadata = $metadata, \
          last_block = $block, last_level = $level, last = $tsp where address = $contract"]
@@ -320,6 +318,7 @@ let metadata_update dbh ~main ~contract ~block ~level ~tsp ?value key =
 
 let insert_metadata ?(forward=false) ~dbh ~op ~contract ?value key =
   if not forward then
+    let value = Option.map Ezjsonm.value_to_string value in
     [%pgsql dbh
         "insert into contract_updates(transaction, index, block, level, tsp, \
          contract, metadata_key, metadata_value) \
@@ -1053,7 +1052,7 @@ let insert_origination ?(forward=false) ?(crawled=true) config dbh op ori =
     Format.printf "\027[0;93morigination %s %s\027[0m@."
       (short kt1) (EzEncoding.construct nft_ledger_enc nft);
     let>? metadata_assoc = match nft.nft_meta_id with
-      | None -> Lwt.return_ok "{}"
+      | None -> Lwt.return_ok (`O [])
       | Some bm_id ->
         let bm = { bm_id; bm_types = Contract_spec.metadata_field } in
         let cmetadata = Storage_diff.get_big_map_updates bm meta.op_lazy_storage_diff in
@@ -1063,39 +1062,48 @@ let insert_origination ?(forward=false) ?(crawled=true) config dbh op ori =
             | _ -> None) cmetadata in
         let massoc =
           List.fold_left (fun m (k, v) ->
-              Ezjsonm.value_to_string @@
-              Json_query.(replace [`Field k] (`String v) (Ezjsonm.value_from_string m))
-            ) "{}" cmetadata in
+              Json_query.(replace [`Field k] v m)
+            ) (`O []) cmetadata in
         Lwt.return_ok massoc in
     let>? () =
-      if metadata_assoc = "{}" then Lwt.return_ok ()
-      else
-        let l = EzEncoding.destruct Json_encoding.(assoc string) metadata_assoc in
-        match List.assoc_opt "" l with
-        | None ->
-          begin try
-              let tzip16_metadata = EzEncoding.destruct tzip16_metadata_enc metadata_assoc in
-              Metadata.insert_tzip16_metadata_data
-                ~dbh ~forward ~contract:kt1 ~block:op.bo_block
-                ~level:op.bo_level ~tsp:op.bo_tsp tzip16_metadata
-            with _ -> Lwt.return_ok ()
-          end
-        | Some uri ->
-          let uri =
-            let storage = try String.sub uri 0 14 with _ -> "" in
-            match storage with
-            | "tezos-storage:" ->
-              let key = String.sub uri 14 (String.length uri - 14) in
-              let l = EzEncoding.destruct Json_encoding.(assoc string) metadata_assoc in
-              begin match List.assoc_opt key l with
-                | None -> uri
-                | Some m -> m
-              end
-            | _ -> uri in
-          Metadata.insert_tzip16_metadata
-            ~dbh ~forward ~contract:kt1 ~block:op.bo_block
-            ~level:op.bo_level ~tsp:op.bo_tsp uri in
+      match metadata_assoc with
+      | `O [] -> Lwt.return_ok ()
+      | `O l ->
+        begin match List.assoc_opt "" l with
+          | None ->
+            begin try
+                let tzip16_metadata = Json_encoding.destruct tzip16_metadata_enc metadata_assoc in
+                Metadata.insert_tzip16_metadata_data
+                  ~dbh ~forward ~contract:kt1 ~block:op.bo_block
+                  ~level:op.bo_level ~tsp:op.bo_tsp tzip16_metadata
+              with _ -> Lwt.return_ok ()
+            end
+          | Some (`String uri) ->
+            let uri =
+              let storage = try String.sub uri 0 14 with _ -> "" in
+              match storage with
+              | "tezos-storage:" ->
+                let key = String.sub uri 14 (String.length uri - 14) in
+                begin match List.assoc_opt key l with
+                  | Some (`String m) -> m
+                  | _ -> uri
+                end
+              | _ -> uri in
+            Metadata.insert_tzip16_metadata
+              ~dbh ~forward ~contract:kt1 ~block:op.bo_block
+              ~level:op.bo_level ~tsp:op.bo_tsp uri
+          | Some json ->
+            begin try
+                let tzip16_metadata = Json_encoding.destruct tzip16_metadata_enc json in
+                Metadata.insert_tzip16_metadata_data
+                  ~dbh ~forward ~contract:kt1 ~block:op.bo_block
+                  ~level:op.bo_level ~tsp:op.bo_tsp tzip16_metadata
+              with _ -> Lwt.return_ok ()
+            end
+        end
+      | _ -> Lwt.return_ok () in
     let kind = Common.Utils.nft_kind_to_string nft.nft_kind in
+    let metadata = Ezjsonm.value_to_string metadata_assoc in
     let>? () = [%pgsql dbh
         "insert into contracts(kind, address, owner, block, level, tsp, \
          last_block, last_level, last, ledger_id, ledger_key, ledger_value, \
@@ -1106,7 +1114,7 @@ let insert_origination ?(forward=false) ?(crawled=true) config dbh op ori =
          ${Z.to_string nft.nft_ledger.bm_id}, \
          $ledger_key, $ledger_value, $?uri, $?{Option.map Z.to_string nft.nft_token_meta_id}, \
          $?{Option.map Z.to_string nft.nft_meta_id}, $?{Option.map Z.to_string nft.nft_royalties_id}, \
-         $metadata_assoc, $forward, $crawled) \
+         $metadata, $forward, $crawled) \
          on conflict do nothing"] in
     let open Crawlori.Config in
     config.extra.contracts <- SMap.add kt1 nft config.extra.contracts;
@@ -1315,6 +1323,7 @@ let contract_updates dbh main l =
               | _ -> Lwt.return_ok ()
             else Lwt.return_ok ()
           end >>=? fun () ->
+          let value = Ezjsonm.value_from_string value in
           let>? () = metadata_update dbh ~main ~contract ~block ~level ~tsp ~value key in
           Lwt.return_ok @@
           ((contract, None, []) :: events, None)
@@ -1377,7 +1386,7 @@ let royalties_updates ~dbh ~main ~contract ~block ~level ~tsp ?token_id royaltie
 
 let token_metadata_updates ~dbh ~main ~contract ~block ~level ~tsp ~token_id ~transaction meta =
   let id = Printf.sprintf "%s:%s" contract (Z.to_string token_id) in
-  let meta = EzEncoding.destruct Json_encoding.(assoc string) meta in
+  let meta = EzEncoding.destruct Json_encoding.(assoc Json_encoding.any_ezjson_value) meta in
   let>? meta, uri, royalties =
     Metadata.insert_token_metadata ~dbh ~block ~level ~tsp ~contract (token_id, meta) in
   let royalties =
