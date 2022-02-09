@@ -86,12 +86,15 @@ let nft_ownership_event dbh contract token_id owner () =
   | None -> Lwt.return_ok ()
   | Some _ ->
     begin
-      Get.get_nft_ownership_by_id
-        ~old:true ~dbh contract token_id owner >>= function
-      | Ok os -> nft_ownership_update_event os
-      | Error err ->
-        Printf.eprintf "Couldn't produce ownership event %S\n%!" @@ Crp.string_of_error err ;
+      if List.exists (fun addr -> addr = owner) Get.burn_addresses then
         Lwt.return_unit
+      else
+        Get.get_nft_ownership_by_id
+          ~old:true ~dbh contract token_id owner >>= function
+        | Ok os -> nft_ownership_update_event os
+        | Error err ->
+          Printf.eprintf "Couldn't produce ownership event %S\n%!" @@ Crp.string_of_error err ;
+          Lwt.return_unit
     end >>= fun () ->
     Lwt.return_ok ()
 
