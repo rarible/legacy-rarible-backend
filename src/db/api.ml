@@ -100,6 +100,7 @@ let get_nft_items_by_owner ?dbh ?include_meta ?continuation ?(size=50) owner =
      | None -> "None"
      | Some (ts, s) -> (Tzfunc.Proto.A.cal_to_str ts) ^ "_" ^ s)
     size ;
+  let burn_addresses = List.map Option.some Get.burn_addresses in
   use dbh @@ fun dbh ->
   let size64 = Int64.of_int size in
   let no_continuation, (ts, id) =
@@ -108,9 +109,14 @@ let get_nft_items_by_owner ?dbh ?include_meta ?continuation ?(size=50) owner =
   let>? l = [%pgsql.object dbh
       "select i.id, \
        last, metadata, tsp, creators, royalties, royalties_metadata, \
-       sum(case when t.balance is not null then t.balance else t.amount end) as supply, \
-       array_agg(case when balance is not null and balance <> 0 \
-       or amount <> 0 then owner end) as owners \
+       sum(case \
+       when t.balance is not null and not (owner = any($burn_addresses)) then t.balance \
+       when not (owner = any($burn_addresses)) then t.amount \
+       else 0 end) as supply, \
+       array_agg(case \
+       when owner = any($burn_addresses) then null \
+       when balance is not null and \
+       balance <> 0 or amount <> 0 then owner end) as owners \
        from (select tid, amount, balance, owner from tokens where \
        owner = $owner and
        ((balance is not null and balance > 0 or amount > 0))) t \
@@ -137,6 +143,7 @@ let get_nft_items_by_creator ?dbh ?include_meta ?continuation ?(size=50) creator
      | None -> "None"
      | Some (ts, s) -> (Tzfunc.Proto.A.cal_to_str ts) ^ "_" ^ s)
     size ;
+  let burn_addresses = List.map Option.some Get.burn_addresses in
   use dbh @@ fun dbh ->
   let size64 = Int64.of_int size in
   let no_continuation, (ts, id) =
@@ -145,11 +152,16 @@ let get_nft_items_by_creator ?dbh ?include_meta ?continuation ?(size=50) creator
   let>? l = [%pgsql.object dbh
       "select i.id, \
        last, metadata, i.tsp, i.creators, royalties, royalties_metadata, \
-       array_agg(case when balance is not null and balance <> 0 or amount <> 0 then owner end) as owners, \
-       sum(case when t.balance is not null then t.balance else t.amount end) as supply \
+       array_agg(case \
+       when owner = any($burn_addresses) then null \
+       when balance is not null and balance <> 0 or amount <> 0 then owner end) as owners, \
+       sum(case \
+       when t.balance is not null and not (owner = any($burn_addresses)) then t.balance \
+       when not (owner = any($burn_addresses)) then t.amount \
+       else 0 end) as supply \
        from tokens as t, token_info as i, creators as c \
        where c.account = $creator and t.tid = i.id and c.id = i.id and \
-       i.main and metadata <> '{}' and (balance is not null and balance > 0 or amount > 0) and \
+       i.main and metadata <> '{}' and supply > 0 and \
        ($no_continuation or (last = $ts and i.id < $id) or (last < $ts)) \
        group by (i.id) \
        order by last desc, i.id desc limit $size64"] in
@@ -170,6 +182,7 @@ let get_nft_items_by_collection ?dbh ?include_meta ?continuation ?(size=50) cont
      | None -> "None"
      | Some (ts, s) -> (Tzfunc.Proto.A.cal_to_str ts) ^ "_" ^ s)
     size ;
+  let burn_addresses = List.map Option.some Get.burn_addresses in
   use dbh @@ fun dbh ->
   let size64 = Int64.of_int size in
   let no_continuation, (ts, id) =
@@ -178,9 +191,13 @@ let get_nft_items_by_collection ?dbh ?include_meta ?continuation ?(size=50) cont
   let>? l = [%pgsql.object dbh
       "select i.id, \
        last, i.tsp, i.creators, i.royalties, i.royalties_metadata, \
-       array_agg(case when t.balance is not null and t.balance <> 0 or \
-       t.amount <> 0 then t.owner end) as owners, \
-       sum(case when t.balance is not null then t.balance else t.amount end) as supply \
+       array_agg(case \
+       when owner = any($burn_addresses) then null \
+       when balance is not null and balance <> 0 or amount <> 0 then owner end) as owners, \
+       sum(case \
+       when t.balance is not null and not (owner = any($burn_addresses)) then t.balance \
+       when not (owner = any($burn_addresses)) then t.amount \
+       else 0 end) as supply \
        from tokens t \
        inner join token_info i on i.id = t.tid \
        where \
@@ -225,6 +242,7 @@ let get_nft_all_items
      | None -> "None"
      | Some (ts, s) -> (Tzfunc.Proto.A.cal_to_str ts) ^ "_" ^ s)
     size ;
+  let burn_addresses = List.map Option.some Get.burn_addresses in
   use dbh @@ fun dbh ->
   let size64 = Int64.of_int size in
   let no_continuation, (ts, id) =
@@ -242,8 +260,13 @@ let get_nft_all_items
   let>? l = [%pgsql.object dbh
       "select i.id, \
        last, i.tsp, i.creators, i.royalties, i.royalties_metadata, \
-       sum(case when t.balance is not null then t.balance else t.amount end) as supply, \
-       array_agg(case when t.balance is not null and t.balance <> 0 or t.amount <> 0 then t.owner end) as owners \
+       sum(case \
+       when t.balance is not null and not (owner = any($burn_addresses)) then t.balance \
+       when not (owner = any($burn_addresses)) then t.amount \
+       else 0 end) as supply, \
+       array_agg(case \
+       when owner = any($burn_addresses) then null \
+       when balance is not null and balance <> 0 or amount <> 0 then owner end) as owners \
        from (select tid, amount, balance, owner from tokens) t \
        inner join token_info i on i.id = t.tid \
        and i.id in (\
@@ -496,6 +519,7 @@ let mk_nft_ownerships_continuation nft_ownership =
 
 let get_nft_ownerships_by_item ?dbh ?continuation ?(size=50) contract token_id =
   let tid = Common.Utils.tid ~contract ~token_id in
+  let burn_addresses = List.map Option.some Get.burn_addresses in
   Format.eprintf "get_nft_ownerships_by_item %s %s %d@." tid
     (match continuation with
      | None -> "None"
@@ -509,7 +533,9 @@ let get_nft_ownerships_by_item ?dbh ?continuation ?(size=50) contract token_id =
   let>? l = [%pgsql.object dbh
       "select oid as id, tsp, last, amount, balance, metadata, creators \
        from tokens t inner join token_info i on t.tid = i.id \
-       where i.id = $tid and main and (balance is not null and balance > 0 or amount > 0) and \
+       where i.id = $tid and main and \
+       not (owner = any($burn_addresses)) and \
+       (balance is not null and balance > 0 or amount > 0) and \
        ($no_continuation or \
        (last = $ts and oid < $id) or \
        (last < $ts)) \
@@ -530,6 +556,7 @@ let get_nft_all_ownerships ?dbh ?continuation ?(size=50) () =
      | None -> "None"
      | Some (ts, s) -> (Tzfunc.Proto.A.cal_to_str ts) ^ "_" ^ s)
     size ;
+  let burn_addresses = List.map Option.some Get.burn_addresses in
   let size64 = Int64.of_int size in
   let no_continuation, (ts, id) =
     continuation = None,
@@ -538,7 +565,9 @@ let get_nft_all_ownerships ?dbh ?continuation ?(size=50) () =
   let>? l = [%pgsql.object dbh
       "select oid as id, tsp, last, amount, balance, metadata, creators \
        from tokens t inner join token_info i on i.id = t.tid \
-       where main and (balance is not null and balance > 0 or amount > 0) and \
+       where main and \
+       not (owner = any($burn_addresses)) and \
+       (balance is not null and balance > 0 or amount > 0) and \
        ($no_continuation or \
        (last = $ts and oid < $id) or \
        (last < $ts)) \

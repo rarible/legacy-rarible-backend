@@ -2,6 +2,11 @@ open Let
 open Rtypes
 open Misc
 
+let burn_addresses = [
+  "tz1burnburnburnburnburnburnburjAYjjX" ;
+  "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU" ; (* null address *)
+]
+
 let offchain_royalties_contracts = [
   "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton"; (* hen *)
   "KT1LjmAdYQCLBjwv4S2oFkEzyHVkomAf5MrW"; (* versum *)
@@ -674,13 +679,19 @@ let mk_nft_item dbh ?include_meta obj =
 
 let get_nft_item_by_id ?dbh ?include_meta contract token_id =
   let tid = Common.Utils.tid ~contract ~token_id in
+  let burn_addresses = List.map Option.some burn_addresses in
   Format.eprintf "get_nft_item_by_id %s(%s)@." tid (match include_meta with None -> "None" | Some s -> string_of_bool s) ;
   use dbh @@ fun dbh ->
   let>? l = [%pgsql.object dbh
       "select i.id, i.contract, i.token_id, \
        last, metadata, tsp, creators, royalties, royalties_metadata, \
-       sum(case when t.balance is not null then t.balance else t.amount end) as supply, \
-       array_agg(case when (balance is not null and balance <> 0 or amount <> 0) then owner end) as owners \
+       sum(case \
+       when t.balance is not null and (not (owner = any($burn_addresses))) then t.balance \
+       when not (owner = any($burn_addresses)) then t.amount \
+       else 0 end) as supply, \
+       array_agg(case \
+       when owner = any($burn_addresses) then null \
+       when (balance is not null and balance <> 0 or amount <> 0) then owner end) as owners \
        from tokens t \
        inner join token_info i on i.id = t.tid \
        where i.id = $tid and main group by i.id"] in
