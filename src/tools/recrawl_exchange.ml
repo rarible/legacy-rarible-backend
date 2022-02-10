@@ -80,14 +80,14 @@ let block _config () b =
   Lwt.return_ok ()
 
 let main () =
-  Arg.parse spec (fun f -> filename := Some f) "recrawl_nft.exe [options] config.json";
+  Arg.parse spec (fun f -> filename := Some f) "recrawl_exchange.exe [options] config.json";
   let>? config = Lwt.return @@ Crawler_config.get !filename Rtypes.config_enc in
   match !recrawl_start with
   | Some start ->
     let|>? _ = async_recrawl ~config ~start ?end_:!recrawl_end ~operation ~block ((), ()) in
     ()
   | _ ->
-    Format.printf "Missing arguments: '--start', '--contracts' are required@.";
+    Format.printf "Missing arguments: '--start' is required@.";
     Lwt.return_ok ()
 
 let () =

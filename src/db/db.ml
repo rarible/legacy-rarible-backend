@@ -7,3 +7,4 @@ module Crawl = Crawl
 module Api = Api
 module Utils = Utils
 module Produce = Produce
+module Metadata = Metadata
