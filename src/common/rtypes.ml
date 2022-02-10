@@ -1093,7 +1093,7 @@ let int_or_string_enc = Json_encoding.(union [
   ])
 
 let bool_or_string_enc = Json_encoding.(union [
-    case bool (fun b -> Some b ) (fun b -> b) ;
+    case bool (fun b -> Some b) (fun b -> b) ;
     case string
       (fun b -> Some (string_of_bool b))
       (fun s ->

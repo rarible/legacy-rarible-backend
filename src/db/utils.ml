@@ -233,8 +233,11 @@ let update_metadata ?(set_metadata=false)
   else
     let metadata_uri = match metadata_uri with
       | None ->
-        let l = EzEncoding.destruct Json_encoding.(assoc string) metadata in
-        List.assoc_opt "" l
+        let l = EzEncoding.destruct Json_encoding.(assoc any_ezjson_value) metadata in
+        begin match List.assoc_opt "" l with
+          | Some (`String uri) -> Some uri
+          | _ -> None
+        end
       | Some uri -> Some uri in
     let>? success = match metadata_uri with
       | None ->

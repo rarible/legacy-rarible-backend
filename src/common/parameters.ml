@@ -69,10 +69,10 @@ let get_string_bytes ?key (h : hex) : Json_repr.ezjsonm option =
       parse_attributes l
     | _ ->
       let s = (b :> string) in
-      if decode s then Some (`String s) else None
+      if decode s then Some (try Ezjsonm.value_from_string s with _ -> `String s) else None
   with _ ->
     let s = (b :> string) in
-    if decode s then Some (`String s) else None
+    if decode s then Some (try Ezjsonm.value_from_string s with _ -> `String s) else None
 
 let parse_metadata l =
   List.filter_map (function

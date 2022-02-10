@@ -49,8 +49,10 @@ let () =
     iter_rp (fun r ->
         let>? metadata_uri =
           if not !retrieve then
-            let l = EzEncoding.destruct Json_encoding.(assoc string) r#metadata in
-            Lwt.return_ok @@ List.assoc_opt "" l
+            let l = EzEncoding.destruct Json_encoding.(assoc any_ezjson_value) r#metadata in
+            match List.assoc_opt "" l with
+            | Some (`String uri) -> Lwt.return_ok @@ Some uri
+            | _ -> Lwt.return_ok None
           else
             match r#metadata_id with
             | None -> Lwt.return_ok None

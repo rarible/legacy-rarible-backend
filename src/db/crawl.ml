@@ -1069,37 +1069,31 @@ let insert_origination ?(forward=false) ?(crawled=true) config dbh op ori =
       match metadata_assoc with
       | `O [] -> Lwt.return_ok ()
       | `O l ->
+        let insert_data json =
+          try
+            let tzip16_metadata = Json_encoding.destruct tzip16_metadata_enc json in
+            Metadata.insert_tzip16_metadata_data
+              ~dbh ~forward ~contract:kt1 ~block:op.bo_block
+              ~level:op.bo_level ~tsp:op.bo_tsp tzip16_metadata
+          with _ -> Lwt.return_ok () in
+        let insert_uri uri =
+          Metadata.insert_tzip16_metadata
+            ~dbh ~forward ~contract:kt1 ~block:op.bo_block
+            ~level:op.bo_level ~tsp:op.bo_tsp uri in
         begin match List.assoc_opt "" l with
-          | None ->
-            begin try
-                let tzip16_metadata = Json_encoding.destruct tzip16_metadata_enc metadata_assoc in
-                Metadata.insert_tzip16_metadata_data
-                  ~dbh ~forward ~contract:kt1 ~block:op.bo_block
-                  ~level:op.bo_level ~tsp:op.bo_tsp tzip16_metadata
-              with _ -> Lwt.return_ok ()
-            end
+          | None -> insert_data metadata_assoc
           | Some (`String uri) ->
-            let uri =
-              let storage = try String.sub uri 0 14 with _ -> "" in
-              match storage with
+            let storage = try String.sub uri 0 14 with _ -> "" in
+            begin match storage with
               | "tezos-storage:" ->
                 let key = String.sub uri 14 (String.length uri - 14) in
                 begin match List.assoc_opt key l with
-                  | Some (`String m) -> m
-                  | _ -> uri
+                  | Some (`O _ as json) -> insert_data json
+                  | _ -> insert_uri uri
                 end
-              | _ -> uri in
-            Metadata.insert_tzip16_metadata
-              ~dbh ~forward ~contract:kt1 ~block:op.bo_block
-              ~level:op.bo_level ~tsp:op.bo_tsp uri
-          | Some json ->
-            begin try
-                let tzip16_metadata = Json_encoding.destruct tzip16_metadata_enc json in
-                Metadata.insert_tzip16_metadata_data
-                  ~dbh ~forward ~contract:kt1 ~block:op.bo_block
-                  ~level:op.bo_level ~tsp:op.bo_tsp tzip16_metadata
-              with _ -> Lwt.return_ok ()
+              | _ -> insert_uri uri
             end
+          | Some json -> insert_data json
         end
       | _ -> Lwt.return_ok () in
     let kind = Common.Utils.nft_kind_to_string nft.nft_kind in
