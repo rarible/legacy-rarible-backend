@@ -893,7 +893,7 @@ let insert_nft ~dbh ~config ~meta ~op ~contract ~nft ~entrypoint ?(forward=false
         let metadata = Storage_diff.get_big_map_updates bm meta.op_lazy_storage_diff in
         iter_rp (function
             | `string key, Some (`bytes h) ->
-              begin match Parameters.get_string_bytes h with
+              begin match Parameters.get_string_bytes ~key h with
                 | None -> Lwt.return_ok ()
                 | Some value -> insert_metadata ~dbh ~op ~contract ~forward ~value key
               end
@@ -1005,8 +1005,8 @@ let filter_contracts op ori =
         let metadata = match f_metadata with
           | (Some (`assoc l), _) ->
             List.filter_map (function
-                | (`string k, `bytes v) ->
-                  Option.map (fun s -> k, s) @@ Parameters.get_string_bytes v
+                | (`string key, `bytes v) ->
+                  Option.map (fun s -> key, s) @@ Parameters.get_string_bytes ~key v
                 | _ -> None) l
           | _ -> [] in
         begin match b_balance && b_update && b_transfer, f_ledger with
@@ -1057,8 +1057,8 @@ let insert_origination ?(forward=false) ?(crawled=true) config dbh op ori =
         let bm = { bm_id; bm_types = Contract_spec.metadata_field } in
         let cmetadata = Storage_diff.get_big_map_updates bm meta.op_lazy_storage_diff in
         let cmetadata = List.filter_map (function
-            | `string k, Some `bytes v ->
-              Option.map (fun s -> k, s) @@ Parameters.get_string_bytes v
+            | `string key, Some `bytes v ->
+              Option.map (fun s -> key, s) @@ Parameters.get_string_bytes ~key v
             | _ -> None) cmetadata in
         let massoc =
           List.fold_left (fun m (k, v) ->
