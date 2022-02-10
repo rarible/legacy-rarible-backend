@@ -63,7 +63,7 @@ let parse_attributes (l : micheline list) : Json_repr.ezjsonm option =
 let get_string_bytes ?key (h : hex) : Json_repr.ezjsonm option =
   let b = Tzfunc.Crypto.hex_to_raw h in
   try match Tzfunc.Read.(unpack ~typ:(prim `string) b), key with
-    | Ok (Mstring ""), Some "attributes" -> Some (`O []) (* dogami attributes *)
+    | Ok (Mstring ""), Some "attributes" -> Some (`A []) (* dogami attributes *)
     | Ok (Mstring s), _ -> (* packed string *)
       if decode s then Some (`String s) else None
 
