@@ -1391,7 +1391,7 @@ let token_metadata_updates ~dbh ~main ~contract ~block ~level ~tsp ~token_id ~tr
   let id = Printf.sprintf "%s:%s" contract (Z.to_string token_id) in
   let meta = EzEncoding.destruct Json_encoding.(assoc Json_encoding.any_ezjson_value) meta in
   let>? meta, uri, royalties =
-    Metadata.insert_token_metadata ~dbh ~block ~level ~tsp ~contract (token_id, meta) in
+    Metadata.insert_token_metadata ~dbh ~block ~level ~tsp ~contract ~forward:true (token_id, meta) in
   let royalties =
     match royalties with
     | None -> None

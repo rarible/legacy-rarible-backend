@@ -595,6 +595,14 @@ let upgrade_17_to_18 dbh version =
     "create index order_match_tsp_index on order_match(tsp)";
   ]
 
+let upgrade_18_to_19 dbh version =
+  EzPG.upgrade ~dbh ~version [
+    "update tzip21_metadata set main = true where not main";
+    "update tzip21_attributes set main = true where not main";
+    "update tzip21_formats set main = true where not main";
+    "update tzip21_creators set main = true where not main"
+  ]
+
 let upgrades =
   let last_version = fst List.(hd @@ rev !Versions.upgrades) in
   !Versions.upgrades @ List.map (fun (i, f) -> last_version + i, f) [
@@ -615,4 +623,5 @@ let upgrades =
     15, upgrade_15_to_16;
     16, upgrade_16_to_17;
     17, upgrade_17_to_18;
+    18, upgrade_18_to_19;
   ]
