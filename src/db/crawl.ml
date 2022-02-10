@@ -78,14 +78,16 @@ let insert_metadata_update ~dbh ~op ~contract ~token_id ?(update_index=0l) ?(for
   else
     let block, level, tsp, transaction = op.bo_block, op.bo_level, op.bo_tsp, op.bo_hash in
     let id = Printf.sprintf "%s:%s" contract (Z.to_string token_id) in
-    let>? uri, royalties = match List.assoc_opt "" l with
-      | None -> Lwt.return_ok (None, None)
-      | Some (`String s) -> Lwt.return_ok (Metadata.parse_uri s, None)
-      | Some (`O l) ->
-        let>? _meta, uri, royalties =
-          Metadata.insert_token_metadata ~dbh ~block ~level ~tsp ~contract (token_id, l) in
-        Lwt.return_ok (uri, royalties)
-      | _ -> Lwt.return_ok (None, None) in
+    let uri = match List.assoc_opt "" l with
+      | None -> None
+      | Some (`String s) -> Metadata.parse_uri s
+      | Some _json -> None in
+    let>? royalties = match uri with
+      | Some _ -> Lwt.return_ok None
+      | None ->
+        let>? _meta, _uri, royalties =
+          Metadata.insert_token_metadata ~dbh ~forward ~block ~level ~tsp ~contract (token_id, l) in
+        Lwt.return_ok royalties in
     let royalties =
       match royalties with
       | None -> None
@@ -97,7 +99,7 @@ let insert_metadata_update ~dbh ~op ~contract ~token_id ?(update_index=0l) ?(for
          values($id, $contract, ${Z.to_string token_id}, $block, $level, $tsp, \
          $block, $level, $tsp, $transaction, $token_meta, $?uri, $?royalties, true) \
          on conflict (id) do update \
-         set metadata = $token_meta, metadata_uri = $?uri, royalties_metadata = $?royalties,\
+         set metadata = $token_meta, metadata_uri = $?uri, royalties_metadata = $?royalties, \
          last_block = $block, \
          last_level = $level, last = $tsp"] in
     update_index
