@@ -739,8 +739,8 @@ let mk_nft_col name obj =
       [] in
   let symbol =
     try
-      let l = EzEncoding.destruct Json_encoding.(assoc string) obj#metadata in
-      List.assoc_opt "symbol" l
+      let l = EzEncoding.destruct Json_encoding.(assoc any_ezjson_value) obj#metadata in
+      match List.assoc_opt "symbol" l with Some (`String s) -> Some s | _ -> None
     with _ -> None in
   Ok {
     nft_collection_id = obj#address ;

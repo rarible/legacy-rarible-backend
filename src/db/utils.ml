@@ -81,10 +81,10 @@ let fetch_metadata_from_source ?(verbose=0) ~timeout ~source l =
         Format.eprintf "%s %s %s@." source r#contract r#token_id;
       let metadata_uri = match r#metadata_uri with
         | None ->
-          let l = EzEncoding.destruct Json_encoding.(assoc string) r#metadata in
+          let l = EzEncoding.destruct Json_encoding.(assoc any_ezjson_value) r#metadata in
           begin match List.assoc_opt "" l with
-            | None -> None
-            | Some uri -> Some uri
+            | Some (`String uri) -> Some uri
+            | _ -> None
           end
         | Some uri -> Some uri in
       match metadata_uri with
@@ -270,14 +270,14 @@ let update_metadata ?(set_metadata=false)
           match storage with
           | "tezos-storage:" ->
             let key = String.sub uri 14 (String.length uri - 14) in
-            let l = EzEncoding.destruct Json_encoding.(assoc string) metadata in
+            let l = EzEncoding.destruct Json_encoding.(assoc any_ezjson_value) metadata in
             begin match List.assoc_opt key l with
               | None ->
                 Format.eprintf "  can't find tezos-storage for metadata %s@." key ;
                 Lwt.return_ok false
               | Some m ->
                 try
-                  let metadata_tzip = EzEncoding.destruct tzip21_token_metadata_enc m in
+                  let metadata_tzip = Json_encoding.destruct tzip21_token_metadata_enc m in
                   let token_id = Z.of_string token_id in
                   use dbh @@ fun dbh ->
                   let>? () =
@@ -290,7 +290,7 @@ let update_metadata ?(set_metadata=false)
                   Format.eprintf "  OK@." ;
                   Lwt.return_ok true
                 with _ ->
-                  Format.eprintf "  can't parse tzip21 metadata in %s@." m ;
+                  Format.eprintf "  can't parse tzip21 metadata in %s@." (Ezjsonm.value_to_string m) ;
                   Lwt.return_ok false
             end
           | _ ->
@@ -467,7 +467,7 @@ let update_contract_metadata
         match storage with
         | "tezos-storage:" ->
           let key = String.sub uri 14 (String.length uri - 14) in
-          let l = EzEncoding.destruct Json_encoding.(assoc string) metadata in
+          let l = EzEncoding.destruct Json_encoding.(assoc any_ezjson_value) metadata in
           begin match List.assoc_opt key l with
             | None ->
               let> v = match metadata_id with
@@ -494,7 +494,7 @@ let update_contract_metadata
               end
             | Some m ->
               try
-                let metadata_tzip = EzEncoding.destruct tzip16_metadata_enc m in
+                let metadata_tzip = Json_encoding.destruct tzip16_metadata_enc m in
                 use dbh @@ fun dbh ->
                 let>? () =
                   Metadata.insert_tzip16_metadata_data
@@ -502,7 +502,7 @@ let update_contract_metadata
                 Format.eprintf "  OK@." ;
                 Lwt.return_ok ()
               with _ ->
-                Format.eprintf "  can't parse tzip16 metadata in %s@." m ;
+                Format.eprintf "  can't parse tzip16 metadata in %s@." (Ezjsonm.value_to_string m) ;
                 Lwt.return_ok ()
           end
         | _ ->

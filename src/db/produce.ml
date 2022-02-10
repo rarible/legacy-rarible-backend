@@ -192,8 +192,8 @@ let collection_events main collections names =
         let name =
           match List.assoc_opt r#address names with
           | None | Some None ->
-            let metadata = EzEncoding.destruct Json_encoding.(assoc string) r#metadata in
-            List.assoc_opt "name" metadata
+            let metadata = EzEncoding.destruct Json_encoding.(assoc any_ezjson_value) r#metadata in
+            begin match List.assoc_opt "name" metadata with | Some (`String s) -> Some s | _ -> None end
           | Some Some s -> Some s in
         match Get.mk_nft_collection_with_name ?name r with
         | Ok c ->
