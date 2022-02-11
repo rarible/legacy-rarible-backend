@@ -1,6 +1,7 @@
 DB=rarible
 CONVERTERS=$(shell pwd)/src/db/converters.sexp
-IMAGE=rarible:latest
+IMAGE ?= rarible:latest
+DEPS_IMAGE ?= functori/rarible-deps:latest
 POSTGRES_USER ?= postgres
 
 -include Makefile.config
@@ -70,3 +71,7 @@ openapi:
 
 build-docker:
 	docker build -t $(IMAGE) -f docker/Dockerfile .
+
+docker-deps:
+	docker build -t $(DEPS_IMAGE) -f docker/Dockerfile_deps .
+	docker push $(DEPS_IMAGE)

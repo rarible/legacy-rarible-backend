@@ -1,14 +1,9 @@
 /_opam
 /_build
 /_bin
-/sdk/node_modules
-/sdk/package-lock.json
-/sdk/dist
 *.tz
 /config/crawler_config.json
 /config/kafka_config.json
-/sdk/www/*.js
-/sdk/www/*.js.*
 /deployment/crawler_config.json
 .idea/
 /test
