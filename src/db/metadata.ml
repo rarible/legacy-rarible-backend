@@ -26,7 +26,11 @@ let parse meta =
 
 let get_or_timeout ?(timeout=5.) ?msg url =
   let timeout = Lwt_unix.sleep timeout >>= fun () -> Lwt.return_error (-1, Some "timeout") in
-  Lwt.pick [ timeout ; EzReq_lwt.get ?msg url ]
+  let get url =
+    let>? s = EzReq_lwt.get ?msg url in
+    if Parameters.decode s then Lwt.return_ok s
+    else Lwt.return_error (0, Some "unsupported unicode") in
+  Lwt.pick [ timeout ; get url ]
 
 let parse_uri s =
   let proto = try String.sub s 0 6 with _ -> "" in
