@@ -182,7 +182,8 @@ let insert_mint_metadata_attributes dbh ?(forward=false) ~contract ~token_id ~bl
   match metadata.tzip21_tm_attributes with
   | Some attributes ->
     iter_rp (fun a ->
-        let value = Ezjsonm.value_to_string a.attribute_value in
+        let r = Str.regexp "\\\\u0000" in
+        let value = Str.global_replace r "%{0}" (Ezjsonm.value_to_string a.attribute_value) in
         if Parameters.decode value then
           [%pgsql dbh
               "insert into tzip21_attributes(id, contract, token_id, block, level, \
