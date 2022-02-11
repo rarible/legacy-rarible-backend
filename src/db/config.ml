@@ -69,6 +69,33 @@ let get_extra_config ?dbh () =
   | [] -> Lwt.return_ok None
   | _ -> Lwt.return_error (`hook_error "wrong_state")
 
+let update_ft_contract ?dbh contract lk =
+  let id = Z.to_string lk.ft_ledger_id in
+  let token_id = Option.map Z.to_string lk.ft_token_id in
+  let no_crawled, crawled = match lk.ft_crawled with
+    | None -> true, false
+    | Some b -> false, b in
+  let kind, k, v = match lk.ft_kind with
+    | Fa2_single -> "fa2_single", None, None
+    | Fa2_multiple -> "fa2_multiple", None, None
+    | Fa2_multiple_inversed -> "fa2_multiple_inversed", None, None
+    | Fa1 -> "fa1", None, None
+    | Lugh -> "lugh", None, None
+    | Custom {bmt_key; bmt_value} ->
+      "custom",
+      Some (EzEncoding.construct micheline_type_short_enc bmt_key),
+      Some (EzEncoding.construct micheline_type_short_enc bmt_value) in
+  use dbh @@ fun dbh ->
+  [%pgsql dbh
+      "insert into ft_contracts(address, kind, ledger_id, ledger_key, \
+       ledger_value, crawled, token_id, decimals) \
+       values($contract, $kind, $id, $?k, $?v, $crawled, $?token_id, \
+       ${lk.ft_decimals}) on conflict (address) \
+       do update set kind = $kind, ledger_id = $id, ledger_key = $?k, \
+       ledger_value = $?v, \
+       crawled = case when $no_crawled then ft_contracts.crawled else $crawled end, \
+       token_id = $?token_id, decimals = ${lk.ft_decimals}"]
+
 let update_extra_config ?dbh e =
   use dbh @@ fun dbh ->
   let>? r = [%pgsql.object dbh "select * from state"] in
@@ -81,29 +108,5 @@ let update_extra_config ?dbh e =
       [%pgsql dbh
           "update state set exchange = ${e.exchange}, \
            royalties = ${e.royalties}, transfer_manager = ${e.transfer_manager}"] in
-  iter_rp (fun (address, lk) ->
-      let id = Z.to_string lk.ft_ledger_id in
-      let token_id = Option.map Z.to_string lk.ft_token_id in
-      let no_crawled, crawled = match lk.ft_crawled with
-        | None -> true, false
-        | Some b -> false, b in
-      let kind, k, v = match lk.ft_kind with
-        | Fa2_single -> "fa2_single", None, None
-        | Fa2_multiple -> "fa2_multiple", None, None
-        | Fa2_multiple_inversed -> "fa2_multiple_inversed", None, None
-        | Fa1 -> "fa1", None, None
-        | Lugh -> "lugh", None, None
-        | Custom {bmt_key; bmt_value} ->
-          "custom",
-          Some (EzEncoding.construct micheline_type_short_enc bmt_key),
-          Some (EzEncoding.construct micheline_type_short_enc bmt_value) in
-      [%pgsql dbh
-          "insert into ft_contracts(address, kind, ledger_id, ledger_key, \
-           ledger_value, crawled, token_id, decimals) \
-           values($address, $kind, $id, $?k, $?v, $crawled, $?token_id, \
-           ${lk.ft_decimals}) on conflict (address) \
-           do update set kind = $kind, ledger_id = $id, ledger_key = $?k, \
-           ledger_value = $?v, \
-           crawled = case when $no_crawled then ft_contracts.crawled else $crawled end, \
-           token_id = $?token_id, decimals = ${lk.ft_decimals}"])
+  iter_rp (fun (address, lk) -> update_ft_contract ~dbh address lk)
     (SMap.bindings e.ft_contracts)
