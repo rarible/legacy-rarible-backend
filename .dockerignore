@@ -1,0 +1,9 @@
+dumps/
+_build/
+_bin/
+test/
+_opam/
+api-client/
+config/
+contracts/
+docker/

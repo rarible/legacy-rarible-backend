@@ -1,4 +1,4 @@
-FROM maxtori/opam-postgres:debian as compilation
+FROM functori/opam-postgres:debian as compilation
 
 COPY --chown=functori . ./rarible
 WORKDIR ./rarible
