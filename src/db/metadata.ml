@@ -26,11 +26,7 @@ let parse meta =
 
 let get_or_timeout ?(timeout=5.) ?msg url =
   let timeout = Lwt_unix.sleep timeout >>= fun () -> Lwt.return_error (-1, Some "timeout") in
-  let get url =
-    let>? s = EzReq_lwt.get ?msg url in
-    if Parameters.decode s then Lwt.return_ok s
-    else Lwt.return_error (0, Some "unsupported unicode") in
-  Lwt.pick [ timeout ; get url ]
+  Lwt.pick [ timeout ; EzReq_lwt.get ?msg url ]
 
 let parse_uri s =
   let proto = try String.sub s 0 6 with _ -> "" in
@@ -187,18 +183,20 @@ let insert_mint_metadata_attributes dbh ?(forward=false) ~contract ~token_id ~bl
   | Some attributes ->
     iter_rp (fun a ->
         let value = Ezjsonm.value_to_string a.attribute_value in
-        [%pgsql dbh
-            "insert into tzip21_attributes(id, contract, token_id, block, level, \
-             tsp, name, value, type, main) \
-             values($tid, $contract, ${Z.to_string token_id}, $block, $level, $tsp, \
-             ${a.attribute_name}, $value, $?{a.attribute_type}, $forward) \
-             on conflict (id, name) do update set \
-             value = $value, \
-             type = $?{a.attribute_type}, \
-             main = $forward \
-             where tzip21_attributes.contract = $contract and \
-             tzip21_attributes.token_id = ${Z.to_string token_id} and \
-             tzip21_attributes.name = ${a.attribute_name}"])
+        if Parameters.decode value then
+          [%pgsql dbh
+              "insert into tzip21_attributes(id, contract, token_id, block, level, \
+               tsp, name, value, type, main) \
+               values($tid, $contract, ${Z.to_string token_id}, $block, $level, $tsp, \
+               ${a.attribute_name}, $value, $?{a.attribute_type}, $forward) \
+               on conflict (id, name) do update set \
+               value = $value, \
+               type = $?{a.attribute_type}, \
+               main = $forward \
+               where tzip21_attributes.contract = $contract and \
+               tzip21_attributes.token_id = ${Z.to_string token_id} and \
+               tzip21_attributes.name = ${a.attribute_name}"]
+        else Lwt.return_ok ())
       attributes
   | None -> Lwt.return_ok ()
 
