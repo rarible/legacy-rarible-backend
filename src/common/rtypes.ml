@@ -827,7 +827,7 @@ type operator_update = {
   op_add: bool;
 } [@@deriving encoding]
 
-type token_metadata = ((string * string) list [@assoc])
+type token_metadata = ((string * Json_repr.ezjsonm) list [@assoc])
 [@@deriving encoding]
 
 type token_op = {
@@ -844,7 +844,7 @@ type 'a fa2_mint = {
   fa2m_token_id: A.big_integer;
   fa2m_amount: 'a;
   fa2m_owner: string;
-  fa2m_metadata: (string * string) list;
+  fa2m_metadata: (string * Json_repr.ezjsonm) list;
   fa2m_royalties: part list;
 } [@@deriving encoding]
 
@@ -857,7 +857,7 @@ type ubi_mint = {
 type ubi_mint2 = {
   ubi2m_owner : string ;
   ubi2m_amount : A.big_integer ;
-  ubi2m_metadata: (string * string) list ;
+  ubi2m_metadata: (string * Json_repr.ezjsonm) list ;
   ubi2m_token_id : A.big_integer ;
 } [@@deriving encoding]
 
@@ -886,7 +886,7 @@ type nft_param =
   | Operator_updates_all of (string * bool) list
   | Mint_tokens of mint
   | Burn_tokens of burn
-  | Metadata of (string * string)
+  | Metadata of (string * Json_repr.ezjsonm)
   | Add_minter of string
   | Remove_minter of string
   | Token_uri_pattern of string
@@ -1093,7 +1093,7 @@ let int_or_string_enc = Json_encoding.(union [
   ])
 
 let bool_or_string_enc = Json_encoding.(union [
-    case bool (fun b -> Some b ) (fun b -> b) ;
+    case bool (fun b -> Some b) (fun b -> b) ;
     case string
       (fun b -> Some (string_of_bool b))
       (fun s ->

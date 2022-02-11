@@ -34,42 +34,38 @@ let parse_uri s =
   else if proto = "ipfs:/" then Some s
   else None
 
-let get_json ?(source="https://rarible.mypinata.cloud/") ?(quiet=false) ?timeout meta =
-  if not quiet then Format.eprintf "get_metadata_json %s@." meta ;
+let get_json ?(source="https://rarible.mypinata.cloud/") ?(quiet=false) ?timeout uri =
+  if not quiet then Format.eprintf "get_metadata_json %s@." uri ;
   let msg = if not quiet then Some "get_metadata_json" else None in
-  (* 3 ways to recovers metadata :directly json, ipfs link and http(s) link *)
-  try
-    Lwt.return_ok (meta, EzEncoding.destruct tzip21_token_metadata_enc meta, None)
-  with _ ->
-    begin
-      let proto = try String.sub meta 0 6 with _ -> "" in
-      if proto = "https:" || proto = "http:/" then
-        let|>? json = get_or_timeout ?timeout (EzAPI.URL meta) in
-        json, meta
-      else if proto = "ipfs:/" then
-        let url = try String.sub meta 7 ((String.length meta) - 7) with _ -> "" in
-        let fs, url = try
-            let may_fs = String.sub url 0 5 in
-            if may_fs = "ipfs/" then
-              "ipfs/", String.sub url 5 ((String.length meta) - 5)
-            else if may_fs = "ipns/" then
-              "ipns/", String.sub url 5 ((String.length meta) - 5)
-            else "ipfs/", url
-          with _ -> "", url in
-        let uri = Printf.sprintf "%s%s%s" source fs url in
-        let|>? json = get_or_timeout ?timeout ?msg (EzAPI.URL uri) in
-        json, uri
-      else Lwt.return_error (0, Some (Printf.sprintf "unknow scheme %S" proto))
-    end >>= function
-    | Ok (json, uri) ->
-      begin try
-          let metadata = EzEncoding.destruct tzip21_token_metadata_enc json in
-          Lwt.return_ok (json, metadata, Some uri)
-        with exn ->
-          Format.eprintf "%s@." @@ Printexc.to_string exn ;
-          Lwt.return_error (-1, None)
-      end
-    | Error (c, str) -> Lwt.return_error (c, str)
+  (* 2 ways to recovers metadata ipfs link and http(s) link *)
+  let> r =
+    let proto = try String.sub uri 0 6 with _ -> "" in
+    if proto = "https:" || proto = "http:/" then
+      let|>? json = get_or_timeout ?timeout (EzAPI.URL uri) in
+      json, uri
+    else if proto = "ipfs:/" then
+      let url = try String.sub uri 7 ((String.length uri) - 7) with _ -> "" in
+      let fs, url = try
+          let may_fs = String.sub url 0 5 in
+          if may_fs = "ipfs/" then
+            "ipfs/", String.sub url 5 ((String.length uri) - 5)
+          else if may_fs = "ipns/" then
+            "ipns/", String.sub url 5 ((String.length uri) - 5)
+          else "ipfs/", url
+        with _ -> "", url in
+      let uri = Printf.sprintf "%s%s%s" source fs url in
+      let|>? json = get_or_timeout ?timeout ?msg (EzAPI.URL uri) in
+      json, uri
+    else Lwt.return_error (0, Some (Printf.sprintf "unknow scheme %S" proto)) in
+  match r with
+  | Error (c, str) -> Lwt.return_error (c, str)
+  | Ok (json, uri) ->
+    try
+      let metadata = EzEncoding.destruct tzip21_token_metadata_enc json in
+      Lwt.return_ok (metadata, Some uri)
+    with exn ->
+      Format.eprintf "%s@." @@ Printexc.to_string exn ;
+      Lwt.return_error (-1, None)
 
 let get_contract_metadata ?(source="https://rarible.mypinata.cloud/") ?(quiet=false) ?timeout raw =
   if not quiet then Format.eprintf "get_contract_json %s@." raw ;
@@ -285,21 +281,30 @@ let get_uri_pattern ~dbh contract =
   | [] -> Lwt.return_ok None
   | p :: _ -> Lwt.return_ok p
 
-let insert_token_metadata ?forward ~dbh ~block ~level ~tsp ~contract (token_id, l) =
+let insert_token_metadata ?forward ~dbh ~block ~level ~tsp ~contract (token_id, (l : (string * Json_repr.ezjsonm) list)) =
+  let origin_json = Ezjsonm.value_to_string (`O l) in
   let>? json, tzip21_meta, uri =
     match List.assoc_opt "" l with
-    | Some meta ->
-      begin
-        get_json meta >>= function
-        | Ok (_json, metadata, uri) ->
-          Lwt.return_ok (EzEncoding.construct Rtypes.token_metadata_enc l, Some metadata, uri)
+    | Some (`String uri) -> (* { "": uri } case *)
+      let> r = get_json uri in
+      begin match r with
+        | Ok (metadata, uri) ->
+          Lwt.return_ok (origin_json, Some metadata, uri)
         | Error (code, str) ->
           Printf.eprintf "Cannot get metadata from url: %d %s\n%!"
             code (match str with None -> "None" | Some s -> s);
-          Lwt.return_ok (EzEncoding.construct Rtypes.token_metadata_enc l, None, None)
+          Lwt.return_ok (origin_json, None, None)
       end
-    | None ->
-      Lwt.return_ok (EzEncoding.construct Rtypes.token_metadata_enc l, None, None) in
+    | Some json -> (* { "" : { k1: v1, ... } } case (probably not needed) *)
+      let tzip21_meta =
+        try Some (Json_encoding.destruct tzip21_token_metadata_enc json)
+        with _ -> None in
+      Lwt.return_ok (origin_json, tzip21_meta, None)
+    | None -> (* { k1 : v1, ... } case *)
+      let tzip21_meta =
+        try Some (Json_encoding.destruct tzip21_token_metadata_enc (`O l))
+        with _ -> None in
+      Lwt.return_ok (EzEncoding.construct Rtypes.token_metadata_enc l, tzip21_meta, None) in
   let>? royalties = match tzip21_meta with
     | None -> Lwt.return_ok None
     | Some metadata ->

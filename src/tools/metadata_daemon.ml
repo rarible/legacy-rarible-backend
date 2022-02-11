@@ -117,7 +117,7 @@ let () =
                  match metadata with
                  | None -> Lwt.return_ok ()
                  | Some l ->
-                   let metadata = EzEncoding.construct Json_encoding.(assoc string) l in
+                   let metadata = EzEncoding.construct Json_encoding.(assoc any_ezjson_value) l in
                    Db.Utils.update_metadata ~contract:r#contract ~token_id:r#token_id ~block:r#block
                      ~level:r#level ~tsp:r#tsp ~metadata ~set_metadata:true ()) l)
       else
@@ -151,7 +151,7 @@ let () =
             match metadata with
             | None -> Lwt.return_ok ()
             | Some l ->
-              let metadata = EzEncoding.construct Json_encoding.(assoc string) l in
+              let metadata = EzEncoding.construct Json_encoding.(assoc any_ezjson_value) l in
               Db.Utils.update_metadata ~contract:r#contract ~token_id:r#token_id ~block:r#block
                 ~level:r#level ~tsp:r#tsp ~metadata ~set_metadata:true ()) l
     else
