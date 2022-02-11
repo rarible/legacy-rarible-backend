@@ -302,8 +302,12 @@ let insert_token_metadata ?forward ~dbh ~block ~level ~tsp ~contract (token_id, 
   let>? royalties = match tzip21_meta with
     | None -> Lwt.return_ok None
     | Some metadata ->
-      let>? () = insert_mint_metadata dbh ?forward ~contract ~token_id ~block ~level ~tsp metadata in
-      Lwt.return_ok metadata.tzip21_tm_royalties in
+      let> r = insert_mint_metadata dbh ?forward ~contract ~token_id ~block ~level ~tsp metadata in
+      match r with
+      | Error _ ->
+        Format.eprintf "Couldn't register metadata for %s %s\n%s@." contract (Z.to_string token_id) json;
+        Lwt.return_ok metadata.tzip21_tm_royalties
+      | Ok () -> Lwt.return_ok metadata.tzip21_tm_royalties in
   Lwt.return_ok (json, uri, royalties)
 
 let insert_tzip16_metadata_data ?(forward=false) ~dbh ~block ~level ~tsp ~contract metadata =
