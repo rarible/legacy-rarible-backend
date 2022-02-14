@@ -73,3 +73,8 @@
  (name recrawl_exchange)
  (modules recrawl_exchange)
  (libraries crawler_config db ez_api.icurl_lwt))
+
+(executable
+ (name continuation_check)
+ (modules continuation_check)
+ (libraries crawler_config api db ez_api.icurl_lwt))
