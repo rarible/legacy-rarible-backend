@@ -230,6 +230,77 @@ let get_nft_item_meta_by_id ?dbh contract token_id =
     }
   | Some meta -> Lwt.return_ok meta
 
+let filter_items ?show_deleted items =
+  match show_deleted with
+  | None | Some false -> List.filter (fun i -> i.nft_item_supply > Z.zero) items
+  | Some true -> items
+
+let rec get_nft_all_items_aux
+    ?dbh ?last_updated_to ?last_updated_from ?show_deleted ?include_meta
+    ?continuation ~size acc =
+  Format.eprintf "get_nft_all_items_aux %s %s %s %s %s %Ld@."
+    (match last_updated_to with None -> "None" | Some s -> Tzfunc.Proto.A.cal_to_str s)
+    (match last_updated_from with None -> "None" | Some s -> Tzfunc.Proto.A.cal_to_str s)
+    (match show_deleted with None -> "None" | Some s -> string_of_bool s)
+    (match include_meta with None -> "None" | Some s -> string_of_bool s)
+    (match continuation with
+     | None -> "None"
+     | Some (ts, s) -> (Tzfunc.Proto.A.cal_to_str ts) ^ "_" ^ s)
+    size ;
+  let burn_addresses = List.map Option.some Get.burn_addresses in
+  let no_continuation, (ts, id) =
+    continuation = None,
+    (match continuation with None -> CalendarLib.Calendar.now (), "" | Some (ts, h) -> (ts, h)) in
+  let no_last_updated_to, last_updated_to_v =
+    last_updated_to = None,
+    (match last_updated_to with None -> CalendarLib.Calendar.now () | Some ts -> ts) in
+  let no_last_updated_from, last_updated_from_v =
+    last_updated_from = None,
+    (match last_updated_from with None -> CalendarLib.Calendar.now () | Some ts -> ts) in
+  let len = Int64.of_int @@ List.length acc in
+
+  if len < size  then
+    use dbh @@ fun dbh ->
+    let>? l = [%pgsql.object dbh
+        "select i.id, \
+         last, i.tsp, i.creators, i.royalties, i.royalties_metadata, \
+         sum(case \
+         when t.balance is not null and not (owner = any($burn_addresses)) then t.balance \
+         when not (owner = any($burn_addresses)) then t.amount \
+         else 0 end) as supply, \
+         array_agg(case \
+         when owner = any($burn_addresses) then null \
+         when balance is not null and balance <> 0 or amount <> 0 then owner end) as owners \
+         from (select tid, amount, balance, owner from tokens) t \
+         inner join token_info i on i.id = t.tid \
+         and i.id in (\
+         select id from token_info where \
+         main and metadata <> '{}' and \
+         ($no_last_updated_to or (last <= $last_updated_to_v)) and \
+         ($no_last_updated_from or (last >= $last_updated_from_v)) and \
+         ($no_continuation or (last = $ts and id < $id) or (last < $ts)) \
+         order by last desc, id desc limit $size) \
+         group by (i.id) \
+         order by i.last desc, i.id desc limit $size"] in
+
+    let continuation = match List.rev l with
+      | [] -> None
+      | hd :: _ -> Some (hd#last, hd#id) in
+    let>? items = map_rp (fun r -> Get.mk_nft_item dbh ?include_meta r) l in
+    match items with
+    | [] -> Lwt.return_ok acc
+    | _ ->
+      let items = filter_items ?show_deleted items in
+      get_nft_all_items_aux
+        ~dbh ?last_updated_to ?last_updated_from ?show_deleted ?include_meta
+        ?continuation ~size (acc @ items)
+  else
+  if len = size then Lwt.return_ok acc
+  else
+    Lwt.return_ok @@
+    List.filter_map (fun x -> x) @@
+    List.mapi (fun i item -> if i < Int64.to_int size then Some item else None) acc
+
 let get_nft_all_items
     ?dbh ?last_updated_to ?last_updated_from ?show_deleted ?include_meta
     ?continuation ?(size=50) () =
@@ -242,45 +313,12 @@ let get_nft_all_items
      | None -> "None"
      | Some (ts, s) -> (Tzfunc.Proto.A.cal_to_str ts) ^ "_" ^ s)
     size ;
-  let burn_addresses = List.map Option.some Get.burn_addresses in
   use dbh @@ fun dbh ->
-  let size64 = Int64.of_int size in
-  let no_continuation, (ts, id) =
-    continuation = None,
-    (match continuation with None -> CalendarLib.Calendar.now (), "" | Some (ts, h) -> (ts, h)) in
-  let no_last_updated_to, last_updated_to_v =
-    last_updated_to = None,
-    (match last_updated_to with None -> CalendarLib.Calendar.now () | Some ts -> ts) in
-  let no_last_updated_from, last_updated_from_v =
-    last_updated_from = None,
-    (match last_updated_from with None -> CalendarLib.Calendar.now () | Some ts -> ts) in
-  let no_show_deleted, show_deleted_v =
-    show_deleted = None,
-    (match show_deleted with None -> false | Some b -> b) in
-  let>? l = [%pgsql.object dbh
-      "select i.id, \
-       last, i.tsp, i.creators, i.royalties, i.royalties_metadata, \
-       sum(case \
-       when t.balance is not null and not (owner = any($burn_addresses)) then t.balance \
-       when not (owner = any($burn_addresses)) then t.amount \
-       else 0 end) as supply, \
-       array_agg(case \
-       when owner = any($burn_addresses) then null \
-       when balance is not null and balance <> 0 or amount <> 0 then owner end) as owners \
-       from (select tid, amount, balance, owner from tokens) t \
-       inner join token_info i on i.id = t.tid \
-       and i.id in (\
-       select id from token_info where \
-       main and metadata <> '{}' and \
-       ((supply > 0) or (not $no_show_deleted and $show_deleted_v)) and \
-       ($no_last_updated_to or (last <= $last_updated_to_v)) and \
-       ($no_last_updated_from or (last >= $last_updated_from_v)) and \
-       ($no_continuation or (last = $ts and id < $id) or (last < $ts)) \
-       order by last desc, id desc limit $size64) \
-       group by (i.id) \
-       order by i.last desc, i.id desc limit $size64"] in
-  let>? nft_items_items = map_rp (fun r -> Get.mk_nft_item dbh ?include_meta r) l in
-  let len = List.length nft_items_items in
+  let size = Int64.of_int size in
+  let>? nft_items_items = get_nft_all_items_aux
+      ~dbh ?last_updated_to ?last_updated_from ?show_deleted ?include_meta
+      ?continuation ~size [] in
+  let len = Int64.of_int @@ List.length nft_items_items in
   let nft_items_continuation =
     if len <> size then None
     else Some
