@@ -279,21 +279,27 @@ let rec get_nft_all_items_aux
          ($no_last_updated_to or (last <= $last_updated_to_v)) and \
          ($no_last_updated_from or (last >= $last_updated_from_v)) and \
          ($no_continuation or (last = $ts and id < $id) or (last < $ts)) \
-         order by last desc, id desc limit $size) \
+         order by last desc, id desc limit 1000) \
          group by (i.id) \
-         order by i.last desc, i.id desc limit $size"] in
+         order by i.last desc, i.id desc"] in
 
     let continuation = match List.rev l with
       | [] -> None
       | hd :: _ -> Some (hd#last, hd#id) in
-    let>? items = map_rp (fun r -> Get.mk_nft_item dbh ?include_meta r) l in
-    match items with
+    match l with
     | [] -> Lwt.return_ok acc
     | _ ->
-      let items = filter_items ?show_deleted items in
-      get_nft_all_items_aux
-        ~dbh ?last_updated_to ?last_updated_from ?show_deleted ?include_meta
-        ?continuation ~size (acc @ items)
+      let>? items = map_rp (fun r -> Get.mk_nft_item dbh ?include_meta r) l in
+      match items with
+      | [] ->
+        get_nft_all_items_aux
+          ~dbh ?last_updated_to ?last_updated_from ?show_deleted ?include_meta
+          ?continuation ~size acc
+      | _ ->
+        let items = filter_items ?show_deleted items in
+        get_nft_all_items_aux
+          ~dbh ?last_updated_to ?last_updated_from ?show_deleted ?include_meta
+          ?continuation ~size (acc @ items)
   else
   if len = size then Lwt.return_ok acc
   else
