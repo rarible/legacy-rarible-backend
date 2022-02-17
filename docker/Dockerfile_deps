@@ -6,4 +6,5 @@ RUN $(pg_config --bindir)/pg_ctl start -D ../data && \
 opam switch create --no-install . ocaml-system && \
 eval $(opam env) && \
 make deps && \
-opam install httpaf-lwt-unix
+opam install httpaf-lwt-unix && \
+rm -rf $(find . -maxdepth 1 -mindepth 1 -name "*" ! -name "_opam")
