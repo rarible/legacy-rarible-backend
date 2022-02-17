@@ -5,6 +5,7 @@ open Let
 open Errors
 
 module Errors = Errors
+module Version = Version
 
 let nft_section = EzAPI.Doc.{section_name = "nft-activity-controller"; section_docs = []}
 let ownerships_section = EzAPI.Doc.{section_name = "nft-ownership-controller"; section_docs = []}

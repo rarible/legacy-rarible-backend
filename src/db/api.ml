@@ -264,21 +264,18 @@ let rec get_nft_all_items_aux
          main, metadata from token_info where \
          ($no_last_updated_to or (last <= $last_updated_to_v)) and \
          ($no_last_updated_from or (last >= $last_updated_from_v)) and \
-         ($no_continuation or (last <= $ts)) \
+         ($no_continuation or (last = $ts and id < $id) or (last < $ts)) \
          order by last desc, id desc limit $size"] in
     let continuation = match List.rev tis with
       | [] -> None
       | hd :: _ -> Some (hd#last, hd#id) in
     let tis = List.filter_map (fun x -> x) @@
-      List.map (fun ti ->
-          if ti#last = ts then
-            if ti#id < id then Some ti
-            else None
-          else Some ti) tis in
-    let tis = List.filter_map (fun x -> x) @@
       List.map (fun ti -> if ti#main && ti#metadata <> "{}" then Some ti else None) tis in
     match tis with
-    | [] -> Lwt.return_ok acc
+    | [] ->
+      get_nft_all_items_aux
+        ~dbh ?last_updated_to ?last_updated_from ?show_deleted ?include_meta
+        ?continuation ~size acc
     | _ ->
       let>? items = map_rp (fun r -> Get.mk_nft_item_without_owners dbh ?include_meta r) tis in
       match items with
