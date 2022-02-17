@@ -247,7 +247,6 @@ let rec get_nft_all_items_aux
      | None -> "None"
      | Some (ts, s) -> (Tzfunc.Proto.A.cal_to_str ts) ^ "_" ^ s)
     size ;
-  let burn_addresses = List.map Option.some Get.burn_addresses in
   let no_continuation, (ts, id) =
     continuation = None,
     (match continuation with None -> CalendarLib.Calendar.now (), "" | Some (ts, h) -> (ts, h)) in
@@ -261,35 +260,22 @@ let rec get_nft_all_items_aux
 
   if len < size  then
     use dbh @@ fun dbh ->
-    let>? l = [%pgsql.object dbh
-        "select i.id, \
-         last, i.tsp, i.creators, i.royalties, i.royalties_metadata, \
-         sum(case \
-         when t.balance is not null and not (owner = any($burn_addresses)) then t.balance \
-         when not (owner = any($burn_addresses)) then t.amount \
-         else 0 end) as supply, \
-         array_agg(case \
-         when owner = any($burn_addresses) then null \
-         when balance is not null and balance <> 0 or amount <> 0 then owner end) as owners \
-         from (select tid, amount, balance, owner from tokens) t \
-         inner join token_info i on i.id = t.tid \
-         and i.id in (\
-         select id from token_info where \
-         main and metadata <> '{}' and \
+    let>? tis = [%pgsql.object dbh
+        "select id, last, tsp, creators, royalties, royalties_metadata, \
+         main, metadata from token_info where \
          ($no_last_updated_to or (last <= $last_updated_to_v)) and \
          ($no_last_updated_from or (last >= $last_updated_from_v)) and \
          ($no_continuation or (last = $ts and id < $id) or (last < $ts)) \
-         order by last desc, id desc limit 1000) \
-         group by (i.id) \
-         order by i.last desc, i.id desc"] in
-
-    let continuation = match List.rev l with
+         order by last desc, id desc limit $size"] in
+    let continuation = match List.rev tis with
       | [] -> None
       | hd :: _ -> Some (hd#last, hd#id) in
-    match l with
+    let tis = List.filter_map (fun x -> x) @@
+      List.map (fun ti -> if ti#main && ti#metadata <> "{}" then Some ti else None) tis in
+    match tis with
     | [] -> Lwt.return_ok acc
     | _ ->
-      let>? items = map_rp (fun r -> Get.mk_nft_item dbh ?include_meta r) l in
+      let>? items = map_rp (fun r -> Get.mk_nft_item_without_owners dbh ?include_meta r) tis in
       match items with
       | [] ->
         get_nft_all_items_aux
