@@ -16,5 +16,6 @@ let () =
   EzLwtSys.run (fun () ->
       Db.Rarible_kafka.may_set_kafka_config !kafka_config_file >>= function
       | Ok () ->
+        Format.printf "COMMIT_HASH=%s@." Version.version ;
         EzAPIServer.server [ !port, EzAPIServerUtils.API ppx_dir ]
       | Error err -> Lwt.fail_with @@ Crp.string_of_error err)
