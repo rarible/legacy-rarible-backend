@@ -34,6 +34,7 @@ copy: build openapi
 	@cp -f _build/default/src/tools/recrawl_creators.exe _bin/recrawl_creators
 	@cp -f _build/default/src/tools/fix_balances.exe _bin/fix_balances
 	@cp -f _build/default/src/tools/recrawl_exchange.exe _bin/recrawl_exchange
+	@cp -f _build/default/src/tools/continuation_check.exe _bin/continuation_check
 
 clean:
 	@dune clean
