@@ -1254,3 +1254,7 @@ type status = {
   status_chain_id : string ;
   status_chain_timestamp : A.date ;
 } [@@deriving encoding]
+
+type api_version = {
+  api_version : string ;
+} [@@deriving encoding]

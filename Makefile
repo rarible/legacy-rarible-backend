@@ -3,15 +3,19 @@ CONVERTERS=$(shell pwd)/src/db/converters.sexp
 IMAGE ?= rarible:latest
 DEPS_IMAGE ?= functori/rarible-deps:latest
 POSTGRES_USER ?= postgres
+GIT=$(shell git log --pretty=format:'%H' -n 1)
 
 -include Makefile.config
 
 all: copy
 
+version:
+	@echo "let version = \"$(GIT)\"" > src/api/version.ml
+
 build:
 	@CRAWLORI_NO_UPDATE=true PGDATABASE=$(DB) PGCUSTOM_CONVERTERS_CONFIG=$(CONVERTERS) dune build src
 
-copy: build openapi
+copy: version build openapi
 	@mkdir -p _bin
 	@cp -f _build/default/src/crawler/crawler.exe _bin/crawler
 	@cp -f _build/default/src/db/update.exe _bin/update_db

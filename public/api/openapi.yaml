@@ -1466,6 +1466,34 @@ paths:
                 - level
                 additionalProperties: false
       security: []
+  /v0.1/version:
+    summary: version
+    get:
+      tags:
+      - status
+      summary: version
+      operationId: version
+      parameters: []
+      responses:
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  api_version:
+                    type: string
+                required:
+                - api_version
+                additionalProperties: false
+      security: []
   /kafka/item:
     summary: kafka_item
     get:
