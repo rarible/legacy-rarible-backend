@@ -1432,3 +1432,13 @@ let get_status _req () =
    output=status_enc;
    errors=[unexpected_case];
    section=status_section}]
+
+let api_version _req () =
+  let api_version = Version.version in
+  return_ok { api_version }
+[@@get
+  {path="/v0.1/version";
+   name="version";
+   output=api_version_enc;
+   errors=[unexpected_case];
+   section=status_section}]
