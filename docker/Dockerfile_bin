@@ -1,5 +1,6 @@
 FROM functori/rarible-deps:latest as compilation
 
+COPY --chown=functori . .
 RUN $(pg_config --bindir)/pg_ctl start -D ../data && \
 eval $(opam env) && \
 opam update && opam upgrade && \
