@@ -677,6 +677,66 @@ let mk_nft_item dbh ?include_meta obj =
   | _ ->
     Lwt.return_error (`hook_error "can't split id")
 
+
+let get_owners_supply dbh tid =
+  let burn_addresses = List.map Option.some burn_addresses in
+  let>? l =
+    [%pgsql.object dbh
+        "select tid, \
+         sum(case \
+         when t.balance is not null and not (owner = any($burn_addresses)) then t.balance \
+         when not (owner = any($burn_addresses)) then t.amount \
+         else 0 end) as supply, \
+         array_agg(case \
+         when owner = any($burn_addresses) then null \
+         when balance is not null and balance <> 0 or amount <> 0 then owner end) as owners \
+         from (select tid, amount, balance, owner from tokens where tid = $tid) t group by tid"] in
+  match l with
+  | [ hd ] -> Lwt.return_ok hd
+  | _ -> Lwt.return_error (`hook_error "can't find id")
+
+let mk_nft_item_without_owners dbh ?include_meta obj =
+  match String.split_on_char ':' obj#id with
+  | contract :: token_id :: [] ->
+    let token_id = Z.of_string token_id in
+    let> sobj = get_owners_supply dbh obj#id in
+    let supply = match sobj with
+      | Ok sobj -> Option.value ~default:Z.zero sobj#supply
+      | Error _ -> Z.zero in
+    let owners = match sobj with
+      | Ok sobj -> List.filter_map (fun x -> x) @@ Option.value ~default:[] sobj#owners
+      | Error _ -> [] in
+    let creators = List.filter_map (function
+        | None -> None
+        | Some json -> Some (EzEncoding.destruct part_enc json)) obj#creators in
+    let>? meta = match include_meta with
+      | Some true -> mk_nft_item_meta dbh ~contract ~token_id
+      | _ -> Lwt.return_ok None in
+    let nft_item_royalties, nft_item_onchain_royalties =
+      match EzEncoding.destruct parts_enc obj#royalties, Option.map (EzEncoding.destruct parts_enc) obj#royalties_metadata with
+      | [], Some ((_ :: _) as nft_item_roy_list) -> nft_item_roy_list, Some false
+      | [], _ -> [], None
+      | nft_item_roy_list, _ ->
+        nft_item_roy_list,
+        Some (not (List.mem contract offchain_royalties_contracts)) in
+    Lwt.return_ok {
+      nft_item_id = obj#id ;
+      nft_item_contract = contract ;
+      nft_item_token_id = token_id ;
+      nft_item_creators = creators ;
+      nft_item_supply = supply ;
+      nft_item_lazy_supply = Z.zero ;
+      nft_item_owners = owners ;
+      nft_item_royalties ;
+      nft_item_onchain_royalties ;
+      nft_item_date = obj#last ;
+      nft_item_minted_at = obj#tsp ;
+      nft_item_deleted = supply = Z.zero ;
+      nft_item_meta = Common.Utils.rarible_meta_of_tzip21_meta meta ;
+    }
+  | _ ->
+    Lwt.return_error (`hook_error "can't split id")
+
 let get_nft_item_by_id ?dbh ?include_meta contract token_id =
   let tid = Common.Utils.tid ~contract ~token_id in
   let burn_addresses = List.map Option.some burn_addresses in
