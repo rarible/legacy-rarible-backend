@@ -2,10 +2,13 @@ open Let
 open Rtypes
 
 let api = ref "http://localhost:8080"
+let size = ref 20
+let deleted = ref true
 
 let spec = [
-  "--api", Arg.Set_string api,
-  "Url of the API";
+  "--api", Arg.Set_string api, "Url of the API";
+  "--size", Arg.Set_int size, "set size" ;
+  "--deleted", Arg.Set deleted, "show deleted" ;
 ]
 
 let usage =
@@ -22,13 +25,15 @@ let loop () =
   let url = BASE !api in
   let rec aux ?continuation acc =
     let params = match continuation with
-      | None -> [ Api.size_param, I 20 ]
-      | Some c -> [ Api.continuation_param, S c ; Api.size_param, I 20 ] in
+      | None -> [ Api.size_param, I !size ; Api.show_deleted_param, B !deleted ]
+      | Some c ->
+        [ Api.continuation_param, S c ; Api.size_param, I !size ; Api.show_deleted_param, B !deleted ] in
     let> r = EzReq_lwt.get0 url ~params Api.get_nft_all_items_s in
     let>? items = Lwt.return @@ handle_ezreq_result r in
     match items.nft_items_continuation with
     | None ->
       Format.eprintf "[loop] %d new items@." (List.length items.nft_items_items) ;
+      let> _ = EzReq_lwt.get0 ~msg:"last" url ~params Api.get_nft_all_items_s in
       Lwt.return_ok @@ items.nft_items_items @ acc
     | Some continuation ->
       Format.eprintf "[loop] %d new items (total %d) | continuation %s@."
@@ -48,3 +53,4 @@ let () =
   | Error err ->
     Format.eprintf "ERROR %s@." @@ Api.Errors.string_of_error err ;
     Lwt.return_ok ()
+

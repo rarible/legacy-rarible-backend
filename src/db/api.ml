@@ -236,7 +236,7 @@ let filter_items ?show_deleted items =
   | Some true -> items
 
 let rec get_nft_all_items_aux
-    ?dbh ?last_updated_to ?last_updated_from ?show_deleted ?include_meta
+    ~dbh ?last_updated_to ?last_updated_from ?show_deleted ?include_meta
     ?continuation ~size acc =
   Format.eprintf "get_nft_all_items_aux %s %s %s %s %s %Ld@."
     (match last_updated_to with None -> "None" | Some s -> Tzfunc.Proto.A.cal_to_str s)
@@ -259,17 +259,22 @@ let rec get_nft_all_items_aux
   let len = Int64.of_int @@ List.length acc in
 
   if len < size  then
-    use dbh @@ fun dbh ->
     let>? tis = [%pgsql.object dbh
         "select id, last, tsp, creators, royalties, royalties_metadata, \
          main, metadata from token_info where \
          ($no_last_updated_to or (last <= $last_updated_to_v)) and \
          ($no_last_updated_from or (last >= $last_updated_from_v)) and \
-         ($no_continuation or (last = $ts and id < $id) or (last < $ts)) \
+         ($no_continuation or (last <= $ts)) \
          order by last desc, id desc limit $size"] in
     let continuation = match List.rev tis with
       | [] -> None
       | hd :: _ -> Some (hd#last, hd#id) in
+    let tis = List.filter_map (fun x -> x) @@
+      List.map (fun ti ->
+          if ti#last = ts then
+            if ti#id < id then Some ti
+            else None
+          else Some ti) tis in
     let tis = List.filter_map (fun x -> x) @@
       List.map (fun ti -> if ti#main && ti#metadata <> "{}" then Some ti else None) tis in
     match tis with
