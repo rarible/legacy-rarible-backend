@@ -498,7 +498,7 @@ let replace_token_id ~pattern token_id =
 
 let is_animation_format mime_type =
   match String.split_on_char '/' mime_type with
-  | "video" :: _ | "audio" :: _ -> true
+  | "video" :: _ | "audio" :: _ | "model" :: _ -> true
   | _ -> false
 
 let rarible_attributes_of_tzip21_attributes = function
@@ -529,6 +529,21 @@ let find_animation_asset m =
       end
   end
 
+let add_glb_extension uri =
+  if String.contains uri '?' then Printf.sprintf "%s&extension=.glb" uri
+  else Printf.sprintf "%s?extension=.glb" uri
+
+let might_add_glb_extension uri formats =
+  match List.find_opt (fun f -> f.format_uri = uri) formats with
+  | None -> uri
+  | Some f ->
+    match f.format_mime_type with
+    | None -> uri
+    | Some mt ->
+      if mt = "model/gltf-binary" || mt = "model/gltf+json" then
+        add_glb_extension uri
+      else uri
+
 let rarible_meta_of_tzip21_meta meta =
   match meta with
   | None -> None
@@ -541,7 +556,7 @@ let rarible_meta_of_tzip21_meta meta =
         if List.exists (fun f -> match f.format_mime_type with
             | None -> false
             | Some mt -> f.format_uri = uri && is_animation_format mt)
-            formats then Some uri
+            formats then Some (might_add_glb_extension uri formats)
         else find_animation_asset m in
     Some {
       nft_item_meta_name = Option.value ~default:"Unnamed item" m.tzip21_tm_name ;
