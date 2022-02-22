@@ -49,7 +49,7 @@ let reset_nft_item_meta_by_id ?dbh contract token_id =
   Format.eprintf "reset_nft_item_meta_by_id %s@." tid ;
   let update_royalties dbh royalties = match royalties with
     | Some r ->
-      let royalties = EzEncoding.construct parts_enc @@ Metadata.to_4_decimals r in
+      let royalties = EzEncoding.construct parts_enc r in
       [%pgsql dbh
           "update token_info set royalties_metadata = $royalties \
            where id = $tid"]
@@ -73,9 +73,9 @@ let reset_nft_item_meta_by_id ?dbh contract token_id =
       try
         Metadata.get_json uri >>= function
         | Ok (metadata, _uri) ->
-          let>? () =
+          let>? royalties =
             Metadata.insert_mint_metadata dbh ~forward:true ~contract ~token_id ~block ~level ~tsp metadata in
-          update_royalties dbh metadata.tzip21_tm_royalties
+          update_royalties dbh royalties
         | Error (code, str) ->
           Lwt.return_error
             (`hook_error

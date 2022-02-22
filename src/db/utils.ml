@@ -56,8 +56,7 @@ let set_bm_id ?dbh ?(kind=`token) ~contract id =
 
 let update_royalties dbh ~contract ~token_id r =
   let token_id = Z.to_string token_id in
-  let shares = Metadata.to_4_decimals r in
-  let royalties = EzEncoding.construct parts_enc shares in
+  let royalties = EzEncoding.construct parts_enc r in
   [%pgsql dbh
       "update token_info set royalties_metadata = $royalties \
        where contract = $contract and token_id = $token_id"]
@@ -96,10 +95,9 @@ let fetch_metadata_from_source ?(verbose=0) ~timeout ~source l =
               let metadata = EzEncoding.destruct tzip21_token_metadata_enc r#metadata in
               let block, level, tsp, contract, token_id =
                 r#block, r#level, r#tsp, r#contract, Z.of_string r#token_id in
-              let>? () =
+              let>? royalties =
                 Metadata.insert_mint_metadata dbh ~forward:true ~contract ~token_id ~block ~level ~tsp metadata in
-              let>? () =
-                match metadata.tzip21_tm_royalties with
+              let>? () = match royalties with
                 | None -> Lwt.return_ok ()
                 | Some r -> update_royalties dbh ~contract ~token_id r in
               if verbose > 0 then Format.eprintf "  OK@." ;
@@ -123,9 +121,9 @@ let fetch_metadata_from_source ?(verbose=0) ~timeout ~source l =
           | Ok (metadata, _uri) ->
             let block, level, tsp, contract, token_id =
               r#block, r#level, r#tsp, r#contract, Z.of_string r#token_id in
-            let>? () = Metadata.insert_mint_metadata dbh ~forward:true ~contract ~token_id ~block ~level ~tsp metadata in
+            let>? royalties = Metadata.insert_mint_metadata dbh ~forward:true ~contract ~token_id ~block ~level ~tsp metadata in
             let>? () =
-              match metadata.tzip21_tm_royalties with
+              match royalties with
               | None -> Lwt.return_ok ()
               | Some r -> update_royalties dbh ~contract ~token_id r in
             if verbose > 0 then Format.eprintf "  OK@." ;
@@ -252,10 +250,10 @@ let update_metadata ?(set_metadata=false)
             let metadata_tzip = EzEncoding.destruct tzip21_token_metadata_enc metadata in
             let token_id = Z.of_string token_id in
             use dbh @@ fun dbh ->
-            let>? () =
+            let>? royalties =
               Metadata.insert_mint_metadata dbh ~forward:true ~contract ~token_id ~block ~level ~tsp metadata_tzip in
             let>? () =
-              match metadata_tzip.tzip21_tm_royalties with
+              match royalties with
               | None -> Lwt.return_ok ()
               | Some r -> update_royalties dbh ~contract ~token_id r in
             Format.eprintf "  OK@." ;
@@ -280,13 +278,12 @@ let update_metadata ?(set_metadata=false)
                   let metadata_tzip = Json_encoding.destruct tzip21_token_metadata_enc m in
                   let token_id = Z.of_string token_id in
                   use dbh @@ fun dbh ->
-                  let>? () =
+                  let>? royalties =
                     Metadata.insert_mint_metadata
                       dbh ~forward:true ~contract ~token_id ~block ~level ~tsp metadata_tzip in
-            let>? () =
-              match metadata_tzip.tzip21_tm_royalties with
-              | None -> Lwt.return_ok ()
-              | Some r -> update_royalties dbh ~contract ~token_id r in
+                  let>? () = match royalties with
+                    | None -> Lwt.return_ok ()
+                    | Some r -> update_royalties dbh ~contract ~token_id r in
                   Format.eprintf "  OK@." ;
                   Lwt.return_ok true
                 with _ ->
@@ -299,11 +296,10 @@ let update_metadata ?(set_metadata=false)
             | Ok (metadata_tzip, _uri) ->
               let token_id = Z.of_string token_id in
               use dbh @@ fun dbh ->
-              let>? () =
+              let>? royalties =
                 Metadata.insert_mint_metadata
                   dbh ~forward:true ~contract ~token_id ~block ~level ~tsp metadata_tzip in
-              let>? () =
-                match metadata_tzip.tzip21_tm_royalties with
+              let>? () = match royalties with
                 | None -> Lwt.return_ok ()
                 | Some r -> update_royalties dbh ~contract ~token_id r in
               Format.eprintf "  OK@." ;
