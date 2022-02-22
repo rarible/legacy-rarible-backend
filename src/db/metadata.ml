@@ -207,7 +207,7 @@ let metadata_royalties ?creators m =
   | Some r, _ -> Some (to_4_decimals r)
   | _, Some v  -> (* kalamint *)
     Some (List.map (fun {part_account; _} ->
-        { part_account; part_value = Int32.mul v 10l }) creators)
+        { part_account; part_value = Int32.mul v 100l }) creators)
   | _ -> None
 
 let insert_mint_metadata dbh ?(forward=false) ~contract ~token_id ~block ~level ~tsp metadata =
