@@ -420,7 +420,7 @@ let retrieve_contract_metadata ~source ~metadata_id key =
     | Error e ->
       Format.eprintf "Cannot retrieve metadata:\n%s@." (Tzfunc.Rp.string_of_error e);
       Lwt.return None
-    | Ok None | Ok (Some (Bytes _)) | Ok (Some (Other _)) ->
+    | Ok None | Ok (Some (Bytes _)) ->
       Format.eprintf "Wrong metadata format@.";
       Lwt.return None
     | Ok ((Some Micheline m)) ->

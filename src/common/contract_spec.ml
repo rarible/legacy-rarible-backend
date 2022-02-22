@@ -86,7 +86,7 @@ let get_storage_fields script =
 
 let match_fields ~expected ~allocs script =
   match script.storage, get_storage_fields script, get_code_elt `storage script.code with
-  | Bytes _, _, _ | Other _, _, _ | _, Error _, _ | _, _, None ->
+  | Bytes _, _, _ | _, Error _, _ | _, _, None ->
     unexpected_michelson
   | Micheline storage_value, Ok fields, Some storage_type ->
     let$ storage_type = Typed_mich.parse_type storage_type in

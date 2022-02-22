@@ -927,7 +927,7 @@ let insert_nft ~dbh ~config ~meta ~op ~contract ~nft ~entrypoint ?(forward=false
 let insert_transaction ~config ~dbh ~op ?(forward=false) tr =
   let contract = tr.destination in
   match tr.parameters, op.bo_meta with
-  | None, _ | Some { value = Other _; _ }, _ | Some { value = Bytes _; _ }, _ | _, None -> Lwt.return_ok ()
+  | None, _ | Some { value = Bytes _; _ }, _ | _, None -> Lwt.return_ok ()
   | Some {entrypoint; value = Micheline m}, Some meta ->
     if contract = config.Crawlori.Config.extra.royalties then (* royalties *)
       match Parameters.parse_royalties entrypoint m with
