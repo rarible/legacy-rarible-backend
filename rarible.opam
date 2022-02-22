@@ -29,7 +29,7 @@ build: [
 dev-repo: "git://gitlab.com/functori/rarible"
 pin-depends: [
   [ "ez_pgocaml.dev" "git+https://github.com/ocamlpro/ez_pgocaml.git" ]
-  [ "ez_api.dev" "git+https://github.com/maxtori/ez_api.git#allow-static-dynamic" ]
+  [ "ez_api.dev" "git+https://github.com/ocamlpro/ez_api.git" ]
   [ "hacl.dev" "git+https://gitlab.com/maxtori/ocaml-hacl.git" ]
   [ "ppx_deriving_encoding.dev" "git+https://gitlab.com/maxtori/ppx_deriving_encoding.git#rarible" ]
   [ "ppx_deriving_jsoo.dev" "git+https://gitlab.com/o-labs/ppx_deriving_jsoo.git" ]
