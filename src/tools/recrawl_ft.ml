@@ -56,7 +56,7 @@ let rec search ~name (t : Mtyped.ftype) (m : Mtyped.value) : (Mtyped.stype * Mty
 let match_fields ~expected script =
   let open Common.Contract_spec in
   match script.storage, get_code_elt `storage script.code with
-  | Bytes _, _ | Other _, _ | _, None ->
+  | Bytes _, _ | _, None ->
     Error (`generic ("contract_info_error", "unknown script format"))
   | Micheline storage_value, Some storage_type ->
     let$ storage_type = Mtyped.parse_type storage_type in

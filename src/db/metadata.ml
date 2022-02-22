@@ -104,36 +104,40 @@ let get_contract_metadata ?(source="https://rarible.mypinata.cloud/") ?(quiet=fa
       end
     | Error (c, str) -> Lwt.return_error (c, str)
 
+let metadata_creators m =
+  match m.tzip21_tm_creators with
+  | Some (CParts l) -> l
+  | Some (CAssoc l) ->
+    List.map (fun (part_account, part_value) -> {part_account; part_value}) l
+  | Some (CTZIP12 l) ->
+    let len = List.length l in
+    if len > 0 then
+      let part_value = Int32.of_int (10000 / len) in
+      List.map (fun part_account -> {part_account; part_value}) l
+    else []
+  | Some (CNull l) ->
+    let l = List.filter_map (fun x -> x) l in
+    let len = List.length l in
+    if len > 0 then
+      let part_value = Int32.of_int (10000 / len) in
+      List.map (fun part_account -> {part_account; part_value}) l
+    else []
+  | None -> []
+
 let insert_mint_metadata_creators dbh ?(forward=false) ~contract ~token_id ~block ~level ~tsp metadata =
   let tid = Common.Utils.tid ~contract ~token_id in
-  let l = match metadata.tzip21_tm_creators with
-    | Some (CParts l) ->
-      List.map (fun p -> p.part_account, p.part_value) l
-    | Some (CAssoc l) -> l
-    | Some (CTZIP12 l) ->
-      let len = List.length l in
-      if len > 0 then
-        let value = Int32.of_int (10000 / len) in
-        List.map (fun account -> account, value) l
-      else []
-    | Some (CNull l) ->
-      let l = List.filter_map (fun x -> x) l in
-      let len = List.length l in
-      if len > 0 then
-        let value = Int32.of_int (10000 / len) in
-        List.map (fun account -> account, value) l
-      else []
-    | None -> [] in
-  iter_rp (fun (account, value) ->
+  let l = metadata_creators metadata in
+  let|>? () = iter_rp (fun {part_account; part_value} ->
       try
-        ignore @@  Tzfunc.Crypto.(Base58.decode ~prefix:Prefix.contract_public_key_hash account) ;
+        ignore @@  Tzfunc.Crypto.(Base58.decode ~prefix:Prefix.contract_public_key_hash part_account) ;
         [%pgsql dbh
             "insert into tzip21_creators(id, contract, token_id, block, level, \
              tsp, account, value, main) \
              values($tid, $contract, ${Z.to_string token_id}, $block, $level, $tsp, \
-             $account, $value, $forward) \
+             $part_account, $part_value, $forward) \
              on conflict do nothing"]
-      with _ -> Lwt.return_ok ()) l
+      with _ -> Lwt.return_ok ()) l in
+  l
 
 let insert_mint_metadata_formats dbh ?(forward=false) ~contract ~token_id ~block ~level ~tsp metadata =
   let tid = Common.Utils.tid ~contract ~token_id in
@@ -197,8 +201,17 @@ let insert_mint_metadata_attributes dbh ?(forward=false) ~contract ~token_id ~bl
       attributes
   | None -> Lwt.return_ok ()
 
+let metadata_royalties ?creators m =
+  let creators = match creators with None -> metadata_creators m | Some l -> l in
+  match m.tzip21_tm_royalties, m.tzip21_tm_creator_royalty with
+  | Some r, _ -> Some (to_4_decimals r)
+  | _, Some v  -> (* kalamint *)
+    Some (List.map (fun {part_account; _} ->
+        { part_account; part_value = Int32.mul v 10l }) creators)
+  | _ -> None
+
 let insert_mint_metadata dbh ?(forward=false) ~contract ~token_id ~block ~level ~tsp metadata =
-  let>? () =
+  let>? creators =
     insert_mint_metadata_creators dbh ~forward ~contract ~token_id ~block ~level ~tsp metadata in
   let>? () =
     insert_mint_metadata_formats dbh ~forward ~contract ~token_id ~block ~level ~tsp metadata in
@@ -244,10 +257,9 @@ let insert_mint_metadata dbh ?(forward=false) ~contract ~token_id ~block ~level 
   let right_uri = metadata.tzip21_tm_right_uri in
   let is_transferable = metadata.tzip21_tm_is_transferable in
   let should_prefer_symbol = metadata.tzip21_tm_should_prefer_symbol in
-  let royalties = match metadata.tzip21_tm_royalties with
-    | None -> None
-    | Some r -> Some (EzEncoding.construct parts_enc @@ to_4_decimals r) in
-  [%pgsql dbh
+  let royalties = metadata_royalties ~creators metadata in
+  let royalties_str = Option.map (EzEncoding.construct parts_enc) royalties in
+  let|>? () = [%pgsql dbh
       "insert into tzip21_metadata(id, contract, token_id, block, level, tsp, \
        name, symbol, decimals, artifact_uri, display_uri, thumbnail_uri, \
        description, minter, is_boolean_amount, tags, contributors, \
@@ -257,7 +269,7 @@ let insert_mint_metadata dbh ?(forward=false) ~contract ~token_id ~block ~level 
        $?decimals, $?artifact_uri, $?display_uri, $?thumbnail_uri, \
        $?description, $?minter, $?is_boolean_amount, $?tags, $?contributors, \
        $?publishers, $?date, $?block_level, $?genres, $?language, $?rights, \
-       $?right_uri, $?is_transferable, $?should_prefer_symbol, $?royalties, $forward) \
+       $?right_uri, $?is_transferable, $?should_prefer_symbol, $?royalties_str, $forward) \
        on conflict (id) do update set \
        name = $?name, symbol = $?symbol, decimals = $?decimals, \
        artifact_uri = $?artifact_uri, display_uri = $?display_uri, \
@@ -268,9 +280,10 @@ let insert_mint_metadata dbh ?(forward=false) ~contract ~token_id ~block ~level 
        language = $?language, rights = $?rights, right_uri = $?right_uri, \
        is_transferable = $?is_transferable, \
        should_prefer_symbol = $?should_prefer_symbol, \
-       royalties = $?royalties, \
+       royalties = $?royalties_str, \
        main = $forward \
-       where tzip21_metadata.id = $id"]
+       where tzip21_metadata.id = $id"] in
+  royalties
 
 let get_uri_pattern ~dbh contract =
   let>? l =
@@ -312,8 +325,8 @@ let insert_token_metadata ?forward ~dbh ~block ~level ~tsp ~contract (token_id, 
       match r with
       | Error _ ->
         Format.eprintf "Couldn't register metadata for %s %s\n%s@." contract (Z.to_string token_id) json;
-        Lwt.return_ok metadata.tzip21_tm_royalties
-      | Ok () -> Lwt.return_ok metadata.tzip21_tm_royalties in
+        Lwt.return_ok (metadata_royalties metadata)
+      | Ok royalties -> Lwt.return_ok royalties in
   Lwt.return_ok (json, uri, royalties)
 
 let insert_tzip16_metadata_data ?(forward=false) ~dbh ~block ~level ~tsp ~contract metadata =

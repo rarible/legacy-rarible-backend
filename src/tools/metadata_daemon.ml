@@ -51,7 +51,7 @@ let retrieve_token_metadata ~source ~token_metadata_id ~token_id =
     | Error e ->
       Format.eprintf "Cannot retrieve metadata:\n%s@." (Tzfunc.Rp.string_of_error e);
       Lwt.return None
-    | Ok None | Ok (Some (Bytes _)) | Ok (Some (Other _)) ->
+    | Ok None | Ok (Some (Bytes _)) ->
       Format.eprintf "Wrong token metadata format@.";
       Lwt.return None
     | Ok ((Some Micheline m)) ->

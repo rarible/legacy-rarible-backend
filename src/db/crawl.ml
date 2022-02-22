@@ -88,10 +88,7 @@ let insert_metadata_update ~dbh ~op ~contract ~token_id ?(update_index=0l) ?(for
         let>? _meta, _uri, royalties =
           Metadata.insert_token_metadata ~dbh ~forward ~block ~level ~tsp ~contract (token_id, l) in
         Lwt.return_ok royalties in
-    let royalties =
-      match royalties with
-      | None -> None
-      | Some r -> Some (EzEncoding.construct parts_enc @@ Metadata.to_4_decimals r) in
+    let royalties = Option.map (EzEncoding.construct parts_enc) royalties in
     let|>? () = [%pgsql dbh
         "insert into token_info(id, contract, token_id, block, level, tsp, \
          last_block, last_level, last, transaction, metadata, metadata_uri, \
@@ -927,7 +924,7 @@ let insert_nft ~dbh ~config ~meta ~op ~contract ~nft ~entrypoint ?(forward=false
 let insert_transaction ~config ~dbh ~op ?(forward=false) tr =
   let contract = tr.destination in
   match tr.parameters, op.bo_meta with
-  | None, _ | Some { value = Other _; _ }, _ | Some { value = Bytes _; _ }, _ | _, None -> Lwt.return_ok ()
+  | None, _ | Some { value = Bytes _; _ }, _ | _, None -> Lwt.return_ok ()
   | Some {entrypoint; value = Micheline m}, Some meta ->
     if contract = config.Crawlori.Config.extra.royalties then (* royalties *)
       match Parameters.parse_royalties entrypoint m with
@@ -1394,10 +1391,7 @@ let token_metadata_updates ~dbh ~main ~contract ~block ~level ~tsp ~token_id ~tr
   let meta = EzEncoding.destruct Json_encoding.(assoc Json_encoding.any_ezjson_value) meta in
   let>? meta, uri, royalties =
     Metadata.insert_token_metadata ~dbh ~block ~level ~tsp ~contract ~forward:true (token_id, meta) in
-  let royalties =
-    match royalties with
-    | None -> None
-    | Some r -> Some (EzEncoding.construct parts_enc @@ Metadata.to_4_decimals r) in
+  let royalties = Option.map (EzEncoding.construct parts_enc) royalties in
   [%pgsql dbh
       "insert into token_info(id, contract, token_id, block, level, tsp, \
        last_block, last_level, last, transaction, metadata, metadata_uri, \

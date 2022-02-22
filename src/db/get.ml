@@ -610,6 +610,10 @@ let mk_nft_item_meta dbh ~contract ~token_id =
       Option.bind r#genres (fun l -> Some (List.filter_map (fun x -> x) l)) in
     let block_level =
       Option.bind r#block_level (fun i -> Option.some @@ Int32.to_int i) in
+    let tzip21_tm_royalties =
+      Option.map (fun ro -> {
+            royalties_decimals = 4;
+            royalties_shares = EzEncoding.destruct parts_enc ro}) r#royalties in
     Lwt.return_ok @@ Option.some {
       tzip21_tm_name = r#name ;
       tzip21_tm_symbol = r#symbol ;
@@ -634,11 +638,7 @@ let mk_nft_item_meta dbh ~contract ~token_id =
       tzip21_tm_right_uri = r#right_uri ;
       tzip21_tm_is_transferable = r#is_transferable ;
       tzip21_tm_should_prefer_symbol = r#should_prefer_symbol ;
-      tzip21_tm_royalties =
-        match Option.map (fun ro -> EzEncoding.destruct parts_enc ro) r#royalties with
-        | None -> None
-        | Some shares ->
-          Some { royalties_decimals = 4 ; royalties_shares = shares }
+      tzip21_tm_royalties; tzip21_tm_creator_royalty = None;
     }
 
 let mk_nft_item dbh ?include_meta obj =

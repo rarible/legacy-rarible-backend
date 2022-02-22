@@ -30,7 +30,7 @@ let get contract =
     | Some script ->
       match script.storage, Contract_spec.get_storage_fields script,
             Contract_spec.get_code_elt `storage script.code with
-      | Bytes _, _, _ | Other _, _, _ | _, Error _, _ | _, _, None ->
+      | Bytes _, _, _ | _, Error _, _ | _, _, None ->
         Format.printf "wrong storage kind for %s@." contract;
         Lwt.return_ok None
       | Micheline storage_value, Ok fields, Some storage_type ->
