@@ -24,9 +24,11 @@ let update_creators ~contract ~id ~account =
       part_account=account; part_value = 10000l }) ] in
   use None @@ fun dbh ->
   let>? () = [%pgsql dbh "update token_info set creators = $creators where id = $tid"] in
-  [%pgsql dbh
-      "insert into creators(id, contract, token_id, account, value, block, main) \
-       values($tid, $contract, $id, $account, 10000, '', true) on conflict do nothing"]
+  let>? () =
+    [%pgsql dbh
+        "insert into creators(id, contract, token_id, account, value, block, main) \
+         values($tid, $contract, $id, $account, 10000, '', true) on conflict do nothing"] in
+  Db.Produce.nft_item_event dbh contract (Z.of_string id) ()
 
 let operation contracts _ (tokens, ext_diff) op =
   Format.printf "Block %s (%ld)\r@?" (Common.Utils.short op.bo_block) op.bo_level;
