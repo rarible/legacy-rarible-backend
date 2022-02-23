@@ -19,16 +19,16 @@ let spec = [
   "--mode", Arg.Set_string mode, "Mode for recrawl: 'node' (default) or 'db'";
 ]
 
-let update_creators ~contract ~token_id ~account =
+let update_creators ~contract ~token_id creators =
   let token_id = Z.to_string token_id in
   let tid = contract ^ ":" ^ token_id  in
-  let creators = [ Some (EzEncoding.construct part_enc {
-      part_account=account; part_value = 10000l }) ] in
+  let creators_json = List.map (fun c -> Some (EzEncoding.construct part_enc c)) creators in
   use None @@ fun dbh ->
-  let>? () = [%pgsql dbh "update token_info set creators = $creators where id = $tid"] in
-  let>? () = [%pgsql dbh
-      "insert into creators(id, contract, token_id, account, value, block, main) \
-       values($tid, $contract, $token_id, $account, 10000, '', true) on conflict do nothing"] in
+  let>? () = [%pgsql dbh "update token_info set creators = $creators_json where id = $tid"] in
+  let>? () = iter_rp (fun {part_account; part_value} ->
+      [%pgsql dbh
+          "insert into creators(id, contract, token_id, account, value, block, main) \
+           values($tid, $contract, $token_id, $part_account, $part_value, '', true) on conflict do nothing"]) creators in
   Db.Produce.nft_item_event dbh contract (Z.of_string token_id) ()
 
 let operation contracts _ (tokens, ext_diff) op =
@@ -63,7 +63,7 @@ let operation contracts _ (tokens, ext_diff) op =
                     Format.printf "Block %s (%ld)@." (Common.Utils.short op.bo_block) op.bo_level;
                     Format.printf "\027[0;35mUpdate creators %s %s %s\027[0m@."
                       contract (Z.to_string token_id) account;
-                    let|>? () = update_creators ~contract ~token_id ~account in
+                    let|>? () = update_creators ~contract ~token_id [{part_account=account; part_value=10000l}] in
                     TIMap.update (contract, token_id) (fun _ -> Some true) tokens
                 end
               | _ -> Lwt.return_ok tokens
@@ -84,19 +84,34 @@ let remove_indexes () =
 let first_token_balance_update ~token_id ~contract =
   use None @@ fun dbh ->
   let|>? l = [%pgsql dbh
-      "select account from token_balance_updates \
+      "select array_agg(account), array_agg(balance::varchar) from token_balance_updates \
        where token_id = ${Z.to_string token_id} and contract = $contract and account is not null \
-       and balance > 0 order by level asc, index asc, balance asc limit 1"] in
+       and balance > 0 group by (level, index) order by level, index limit 1"] in
   match l with
-  | [ Some account ] -> Some account
-  | _ -> None
+  | [ Some la, Some lb ] ->
+    let l = List.map2 (fun a b -> match a, b with
+        | None, _ | _, None -> None
+        | Some a, Some b -> Some (a, Z.of_string b)) la lb in
+    let l = List.filter_map (fun x -> x) l in
+    if l = [] then []
+    else
+      let total = List.fold_left (fun acc (_, b) -> Z.add acc b) Z.zero l in
+      List.map (fun (part_account, b) ->
+          let part_value = Z.(to_int32 @@ div (mul b ~$10000) total) in
+          {part_account; part_value}) l
+  | _ -> []
 
 let db_mode map =
   iter_rp (fun ((contract, token_id), _) ->
-      let>? o = first_token_balance_update ~token_id ~contract in
-      match o with
-      | None -> Lwt.return_ok ()
-      | Some account -> update_creators ~contract ~token_id ~account) @@
+      let>? creators = first_token_balance_update ~token_id ~contract in
+      update_creators ~contract ~token_id creators) @@
+  Rtypes.TIMap.bindings map
+
+let delete_wrong_creators map =
+  iter_rp (fun ((contract, token_id), _) ->
+      use None @@ fun dbh ->
+      let id = contract ^ ":" ^ Z.to_string token_id in
+      [%pgsql dbh "delete from creators where id = $id"]) @@
   Rtypes.TIMap.bindings map
 
 let main () =
@@ -116,6 +131,7 @@ let main () =
       Format.printf "Missing arguments: '--start' is required@.";
       Lwt.return_ok ()
   else if !mode = "db" then
+    let>? () = delete_wrong_creators tokens in
     db_mode tokens
   else (
     Format.printf "Unhandled mode: %S@." !mode;
