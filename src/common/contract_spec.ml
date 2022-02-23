@@ -4,7 +4,7 @@ open Utils
 open Let
 
 let get_code_elt p = function
-  | Some (Micheline (Mseq l)) ->
+  | Mseq l ->
     List.find_map
       (function
         | Mprim { prim; args = [ arg ]; _} when prim = p -> Some arg
@@ -21,11 +21,11 @@ let get_entrypoints script =
         | Ok acc -> aux acc arg2
       end
     | Mprim { annots; _ } as m ->
-      begin match Typed_mich.get_name_annots annots with
+      begin match Mtyped.get_name_annots annots with
         | None -> Ok acc
-        | Some name -> match Typed_mich.parse_type m with
+        | Some name -> match Mtyped.parse_type m with
           | Error e -> Error e
-          | Ok t -> Ok ((name, Typed_mich.short_micheline_type t) :: acc)
+          | Ok t -> Ok ((name, Mtyped.short t) :: acc)
       end
     | _ -> unexpected_michelson in
   match get_code_elt `parameter script.code with
@@ -39,7 +39,7 @@ let transfer_entry = `seq ( `tuple [`address; `seq ( `tuple [ `address; `nat; `n
 let update_operators_entry = `seq (
     `or_ (`tuple [ `address; `address; `nat ], `tuple [ `address; `address; `nat ]))
 
-let fa2_entrypoints : (string * micheline_type_short) list = [
+let fa2_entrypoints : (string * Mtyped.stype) list = [
   "balance_of", `tuple [
     `seq (`tuple [`address; `nat]);
     `contract (`seq (`tuple [ `tuple [ `address; `nat ]; `nat ]))
@@ -58,7 +58,7 @@ let burn_nft_entry = `nat
 let burn_mt_entry = `tuple [ `nat; `nat ]
 let set_token_metadata_entry = `tuple [ `nat; `map (`string, `bytes) ]
 
-let fa2_ext_entrypoints : (string * micheline_type_short) list = [
+let fa2_ext_entrypoints : (string * Mtyped.stype) list = [
   "update_operators_for_all", update_operators_all_entry;
   "mint", mint_mt_entry;
   "mint", mint_nft_entry;
@@ -68,36 +68,36 @@ let fa2_ext_entrypoints : (string * micheline_type_short) list = [
 
 let get_storage_fields script =
   let rec aux bm_index acc = function
-    | {typ=`tuple []; name = None} -> bm_index, acc
-    | {typ=`tuple (h :: t); _} ->
+    | {Mtyped.typ=`tuple []; name = None} -> bm_index, acc
+    | {Mtyped.typ=`tuple (h :: t); _} ->
       let bm_index, acc = aux bm_index acc h in
-      aux bm_index acc {name=None; typ=`tuple t}
-    | {name=Some n; typ = `big_map (k, v)} ->
+      aux bm_index acc {Mtyped.name=None; typ=`tuple t}
+    | {Mtyped.name=Some n; typ = `big_map (k, v)} ->
       bm_index + 1, (n, Some (
-          bm_index, Typed_mich.short_micheline_type k, Typed_mich.short_micheline_type v)) :: acc
-    | {name=Some n; _} ->
+          bm_index, Mtyped.short k, Mtyped.short v)) :: acc
+    | {Mtyped.name=Some n; _} ->
       bm_index, (n, None) :: acc
     | _ -> bm_index, acc in
   match get_code_elt `storage script.code with
   | None -> unexpected_michelson
-  | Some m -> match Typed_mich.parse_type m with
+  | Some m -> match Mtyped.parse_type m with
     | Error e -> Error e
     | Ok t -> Ok (List.rev @@ snd @@ aux 0 [] t)
 
 let match_fields ~expected ~allocs script =
-  match script.storage, get_storage_fields script, get_code_elt `storage script.code with
-  | Bytes _, _, _ | _, Error _, _ | _, _, None ->
+  match get_storage_fields script, get_code_elt `storage script.code with
+  | Error _, _ | _, None ->
     unexpected_michelson
-  | Micheline storage_value, Ok fields, Some storage_type ->
-    let$ storage_type = Typed_mich.parse_type storage_type in
-    let$ storage_value = Typed_mich.(parse_value (short_micheline_type storage_type) storage_value) in
+  | Ok fields, Some storage_type ->
+    let$ storage_type = Mtyped.parse_type storage_type in
+    let$ storage_value = Mtyped.(parse_value (short storage_type) script.storage) in
     Ok (List.map (fun name ->
         match List.assoc_opt name fields with
         | None -> None, None
         | Some None ->
-          Typed_mich.search_value ~name storage_type storage_value, None
+          Mtyped.search_value ~name storage_type storage_value, None
         | Some (Some (bm_index, k, v)) ->
-          Typed_mich.search_value ~name storage_type storage_value,
+          Mtyped.search_value ~name storage_type storage_value,
           (match Storage_diff.get_big_map_id ~allocs bm_index k v with
            | None -> None
            | Some bm_id -> Some {bm_id; bm_types = {bmt_key=k; bmt_value=v}})

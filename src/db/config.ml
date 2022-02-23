@@ -6,8 +6,8 @@ let db_contracts =
   List.fold_left (fun acc r ->
       match r#ledger_key, r#ledger_value with
       | Some k, Some v ->
-        let bmt_key = EzEncoding.destruct micheline_type_short_enc k in
-        let bmt_value = EzEncoding.destruct micheline_type_short_enc v in
+        let bmt_key = EzEncoding.destruct Mtyped.stype_enc.Proto.json k in
+        let bmt_value = EzEncoding.destruct Mtyped.stype_enc.Proto.json v in
         let v = {
           nft_ledger = {bm_types = {bmt_key; bmt_value}; bm_id = Z.of_string r#ledger_id};
           nft_meta_id=Option.map Z.of_string r#metadata_id;
@@ -26,8 +26,8 @@ let db_ft_contract r =
     | "lugh", _, _ -> Some Lugh
     | "fa2_multiple_inversed", _, _ -> Some Fa2_multiple_inversed
     | "custom", Some k, Some v ->
-      let bmt_key = EzEncoding.destruct micheline_type_short_enc k in
-      let bmt_value = EzEncoding.destruct micheline_type_short_enc v in
+      let bmt_key = EzEncoding.destruct Mtyped.stype_enc.Proto.json k in
+      let bmt_value = EzEncoding.destruct Mtyped.stype_enc.Proto.json v in
       Some (Custom {bmt_key; bmt_value})
     | _ -> None in
   match v with
@@ -83,8 +83,8 @@ let update_ft_contract ?dbh contract lk =
     | Lugh -> "lugh", None, None
     | Custom {bmt_key; bmt_value} ->
       "custom",
-      Some (EzEncoding.construct micheline_type_short_enc bmt_key),
-      Some (EzEncoding.construct micheline_type_short_enc bmt_value) in
+      Some (EzEncoding.construct Mtyped.stype_enc.Proto.json bmt_key),
+      Some (EzEncoding.construct Mtyped.stype_enc.Proto.json bmt_value) in
   use dbh @@ fun dbh ->
   [%pgsql dbh
       "insert into ft_contracts(address, kind, ledger_id, ledger_key, \

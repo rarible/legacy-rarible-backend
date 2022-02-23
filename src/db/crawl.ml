@@ -192,11 +192,11 @@ let insert_transfer ~dbh ~op ~contract lt =
 let insert_creators ~dbh ~contract ~token_id ~block ?(forward=false) creators =
   let token_id = Z.to_string token_id in
   let tid = contract ^ ":" ^ token_id in
-  let>? l = [%pgsql dbh "select id from token_info where id = $tid and creators = '{}'"] in
+  let>? l = [%pgsql dbh "select id from token_info where id = $tid and creators <> '{}'"] in
   match l with
-  | [ _ ] ->
+  | [] ->
     let creators_json = List.map (fun c -> Some (EzEncoding.construct part_enc c)) creators in
-    let>? () = [%pgsql dbh "update token_info set creators = $creators_json where id = $tid and creators <> '{}'"]  in
+    let>? () = [%pgsql dbh "update token_info set creators = $creators_json where id = $tid"]  in
     iter_rp (fun {part_account; part_value} ->
         [%pgsql dbh
             "insert into creators(id, contract, token_id, account, value, block, main) \
@@ -747,7 +747,7 @@ let insert_fxhash_royalties ~dbh ~op ?forward ~info ~config ~update_index l =
       let base = Option.map (fun s -> EzAPI.BASE s) @@ List.nth_opt config.Crawlori.Config.nodes 0 in
       let> r = Tzfunc.Node.(get_bigmap_value ?base ~typ:(prim `nat) info.fxhash_issuer_id (Proto.Mint issuer_id)) in
       begin match r with
-        | Ok (Some (Micheline m)) ->
+        | Ok (Some m) ->
           begin match Mtyped.parse_value Contract_spec.fxhash_issuer_field.bmt_value m with
             | Ok (`tuple [`tuple [ `tuple [ `address part_account; _ ]; _; _; _ ]; _; `nat royalties; _; _ ]) ->
               insert_royalties ~dbh ~op ?forward ~update_index {
@@ -924,17 +924,17 @@ let insert_nft ~dbh ~config ~meta ~op ~contract ~nft ~entrypoint ?(forward=false
 let insert_transaction ~config ~dbh ~op ?(forward=false) tr =
   let contract = tr.destination in
   match tr.parameters, op.bo_meta with
-  | None, _ | Some { value = Bytes _; _ }, _ | _, None -> Lwt.return_ok ()
-  | Some {entrypoint; value = Micheline m}, Some meta ->
+  | None, _ | _, None -> Lwt.return_ok ()
+  | Some {entrypoint; value}, Some meta ->
     if contract = config.Crawlori.Config.extra.royalties then (* royalties *)
-      match Parameters.parse_royalties entrypoint m with
+      match Parameters.parse_royalties entrypoint value with
       | Ok roy ->
         Format.printf "\027[0;35mset royalties %s %ld\027[0m@." (short op.bo_hash) op.bo_index;
         let|>? _ = insert_royalties ~dbh ~op ~forward roy in
         ()
       | _ -> Lwt.return_ok ()
     else if contract = config.Crawlori.Config.extra.exchange then (* exchange *)
-      begin match Parameters.parse_cancel entrypoint m with
+      begin match Parameters.parse_cancel entrypoint value with
         | Ok { cc_hash; cc_maker_edpk; cc_maker; cc_make ; cc_take; cc_salt } ->
           Format.printf "\027[0;35mcancel order %s %ld %s\027[0m@."
             (short op.bo_hash) op.bo_index (short (cc_hash :> string));
@@ -943,7 +943,7 @@ let insert_transaction ~config ~dbh ~op ?(forward=false) tr =
         | _ -> Lwt.return_ok ()
       end
     else if contract = config.Crawlori.Config.extra.transfer_manager then (* transfer_manager *)
-      begin match Parameters.parse_do_transfers entrypoint m with
+      begin match Parameters.parse_do_transfers entrypoint value with
         | Ok {dt_left; dt_left_maker_edpk; dt_left_maker; dt_left_make_asset;
               dt_left_take_asset; dt_left_salt;
               dt_right; dt_right_maker_edpk; dt_right_maker; dt_right_make_asset;
@@ -983,7 +983,7 @@ let insert_transaction ~config ~dbh ~op ?(forward=false) tr =
       insert_tezos_domains ~dbh ~op ~forward l
     | _, _, Some ft, _ -> insert_ft ~dbh ~config ~op ~contract ~forward ft
     | _, _, _, Some nft ->
-      insert_nft ~dbh ~config ~meta ~op ~contract ~nft ~entrypoint ~forward m
+      insert_nft ~dbh ~config ~meta ~op ~contract ~nft ~entrypoint ~forward value
     | _ -> Lwt.return_ok ()
 
 let ledger_kind types =
@@ -1055,8 +1055,8 @@ let insert_origination ?(forward=false) ?(crawled=true) config dbh op ori =
   | _, _, Some _ -> set_crawled_ft ~dbh kt1
   | None, _, _ | _, None, _ -> Lwt.return_ok ()
   | Some (nft, owner, uri, _metadata), Some meta, _ ->
-    let ledger_key = EzEncoding.construct micheline_type_short_enc nft.nft_ledger.bm_types.bmt_key in
-    let ledger_value = EzEncoding.construct micheline_type_short_enc nft.nft_ledger.bm_types.bmt_value in
+    let ledger_key = EzEncoding.construct Mtyped.stype_enc.json nft.nft_ledger.bm_types.bmt_key in
+    let ledger_value = EzEncoding.construct Mtyped.stype_enc.json nft.nft_ledger.bm_types.bmt_value in
     Format.printf "\027[0;93morigination %s %s\027[0m@."
       (short kt1) (EzEncoding.construct nft_ledger_enc nft);
     let>? metadata_assoc = match nft.nft_meta_id with
@@ -1512,11 +1512,14 @@ let token_balance_updates dbh main l =
             Format.printf "\027[0;33mupdate supply for %s[%s]: %s\027[0m@."
               (short contract) (Z.to_string token_id) (Z.to_string supply_diff);
             let id = Common.Utils.tid ~contract ~token_id in
+            let creators = match r#account with
+              | None -> []
+              | Some a -> [ Some (EzEncoding.construct part_enc { part_account=a; part_value = 10000l }) ] in
             [%pgsql dbh
                 "insert into token_info(id, contract, token_id, block, level, tsp, \
-                 last_block, last_level, last, transaction, supply, main) \
+                 last_block, last_level, last, transaction, supply, creators, main) \
                  values($id, $contract, ${Z.to_string token_id}, ${r#block}, ${r#level}, ${r#tsp}, \
-                 ${r#block}, ${r#level}, ${r#tsp}, ${r#transaction}, $supply_diff, true) \
+                 ${r#block}, ${r#level}, ${r#tsp}, ${r#transaction}, $supply_diff, $creators, true) \
                  on conflict (id) do update \
                  set supply = token_info.supply + ${Z.to_string supply_diff}, \
                  last_block = case when $main then ${r#block} else token_info.last_block end, \

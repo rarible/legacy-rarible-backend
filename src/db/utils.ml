@@ -406,7 +406,6 @@ let expr key =
 
 let retrieve_contract_metadata ~source ~metadata_id key =
   let open Common in
-  let open Proto in
   match expr key with
   | None -> Lwt.return None
   | Some hash ->
@@ -416,11 +415,11 @@ let retrieve_contract_metadata ~source ~metadata_id key =
     | Error e ->
       Format.eprintf "Cannot retrieve metadata:\n%s@." (Tzfunc.Rp.string_of_error e);
       Lwt.return None
-    | Ok None | Ok (Some (Bytes _)) ->
+    | Ok None ->
       Format.eprintf "Wrong metadata format@.";
       Lwt.return None
-    | Ok ((Some Micheline m)) ->
-      match Typed_mich.parse_value Contract_spec.metadata_field.Rtypes.bmt_value m with
+    | Ok (Some m) ->
+      match Mtyped.parse_value Contract_spec.metadata_field.Rtypes.bmt_value m with
       | Ok (`bytes v) ->
         let s = (Tzfunc.Crypto.hex_to_raw v :> string) in
         if Parameters.decode s then Lwt.return @@ Some s

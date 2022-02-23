@@ -39,7 +39,7 @@ let main () =
       Format.printf "\027[0;36mCheck %s[%s] for %s (%s, %s)\027[0m@."
         (String.sub r#contract 0 10) r#token_id (String.sub r#owner 0 10) (Z.to_string r#amount)
         (Option.fold ~none:"None" ~some:Z.to_string r#balance);
-      let ok, typ, value = match Option.map (EzEncoding.destruct Rtypes.micheline_type_short_enc) r#ledger_key with
+      let ok, typ, value = match Option.map (EzEncoding.destruct Mtyped.stype_enc.json) r#ledger_key with
         | Some (`tuple [ `address; `nat ]) ->
           true, prim `pair ~args:[ prim `address; prim `nat ],
           prim `Pair ~args:[ Mstring r#owner; Mint (Z.of_string r#token_id) ]
@@ -54,12 +54,12 @@ let main () =
       else
         let> v = Node.get_bigmap_value ~block ~typ ~base:(EzAPI.BASE !node)
             (Z.of_string r#ledger_id) value in
-        match Option.map (EzEncoding.destruct Rtypes.micheline_type_short_enc) r#ledger_value, v with
-        | Some `nat, Ok (Some (Micheline (Mint z))) ->
+        match Option.map (EzEncoding.destruct Mtyped.stype_enc.json) r#ledger_value, v with
+        | Some `nat, Ok (Some (Mint z)) ->
           if z = r#amount then Format.printf "\027[0;32mOk\027[0m@."
           else Format.printf "\027[0;31mWrong %s %s\027[0m@." (Z.to_string r#amount) (Z.to_string z);
           Lwt.return_ok ()
-        | Some `address, Ok (Some (Micheline (Mstring s))) ->
+        | Some `address, Ok (Some (Mstring s)) ->
           if r#amount = Z.zero && s <> r#owner then Format.printf "\027[0;32mOk\027[0m@."
           else if r#amount = Z.one && s = r#owner then Format.printf "\027[0;32mOk\027[0m@."
           else Format.printf "\027[0;31mWrong %s\027[0m@." s;

@@ -3,10 +3,10 @@ open Rtypes
 
 let big_map_allocs l =
   let f id key_type value_type =
-    match Typed_mich.parse_type key_type, Typed_mich.parse_type value_type with
+    match Mtyped.parse_type key_type, Mtyped.parse_type value_type with
     | Error _, _ | _, Error _ -> id, None
     | Ok k, Ok v ->
-      id, Some (Typed_mich.short_micheline_type k, Typed_mich.short_micheline_type v) in
+      id, Some (Mtyped.short k, Mtyped.short v) in
   List.sort (fun (id1, _) (id2, _) -> compare id1 id2) @@
   List.filter_map (function
       | Big_map { id; diff = SDAlloc {key_type; value_type; _} } ->
@@ -32,13 +32,13 @@ let get_big_map_id ~allocs bm_index k v =
 let get_big_map_updates bm l =
   let f l =
     List.filter_map (fun {bm_key; bm_value; _} ->
-        match Typed_mich.parse_value bm.bm_types.bmt_key bm_key with
+        match Mtyped.parse_value bm.bm_types.bmt_key bm_key with
         | Error _ -> None
         | Ok k ->
           match bm_value with
           | None -> Some (k, None)
           | Some value ->
-            match Typed_mich.parse_value bm.bm_types.bmt_value value with
+            match Mtyped.parse_value bm.bm_types.bmt_value value with
             | Error _ -> None
             | Ok v -> Some (k, Some v)) l in
   List.flatten @@

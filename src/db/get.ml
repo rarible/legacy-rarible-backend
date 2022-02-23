@@ -791,8 +791,8 @@ let mk_nft_col name obj =
   let$ nft_collection_type = match obj#ledger_key, obj#ledger_value with
     | None, _ | _, None -> Error (`hook_error "unknown_token_kind")
     | Some k, Some v -> match
-        EzEncoding.destruct micheline_type_short_enc k,
-        EzEncoding.destruct micheline_type_short_enc v with
+        EzEncoding.destruct Mtyped.stype_enc.Proto.json k,
+        EzEncoding.destruct Mtyped.stype_enc.Proto.json v with
     | `nat, `address -> Ok CTNFT
     | `tuple [`nat; `address], `nat
     | `tuple [`address; `nat], `nat -> Ok CTMT

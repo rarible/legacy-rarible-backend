@@ -11,7 +11,7 @@ let parse_address = function
   | _ -> unexpected_michelson
 
 let parse_transfer m =
-  match Typed_mich.parse_value Contract_spec.transfer_entry m with
+  match Mtyped.parse_value Contract_spec.transfer_entry m with
   | Ok (`seq l) ->
     Ok (Transfers (
         List.filter_map (function
@@ -91,7 +91,7 @@ let parse_royalties l =
       | _ -> None) l
 
 let parse_mint m =
-  match Typed_mich.parse_value Contract_spec.mint_mt_entry m with
+  match Mtyped.parse_value Contract_spec.mint_mt_entry m with
   | Ok (`tuple [`nat fa2m_token_id; `address fa2m_owner; `nat fa2m_amount;
                 `assoc meta; `seq royalties]) ->
     let fa2m_metadata = parse_metadata meta in
@@ -99,7 +99,7 @@ let parse_mint m =
     Ok (Mint_tokens
           (MTMint { fa2m_token_id ; fa2m_owner ; fa2m_amount ; fa2m_metadata; fa2m_royalties }))
   | _ ->
-    match Typed_mich.parse_value Contract_spec.mint_nft_entry m with
+    match Mtyped.parse_value Contract_spec.mint_nft_entry m with
     | Ok (`tuple [`nat fa2m_token_id; `address fa2m_owner; `assoc meta; `seq royalties]) ->
       let fa2m_metadata = parse_metadata meta in
       let fa2m_royalties = parse_royalties royalties in
@@ -107,19 +107,19 @@ let parse_mint m =
             (NFTMint
                { fa2m_token_id ; fa2m_owner ; fa2m_amount = () ; fa2m_metadata; fa2m_royalties }))
     | _ ->
-      match Typed_mich.parse_value Contract_spec.mint_ubi_entry m with
+      match Mtyped.parse_value Contract_spec.mint_ubi_entry m with
       | Ok (`tuple [ `address ubim_owner; `nat ubim_token_id ]) ->
         let ubim_uri = Some "" in
         Ok (Mint_tokens (UbiMint { ubim_owner ; ubim_token_id ; ubim_uri }))
       | _ ->
-        match Typed_mich.parse_value Contract_spec.mint_ubi2_entry m with
+        match Mtyped.parse_value Contract_spec.mint_ubi2_entry m with
         | Ok (`tuple [ `tuple [ `address ubi2m_owner; `nat ubi2m_amount ]; `assoc meta; `nat ubi2m_token_id ]) ->
           let ubi2m_metadata = parse_metadata meta in
           Ok (Mint_tokens
                 (UbiMint2 { ubi2m_owner ; ubi2m_amount ; ubi2m_token_id ; ubi2m_metadata }))
 
         | _ ->
-          match Typed_mich.parse_value Contract_spec.mint_hen_entry m with
+          match Mtyped.parse_value Contract_spec.mint_hen_entry m with
           | Ok (`tuple [
               `tuple [ `address fa2m_owner; `nat fa2m_amount ] ;
               `tuple [ `nat fa2m_token_id ; `assoc meta ] ]) ->
@@ -129,32 +129,32 @@ let parse_mint m =
           | _ -> unexpected_michelson
 
 let parse_burn m =
-  match Typed_mich.parse_value Contract_spec.burn_mt_entry m with
+  match Mtyped.parse_value Contract_spec.burn_mt_entry m with
   | Ok (`tuple [ `nat token_id; `nat amount ]) ->
     Ok (Burn_tokens (MTBurn { token_id; amount }))
-  | _ -> match Typed_mich.parse_value Contract_spec.burn_nft_entry m with
+  | _ -> match Mtyped.parse_value Contract_spec.burn_nft_entry m with
     | Ok (`nat id) -> Ok (Burn_tokens (NFTBurn id))
     | _ -> unexpected_michelson
 
 let parse_metadata_uri m =
-  match Typed_mich.parse_value (`tuple [`string; `bytes]) m with
+  match Mtyped.parse_value (`tuple [`string; `bytes]) m with
   | Ok (`tuple [ `string key; `bytes h ]) ->
     Option.fold ~none:unexpected_michelson ~some:(fun s -> Ok (Metadata (key, s))) @@
     get_string_bytes ~key h
   | _ -> unexpected_michelson
 
 let parse_add_minter m =
-  match Typed_mich.parse_value `address m with
+  match Mtyped.parse_value `address m with
   | Ok (`address a) -> Ok (Add_minter a)
   | _ -> unexpected_michelson
 
 let parse_remove_minter m =
-  match Typed_mich.parse_value `address m with
+  match Mtyped.parse_value `address m with
   | Ok (`address a) -> Ok (Remove_minter a)
   | _ -> unexpected_michelson
 
 let parse_set_token_uri_pattern m =
-  match Typed_mich.parse_value `string m with
+  match Mtyped.parse_value `string m with
   | Ok (`string s) -> Ok (Token_uri_pattern s)
   | _ -> unexpected_michelson
 
@@ -170,7 +170,7 @@ let parse_fa2 e p =
   | _ -> unexpected_michelson
 
 let parse_set_royalties m =
-  match Typed_mich.parse_value Contract_spec.set_royalties_entry m with
+  match Mtyped.parse_value Contract_spec.set_royalties_entry m with
   | Ok (`tuple [ `address roy_contract; token_id; `seq l ]) ->
     let$ roy_token_id = match token_id with
       | `some (`nat id) -> Ok (Some id)
@@ -185,12 +185,12 @@ let parse_royalties e p =
   | EPnamed "set_royalties", m -> parse_set_royalties m
   | _ -> unexpected_michelson
 
-let parse_option_key : micheline_value -> (string option, _) result = function
+let parse_option_key : Mtyped.value -> (string option, _) result = function
   | `none -> Ok None
   | `some (`key maker) -> Ok (Some maker)
   | _ -> unexpected_michelson
 
-let parse_asset_type (mclass : micheline_value) (mdata : micheline_value) =
+let parse_asset_type (mclass : Mtyped.value) (mdata : Mtyped.value) =
  match mclass, mdata with
   | `left `unit, _ -> Ok ATXTZ
   | `right (`left `unit), `bytes h ->
@@ -213,8 +213,43 @@ let parse_asset_type (mclass : micheline_value) (mdata : micheline_value) =
     end
   | _ -> unexpected_michelson
 
+let asset_class_type : Mtyped.stype =
+  `or_ (`unit, `or_ (`unit, `or_ (`int, `or_ (`int, `bytes))))
+
+let asset_type_type : Mtyped.stype = `tuple [asset_class_type; `bytes]
+let asset_type = `tuple [asset_type_type; `nat]
+
+let order_type =
+  `tuple [
+    `option `key;
+    asset_type;
+    `option `key;
+    asset_type;
+    `nat;
+    `option `timestamp;
+    `option `timestamp;
+    `bytes;
+    `bytes;
+  ]
+
+let part_type = `tuple [`address; `nat]
+let order_data_type = `tuple [`seq part_type; `seq part_type; `bool ]
+
+let do_transfers_type =
+  `tuple [
+    order_type;
+    order_type;
+    asset_type_type;
+    asset_type_type;
+    order_data_type;
+    order_data_type;
+    `tuple [ `nat; `nat ];
+    `nat;
+    `seq (`tuple [`address; `nat])
+  ]
+
 let parse_cancel e m =
-  match e, Typed_mich.(parse_value order_type m) with
+  match e, Mtyped.(parse_value order_type m) with
   | EPnamed "cancel", Ok (`tuple [
       maker;
       `tuple [ `tuple [ make_asset_class; make_asset_data ]; `nat m_asset_value ];
@@ -232,7 +267,7 @@ let parse_cancel e m =
   | _ -> unexpected_michelson
 
 let parse_do_transfers e m =
-  match e, Typed_mich.(parse_value do_transfers_type m) with
+  match e, Mtyped.(parse_value do_transfers_type m) with
   | EPnamed "do_transfers", Ok (`tuple [
       `tuple [
         left_maker;
@@ -271,7 +306,7 @@ let parse_do_transfers e m =
   | _ -> unexpected_michelson
 
 let parse_ft_fa1_transfer m =
-  match Typed_mich.parse_value (`tuple [ `address; `address; `nat ]) m with
+  match Mtyped.parse_value (`tuple [ `address; `address; `nat ]) m with
   | Ok (`tuple [ `address tr_source; `address tr_destination; `nat tr_amount ]) ->
     Ok (FT_transfers [ {tr_source; tr_txs = [{tr_destination; tr_amount; tr_token_id = Z.zero}] } ])
   | _ -> unexpected_michelson
@@ -287,7 +322,7 @@ let parse_ft_fa2_transfer m =
   | _ -> unexpected_michelson
 
 let parse_ft_mint m =
-  match Typed_mich.parse_value (`tuple [ `address; `nat; `nat ]) m with
+  match Mtyped.parse_value (`tuple [ `address; `nat; `nat ]) m with
   | Ok (`tuple [ `address owner; `nat amount; `nat id ]) ->
     if id = Z.zero then
       Ok (FT_mint { owner; amount })
@@ -295,7 +330,7 @@ let parse_ft_mint m =
   | _ -> unexpected_michelson
 
 let parse_ft_burn m =
-  match Typed_mich.parse_value (`tuple [ `address; `nat; `nat ]) m with
+  match Mtyped.parse_value (`tuple [ `address; `nat; `nat ]) m with
   | Ok (`tuple [ `address owner; `nat amount; `nat id ]) ->
     if id = Z.zero then
       Ok (FT_burn { owner; amount })
@@ -317,7 +352,7 @@ let parse_ft_fa2 e p =
   | _ -> unexpected_michelson
 
 let parse_process_transfer_lugh m =
-  match Typed_mich.parse_value (`tuple [ `tuple [`nat; `address];  `nat; `address; `nat ]) m with
+  match Mtyped.parse_value (`tuple [ `tuple [`nat; `address];  `nat; `address; `nat ]) m with
   | Ok (`tuple [ `tuple [`nat tr_amount; `address tr_source]; `nat fees;
                  `address tr_destination; `nat id ]) ->
     if id = Z.zero  then

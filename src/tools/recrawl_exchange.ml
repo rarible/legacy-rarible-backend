@@ -68,8 +68,8 @@ let operation config () op =
       match op.bo_op.kind with
       | Transaction tr ->
         begin match tr.parameters with
-          | Some {entrypoint; value = Micheline m } ->
-            insert_op ~config ~contract:tr.destination ~entrypoint ~op m
+          | Some {entrypoint; value } ->
+            insert_op ~config ~contract:tr.destination ~entrypoint ~op value
           | _ -> Lwt.return_ok ()
         end
       | _ -> Lwt.return_ok ()

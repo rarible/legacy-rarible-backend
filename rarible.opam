@@ -34,5 +34,5 @@ pin-depends: [
   [ "ppx_deriving_encoding.dev" "git+https://gitlab.com/maxtori/ppx_deriving_encoding.git#rarible" ]
   [ "ppx_deriving_jsoo.dev" "git+https://gitlab.com/o-labs/ppx_deriving_jsoo.git" ]
   [ "tzfunc.~dev" "git+https://gitlab.com/functori/tzfunc.git" ]
-  [ "crawlori.~dev" "git+https://gitlab.com/functori/crawlori.git" ]
+  [ "crawlori.~dev" "git+https://gitlab.com/functori/crawlori.git#old" ]
 ]
