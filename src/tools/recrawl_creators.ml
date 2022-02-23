@@ -72,11 +72,13 @@ let operation contracts _ (tokens, ext_diff) op =
     else Lwt.return_ok (tokens, ext_diff)
 
 let add_indexes () =
+  Format.printf "Add token_balance_updates indexes@.";
   use None @@ fun dbh ->
   let>? () = [%pgsql dbh "create index token_balance_updates_contract_index on token_balance_updates(contract)"] in
   [%pgsql dbh "create index token_balance_updates_token_id_index on token_balance_updates(token_id)"]
 
 let remove_indexes () =
+  Format.printf "Remove token_balance_updates indexes@.";
   use None @@ fun dbh ->
   let>? () = [%pgsql dbh "drop index token_balance_updates_contract_index"] in
   [%pgsql dbh "drop index token_balance_updates_token_id_index"]
@@ -110,6 +112,7 @@ let db_mode map =
   Rtypes.TIMap.bindings map
 
 let delete_wrong_creators map =
+  Format.printf "Delete wrong creators@.";
   iter_rp (fun ((contract, token_id), _) ->
       use None @@ fun dbh ->
       let id = contract ^ ":" ^ Z.to_string token_id in
@@ -118,6 +121,7 @@ let delete_wrong_creators map =
 
 let main () =
   Arg.parse spec (fun f -> filename := Some f) "recrawl_creators.exe [options] config.json";
+  Format.printf "Get tokens without creators@.";
   let>? tokens = Db.Utils.tokens_without_creators () in
   if !mode = "node" then
     let>? config = Lwt.return @@ Crawler_config.get !filename Rtypes.config_enc in
@@ -133,8 +137,10 @@ let main () =
       Format.printf "Missing arguments: '--start' is required@.";
       Lwt.return_ok ()
   else if !mode = "db" then
+    let>? () = add_indexes () in
     let>? () = delete_wrong_creators tokens in
-    db_mode tokens
+    let>? () = db_mode tokens in
+    remove_indexes ()
   else (
     Format.printf "Unhandled mode: %S@." !mode;
     Lwt.return_ok ())
