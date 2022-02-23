@@ -55,12 +55,12 @@ let rec search ~name (t : Mtyped.ftype) (m : Mtyped.value) : (Mtyped.stype * Mty
 
 let match_fields ~expected script =
   let open Common.Contract_spec in
-  match script.storage, get_code_elt `storage script.code with
-  | Bytes _, _ | _, None ->
+  match get_code_elt `storage script.code with
+  | None ->
     Error (`generic ("contract_info_error", "unknown script format"))
-  | Micheline storage_value, Some storage_type ->
+  | Some storage_type ->
     let$ storage_type = Mtyped.parse_type storage_type in
-    let$ storage_value = Mtyped.(parse_value (short storage_type) storage_value) in
+    let$ storage_value = Mtyped.(parse_value (short storage_type) script.storage) in
     Ok (List.map (fun name ->
         match search ~name storage_type storage_value with
         | Some (`big_map (bmt_key, bmt_value), `nat bm_id) ->
@@ -71,12 +71,12 @@ let get_fa1_decimals metadata_id =
   let get s = Tzfunc.Node.(get_bigmap_value ~typ:(prim `string) metadata_id (Mstring s)) in
   let>? v = get "decimals" in
   match v with
-  | Some (Micheline (Mbytes h)) when int_of_string_opt (Tzfunc.Crypto.hex_to_raw h :> string) <> None ->
+  | Some (Mbytes h) when int_of_string_opt (Tzfunc.Crypto.hex_to_raw h :> string) <> None ->
     Lwt.return_ok (Int32.of_string (Tzfunc.Crypto.hex_to_raw h :> string))
   | _ ->
     let>? v = get "" in
     match v with
-    | Some (Micheline (Mbytes h)) ->
+    | Some (Mbytes h) ->
       let uri = (Tzfunc.Crypto.hex_to_raw h :> string) in
       let|> r = Db.Metadata.get_json uri in
       begin match r with
@@ -91,7 +91,7 @@ let get_fa1_decimals metadata_id =
 let get_fa2_decimals metadata_id token_id =
   let>? v = Tzfunc.Node.(get_bigmap_value ~typ:(prim `nat) metadata_id (Mint token_id)) in
   match v with
-  | Some (Micheline (Mprim {prim=`Pair; args=[_; Mseq l]; _})) ->
+  | Some (Mprim {prim=`Pair; args=[_; Mseq l]; _}) ->
     begin match List.find_map (function
         | Mprim {prim = `Elt; args=[Mstring "decimals"; Mbytes h]; _} when int_of_string_opt (Tzfunc.Crypto.hex_to_raw h :> string) <> None ->
           Some (Int32.of_string (Tzfunc.Crypto.hex_to_raw h :> string))

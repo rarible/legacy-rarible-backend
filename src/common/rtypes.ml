@@ -918,65 +918,6 @@ type do_transfers_param = {
   dt_right_take_asset: A.big_integer asset ; dt_right_salt: z;
   dt_fill_make_value: A.big_integer; dt_fill_take_value: A.big_integer }
 
-type micheline_value = [
-  | `address of string
-  | `assoc of ((micheline_value [@key "key"]) * (micheline_value [@key "value"]) [@object]) list
-  | `bool of (bool [@wrap "bool"])
-  | `bytes of (Proto.hex [@encoding Proto.hex_enc.Proto.Encoding.json])
-  | `chain_id of (string [@wrap "chain_id"])
-  | `contract
-  | `int of (z [@wrap "int"])
-  | `key of (string [@wrap "key"])
-  | `key_hash of (string [@wrap "key_hash"])
-  | `lambda
-  | `left of (micheline_value [@wrap "left"])
-  | `mutez of (z [@wrap "mutez"])
-  | `nat of (z [@wrap "nat"])
-  | `none
-  | `operation
-  | `right of (micheline_value [@wrap "right"])
-  | `seq of (micheline_value list [@wrap "seq"])
-  | `signature of (string [@wrap "signature"])
-  | `some of (micheline_value [@wrap "some"])
-  | `string of (string [@wrap "string"])
-  | `timestamp of (A.timestamp [@encoding A.timestamp_enc])
-  | `tuple of (micheline_value list [@wrap "tuple"])
-  | `unit
-] [@@deriving encoding {recursive}]
-
-type 'a micheline_type_aux = [
-  | `address
-  | `big_map of (('a [@key "bkey"]) * ('a [@key "bvalue"]) [@object])
-  | `bool
-  | `bytes
-  | `chain_id
-  | `contract of ('a [@wrap "contract"])
-  | `int
-  | `key
-  | `key_hash
-  | `lambda of (('a [@key "arg"]) * ('a [@key "result"]) [@object])
-  | `map of (('a [@key "key"]) * ('a [@key "value"]) [@object])
-  | `mutez
-  | `nat
-  | `operation
-  | `option of ('a [@wrap "option"])
-  | `or_ of (('a [@key "left"]) * ('a [@key "right"]) [@object])
-  | `seq of ('a [@wrap "seq"])
-  | `signature
-  | `string
-  | `timestamp
-  | `tuple of 'a list
-  | `unit
-] [@@deriving encoding]
-
-type micheline_type = {
-  name: string option;
-  typ: micheline_type micheline_type_aux [@key "type"]
-} [@@deriving encoding {recursive}]
-
-type micheline_type_short = micheline_type_short micheline_type_aux
-[@@deriving encoding {recursive}]
-
 (** Config *)
 
 module SMap = Map.Make(String)
@@ -1000,8 +941,8 @@ module TIMap = Map.Make(struct
   end)
 
 type bigmap_types = {
-  bmt_key: micheline_type_short;
-  bmt_value: micheline_type_short;
+  bmt_key: Mtyped.stype; [@encoding Mtyped.stype_enc.Proto.json]
+  bmt_value: Mtyped.stype; [@encoding Mtyped.stype_enc.Proto.json]
 } [@@deriving encoding]
 
 type bigmap_info = {

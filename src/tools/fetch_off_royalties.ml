@@ -52,7 +52,7 @@ let iter_ids f =
 let get_hen id =
   let|> r = Node.(get_bigmap_value ~typ:(prim `nat) !bigmap (Mint (Z.of_string id))) in
   match r with
-  | Ok (Some (Micheline (Mprim {prim = `Pair; args = [Mstring part_account; Mint v]; _}))) ->
+  | Ok (Some (Mprim {prim = `Pair; args = [Mstring part_account; Mint v]; _})) ->
     Some (
       EzEncoding.construct parts_enc [ {
           part_account; part_value = Z.(to_int32 @@ v * ~$10) } ])
@@ -61,7 +61,7 @@ let get_hen id =
 let get_rarible id =
   let|> r = Node.(get_bigmap_value ~typ:(prim `nat) !bigmap (Mint (Z.of_string id))) in
   match r with
-  | Ok (Some (Micheline (Mseq l))) ->
+  | Ok (Some (Mseq l)) ->
     let l = List.filter_map (function
         | Mprim {prim = `Pair; args = [Mstring part_account; Mint v]; _} ->
           Some { part_account; part_value = Z.to_int32 v }
@@ -73,7 +73,7 @@ let get_versum id =
   let typ = Common.Contract_spec.versum_royalties_field.bmt_value in
   let|> r = Node.(get_bigmap_value ~typ:(prim `nat) !bigmap (Proto.Mint (Z.of_string id))) in
   match r with
-  | Ok (Some (Micheline m)) ->
+  | Ok (Some m) ->
     begin match Mtyped.parse_value typ m with
       | Ok (`tuple [ _; _; _; `nat royalty; `seq l ]) ->
         let l = List.filter_map (function
@@ -96,12 +96,12 @@ let get_fxhash id =
     let issuer_typ = Common.Contract_spec.fxhash_issuer_field.bmt_value in
     let> r = Node.(get_bigmap_value ~typ:(prim `nat) !bigmap (Proto.Mint (Z.of_string id))) in
     match r with
-    | Ok (Some (Micheline m)) ->
+    | Ok (Some m) ->
       begin match Mtyped.parse_value data_typ m with
         | Ok (`tuple [ `tuple [_; `nat issuer_id ]; _; _ ]) ->
           let|> r = Node.(get_bigmap_value ~typ:(prim `nat) !issuer_bigmap (Proto.Mint issuer_id)) in
           begin match r with
-            | Ok (Some (Micheline m)) ->
+            | Ok (Some m) ->
               begin match Mtyped.parse_value issuer_typ m with
                 | Ok (`tuple [`tuple [ `tuple [ `address part_account; _ ]; _; _; _ ]; _; `nat pct; _; _ ]) ->
                   Some (EzEncoding.construct parts_enc [ {

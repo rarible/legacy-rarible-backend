@@ -20,9 +20,9 @@ let get_balance ~block ~ledger_id ~key ~value ~token_id ~account =
   | Some (typ, key) ->
     let|> r = Node.get_bigmap_value ~block ~typ ledger_id key in
     match EzEncoding.destruct Mtyped.stype_enc.json value, r with
-    | `address, Ok (Some (Micheline (Mstring a))) when a = account -> Some Z.one
+    | `address, Ok (Some (Mstring a)) when a = account -> Some Z.one
     | `address, Ok None -> Some Z.zero
-    | `nat, Ok (Some (Micheline (Mint balance))) -> Some balance
+    | `nat, Ok (Some (Mint balance)) -> Some balance
     | `nat, Ok None -> Some Z.zero
     | _ -> None
 

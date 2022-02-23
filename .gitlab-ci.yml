@@ -17,6 +17,7 @@ check:
   script:
     - if [ ! -d _opam ]; then opam switch create --no-install . ocaml-system; fi
     - eval $(opam env)
+    - opam update
     - make deps
     - make
   only:

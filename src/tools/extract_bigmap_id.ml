@@ -28,14 +28,14 @@ let get contract =
       Format.printf "%s is not a contract@." contract;
       Lwt.return_ok None
     | Some script ->
-      match script.storage, Contract_spec.get_storage_fields script,
+      match Contract_spec.get_storage_fields script,
             Contract_spec.get_code_elt `storage script.code with
-      | Bytes _, _, _ | _, Error _, _ | _, _, None ->
+      | Error _, _ | _, None ->
         Format.printf "wrong storage kind for %s@." contract;
         Lwt.return_ok None
-      | Micheline storage_value, Ok fields, Some storage_type ->
-        let>? storage_type = Lwt.return @@ Typed_mich.parse_type storage_type in
-        let|>? storage_value = Lwt.return @@ Typed_mich.(parse_value (short_micheline_type storage_type) storage_value) in
+      | Ok fields, Some storage_type ->
+        let>? storage_type = Lwt.return @@ Mtyped.parse_type storage_type in
+        let|>? storage_value = Lwt.return @@ Mtyped.(parse_value (short storage_type) script.storage) in
         let name = match !kind with
           | `token -> "token_metadata"
           | `contract -> "metadata"
@@ -43,7 +43,7 @@ let get contract =
         match List.assoc_opt name fields with
         | None -> None
         | Some _ ->
-          Typed_mich.search_value ~name storage_type storage_value
+          Mtyped.search_value ~name storage_type storage_value
 
 let spec = [
   "--contracts", Arg.String (fun s ->

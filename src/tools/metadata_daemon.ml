@@ -51,11 +51,11 @@ let retrieve_token_metadata ~source ~token_metadata_id ~token_id =
     | Error e ->
       Format.eprintf "Cannot retrieve metadata:\n%s@." (Tzfunc.Rp.string_of_error e);
       Lwt.return None
-    | Ok None | Ok (Some (Bytes _)) ->
+    | Ok None ->
       Format.eprintf "Wrong token metadata format@.";
       Lwt.return None
-    | Ok ((Some Micheline m)) ->
-      match Typed_mich.parse_value Contract_spec.token_metadata_field.Rtypes.bmt_value m with
+    | Ok (Some m) ->
+      match Mtyped.parse_value Contract_spec.token_metadata_field.Rtypes.bmt_value m with
       | Ok (`tuple [`nat _; `assoc l]) ->
         Lwt.return (Some (Parameters.parse_metadata l))
       | _ ->

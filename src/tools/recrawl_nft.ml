@@ -32,11 +32,11 @@ let operation config ext_diff op =
       match op.bo_op.kind with
       | Transaction tr ->
         begin match tr.parameters, SMap.find_opt tr.destination config.Crawlori.Config.extra.Rtypes.contracts with
-          | Some {entrypoint; value = Micheline m }, Some nft ->
+          | Some {entrypoint; value }, Some nft ->
             let nft = { nft with Rtypes.nft_crawled = Some true } in
             Db.Misc.use None @@ fun dbh ->
             Format.printf "Block %s (%ld)@." (Common.Utils.short op.bo_block) op.bo_level;
-            let|>? () = Db.Crawl.insert_nft ~dbh ~config ~meta ~op ~contract:tr.destination ~forward:true ~entrypoint ~nft m in
+            let|>? () = Db.Crawl.insert_nft ~dbh ~config ~meta ~op ~contract:tr.destination ~forward:true ~entrypoint ~nft value in
             ext_diff
           | _ -> Lwt.return_ok ext_diff
         end
