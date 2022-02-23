@@ -192,11 +192,11 @@ let insert_transfer ~dbh ~op ~contract lt =
 let insert_creators ~dbh ~contract ~token_id ~block ?(forward=false) creators =
   let token_id = Z.to_string token_id in
   let tid = contract ^ ":" ^ token_id in
-  let>? l = [%pgsql dbh "select id from token_info where id = $tid and creators = '{}'"] in
+  let>? l = [%pgsql dbh "select id from token_info where id = $tid and creators <> '{}'"] in
   match l with
-  | [ _ ] ->
+  | [] ->
     let creators_json = List.map (fun c -> Some (EzEncoding.construct part_enc c)) creators in
-    let>? () = [%pgsql dbh "update token_info set creators = $creators_json where id = $tid and creators <> '{}'"]  in
+    let>? () = [%pgsql dbh "update token_info set creators = $creators_json where id = $tid"]  in
     iter_rp (fun {part_account; part_value} ->
         [%pgsql dbh
             "insert into creators(id, contract, token_id, account, value, block, main) \
@@ -1512,11 +1512,14 @@ let token_balance_updates dbh main l =
             Format.printf "\027[0;33mupdate supply for %s[%s]: %s\027[0m@."
               (short contract) (Z.to_string token_id) (Z.to_string supply_diff);
             let id = Common.Utils.tid ~contract ~token_id in
+            let creators = match r#account with
+              | None -> []
+              | Some a -> [ Some (EzEncoding.construct part_enc { part_account=a; part_value = 10000l }) ] in
             [%pgsql dbh
                 "insert into token_info(id, contract, token_id, block, level, tsp, \
-                 last_block, last_level, last, transaction, supply, main) \
+                 last_block, last_level, last, transaction, supply, creators, main) \
                  values($id, $contract, ${Z.to_string token_id}, ${r#block}, ${r#level}, ${r#tsp}, \
-                 ${r#block}, ${r#level}, ${r#tsp}, ${r#transaction}, $supply_diff, true) \
+                 ${r#block}, ${r#level}, ${r#tsp}, ${r#transaction}, $supply_diff, $creators, true) \
                  on conflict (id) do update \
                  set supply = token_info.supply + ${Z.to_string supply_diff}, \
                  last_block = case when $main then ${r#block} else token_info.last_block end, \
