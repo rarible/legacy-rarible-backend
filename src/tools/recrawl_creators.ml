@@ -104,6 +104,8 @@ let first_token_balance_update ~token_id ~contract =
 let db_mode map =
   iter_rp (fun ((contract, token_id), _) ->
       let>? creators = first_token_balance_update ~token_id ~contract in
+      Format.printf "\027[0;35mUpdate creators %s %s %s\027[0m@."
+        contract (Z.to_string token_id) (EzEncoding.construct parts_enc creators);
       update_creators ~contract ~token_id creators) @@
   Rtypes.TIMap.bindings map
 
