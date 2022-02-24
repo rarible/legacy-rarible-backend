@@ -94,8 +94,10 @@ let first_token_balance_update ~token_id ~contract =
   match l with
   | [ Some la, Some lb ] ->
     let l = List.map2 (fun a b -> match a, b with
-        | None, _ | _, None -> None
-        | Some a, Some b -> Some (a, Z.of_string b)) la lb in
+        | None, _ -> None
+        | Some a, b ->
+          let b = Option.value ~default:"1" b in
+          Some (a, Z.of_string b)) la lb in
     let l = List.filter_map (fun x -> x) l in
     if l = [] then []
     else
