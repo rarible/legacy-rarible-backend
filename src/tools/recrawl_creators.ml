@@ -12,11 +12,13 @@ let filename = ref None
 let recrawl_start = ref None
 let recrawl_end = ref None
 let mode = ref "node"
+let kafka_config_file = ref ""
 
 let spec = [
   "--start", Arg.Int (fun i -> recrawl_start := Some (Int32.of_int i)), "Start level for recrawl";
   "--end", Arg.Int (fun i -> recrawl_end := Some (Int32.of_int i)), "Optional end level for recrawl";
   "--mode", Arg.Set_string mode, "Mode for recrawl: 'node' (default) or 'db'";
+  "--kafka-config", Arg.Set_string kafka_config_file, "set kafka configuration"
 ]
 
 let update_creators ~contract ~token_id creators =
@@ -121,6 +123,7 @@ let delete_wrong_creators map =
 
 let main () =
   Arg.parse spec (fun f -> filename := Some f) "recrawl_creators.exe [options] config.json";
+  let>? () = Db.Rarible_kafka.may_set_kafka_config !kafka_config_file in
   Format.printf "Get tokens without creators@.";
   let>? tokens = Db.Utils.tokens_without_creators () in
   if !mode = "node" then
