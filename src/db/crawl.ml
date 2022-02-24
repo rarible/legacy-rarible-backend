@@ -1522,6 +1522,7 @@ let token_balance_updates dbh main l =
                  ${r#block}, ${r#level}, ${r#tsp}, ${r#transaction}, $supply_diff, $creators, true) \
                  on conflict (id) do update \
                  set supply = token_info.supply + ${Z.to_string supply_diff}, \
+                 creators = case when token_info.creators = '{}' then $creators else token_info.creators end, \
                  last_block = case when $main then ${r#block} else token_info.last_block end, \
                  last_level = case when $main then ${r#level} else token_info.last_level end, \
                  last = case when $main then ${r#tsp} else token_info.last end"]
