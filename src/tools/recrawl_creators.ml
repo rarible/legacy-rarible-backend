@@ -90,7 +90,7 @@ let first_token_balance_update ~token_id ~contract =
   let|>? l = [%pgsql dbh
       "select array_agg(account), array_agg(balance::varchar) from token_balance_updates \
        where token_id = ${Z.to_string token_id} and contract = $contract and account is not null \
-       and balance > 0 group by (level, index) order by level, index limit 1"] in
+       and (balance > 0 or kind = 'nft') group by (level, index) order by level, index limit 1"] in
   match l with
   | [ Some la, Some lb ] ->
     let l = List.map2 (fun a b -> match a, b with
