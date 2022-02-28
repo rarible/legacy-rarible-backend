@@ -320,12 +320,12 @@ let get_ft_balance ?dbh ?token_id ?(do_error=false) ~contract account =
   let no_token_id = Option.is_none token_id in
   use dbh @@ fun dbh ->
   let>? l = [%pgsql dbh
-      "select balance from token_balance_updates where contract = $contract \
+      "select balance from ft_token_balance_updates where contract = $contract \
        and account = $account and main and ($no_token_id or token_id = $?{Option.map Z.to_string token_id}) \
        order by level desc, index desc limit 1"] in
   match l with
-  | [] | _ :: _ :: _ | [ None ] -> Lwt.return_ok (Z.zero, None)
-  | [ Some b ] -> Lwt.return_ok (b, decimals)
+  | [] | _ :: _ :: _ -> Lwt.return_ok (Z.zero, None)
+  | [ b ] -> Lwt.return_ok (b, decimals)
 
 let get_make_balance ?dbh make owner = match make.asset_type with
   | ATXTZ -> Lwt.return_ok Z.zero

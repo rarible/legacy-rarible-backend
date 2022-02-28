@@ -603,6 +603,33 @@ let upgrade_18_to_19 dbh version =
     "update tzip21_creators set main = true where not main"
   ]
 
+let upgrade_19_to_20 dbh version =
+  EzPG.upgrade ~dbh ~version [
+    "create table ft_token_balance_updates(\
+     transaction varchar not null, \
+     index int not null, \
+     block varchar not null, \
+     level int not null, \
+     main boolean not null, \
+     tsp timestamp not null, \
+     kind varchar not null, \
+     contract varchar not null, \
+     token_id varchar not null, \
+     account varchar not null, \
+     balance zarith not null, \
+     unique (block, index, contract, token_id, account))";
+    "create index ft_token_balance_updates_block_index on ft_token_balance_updates(block)";
+    "create index ft_token_balance_updates_account_index on ft_token_balance_updates(account)";
+
+    "insert into ft_token_balance_updates(transaction, index, block, level, main, \
+     tsp, kind, contract, token_id, account, balance) \
+     (select transaction, index, block, level, main, tsp, u.kind, contract, u.token_id, \
+     account, (case when balance is null then 0 else balance end) \
+     from ft_contracts c \
+     inner join token_balance_updates u on u.contract = c.address \
+     where u.account is not null)";
+  ]
+
 let upgrades =
   let last_version = fst List.(hd @@ rev !Versions.upgrades) in
   !Versions.upgrades @ List.map (fun (i, f) -> last_version + i, f) [
@@ -624,4 +651,5 @@ let upgrades =
     16, upgrade_16_to_17;
     17, upgrade_17_to_18;
     18, upgrade_18_to_19;
+    19, upgrade_19_to_20;
   ]
