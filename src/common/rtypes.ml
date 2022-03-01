@@ -1104,10 +1104,10 @@ let date_or_error_enc = Json_encoding.(union [
   ])
 
 let royalties_enc = Json_encoding.(union [
-    case (list part_enc) (fun l -> Some l)
+    case (list part_enc) (fun l -> Some (List.map (fun p -> {p with part_account = String.trim p.part_account}) l))
       (fun l -> List.map (fun p -> {p with part_account = String.trim p.part_account}) l);
     case (assoc int_or_string_enc)
-      (fun l -> Some (List.map (fun p -> p.part_account, Int32.to_int p.part_value) l))
+      (fun l -> Some (List.map (fun p -> String.trim p.part_account, Int32.to_int p.part_value) l))
       (fun l -> List.map (fun (a, part_value) -> {part_account= String.trim a; part_value = Int32.of_int part_value}) l);
     case Json_encoding.any_value (fun _ -> None) (fun _ -> []) ;
   ])
