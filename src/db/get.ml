@@ -672,7 +672,7 @@ let mk_nft_item dbh ?include_meta obj =
       nft_item_date = obj#last ;
       nft_item_minted_at = obj#tsp ;
       nft_item_deleted = supply = Z.zero ;
-      nft_item_meta = Common.Utils.rarible_meta_of_tzip21_meta meta ;
+      nft_item_meta = Common.Utils.rarible_meta_of_tzip21_meta ~contract meta ;
     }
   | _ ->
     Lwt.return_error (`hook_error "can't split id")
@@ -732,7 +732,7 @@ let mk_nft_item_without_owners dbh ?include_meta obj =
       nft_item_date = obj#last ;
       nft_item_minted_at = obj#tsp ;
       nft_item_deleted = supply = Z.zero ;
-      nft_item_meta = Common.Utils.rarible_meta_of_tzip21_meta meta ;
+      nft_item_meta = Common.Utils.rarible_meta_of_tzip21_meta ~contract meta ;
     }
   | _ ->
     Lwt.return_error (`hook_error "can't split id")

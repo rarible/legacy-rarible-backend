@@ -219,7 +219,7 @@ let get_nft_item_meta_by_id ?dbh contract token_id =
   Format.eprintf "get_nft_meta_by_id %s@." tid;
   use dbh @@ fun dbh ->
   let>? meta = Get.mk_nft_item_meta dbh ~contract ~token_id in
-  match Utils.rarible_meta_of_tzip21_meta meta with
+  match Utils.rarible_meta_of_tzip21_meta ~contract meta with
   | None ->
     Lwt.return_ok {
       nft_item_meta_name = "Unnamed item" ;
