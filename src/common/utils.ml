@@ -544,7 +544,7 @@ let might_add_glb_extension uri formats =
         add_glb_extension uri
       else uri
 
-let rarible_meta_of_tzip21_meta meta =
+let rarible_meta_of_tzip21_meta_all meta =
   match meta with
   | None -> None
   | Some m ->
@@ -582,6 +582,51 @@ let rarible_meta_of_tzip21_meta meta =
             end
         end ;
     }
+
+let rarible_meta_of_tzip21_meta_fx meta =
+  match meta with
+  | None -> None
+  | Some m ->
+    let animation_uri, nft_item_meta_animation =
+      match m.tzip21_tm_artifact_uri, m.tzip21_tm_formats with
+      | None, _ -> None, None
+      | Some _, None ->
+        let uri = find_animation_asset m in
+        uri, uri
+      | Some uri, Some formats ->
+        if List.exists (fun f -> match f.format_mime_type with
+            | None -> false
+            | Some mt -> f.format_uri = uri && is_animation_format mt)
+            formats then Some uri, Some (might_add_glb_extension uri formats)
+        else
+          let uri = find_animation_asset m in
+          uri, uri in
+    Some {
+      nft_item_meta_name = Option.value ~default:"Unnamed item" m.tzip21_tm_name ;
+      nft_item_meta_description = m.tzip21_tm_description ;
+      nft_item_meta_attributes =
+        rarible_attributes_of_tzip21_attributes m.tzip21_tm_attributes ;
+      nft_item_meta_animation ;
+      nft_item_meta_image =
+        begin match m.tzip21_tm_display_uri with
+          | Some _ as uri when uri <> animation_uri -> uri
+          | _ ->
+            begin match m.tzip21_tm_artifact_uri with
+              | Some _ as uri -> uri
+              | None ->
+                begin match m.tzip21_tm_thumbnail_uri with
+                  | Some _ as uri -> uri
+                  | None -> m.tzip21_tm_display_uri
+                end
+            end
+        end ;
+    }
+
+let rarible_meta_of_tzip21_meta ~contract meta =
+  (* FXHASH exception *)
+  if contract = "KT1KEa8z6vWXDJrVqtMrAeDVzsvxat3kHaCE" then
+    rarible_meta_of_tzip21_meta_fx meta
+  else rarible_meta_of_tzip21_meta_all meta
 
 let check_address a =
   match Tzfunc.Crypto.Pkh.b58dec a with
