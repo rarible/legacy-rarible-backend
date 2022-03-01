@@ -261,7 +261,7 @@ let rec get_nft_all_items_aux
   if len < size  then
     let>? tis = [%pgsql.object dbh
         "select id, last, tsp, creators, royalties, royalties_metadata, \
-         main, metadata from token_info where \
+         main, metadata from token_info where main and metadata <> '{}' and \
          ($no_last_updated_to or (last <= $last_updated_to_v)) and \
          ($no_last_updated_from or (last >= $last_updated_from_v)) and \
          ($no_continuation or (last = $ts and id < $id) or (last < $ts)) \
@@ -269,8 +269,6 @@ let rec get_nft_all_items_aux
     let continuation = match List.rev tis with
       | [] -> None
       | hd :: _ -> Some (hd#last, hd#id) in
-    let tis = List.filter_map (fun x -> x) @@
-      List.map (fun ti -> if ti#main && ti#metadata <> "{}" then Some ti else None) tis in
     match tis with
     | [] ->
       get_nft_all_items_aux
