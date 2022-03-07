@@ -11,6 +11,7 @@ let bigmap = ref Z.zero
 let issuer_bigmap = ref Z.zero
 let kind = ref ""
 let step = ref 10000L
+let kafka_config_file = ref ""
 
 let spec = [
   "--issuer", Arg.Set_string issuer, "set fxhash issuer";
@@ -20,13 +21,15 @@ let spec = [
   "--kind", Arg.Set_string kind, "kind of royalties (versum, fxhash, hen, one_of, rarible)";
   "--node", Arg.Set_string node, "tezos node to use";
   "--step", Arg.Int (fun i -> step := Int64.of_int i), "steps";
+  "--kafka-config", Arg.Set_string kafka_config_file, "set kafka configuration"
 ]
 
 let update_royalties id royalties =
   use None @@ fun dbh ->
-  [%pgsql dbh
+  let>? () = [%pgsql dbh
       "update token_info set royalties = $royalties where \
-       contract = ${!collection} and token_id = $id"]
+       contract = ${!collection} and token_id = $id"] in
+  Db.Produce.nft_item_event dbh !collection (Z.of_string id) ()
 
 let print_result r =
   begin match r with
@@ -213,6 +216,7 @@ let () =
     Format.printf "Missing collection or collection-bigmap or kind argument@.";
     exit 1);
   let main () =
+    let>? () = Db.Rarible_kafka.may_set_kafka_config !kafka_config_file in
     if !kind = "versum" then iter_ids get_versum
     else if !kind = "fxhash" then iter_ids get_fxhash
     else if !kind = "hen" then iter_ids get_hen
