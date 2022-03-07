@@ -734,7 +734,7 @@ let insert_hen_royalties ~dbh ~op ?forward ~info l =
     | `nat token_id, Some (`tuple [ `address part_account; `nat v ]) ->
       insert_royalties ~dbh ~op ?forward ~update_index {
         roy_contract = info.hen_contract; roy_token_id = Some token_id;
-        roy_royalties = [ { part_account; part_value = Z.to_int32 v } ]}
+        roy_royalties = [ { part_account; part_value = Z.(to_int32 @@ v * ~$10) } ]}
     | _ -> Lwt.return_ok update_index in
   fold_rp f 0l l
 
