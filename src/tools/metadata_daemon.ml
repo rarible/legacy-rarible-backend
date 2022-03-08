@@ -140,6 +140,7 @@ let () =
       let>? l = match !force, !contract with
         | true, Some contract -> Db.Utils.contract_token_metadata ~royalties:!royalties contract
         | _ -> Db.Utils.empty_token_metadata ?contract:!contract () in
+      Format.printf "Retrieving %d token metadata from context@." (List.length l);
       iter_rp (fun r ->
           match r#token_metadata_id with
           | None -> Lwt.return_ok ()
@@ -164,6 +165,7 @@ let () =
         | _ ->
           let levels = if !fast then Some !fast_levels else None in
           Db.Utils.unknown_token_metadata ?contract:!contract ?levels () in
+      Format.printf "Getting %d token metadata from given uri@." (List.length l);
       iter_rp (fun r ->
           Db.Utils.update_metadata ~contract:r#contract ~token_id:r#token_id ~block:r#block
             ~level:r#level ~tsp:r#tsp ~metadata:r#metadata ?metadata_uri:r#metadata_uri ()) l
