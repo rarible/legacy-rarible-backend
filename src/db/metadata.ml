@@ -39,6 +39,11 @@ let get_json ?(source="https://rarible.mypinata.cloud/") ?(quiet=false) ?timeout
   let msg = if not quiet then Some "get_metadata_json" else None in
   (* 2 ways to recovers metadata ipfs link and http(s) link *)
   let> r =
+    let len = String.length uri in
+    let uri =
+      if (len>= 2 && uri.[0] = '"' && uri.[len - 1] = '"') then
+        String.sub uri 1 (len-2)
+      else uri in
     let proto = try String.sub uri 0 6 with _ -> "" in
     if proto = "https:" || proto = "http:/" then
       let|>? json = get_or_timeout ?timeout (EzAPI.URL uri) in
@@ -75,18 +80,23 @@ let get_contract_metadata ?(source="https://rarible.mypinata.cloud/") ?(quiet=fa
     Lwt.return_ok (EzEncoding.destruct tzip16_metadata_enc raw)
   with _ ->
     begin
-      let proto = try String.sub raw 0 6 with _ -> "" in
+      let len = String.length raw in
+      let uri =
+        if (len>= 2 && raw.[0] = '"' && raw.[len - 1] = '"') then
+          String.sub raw 1 (len-2)
+        else raw in
+      let proto = try String.sub uri 0 6 with _ -> "" in
       if proto = "https:" || proto = "http:/" then
-        let|>? json = get_or_timeout ?timeout (EzAPI.URL raw) in
+        let|>? json = get_or_timeout ?timeout (EzAPI.URL uri) in
         json
       else if proto = "ipfs:/" then
-        let url = try String.sub raw 7 ((String.length raw) - 7) with _ -> "" in
+        let url = try String.sub uri 7 ((String.length uri) - 7) with _ -> "" in
         let fs, url = try
             let may_fs = String.sub url 0 5 in
             if may_fs = "ipfs/" then
-              "ipfs/", String.sub url 5 ((String.length raw) - 5)
+              "ipfs/", String.sub url 5 ((String.length uri) - 5)
             else if may_fs = "ipns/" then
-              "ipns/", String.sub url 5 ((String.length raw) - 5)
+              "ipns/", String.sub url 5 ((String.length uri) - 5)
             else "ipfs/", url
           with _ -> "", url in
         let uri = Printf.sprintf "%s%s%s" source fs url in
