@@ -12,6 +12,8 @@ let recrawl_start = ref None
 let recrawl_end = ref None
 let reset = ref false
 
+let crawled_contracts = ref SSet.empty
+
 let spec = [
   "--contract", Arg.String (fun s -> objkt_contract := s), "OBJKT contract";
   "--start", Arg.Int (fun i -> recrawl_start := Some (Int32.of_int i)), "Start level for recrawl";
@@ -38,7 +40,8 @@ let operation config ext_diff op =
         | Transaction tr ->
           Db.Crawl.insert_transaction ~forward:true ~config ~dbh ~op tr
         | Origination ori ->
-          if op.bo_op.source = !objkt_contract then
+          let contract = Tzfunc.Crypto.op_to_KT1 op.bo_hash in
+          if op.bo_op.source = !objkt_contract && not (SSet.mem contract !crawled_contracts) then
             Db.Crawl.insert_origination ~forward:true ~crawled:false config dbh op ori
           else Lwt.return_ok ()
         | _ -> Lwt.return_ok () in
@@ -68,7 +71,9 @@ let objkt_contracts () =
   SMap.fold (fun c v acc ->
       SMap.update c (fun _ ->
           match v.nft_crawled with
-          | Some true -> None
+          | Some true ->
+            crawled_contracts := SSet.add c !crawled_contracts;
+            None
           | _ -> Some {v with nft_crawled = Some true}) acc) map map
 
 let reset_contracts contracts =
