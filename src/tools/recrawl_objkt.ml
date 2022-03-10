@@ -13,12 +13,14 @@ let recrawl_end = ref None
 let reset = ref false
 
 let crawled_contracts = ref SSet.empty
+let kafka_config_file = ref ""
 
 let spec = [
   "--contract", Arg.String (fun s -> objkt_contract := s), "OBJKT contract";
   "--start", Arg.Int (fun i -> recrawl_start := Some (Int32.of_int i)), "Start level for recrawl";
   "--end", Arg.Int (fun i -> recrawl_end := Some (Int32.of_int i)), "Optional end level for recrawl";
   "--reset", Arg.Set reset, "clear all objkt contracts";
+  "--kafka-config", Arg.Set_string kafka_config_file, "set kafka configuration"
 ]
 
 let operation config ext_diff op =
@@ -80,8 +82,35 @@ let reset_contracts contracts =
   Format.printf "Resetting %d@." @@ List.length contracts;
   Db.Utils.clear_contracts contracts
 
+let get_nft_items_by_collection contract =
+  let rec aux ?continuation acc =
+    let>? items = Db.Api.get_nft_items_by_collection ?continuation ~size:1000 contract in
+    match items.nft_items_continuation with
+    | None -> Lwt.return_ok @@ items.nft_items_items @ acc
+    | Some continuation ->
+      try
+        let l = String.split_on_char '_' continuation in
+        match l with
+        | ts :: id :: [] ->
+          let ts = CalendarLib.Calendar.from_unixfloat (float_of_string ts /. 1000.) in
+          aux ~continuation:(ts,id) (items.nft_items_items @ acc)
+        | _ -> Lwt.return @@ Error (`generic ("event_error", "wrong contination"))
+      with _ -> Lwt.return @@ Error (`generic ("event_error", "wrong contination")) in
+  aux []
+
+let produce_contract_events contract =
+  let>? items = get_nft_items_by_collection contract in
+  iter_rp (fun it ->
+      Db.Misc.use None @@ fun dbh ->
+      Db.Produce.nft_item_event dbh contract it.nft_item_token_id ())
+    items
+
+let produce_events contracts =
+  iter_rp (fun c -> produce_contract_events c) contracts
+
 let main () =
   Arg.parse spec (fun f -> filename := Some f) "recrawl_objkt.exe [options] config.json";
+  let>? () = Db.Rarible_kafka.may_set_kafka_config !kafka_config_file in
   if !reset then
     let>? contracts = objkt_contracts_list () in
     reset_contracts contracts
@@ -103,7 +132,8 @@ let main () =
       let>? _ = async_recrawl ~config ~start ?end_:!recrawl_end ~block ~operation ((), []) in
       let contracts = List.map fst @@ SMap.bindings contracts in
       let>? () = iter_rp (fun c -> Db.Crawl.set_crawled_nft c) contracts in
-      Db.Utils.refresh_objkt_royalties contracts
+      let>? () = Db.Utils.refresh_objkt_royalties contracts in
+      produce_events contracts
     | _ ->
       Format.printf "Missing arguments: '--start' is required@.";
       exit 1
