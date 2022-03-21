@@ -1564,6 +1564,18 @@ let tezos_domain_updates dbh main l =
              ${r2#block}, ${r2#blevel}, ${r2#index}, ${r2#tsp}, not $main)"]
       | _ -> Lwt.return_ok ()) l
 
+let cancel_updates dbh l =
+  iter_rp (fun x -> match x#cancel with
+      | None -> Lwt.return_ok ()
+      | Some hash ->
+        [%pgsql dbh "update orders set last_update_at = ${x#tsp} where hash = $hash"]) l
+
+let match_updates dbh l =
+  iter_rp (fun x ->
+      [%pgsql dbh
+          "update orders set last_update_at = ${x#tsp} where hash = ${x#hash_left} \
+           or hash = ${x#hash_right}"]) l
+
 let set_main _config ?(forward=false) dbh {Hooks.m_main; m_hash} =
   let sort l = List.sort (fun r1 r2 ->
       if m_main then Int32.compare r1#index r2#index
@@ -1622,10 +1634,17 @@ let set_main _config ?(forward=false) dbh {Hooks.m_main; m_hash} =
       [%pgsql dbh
           "update tzip16_metadata set main = $m_main \
            where block = $m_hash returning contract, name"] in
+    let cancels = sort cancels in
+    let matches = sort matches in
+    let>? () =
+      if m_main then
+        let>? () = match_updates dbh matches in
+        cancel_updates dbh cancels
+      else Lwt.return_ok () in
     Lwt.return_ok (fun () ->
         let>? () = Produce.collection_events m_main collections collections_name in
-        let>? () = Produce.cancel_events dbh m_main @@ sort cancels in
-        let>? () = Produce.match_events dbh m_main @@ sort matches in
+        let>? () = Produce.cancel_events dbh m_main cancels in
+        let>? () = Produce.match_events dbh m_main matches in
         let unseen =
           List.map (fun ((contract, token_id, owner), _) -> (contract, Some token_id, [ owner ]))
             (TMap.bindings unseen)
