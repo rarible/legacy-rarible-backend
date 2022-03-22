@@ -356,8 +356,7 @@ let get_order_updates ?dbh obj make maker take data =
   let>? cancel = [%pgsql.object dbh
       "select * from order_cancel where (cancel = $hash) order by tsp"] in
   match cancel with
-  | cancel :: _ ->
-    Lwt.return_ok (Z.zero, Z.zero, true, cancel#tsp, Z.zero)
+  | _cancel :: _ -> Lwt.return_ok (Z.zero, Z.zero, true, Z.zero)
   | _ ->
     let>? matches = [%pgsql.object dbh
         "select * from order_match \
@@ -367,8 +366,7 @@ let get_order_updates ?dbh obj make maker take data =
     let cancelled = false in
     let make_stock =
       calculate_make_stock make take data fill make_balance cancelled in
-    let last_update_at = match matches with hd :: _ -> hd#tsp | [] -> obj#created_at in
-    fill, make_stock, cancelled, last_update_at, make_balance
+    fill, make_stock, cancelled, make_balance
 
 let calculate_status fill take make_stock cancelled =
   if cancelled then OCANCELLED
@@ -395,7 +393,7 @@ let mk_order ?dbh order_obj =
     order_rarible_v2_data_v1_payouts = payouts ;
     order_rarible_v2_data_v1_origin_fees = origin_fees ;
   } in
-  let>? (fill, make_stock, cancelled, last_update_at, make_balance) =
+  let>? (fill, make_stock, cancelled, make_balance) =
     get_order_updates ?dbh order_obj order_elt_make order_obj#maker order_elt_take data in
   let status = calculate_status fill order_elt_take make_stock cancelled in
   let order_elt = {
@@ -413,7 +411,7 @@ let mk_order ?dbh order_obj =
     order_elt_salt = Z.of_string order_obj#salt ;
     order_elt_signature = order_obj#signature ;
     order_elt_created_at = order_obj#created_at ;
-    order_elt_last_update_at = last_update_at ;
+    order_elt_last_update_at = order_obj#last_update_at ;
     order_elt_hash = order_obj#hash ;
     order_elt_make_balance = Some make_balance ;
     order_elt_price_history = price_history ;
@@ -435,7 +433,7 @@ let get_order ?dbh hash_key =
        make_asset_value, make_asset_decimals, \
        take_asset_type_class, take_asset_type_contract, take_asset_type_token_id, \
        take_asset_value, take_asset_decimals, \
-       start_date, end_date, salt, signature, created_at, hash \
+       start_date, end_date, salt, signature, created_at, hash, last_update_at \
        from orders where hash = $hash_key"] in
   match l with
   | [] -> Lwt.return_ok None
