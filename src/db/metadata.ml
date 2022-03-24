@@ -213,11 +213,34 @@ let insert_mint_metadata_attributes dbh ?(forward=false) ~contract ~token_id ~bl
 
 let metadata_royalties ?creators m =
   let creators = match creators with None -> metadata_creators m | Some l -> l in
-  match m.tzip21_tm_royalties, m.tzip21_tm_creator_royalty with
-  | Some r, _ -> Some (to_4_decimals r)
-  | _, Some v  -> (* kalamint *)
+  match m.tzip21_tm_royalties, m.tzip21_tm_creator_royalty, m.tzip21_tm_attributes with
+  | Some r, _, _ -> Some (to_4_decimals r)
+  | _, Some v, _  -> (* kalamint *)
     Some (List.map (fun {part_account; _} ->
         { part_account; part_value = Int32.mul v 100l }) creators)
+  | _, _, Some attr -> (* sweet.io / Mclaren *)
+    begin match
+        List.find_opt (fun at -> at.attribute_name = "fee_recipient") attr,
+        List.find_opt (fun at -> at.attribute_name = "seller_fee_basis_points") attr with
+    | Some recipient, Some fee ->
+      begin match recipient.attribute_value, fee.attribute_value with
+        | `String recipient_value, `String fee_value ->
+          let r = Str.regexp "\\\\u0000" in
+          let recipient_value =
+            Str.global_replace r "%{0}" recipient_value in
+          let fee_value =
+            Str.global_replace r "%{0}" fee_value in
+          if Parameters.decode recipient_value && Parameters.decode fee_value then
+            try
+              Some
+                [ { part_account = recipient_value ;
+                    part_value = Int32.of_string fee_value } ]
+            with _ -> None
+          else None
+        | _ -> None
+      end
+    | _ -> None
+    end
   | _ -> None
 
 let insert_mint_metadata dbh ?(forward=false) ~contract ~token_id ~block ~level ~tsp metadata =
