@@ -61,6 +61,13 @@ let get_json ?(source="https://rarible.mypinata.cloud/") ?(quiet=false) ?timeout
       let uri = Printf.sprintf "%s%s%s" source fs url in
       let|>? json = get_or_timeout ?timeout ?msg (EzAPI.URL uri) in
       json, uri
+    else if proto = "sha256" then
+      match String.rindex_opt uri '/' with
+      | None -> Lwt.return_error (0, Some (Printf.sprintf "unhandled link format %S" uri))
+      | Some i ->
+        let uri = EzAPI.Url.decode @@ String.sub uri (i+1) (String.length uri - i - 1) in
+        let|>? json = get_or_timeout ?timeout ?msg (EzAPI.URL uri) in
+        json, uri
     else Lwt.return_error (0, Some (Printf.sprintf "unknow scheme %S" proto)) in
   match r with
   | Error (c, str) -> Lwt.return_error (c, str)
@@ -102,6 +109,13 @@ let get_contract_metadata ?(source="https://rarible.mypinata.cloud/") ?(quiet=fa
         let uri = Printf.sprintf "%s%s%s" source fs url in
         let|>? json = get_or_timeout ?timeout ?msg (EzAPI.URL uri) in
         json
+      else if proto = "sha256" then
+        match String.rindex_opt uri '/' with
+        | None -> Lwt.return_error (0, Some (Printf.sprintf "unhandled link format %S" uri))
+        | Some i ->
+          let uri = EzAPI.Url.decode @@ String.sub uri (i+1) (String.length uri - i - 1) in
+          let|>? json = get_or_timeout ?timeout ?msg (EzAPI.URL uri) in
+          json
       else Lwt.return_error (0, Some (Printf.sprintf "unknow scheme %S" proto))
     end >>= function
     | Ok json ->
