@@ -131,7 +131,10 @@ let insert_mint ~dbh ~op ~nft ~contract m =
            last_block, last_level, last, transaction, royalties) \
            values($id, $contract, ${Z.to_string token_id}, $block, $level, $tsp, $block, $level, \
            $tsp, ${op.bo_hash}, $royalties) \
-           on conflict do nothing"] in
+           on conflict (id) do update \
+           set block = case when token_info.main then token_info.block else $block end, \
+           level = case when token_info.main then token_info.level else $level end, \
+           tsp = case when token_info.main then token_info.tsp else $tsp end"] in
     let mint = EzEncoding.construct mint_enc m in
     let>? () =
       [%pgsql dbh

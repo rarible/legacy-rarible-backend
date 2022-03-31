@@ -318,8 +318,11 @@ let insert_mint_metadata dbh ?(forward=false) ~contract ~token_id ~block ~level 
        $?publishers, $?date, $?block_level, $?genres, $?language, $?rights, \
        $?right_uri, $?is_transferable, $?should_prefer_symbol, $?royalties_str, $forward) \
        on conflict (id) do update set \
-       name = $?name, symbol = $?symbol, decimals = $?decimals, \
-       artifact_uri = $?artifact_uri, display_uri = $?display_uri, \
+       name = $?name, symbol = $?symbol, \
+       block = case when tzip21_metadata.main then tzip21_metadata.block else $block end, \
+       level = case when tzip21_metadata.main then tzip21_metadata.level else $level end, \
+       tsp = case when tzip21_metadata.main then tzip21_metadata.tsp else $tsp end, \
+       decimals = $?decimals, artifact_uri = $?artifact_uri, display_uri = $?display_uri, \
        thumbnail_uri = $?thumbnail_uri, description = $?description, \
        minter = $?minter, is_boolean_amount = $?is_boolean_amount, \
        tags = $?tags, contributors = $?contributors, publishers = $?publishers, \
