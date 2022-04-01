@@ -89,8 +89,8 @@ let match_fields ~expected ~allocs script =
   | Error _, _ | _, None ->
     unexpected_michelson
   | Ok fields, Some storage_type ->
-    let$ storage_type = Mtyped.parse_type storage_type in
-    let$ storage_value = Mtyped.(parse_value (short storage_type) script.storage) in
+    let$ storage_type = try Mtyped.parse_type storage_type with _ -> unexpected_michelson in
+    let$ storage_value = try Mtyped.(parse_value (short storage_type) script.storage) with _ -> unexpected_michelson in
     Ok (List.map (fun name ->
         match List.assoc_opt name fields with
         | None -> None, None
