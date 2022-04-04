@@ -1560,6 +1560,28 @@ paths:
               schema:
                 $ref: '#/components/schemas/TopCollections'
       security: []
+  /v0.1/top/all:
+    description: get top collections of all time
+    get:
+      tags:
+      - top
+      description: get top collections of all time
+      operationId: topAllTime
+      parameters: []
+      responses:
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TopCollections'
+      security: []
   /kafka/item:
     summary: kafka_item
     get:
