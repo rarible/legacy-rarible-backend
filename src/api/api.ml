@@ -24,10 +24,13 @@ let balance_section =
   EzAPI.Doc.{section_name = "ft-balance-controller"; section_docs = []}
 let status_section =
   EzAPI.Doc.{section_name = "status"; section_docs = []}
+let top_section =
+  EzAPI.Doc.{section_name = "top"; section_docs = []}
 let sections = [
   nft_section; ownerships_section; items_section; collections_section;
   orders_section; order_activities_section; aggregation_section; order_bid_section;
-  signature_section; balance_section; status_section; Kafka_openapi.kafka_section ]
+  signature_section; balance_section; status_section; top_section;
+  Kafka_openapi.kafka_section ]
 
 let pstring ?enc ?required name =
   let schema = Option.map (Json_encoding.schema ~definitions_path:"/components/schemas/") enc in
@@ -1443,3 +1446,45 @@ let api_version _req () =
    output=api_version_enc;
    errors=[unexpected_case];
    section=status_section}]
+
+let top_collections_1d _req () =
+  let> top = Db.Api.top_collection_1d () in
+  match top with
+  | Error e ->
+    let message = Crawlori.Rp.string_of_error e in
+    return (Error {code=`UNEXPECTED_API_ERROR; message})
+  | Ok top -> return_ok top
+[@@get
+  {path="/v0.1/top/1day";
+   name="top_1d";
+   output=top_collections_enc;
+   errors=[unexpected_case];
+   section=top_section}]
+
+let top_collections_7d _req () =
+  let> top = Db.Api.top_collection_7d () in
+  match top with
+  | Error e ->
+    let message = Crawlori.Rp.string_of_error e in
+    return (Error {code=`UNEXPECTED_API_ERROR; message})
+  | Ok top -> return_ok top
+[@@get
+  {path="/v0.1/top/7day";
+   name="top_7d";
+   output=top_collections_enc;
+   errors=[unexpected_case];
+   section=top_section}]
+
+let top_collections_30d _req () =
+  let> top = Db.Api.top_collection_1d () in
+  match top with
+  | Error e ->
+    let message = Crawlori.Rp.string_of_error e in
+    return (Error {code=`UNEXPECTED_API_ERROR; message})
+  | Ok top -> return_ok top
+[@@get
+  {path="/v0.1/top/30day";
+   name="top_30d";
+   output=top_collections_enc;
+   errors=[unexpected_case];
+   section=top_section}]

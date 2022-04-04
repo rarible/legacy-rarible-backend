@@ -1494,6 +1494,72 @@ paths:
                 - api_version
                 additionalProperties: false
       security: []
+  /v0.1/top/1day:
+    description: get top collections in 1 day
+    get:
+      tags:
+      - top
+      description: get top collections in 1 day
+      operationId: top1d
+      parameters: []
+      responses:
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TopCollections'
+      security: []
+  /v0.1/top/7day:
+    description: get top collections in 7 days
+    get:
+      tags:
+      - top
+      description: get top collections in 7 days
+      operationId: top7d
+      parameters: []
+      responses:
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TopCollections'
+      security: []
+  /v0.1/top/30day:
+    description: get top collections in 30 days
+    get:
+      tags:
+      - top
+      description: get top collections in 30 days
+      operationId: top30d
+      parameters: []
+      responses:
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TopCollections'
+      security: []
   /kafka/item:
     summary: kafka_item
     get:
@@ -2840,6 +2906,24 @@ components:
       - edpk
       - address
       additionalProperties: false
+    TopCollection:
+      type: object
+      properties:
+        collection_id:
+          $ref: '#/components/schemas/Address'
+        volume:
+          $ref: '#/components/schemas/BigDecimal'
+        average_price:
+          $ref: '#/components/schemas/BigDecimal'
+      required:
+      - average_price
+      - volume
+      - collection_id
+      additionalProperties: false
+    TopCollections:
+      type: array
+      items:
+        $ref: '#/components/schemas/TopCollection'
     Transfer:
       type: object
       properties:

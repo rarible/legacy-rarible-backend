@@ -58,4 +58,9 @@ let docs = List.map (fun (n, t, d) -> (n, (t, d, None, None))) @@ [
     "validate", "validate", "Validate a message" ;
 
 
+    (* Top Collections controller *)
+    "top_30d", "top30d", "get top collections in 30 days" ;
+    "top_7d", "top7d", "get top collections in 7 days" ;
+    "top_1d", "top1d", "get top collections in 1 day" ;
+
   ]
