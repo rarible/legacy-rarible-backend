@@ -1488,3 +1488,17 @@ let top_collections_30d _req () =
    output=top_collections_enc;
    errors=[unexpected_case];
    section=top_section}]
+
+let top_collections_all _req () =
+  let> top = Db.Api.top_collection_all () in
+  match top with
+  | Error e ->
+    let message = Crawlori.Rp.string_of_error e in
+    return (Error {code=`UNEXPECTED_API_ERROR; message})
+  | Ok top -> return_ok top
+[@@get
+  {path="/v0.1/top/all";
+   name="top_all";
+   output=top_collections_enc;
+   errors=[unexpected_case];
+   section=top_section}]
