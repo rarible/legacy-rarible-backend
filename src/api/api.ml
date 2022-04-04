@@ -1476,7 +1476,7 @@ let top_collections_7d _req () =
    section=top_section}]
 
 let top_collections_30d _req () =
-  let> top = Db.Api.top_collection_1d () in
+  let> top = Db.Api.top_collection_30d () in
   match top with
   | Error e ->
     let message = Crawlori.Rp.string_of_error e in
