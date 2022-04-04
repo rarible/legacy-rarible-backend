@@ -1201,3 +1201,12 @@ type status = {
 type api_version = {
   api_version : string ;
 } [@@deriving encoding]
+
+type top_collection = {
+  top_collection_id : A.address ;
+  top_volume : A.big_decimal ;
+  top_average_price : A.big_decimal ;
+} [@@deriving encoding {title="TopCollection"; def_title}]
+
+type top_collections =
+  top_collection list [@@deriving encoding {title="TopCollections"; def_title}]

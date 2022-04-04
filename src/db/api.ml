@@ -2040,3 +2040,96 @@ let status () =
       status_level = r#level; status_timestamp = CalendarLib.Calendar.now ();
       status_chain_id = r#chain_id; status_chain_timestamp = r#tsp }
   | _ -> Lwt.return_error (`hook_error "no status information")
+
+let top_collection_1d () =
+  use None @@ fun dbh ->
+  let>? res =
+    [%pgsql.object dbh
+        "select case \
+         when l.make_asset_type_class = 'XTZ' then l.take_asset_type_contract \
+         when l.take_asset_type_class = 'XTZ' then l.make_asset_type_contract end \
+         as collection, \
+         sum(case \
+         when l.make_asset_type_class = 'XTZ' then om.fill_make_value \
+         when l.take_asset_type_class = 'XTZ' then om.fill_take_value else 0 end) / 1000000 \
+         as volume, \
+         avg(case \
+         when l.make_asset_type_class = 'XTZ' then om.fill_make_value \
+         when l.take_asset_type_class = 'XTZ' then om.fill_take_value else 0 end) / 1000000 \
+         as avgp \
+         from order_match om \
+         inner join orders l on l.hash = om.hash_left \
+         inner join orders r on r.hash = om.hash_right \
+         where main and tsp >= now () - interval '1 day' \
+         group by collection order by volume desc limit 100" ] in
+  Lwt.return_ok @@
+  List.filter_map (fun x -> x) @@ List.map (fun r ->
+      match r#collection, r#volume, r#avgp with
+      | Some c, Some v, Some a ->
+        Some { top_collection_id = c  ;
+               top_volume = v ;
+               top_average_price = a }
+      | _ -> None)
+    res
+
+let top_collection_7d () =
+  use None @@ fun dbh ->
+  let>? res =
+    [%pgsql.object dbh
+        "select case \
+         when l.make_asset_type_class = 'XTZ' then l.take_asset_type_contract \
+         when l.take_asset_type_class = 'XTZ' then l.make_asset_type_contract end \
+         as collection, \
+         sum(case \
+         when l.make_asset_type_class = 'XTZ' then om.fill_make_value \
+         when l.take_asset_type_class = 'XTZ' then om.fill_take_value else 0 end) / 1000000 \
+         as volume, \
+         avg(case \
+         when l.make_asset_type_class = 'XTZ' then om.fill_make_value \
+         when l.take_asset_type_class = 'XTZ' then om.fill_take_value else 0 end) / 1000000 \
+         as avgp \
+         from order_match om \
+         inner join orders l on l.hash = om.hash_left \
+         inner join orders r on r.hash = om.hash_right \
+         where main and tsp >= now () - interval '7 day' \
+         group by collection order by volume desc limit 100" ] in
+  Lwt.return_ok @@
+  List.filter_map (fun x -> x) @@ List.map (fun r ->
+      match r#collection, r#volume, r#avgp with
+      | Some c, Some v, Some a ->
+        Some { top_collection_id = c  ;
+               top_volume = v ;
+               top_average_price = a }
+      | _ -> None)
+    res
+
+let top_collection_30d () =
+  use None @@ fun dbh ->
+  let>? res =
+    [%pgsql.object dbh
+        "select case \
+         when l.make_asset_type_class = 'XTZ' then l.take_asset_type_contract \
+         when l.take_asset_type_class = 'XTZ' then l.make_asset_type_contract end \
+         as collection, \
+         sum(case \
+         when l.make_asset_type_class = 'XTZ' then om.fill_make_value \
+         when l.take_asset_type_class = 'XTZ' then om.fill_take_value else 0 end) / 1000000 \
+         as volume, \
+         avg(case \
+         when l.make_asset_type_class = 'XTZ' then om.fill_make_value \
+         when l.take_asset_type_class = 'XTZ' then om.fill_take_value else 0 end) / 1000000 \
+         as avgp \
+         from order_match om \
+         inner join orders l on l.hash = om.hash_left \
+         inner join orders r on r.hash = om.hash_right \
+         where main and tsp >= now () - interval '30 day' \
+         group by collection order by volume desc limit 100" ] in
+  Lwt.return_ok @@
+  List.filter_map (fun x -> x) @@ List.map (fun r ->
+      match r#collection, r#volume, r#avgp with
+      | Some c, Some v, Some a ->
+        Some { top_collection_id = c  ;
+               top_volume = v ;
+               top_average_price = a }
+      | _ -> None)
+    res
