@@ -214,6 +214,13 @@ let contract_metadata ?dbh ?(retrieve=false) () =
        where c.main and \
        (metadata <> '{}' or $retrieve) and (m.contract is null or $retrieve)"]
 
+let metadata ?dbh contract =
+  use dbh @@ fun dbh ->
+  [%pgsql.object dbh
+      "select address, c.block, c.level, c.tsp, c.metadata, c.metadata_id \
+       from contracts c left join tzip16_metadata m on c.address = m.contract \
+       where m.contract = $contract"]
+
 let contract_metadata_no_name ?dbh () =
   use dbh @@ fun dbh ->
   [%pgsql.object dbh
@@ -441,84 +448,87 @@ let update_contract_metadata
     [%pgsql dbh
         "update contracts set metadata = $metadata where address = $contract"]
   else
-    match metadata_uri with
-    | None ->
-      Format.eprintf "  can't find uri for metadata, try to decode@." ;
-      begin try
-          let metadata_tzip = EzEncoding.destruct tzip16_metadata_enc metadata in
-          use dbh @@ fun dbh ->
-          let>? () =
-            Metadata.insert_tzip16_metadata_data
-              ~dbh ~forward:true ~contract ~block ~level ~tsp metadata_tzip in
-          Format.eprintf "  OK@." ;
-          Lwt.return_ok ()
-        with _ ->
-          Format.eprintf "  can't find uri or metadata in %s@." metadata ;
-          Lwt.return_ok ()
-      end
-    | Some uri ->
-      if uri <> "" then
-        let storage = try String.sub uri 0 14 with _ -> "" in
-        match storage with
-        | "tezos-storage:" ->
-          let key = String.sub uri 14 (String.length uri - 14) in
-          let l = EzEncoding.destruct Json_encoding.(assoc any_ezjson_value) metadata in
-          begin match List.assoc_opt key l with
-            | None ->
-              let> v = match metadata_id with
-                | None -> Lwt.return None
-                | Some id ->
-                  let id = Z.of_string id in
-                  retrieve_contract_metadata ~source ~metadata_id:id key in
-              begin match v with
-                | None ->
-                  Format.eprintf "  can't find tezos-storage for metadata %s@." key ;
-                  Lwt.return_ok ()
-                | Some v ->
-                  try
-                    let metadata_tzip = EzEncoding.destruct tzip16_metadata_enc v in
-                    use dbh @@ fun dbh ->
-                    let>? () =
-                      Metadata.insert_tzip16_metadata_data
-                        ~dbh ~forward:true ~contract ~block ~level ~tsp metadata_tzip in
-                    Format.eprintf "  OK@." ;
-                    Lwt.return_ok ()
-                  with _ ->
-                    Format.eprintf "  can't parse tzip16 metadata in %s@." v ;
-                    Lwt.return_ok ()
-              end
-            | Some m ->
-              try
-                let metadata_tzip = Json_encoding.destruct tzip16_metadata_enc m in
-                use dbh @@ fun dbh ->
-                let>? () =
-                  Metadata.insert_tzip16_metadata_data
-                    ~dbh ~forward:true ~contract ~block ~level ~tsp metadata_tzip in
-                Format.eprintf "  OK@." ;
-                Lwt.return_ok ()
-              with _ ->
-                Format.eprintf "  can't parse tzip16 metadata in %s@." (Ezjsonm.value_to_string m) ;
-                Lwt.return_ok ()
-          end
-        | _ ->
-          let> re = Metadata.get_contract_metadata ~quiet:true uri in
-          match re with
-          | Ok metadata_tzip ->
+    let>? success = match metadata_uri with
+      | None ->
+        Format.eprintf "  can't find uri for metadata, try to decode@." ;
+        begin try
+            let metadata_tzip = EzEncoding.destruct tzip16_metadata_enc metadata in
             use dbh @@ fun dbh ->
             let>? () =
               Metadata.insert_tzip16_metadata_data
                 ~dbh ~forward:true ~contract ~block ~level ~tsp metadata_tzip in
             Format.eprintf "  OK@." ;
-            Lwt.return_ok ()
-          | Error (code, str) ->
-            (Format.eprintf "  fetch metadata error %d:%s@." code @@
-             Option.value ~default:"None" str);
-            Lwt.return_ok ()
-      else
-        begin
-          Format.eprintf "  can't find uri for metadata %s@." metadata ;
-          Lwt.return_ok ()
+            Lwt.return_ok true
+          with _ ->
+            Format.eprintf "  can't find uri or metadata in %s@." metadata ;
+            Lwt.return_ok false
         end
+      | Some uri ->
+        if uri <> "" then
+          let storage = try String.sub uri 0 14 with _ -> "" in
+          match storage with
+          | "tezos-storage:" ->
+            let key = String.sub uri 14 (String.length uri - 14) in
+            let l = EzEncoding.destruct Json_encoding.(assoc any_ezjson_value) metadata in
+            begin match List.assoc_opt key l with
+              | None ->
+                let> v = match metadata_id with
+                  | None -> Lwt.return None
+                  | Some id ->
+                    let id = Z.of_string id in
+                    retrieve_contract_metadata ~source ~metadata_id:id key in
+                begin match v with
+                  | None ->
+                    Format.eprintf "  can't find tezos-storage for metadata %s@." key ;
+                    Lwt.return_ok false
+                  | Some v ->
+                    try
+                      let metadata_tzip = EzEncoding.destruct tzip16_metadata_enc v in
+                      use dbh @@ fun dbh ->
+                      let>? () =
+                        Metadata.insert_tzip16_metadata_data
+                          ~dbh ~forward:true ~contract ~block ~level ~tsp metadata_tzip in
+                      Format.eprintf "  OK@." ;
+                      Lwt.return_ok true
+                    with _ ->
+                      Format.eprintf "  can't parse tzip16 metadata in %s@." v ;
+                      Lwt.return_ok false
+                end
+              | Some m ->
+                try
+                  let metadata_tzip = Json_encoding.destruct tzip16_metadata_enc m in
+                  use dbh @@ fun dbh ->
+                  let>? () =
+                    Metadata.insert_tzip16_metadata_data
+                      ~dbh ~forward:true ~contract ~block ~level ~tsp metadata_tzip in
+                  Format.eprintf "  OK@." ;
+                  Lwt.return_ok true
+                with _ ->
+                  Format.eprintf "  can't parse tzip16 metadata in %s@." (Ezjsonm.value_to_string m) ;
+                  Lwt.return_ok false
+            end
+          | _ ->
+            let> re = Metadata.get_contract_metadata ~quiet:true uri in
+            match re with
+            | Ok metadata_tzip ->
+              use dbh @@ fun dbh ->
+              let>? () =
+                Metadata.insert_tzip16_metadata_data
+                  ~dbh ~forward:true ~contract ~block ~level ~tsp metadata_tzip in
+              Format.eprintf "  OK@." ;
+              Lwt.return_ok true
+            | Error (code, str) ->
+              (Format.eprintf "  fetch metadata error %d:%s@." code @@
+               Option.value ~default:"None" str);
+              Lwt.return_ok false
+        else
+          begin
+            Format.eprintf "  can't find uri for metadata %s@." metadata ;
+            Lwt.return_ok false
+          end in
+    if success then
+      use None @@ fun dbh -> Produce.update_collection_event dbh contract ()
+    else Lwt.return_ok ()
 
 let update_contract_metadata_name ?dbh ~metadata ~contract ~block ~level ~tsp name =
   Format.eprintf "%s@." contract;
