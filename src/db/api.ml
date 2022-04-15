@@ -567,9 +567,9 @@ let get_nft_ownerships_by_item ?dbh ?continuation ?(size=50) contract token_id =
        not (owner = any($burn_addresses)) and \
        (balance is not null and balance > 0 or amount > 0) and \
        ($no_continuation or \
-       (last = $ts and oid < $id) or \
-       (last < $ts)) \
-       order by last desc, oid desc \
+       (tsp = $ts and oid < $id) or \
+       (tsp < $ts)) \
+       order by tsp desc, oid desc \
        limit $size64"] in
   let>? nft_ownerships_ownerships = map_rp Get.mk_nft_ownership l in
   let len = List.length nft_ownerships_ownerships in
@@ -599,9 +599,9 @@ let get_nft_all_ownerships ?dbh ?continuation ?(size=50) () =
        not (owner = any($burn_addresses)) and \
        (balance is not null and balance > 0 or amount > 0) and \
        ($no_continuation or \
-       (last = $ts and oid < $id) or \
-       (last < $ts)) \
-       order by last desc, oid desc \
+       (tsp = $ts and oid < $id) or \
+       (tsp < $ts)) \
+       order by tsp desc, oid desc \
        limit $size64"] in
   let>? nft_ownerships_ownerships = map_rp Get.mk_nft_ownership l in
   let len = List.length nft_ownerships_ownerships in
