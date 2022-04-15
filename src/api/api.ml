@@ -1099,21 +1099,24 @@ let get_sell_orders_by_maker req () =
     match get_origin_param req with
     | Error err -> return @@ Error err
     | Ok origin ->
-      match get_size_param req with
+      match get_status_param req with
       | Error err -> return @@ Error err
-      | Ok size ->
-        match get_continuation_last_update_param req with
+      | Ok statuses ->
+        match get_size_param req with
         | Error err -> return @@ Error err
-        | Ok continuation ->
-          Db.Api.get_sell_orders_by_maker ?origin ?continuation ?size maker >>= function
-          | Error db_err ->
-            let message = Crawlori.Rp.string_of_error db_err in
-            return (Error {code=`UNEXPECTED_API_ERROR; message})
-          | Ok (res, d) ->
-            return_ok (Balance.dec_orders_pagination ~d res)
+        | Ok size ->
+          match get_continuation_last_update_param req with
+          | Error err -> return @@ Error err
+          | Ok continuation ->
+            Db.Api.get_sell_orders_by_maker ?origin ?statuses ?continuation ?size maker >>= function
+            | Error db_err ->
+              let message = Crawlori.Rp.string_of_error db_err in
+              return (Error {code=`UNEXPECTED_API_ERROR; message})
+            | Ok (res, d) ->
+              return_ok (Balance.dec_orders_pagination ~d res)
 [@@get
   {path="/v0.1/orders/sell/byMaker";
-   params=[maker_param;origin_param;size_param;continuation_param];
+   params=[maker_param;origin_param;status_param;size_param;continuation_param];
    output=orders_pagination_enc A.big_decimal_enc;
    errors=[bad_request_case;unexpected_case];
    name="orders_by_maker";
