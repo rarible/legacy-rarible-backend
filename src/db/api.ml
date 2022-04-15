@@ -109,22 +109,21 @@ let get_nft_items_by_owner ?dbh ?include_meta ?continuation ?(size=50) owner =
   let>? l = [%pgsql.object dbh
       "select i.id, \
        last, metadata, tsp, creators, royalties, royalties_metadata, \
+       t.owners, t.supply \
+       from (select tid, \
        sum(case \
-       when t.balance is not null and not (owner = any($burn_addresses)) then t.balance \
-       when not (owner = any($burn_addresses)) then t.amount \
+       when balance is not null and not (owner = any($burn_addresses)) then balance \
+       when not (owner = any($burn_addresses)) then amount \
        else 0 end) as supply, \
        array_agg(case \
        when owner = any($burn_addresses) then null \
        when balance is not null and \
        balance <> 0 or amount <> 0 then owner end) as owners \
-       from (select tid, amount, balance, owner from tokens where \
-       owner = $owner and
-       ((balance is not null and balance > 0 or amount > 0))) t \
+       from tokens group by tid) t \
        inner join token_info i on i.id = t.tid \
        where \
-       main and metadata <> '{}' and owner = $owner and (balance is not null and balance > 0 or amount > 0) and \
+       main and metadata <> '{}' and $owner = any(owners) and \
        ($no_continuation or (last = $ts and i.id < $id) or (last < $ts)) \
-       group by (i.id, i.contract, i.token_id) \
        order by last desc, id desc limit $size64"] in
   map_rp (fun r -> Get.mk_nft_item dbh ?include_meta r) l >>=? fun nft_items_items ->
   let len = List.length nft_items_items in
