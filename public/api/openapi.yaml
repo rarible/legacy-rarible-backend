@@ -874,6 +874,13 @@ paths:
         required: false
         schema:
           $ref: '#/components/schemas/Address'
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderStatus'
       - name: size
         in: query
         required: false

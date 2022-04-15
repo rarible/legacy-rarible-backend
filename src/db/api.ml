@@ -785,7 +785,8 @@ let get_orders_all ?dbh ?sort ?statuses ?origin ?continuation ?(size=50) () =
   Lwt.return_ok
     ({ orders_pagination_orders = orders ; orders_pagination_continuation }, decs)
 
-let rec get_sell_orders_by_maker_aux ?dbh ?origin ?continuation ~size ~maker acc =
+let rec get_sell_orders_by_maker_aux
+    ?dbh ?origin ?statuses ?continuation ~size ~maker acc =
   Format.eprintf "get_sell_orders_by_maker_aux %s %s %Ld %s %d@."
     (match origin with None -> "None" | Some s -> s)
     (match continuation with
@@ -819,8 +820,9 @@ let rec get_sell_orders_by_maker_aux ?dbh ?origin ?continuation ~size ~maker acc
     | [] -> Lwt.return_ok acc
     | _ ->
       let orders = List.filter_map (fun x -> x) orders in
-      let orders = filter_orders ?origin orders in
-      get_sell_orders_by_maker_aux ~dbh ?origin ?continuation ~size ~maker (acc @ orders)
+      let orders = filter_orders ?origin ?statuses orders in
+      get_sell_orders_by_maker_aux
+        ~dbh ?origin ?statuses ?continuation ~size ~maker (acc @ orders)
   else
   if len = size then Lwt.return_ok acc
   else
@@ -829,7 +831,7 @@ let rec get_sell_orders_by_maker_aux ?dbh ?origin ?continuation ~size ~maker acc
     List.mapi (fun i order -> if i < Int64.to_int size then Some order else None) acc
 
 (* SELL ORDERS -> make asset = nft *)
-let get_sell_orders_by_maker ?dbh ?origin ?continuation ?(size=50) maker =
+let get_sell_orders_by_maker ?dbh ?origin ?statuses ?continuation ?(size=50) maker =
   Format.eprintf "get_sell_orders_by_maker %s %s %s %d@."
     maker
     (match origin with None -> "None" | Some s -> s)
@@ -838,7 +840,8 @@ let get_sell_orders_by_maker ?dbh ?origin ?continuation ?(size=50) maker =
      | Some (ts, s) -> (Tzfunc.Proto.A.cal_to_str ts) ^ "_" ^ s)
     size ;
   let size = Int64.of_int size in
-  let>? orders = get_sell_orders_by_maker_aux ?dbh ?origin ?continuation ~size ~maker [] in
+  let>? orders =
+    get_sell_orders_by_maker_aux ?dbh ?origin ?statuses ?continuation ~size ~maker [] in
   let len = Int64.of_int @@ List.length orders in
   let orders, decs = List.split orders in
   let orders_pagination_continuation =
