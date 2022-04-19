@@ -32,7 +32,8 @@ let config = {
         ft_crawled = Some true ;
         ft_token_id = Some Z.zero ;
         ft_decimals = 6l ;
-      }
+      };
+  ipfs_source = None;
 }
 
 let api_pid = ref None
@@ -2236,7 +2237,8 @@ let make_config ~exchange ~royalties ~transfer_manager ~contracts ~ft_contracts
       retry = None;
       retry_timeout = 5.;
       extra = { exchange; royalties; transfer_manager; contracts; ft_contracts;
-                hen_info = None; tezos_domains = None; versum_info = None; fxhash_info = None } ;
+                hen_info = None; tezos_domains = None; versum_info = None;
+                fxhash_info = None; ipfs_source = None } ;
     } in
     let temp_fn = Filename.temp_file "config" "" in
     let json = EzEncoding.construct (Cconfig.enc Rtypes.config_enc) config in

@@ -1002,6 +1002,7 @@ type config = {
   tezos_domains: (((string [@key "contract"]) * (z [@key "id"])) [@object]) option;
   mutable ft_contracts: ft_ledger SMap.t; [@map] [@dft SMap.empty]
   mutable contracts: nft_ledger SMap.t; [@map] [@dft SMap.empty]
+  ipfs_source: string option;
 } [@@deriving encoding]
 
 type daemon_config = {
