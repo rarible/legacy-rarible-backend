@@ -1003,6 +1003,7 @@ type config = {
   mutable ft_contracts: ft_ledger SMap.t; [@map] [@dft SMap.empty]
   mutable contracts: nft_ledger SMap.t; [@map] [@dft SMap.empty]
   ipfs_source: string option;
+  ipfs_timeout: float option;
 } [@@deriving encoding]
 
 type daemon_config = {

@@ -64,7 +64,7 @@ let insert_nft_activity_transfer dbh op kt1 from owner token_id amount =
   let nft_activity_type = NftActivityTransfer {from; elt} in
   insert_nft_activity dbh op.bo_index op.bo_tsp nft_activity_type
 
-let insert_metadata_update ~dbh ~op ~contract ~token_id ?(update_index=0l) ?(forward=false) ?source l =
+let insert_metadata_update ~dbh ~op ~contract ~token_id ?(update_index=0l) ?(forward=false) ?source ?timeout l =
   let token_meta = Ezjsonm.value_to_string (`O l) in
   if not forward then
     let|>? () = [%pgsql dbh
@@ -86,7 +86,7 @@ let insert_metadata_update ~dbh ~op ~contract ~token_id ?(update_index=0l) ?(for
       | Some _ -> Lwt.return_ok None
       | None ->
         let>? _meta, _uri, royalties =
-          Metadata.insert_token_metadata ?source ~dbh ~forward ~block ~level ~tsp ~contract (token_id, l) in
+          Metadata.insert_token_metadata ?source ?timeout ~dbh ~forward ~block ~level ~tsp ~contract (token_id, l) in
         Lwt.return_ok royalties in
     let royalties = Option.map (EzEncoding.construct parts_enc) royalties in
     let|>? () = [%pgsql dbh
@@ -101,7 +101,7 @@ let insert_metadata_update ~dbh ~op ~contract ~token_id ?(update_index=0l) ?(for
          last_level = $level, last = $tsp"] in
     update_index
 
-let insert_mint ~dbh ~op ~nft ~contract ?source m =
+let insert_mint ~dbh ~op ~nft ~contract ?source ?timeout m =
   let block = op.bo_block in
   let level = op.bo_level in
   let tsp = op.bo_tsp in
@@ -113,7 +113,7 @@ let insert_mint ~dbh ~op ~nft ~contract ?source m =
     | `ubi, UbiMint m ->
       let>? pattern = Metadata.get_uri_pattern ~dbh contract in
       let meta = Option.fold ~none:[] ~some:(fun pattern -> ["", `String (Common.Utils.replace_token_id ~pattern (Z.to_string m.ubim_token_id))]) pattern in
-      let|>? update_index = insert_metadata_update ~dbh ~op ~contract ~token_id:m.ubim_token_id ?source meta in
+      let|>? update_index = insert_metadata_update ~dbh ~op ~contract ~token_id:m.ubim_token_id ?source ?timeout meta in
       Some (m.ubim_token_id, m.ubim_owner, Z.one, [], update_index)
     | `ubi, UbiMint2 m ->
       Lwt.return_ok @@ Some (m.ubi2m_token_id, m.ubi2m_owner, m.ubi2m_amount, [], 0l)
@@ -146,11 +146,11 @@ let insert_mint ~dbh ~op ~nft ~contract ?source m =
     let|>? () = insert_nft_activity_mint dbh op contract token_id owner amount in
     update_index
 
-let insert_metadatas ~dbh ~op ~contract ?(forward=false) ~update_index ?source l =
+let insert_metadatas ~dbh ~op ~contract ?(forward=false) ~update_index ?source ?timeout l =
   fold_rp (fun update_index m -> match m with
       | `nat token_id, Some (`tuple [`nat _; `assoc l]) ->
         let meta = Parameters.parse_metadata l in
-        insert_metadata_update ~dbh ~op ~contract ~token_id ~forward ~update_index ?source meta
+        insert_metadata_update ~dbh ~op ~contract ~token_id ~forward ~update_index ?source ?timeout meta
       | _ -> Lwt.return_ok update_index) update_index l
 
 let insert_burn ~dbh ~op ~contract m =
@@ -872,7 +872,7 @@ let string_of_entrypoint = function
   | EPremove -> "remove"
   | EPnamed s -> s
 
-let insert_nft ~dbh ~config ~meta ~op ~contract ~nft ~entrypoint ?(forward=false) ?source param =
+let insert_nft ~dbh ~config ~meta ~op ~contract ~nft ~entrypoint ?(forward=false) param =
   if List.mem entrypoint crawled_entrypoints then
     Format.printf "\027[0;35mNFT %s %s[%ld] %s\027[0m@."
       (string_of_entrypoint entrypoint) (short op.bo_hash) op.bo_index (short contract);
@@ -882,7 +882,9 @@ let insert_nft ~dbh ~config ~meta ~op ~contract ~nft ~entrypoint ?(forward=false
     let>? update_index =
       if forward then Lwt.return_ok 0l
       else match Parameters.parse_fa2 entrypoint param with
-        | Ok (Mint_tokens m) -> insert_mint ~dbh ~op ~contract ~nft ?source:config.Cconfig.extra.ipfs_source m
+        | Ok (Mint_tokens m) ->
+          insert_mint ~dbh ~op ~contract ~nft
+            ?source:config.Cconfig.extra.ipfs_source ?timeout:config.Cconfig.extra.ipfs_timeout m
         | Ok (Burn_tokens b) ->
           let|>? () = insert_burn ~dbh ~op ~contract b in 0l
         | Ok (Transfers t) -> insert_transfer ~dbh ~op ~contract t
@@ -903,7 +905,8 @@ let insert_nft ~dbh ~config ~meta ~op ~contract ~nft ~entrypoint ?(forward=false
       | Some bm_id ->
         let bm = {bm_id; bm_types = Contract_spec.token_metadata_field} in
         let metadata = Storage_diff.get_big_map_updates bm meta.op_lazy_storage_diff in
-        insert_metadatas ~dbh ~op ~contract ~forward ~update_index ?source metadata in
+        insert_metadatas ~dbh ~op ~contract ~forward ~update_index
+          ?source:config.Cconfig.extra.ipfs_source ?timeout:config.Cconfig.extra.ipfs_timeout metadata in
     let>? update_index = match nft.nft_royalties_id with
       | None -> Lwt.return_ok update_index
       | Some bm_id ->
@@ -999,7 +1002,7 @@ let insert_transaction ~config ~dbh ~op ?(forward=false) tr =
       insert_tezos_domains ~dbh ~op ~forward l
     | _, _, Some ft, _ -> insert_ft ~dbh ~config ~op ~contract ~forward ft
     | _, _, _, Some nft ->
-      insert_nft ~dbh ~config ~meta ~op ~contract ~nft ~entrypoint ~forward ?source:config.Cconfig.extra.ipfs_source value
+      insert_nft ~dbh ~config ~meta ~op ~contract ~nft ~entrypoint ~forward value
     | _ -> Lwt.return_ok ()
 
 let ledger_kind types =
@@ -1102,6 +1105,7 @@ let insert_origination ?(forward=false) ?(crawled=true) config dbh op ori =
           with _ -> Lwt.return_ok () in
         let insert_uri uri =
           Metadata.insert_tzip16_metadata ?source:config.Cconfig.extra.ipfs_source
+            ?timeout:config.Cconfig.extra.ipfs_timeout
             ~dbh ~forward ~contract:kt1 ~block:op.bo_block
             ~level:op.bo_level ~tsp:op.bo_tsp uri in
         begin match List.assoc_opt "" l with
@@ -1294,7 +1298,7 @@ let uri_pattern_update dbh ~main ~contract ~block ~level ~tsp uri =
          last_block = $block, last_level = $level, last = $tsp where address = $contract"]
   else Lwt.return_ok ()
 
-let contract_updates ?source dbh main l =
+let contract_updates ?source ?timeout dbh main l =
   let>? contracts, events = fold_rp (fun (acc, events) r ->
       let contract, block, level, tsp = r#contract, r#block, r#level, r#tsp in
       let>? events, token_id =
@@ -1333,7 +1337,7 @@ let contract_updates ?source dbh main l =
           begin if main then
               match key with
               | "" ->
-                Metadata.insert_tzip16_metadata ?source
+                Metadata.insert_tzip16_metadata ?source ?timeout
                   ~dbh ~forward:main ~contract ~block ~level ~tsp value
               | "name" ->
                 Metadata.insert_tzip16_metadata_name
@@ -1402,11 +1406,11 @@ let royalties_updates ~dbh ~main ~contract ~block ~level ~tsp ?token_id royaltie
          where id = $tid"]
   | _ -> Lwt.return_ok ()
 
-let token_metadata_updates ~dbh ~main ~contract ~block ~level ~tsp ~token_id ~transaction ?source meta =
+let token_metadata_updates ~dbh ~main ~contract ~block ~level ~tsp ~token_id ~transaction ?source ?timeout meta =
   let id = Printf.sprintf "%s:%s" contract (Z.to_string token_id) in
   let meta = EzEncoding.destruct Json_encoding.(assoc Json_encoding.any_ezjson_value) meta in
   let>? meta, uri, royalties =
-    Metadata.insert_token_metadata ?source ~dbh ~block ~level ~tsp ~contract ~forward:true (token_id, meta) in
+    Metadata.insert_token_metadata ?source ?timeout ~dbh ~block ~level ~tsp ~contract ~forward:true (token_id, meta) in
   let royalties = Option.map (EzEncoding.construct parts_enc) royalties in
   [%pgsql dbh
       "insert into token_info(id, contract, token_id, block, level, tsp, \
@@ -1420,7 +1424,7 @@ let token_metadata_updates ~dbh ~main ~contract ~block ~level ~tsp ~token_id ~tr
        last_level = case when $main then $level else token_info.last_level end, \
        last = case when $main then $tsp else token_info.last end"]
 
-let token_updates ?source dbh main l =
+let token_updates ?source ?timeout dbh main l =
   fold_rp (fun acc r ->
       let contract, block, level, tsp, src, transaction =
         r#contract, r#block, r#level, r#tsp, r#source, r#transaction in
@@ -1440,7 +1444,7 @@ let token_updates ?source dbh main l =
         Lwt.return_ok ((contract, token_id, []) :: acc)
       | _, Some token_id, _, _, _, _, Some meta ->
         let>? () =
-          token_metadata_updates ~dbh ~main ~contract ~block ~level ~tsp ~token_id ~transaction ?source meta in
+          token_metadata_updates ~dbh ~main ~contract ~block ~level ~tsp ~token_id ~transaction ?source ?timeout meta in
         Lwt.return_ok (((contract, Some token_id, []) :: acc))
       | _ -> Lwt.return_error (`hook_error "invalid token_update")) [] l
 
@@ -1617,8 +1621,10 @@ let set_main config ?(forward=false) dbh {Hooks.m_main; m_hash} =
       [%pgsql dbh "update creators set main = true where block = $m_hash"] in
     let>? td_updates =
       [%pgsql.object dbh "select * from tezos_domains where block = $m_hash"] in
-    let>? cevents = contract_updates ?source:config.Cconfig.extra.ipfs_source dbh m_main @@ sort c_updates in
-    let>? tevents = token_updates ?source:config.Cconfig.extra.ipfs_source dbh m_main @@ sort t_updates in
+    let>? cevents = contract_updates ?source:config.Cconfig.extra.ipfs_source
+        ?timeout:config.Cconfig.extra.ipfs_timeout dbh m_main @@ sort c_updates in
+    let>? tevents = token_updates ?source:config.Cconfig.extra.ipfs_source
+        ?timeout:config.Cconfig.extra.ipfs_timeout dbh m_main @@ sort t_updates in
     let>? unseen = token_balance_updates dbh m_main @@ sort tb_updates in
     let>? () = tezos_domain_updates dbh m_main @@ sort td_updates in
     let>? () =

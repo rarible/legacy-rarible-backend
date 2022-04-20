@@ -344,12 +344,12 @@ let get_uri_pattern ~dbh contract =
   | [] -> Lwt.return_ok None
   | p :: _ -> Lwt.return_ok p
 
-let insert_token_metadata ?forward ?source ~dbh ~block ~level ~tsp ~contract (token_id, (l : (string * Json_repr.ezjsonm) list)) =
+let insert_token_metadata ?forward ?source ?timeout ~dbh ~block ~level ~tsp ~contract (token_id, (l : (string * Json_repr.ezjsonm) list)) =
   let origin_json = Ezjsonm.value_to_string (`O l) in
   let>? json, tzip21_meta, uri =
     match List.assoc_opt "" l with
     | Some (`String uri) -> (* { "": uri } case *)
-      let> r = get_json ?source uri in
+      let> r = get_json ?source ?timeout uri in
       begin match r with
         | Ok (metadata, uri) ->
           Lwt.return_ok (origin_json, Some metadata, uri)
@@ -428,8 +428,8 @@ let insert_tzip16_metadata_name ?(forward=false) ~dbh ~block ~level ~tsp ~contra
        block=$block,level=$level,tsp=$tsp,main=$forward,name=$?name \
        where tzip16_metadata.contract = $contract"]
 
-let insert_tzip16_metadata ?forward ?source ~dbh ~block ~level ~tsp ~contract value =
-  get_contract_metadata ?source value >>= function
+let insert_tzip16_metadata ?forward ?source ?timeout ~dbh ~block ~level ~tsp ~contract value =
+  get_contract_metadata ?source ?timeout value >>= function
   | Ok metadata ->
     insert_tzip16_metadata_data ~dbh ?forward ~contract ~block ~level ~tsp metadata
   | Error (code, str) ->
