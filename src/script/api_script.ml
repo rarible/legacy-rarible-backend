@@ -34,6 +34,7 @@ let config = {
         ft_decimals = 6l ;
       };
   ipfs_source = None;
+  ipfs_timeout = None;
 }
 
 let api_pid = ref None
@@ -2238,7 +2239,7 @@ let make_config ~exchange ~royalties ~transfer_manager ~contracts ~ft_contracts
       retry_timeout = 5.;
       extra = { exchange; royalties; transfer_manager; contracts; ft_contracts;
                 hen_info = None; tezos_domains = None; versum_info = None;
-                fxhash_info = None; ipfs_source = None } ;
+                fxhash_info = None; ipfs_source = None; ipfs_timeout = None } ;
     } in
     let temp_fn = Filename.temp_file "config" "" in
     let json = EzEncoding.construct (Cconfig.enc Rtypes.config_enc) config in

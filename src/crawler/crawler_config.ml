@@ -23,7 +23,7 @@ let dummy_extra = {
   exchange = ""; royalties = ""; transfer_manager = "";
   contracts = SMap.empty; ft_contracts = SMap.empty; hen_info = None;
   tezos_domains = None; versum_info = None; fxhash_info = None;
-  ipfs_source = None;
+  ipfs_source = None; ipfs_timeout = None;
 }
 
 let rarible_contracts ?(db=dummy_extra) config =

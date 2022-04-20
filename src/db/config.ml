@@ -65,7 +65,7 @@ let get_extra_config ?dbh () =
       transfer_manager = r#transfer_manager;
       ft_contracts; contracts;
       hen_info = None; tezos_domains = None; versum_info = None; fxhash_info = None;
-      ipfs_source = None;
+      ipfs_source = None; ipfs_timeout = None;
     })
   | [] -> Lwt.return_ok None
   | _ -> Lwt.return_error (`hook_error "wrong_state")
