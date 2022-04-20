@@ -186,16 +186,27 @@ let unknown_token_metadata ?dbh ?contract ?levels () =
          where i.main and t.contract is null and ($no_contract or i.contract = $?contract) \
          and i.level > $level::int - $levels::int"]
 
-
-let contract_token_metadata ?dbh ?(royalties=false) contract =
+let contract_token_metadata ?dbh ?(royalties=false) ?levels contract =
   use dbh @@ fun dbh ->
-  [%pgsql.object dbh
-      "select contract, token_id, i.block, i.level, i.tsp, i.metadata, \
-       metadata_uri, token_metadata_id \
-       from token_info i inner join contracts c on c.address = i.contract \
-       where i.main and contract = $contract and \
-       (not $royalties or \
-       (royalties_metadata is null or royalties_metadata = '[]' or royalties_metadata = '{}'))"]
+  match levels with
+  | None ->
+    [%pgsql.object dbh
+        "select contract, token_id, i.block, i.level, i.tsp, i.metadata, \
+         metadata_uri, token_metadata_id \
+         from token_info i inner join contracts c on c.address = i.contract \
+         where i.main and contract = $contract and \
+         (not $royalties or \
+         (royalties_metadata is null or royalties_metadata = '[]' or royalties_metadata = '{}'))"]
+  | Some levels ->
+    let levels = Int32.of_int levels in
+    let>? _, level = Pg.head (Some dbh) in
+    [%pgsql.object dbh
+        "select contract, token_id, i.block, i.level, i.tsp, i.metadata, \
+         metadata_uri, token_metadata_id \
+         from token_info i inner join contracts c on c.address = i.contract \
+         where i.main and contract = $contract and i.level > $level::int - $levels::int and \
+         (not $royalties or \
+         (royalties_metadata is null or royalties_metadata = '[]' or royalties_metadata = '{}'))"]
 
 let no_royalties_token_metadata ?dbh () =
   use dbh @@ fun dbh ->
